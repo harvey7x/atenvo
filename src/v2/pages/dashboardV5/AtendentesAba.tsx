@@ -7,7 +7,7 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, type SerieGraf } from './GrafLinhas';
 
 /* Aba ATENDENTES (12/11): quem fecha mais (placar do CAF), os DOIS relógios com os
    excluídos à vista — "preciso de um resultado exato, não posso aceitar algo falso"
@@ -83,7 +83,6 @@ function Cabeca({ col, ordem, aoOrdenar }: { col: Coluna; ordem: { chave: Chave;
 }
 
 const CORES_EQUIPE = ['var(--dado-1)', 'var(--dado-2)', 'var(--dado-3)', 'var(--dado-4)', 'var(--dado-5)'];
-const TRACO_EQUIPE = [undefined, '5 3', '2 3', '8 3 2 3', '6 2'];
 
 export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; periodo: Periodo; hoje: string }) {
   const [ordem, setOrdem] = useState<{ chave: Chave; dir: Dir }>({ chave: 'ganhos', dir: 'desc' });
@@ -102,7 +101,6 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
       id: a.usuarioId,
       rotulo: a.nome,
       cor: CORES_EQUIPE[i % CORES_EQUIPE.length],
-      tracejado: TRACO_EQUIPE[i % TRACO_EQUIPE.length],
       valores: somarEmBaldes(
         d.serieGanhos.filter((p) => p.usuarioId === a.usuarioId).map((p) => ({ dia: p.dia, valor: p.ganhos })),
         balde,
@@ -190,8 +188,10 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
 
       {serieEquipe.length > 0 && (
         <Secao className="d5-ondas d5-ondas-eq" titulo="Fechados da equipe, no tempo"
-          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ' no período escolhido'}. Fim de semana e feriado mostram 0 porque o administrativo lança em dia útil.`}>
-          <LegendaGraf series={serieEquipe} />
+          ajuda={'Fechados do placar do CAF por atendente. O administrativo lança em dia útil: fim de semana e feriado '
+            + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
+            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'}
+          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}>
           <GrafLinhas baldes={baldes} series={serieEquipe}
             titulo={`Fechados por atendente e ${balde === 'dia' ? 'dia' : 'semana'}`}
             vazio="Sem fechados lançados neste período." />

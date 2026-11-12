@@ -9,7 +9,7 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Segmentado, Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, type NotaSerie, type SerieGraf } from './GrafLinhas';
 
 /* Aba CAMPANHAS (12/11): o melhor do dia/semana/mês, as ondas por campanha
    (alternáveis dia · semana · mês CAF), a tabela do período, quem chegou já tendo
@@ -37,24 +37,14 @@ const AJUDA_MELHOR = 'Melhor do dia = mais entradas (fechados do dia só aparece
 const AJUDA_RETORNOS = 'Clientes que mandaram a mensagem do anúncio mas JÁ ESTAVAM no sistema. "De qual campanha" '
   + 'é o número da primeira conversa deles (aquisição). A atribuição por número é exata só nos últimos 14 dias '
   + '(retenção dos eventos do WhatsApp); quem volta escrevendo direto, sem o texto do anúncio, não é contado.';
+const AJUDA_ONDAS = 'Cada ponto é o número exato do dia (ou da semana, ou do mês da casa); a curva só liga '
+  + 'os pontos — nada é inventado entre eles. Clique no nome de uma campanha para esconder ou mostrar a linha '
+  + '(a escala se ajusta). Com período curto o gráfico mostra os últimos 7 dias para dar contexto; as tabelas '
+  + 'abaixo continuam só no período escolhido. Ao lado do nome: cresceu ou caiu no último dia/semana fechado, '
+  + 'e "parou e voltou" quando a campanha zerou e retomou dentro do desenho.';
 const AJUDA_PARENTE = 'Clientes que disseram que NÃO recebem INSS, mas um parente recebe — o atendimento seguiu '
   + 'pelo benefício do parente. Conta "algum parente" (pai ou mãe especificamente não fica registrado). O dia de '
   + 'hoje cresce ao longo do dia: a resposta sobre o parente vem depois da entrada.';
-
-const chipCamp = (slug: string) => {
-  const cfg = CAMPANHAS_GRAF.find((c) => c.slug === slug);
-  return (
-    <span className="d5-camp-chip" key={slug}>
-      {cfg && (
-        <svg viewBox="0 0 18 8" width="18" height="8" aria-hidden>
-          <line x1="1" x2="17" y1="4" y2="4" style={{ stroke: cfg.cor }} strokeWidth="2"
-            strokeDasharray={cfg.tracejado} strokeLinecap="round" />
-        </svg>
-      )}
-      <span>{rotuloCampanha(slug)}</span>
-    </span>
-  );
-};
 
 /* ---------------- quadro: melhor do dia / semana / mês ---------------- */
 function CartaoQuadro({ titulo, quadro, metrica, comparacao }: {
@@ -106,25 +96,25 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
 
   // período curto desenha os ÚLTIMOS 7 DIAS (a régua do mapa): um dia só não faz onda
   const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
-  const { baldes, series, leituras } = useMemo(() => {
+  const { baldes, series } = useMemo(() => {
     const bs: Balde[] = baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde);
+    const fechados = bs.filter((b) => b.fim <= hoje).length;
     const ativos = CAMPANHAS_GRAF.filter((c) => d.serie.some((p) => p.campanha === c.slug)
       || campanhas.some((x) => x.campanha === c.slug));
-    const ss: SerieGraf[] = ativos.map((c) => ({
-      id: c.slug,
-      rotulo: rotuloCampanha(c.slug),
-      cor: c.cor,
-      tracejado: c.tracejado,
-      valores: somarEmBaldes(
+    const ss: SerieGraf[] = ativos.map((c) => {
+      const valores = somarEmBaldes(
         d.serie.filter((p) => p.campanha === c.slug).map((p) => ({ dia: p.dia, valor: p[metrica] })),
         balde,
-      ),
-    }));
-    const fechados = bs.filter((b) => b.fim <= hoje).length;
-    const ls = ss
-      .map((s) => leituraOnda(s.id, bs.map((b) => s.valores.get(b.chave) ?? 0), fechados))
-      .filter((l) => l.tendencia != null || l.recaida);
-    return { baldes: bs, series: ss, leituras: ls };
+      );
+      // cresceu / caiu / parou e voltou: a leitura vai ao lado do nome, na legenda
+      const l = leituraOnda(c.slug, bs.map((b) => valores.get(b.chave) ?? 0), fechados);
+      const notas: NotaSerie[] = [];
+      if (l.tendencia === 'cresceu') notas.push({ texto: 'cresceu', tom: 'ok' });
+      if (l.tendencia === 'caiu') notas.push({ texto: 'caiu', tom: 'er' });
+      if (l.recaida) notas.push({ texto: 'parou e voltou', tom: 'am' });
+      return { id: c.slug, rotulo: rotuloCampanha(c.slug), cor: c.cor, valores, notas };
+    });
+    return { baldes: bs, series: ss };
   }, [d.serie, campanhas, periodo, balde, metrica, hoje, jm]);
 
   const tituloMetrica = METRICAS.find((m) => m.valor === metrica)!.rotulo;
@@ -145,34 +135,20 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
         </div>
       </Secao>
 
-      <Secao className="d5-ondas" titulo="Ondas por campanha"
-        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana (seg–dom)' : 'mês da casa (11 a 10)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ' no período escolhido'}. A curva passa por todos os pontos medidos — nada é inventado entre eles.`}
+      <Secao className="d5-ondas" titulo="Ondas por campanha" ajuda={AJUDA_ONDAS}
+        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês da casa'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
         acao={(
           <div className="d5-ondas-ctl">
             <Segmentado<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="Métrica do gráfico" />
             <Segmentado<BaldeTipo> opcoes={BALDES} valor={balde} aoMudar={setBalde} rotulo="Agrupamento do gráfico" />
           </div>
         )}>
-        <LegendaGraf series={series} />
         <GrafLinhas baldes={baldes} series={series}
           titulo={`${tituloMetrica} por campanha e ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês'}`}
           vazio="Sem movimento para desenhar neste período."
           rodape={metrica === 'ganhos'
-            ? 'Fechados aparecem quando o administrativo lança (dias úteis) — fim de semana e feriado mostram 0 sem ser queda de venda.'
+            ? 'Fechados entram quando o administrativo lança (dias úteis): fim de semana e feriado aparecem zerados.'
             : undefined} />
-        {leituras.length > 0 && (
-          <ul className="d5-onda-leitura" aria-label="Leitura das ondas">
-            {leituras.map((l) => (
-              <li key={l.campanha}>
-                {chipCamp(l.campanha)}
-                <span className={'d5-onda-tend' + (l.tendencia === 'cresceu' ? ' ok' : l.tendencia === 'caiu' ? ' er' : '')}>
-                  {l.tendencia === 'cresceu' ? 'cresceu' : l.tendencia === 'caiu' ? 'caiu' : l.tendencia ? 'estável' : ''}
-                </span>
-                {l.recaida && <span className="d5-onda-rec">parou e voltou no período</span>}
-              </li>
-            ))}
-          </ul>
-        )}
       </Secao>
 
       <Secao className="d5-camp-tab" titulo="Campanhas no período" ajuda={AJUDA_FECHADOS}
@@ -345,7 +321,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
                   id: 'parente', rotulo: 'Recuperados', cor: 'var(--dado-3)',
                   valores: somarEmBaldes(d.parente.serie.map((p) => ({ dia: p.dia, valor: p.n })), periodo.dias <= 14 ? 'dia' : 'semana'),
                 }]}
-                titulo="Recuperados pelo parente por dia" vazio=""
+                titulo="Recuperados pelo parente por dia" vazio="" altura={176}
                 rodape="O dia de hoje cresce ao longo do dia: a resposta sobre o parente vem depois da entrada." />
             )}
           </>

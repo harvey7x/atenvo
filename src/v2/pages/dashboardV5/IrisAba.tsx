@@ -7,7 +7,7 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, type SerieGraf } from './GrafLinhas';
 
 /* Aba IRIS (12/11): o funil dela (atendidas → qualificadas → proposta → aceite →
    documentação → FECHOU), o que falta de documento, o tempo até fechar, as ondas e
@@ -22,8 +22,8 @@ const AJUDA_QUALIFICADAS = 'Passaram na porta das 5 financeiras (têm empréstim
 const AJUDA_PROPOSTAS = 'Propostas de PORTABILIDADE enviadas (evento com data). A pré-aprovada clássica ainda não '
   + 'grava data — não entra aqui, então o número real é um pouco maior.';
 const AJUDA_FECHOU = 'FECHOU para a Iris = pegou a documentação completa no período (identidade dos dois lados ou '
-  + '2 fotos, comprovante e e-mail). O aceite explícito aparece como linha de apoio porque parte dos clientes '
-  + 'aceita mandando o documento, sem escrever "sim".';
+  + '2 fotos, comprovante e e-mail). Conta também quem aceitou mandando o documento, sem escrever "sim" — por '
+  + 'isso pode passar do cartão Aceitaram.';
 const AJUDA_DOCS = 'Régua do código da Iris: identidade completa (2 fotos ou frente e verso), comprovante presente '
   + '("não tenho", aguardando o analista, conta — a linha estrita não conta) e e-mail (ou e-mail a criar com o cliente).';
 const AJUDA_TEMPO = 'Da criação da sessão até a documentação completa, relógio de parede (madrugada e espera do '
@@ -68,11 +68,11 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
       valores: somarEmBaldes(d.serie.map((p) => ({ dia: p.dia, valor: p.atendidas })), balde),
     },
     {
-      id: 'qualificadas', rotulo: 'Qualificadas', cor: 'var(--dado-2)', tracejado: '5 3',
+      id: 'qualificadas', rotulo: 'Qualificadas', cor: 'var(--dado-2)',
       valores: somarEmBaldes(d.serie.map((p) => ({ dia: p.dia, valor: p.qualificadas })), balde),
     },
     {
-      id: 'docs', rotulo: 'Documentação completa', cor: 'var(--dado-3)', tracejado: '2 3',
+      id: 'docs', rotulo: 'Documentação completa', cor: 'var(--dado-3)',
       valores: somarEmBaldes(d.serie.map((p) => ({ dia: p.dia, valor: p.docsCompletos })), balde),
     },
   ], [d.serie, balde]);
@@ -114,16 +114,12 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
               f.aceiteNao > 0 && `${fmtInt(f.aceiteNao)} ${f.aceiteNao === 1 ? 'recusou' : 'recusaram'}`,
             ]} />}
             variacao={{ atual: f.aceiteSim, anterior: a?.aceiteSim ?? null }} />
-          <Cartao rotulo="Documentação completa" ajuda={AJUDA_DOCS} n={fmtInt(f.docsCompletos)}
+          {/* "Fechou" da Iris = documentação completa: um cartão só (antes eram dois com o mesmo número) */}
+          <Cartao rotulo="Fechou" ajuda={`${AJUDA_FECHOU} ${AJUDA_DOCS}`} n={fmtInt(f.docsCompletos)} destaque
             sub={<Legenda partes={[
-              `${fmtInt(f.docsCompletosEstrito)} com comprovante de verdade`,
-              `${fmtInt(f.docsAlgum)} mandaram algum documento`,
-            ]} />}
-            variacao={{ atual: f.docsCompletos, anterior: a?.docsCompletos ?? null }} />
-          <Cartao rotulo="Fechou" ajuda={AJUDA_FECHOU} n={fmtInt(f.docsCompletos)} destaque
-            sub={<Legenda partes={[
-              `${fmtInt(f.fechouAceite)} com aceite explícito`,
+              'documentação completa',
               f.atendidasSessoes > 0 && `${fmtPct(pctDe(f.docsCompletos, f.atendidasSessoes))} das atendidas`,
+              `${fmtInt(f.docsCompletosEstrito)} com comprovante de verdade`,
             ]} />}
             variacao={{ atual: f.docsCompletos, anterior: a?.docsCompletos ?? null }} />
           <Cartao rotulo="Tempo até fechar" ajuda={AJUDA_TEMPO}
@@ -135,8 +131,10 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
       </Secao>
 
       <Secao className="d5-ondas d5-ondas-iris" titulo="Ondas da Iris"
-        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ''}.`}>
-        <LegendaGraf series={series} />
+        ajuda={'Por dia: sessões em que a Iris falou, que passaram na porta das 5 financeiras e que fecharam a '
+          + 'documentação. Com período curto o gráfico mostra os últimos 7 dias; os cartões acima continuam só no '
+          + 'período escolhido. Clique no nome para esconder ou mostrar a linha.'}
+        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}>
         <GrafLinhas baldes={baldes} series={series}
           titulo={`Funil da Iris por ${balde === 'dia' ? 'dia' : 'semana'}`}
           vazio="Sem movimento da Iris neste período." />
@@ -144,9 +142,8 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
 
       <div className="d5-linha2 d5-iris-linha">
         <Secao className="d5-iris-faltas" titulo="O que falta de documento" ajuda={AJUDA_DOCS}
-          sub={fa.universo > 0
-            ? `${fmtInt(fa.universo)} clientes na coleta sem completar, agora (proposta na mão e documentação aberta).`
-            : undefined}>
+          sub={`${fmtInt(f.docsAlgum)} ${f.docsAlgum === 1 ? 'mandou' : 'mandaram'} algum documento no período`
+            + (fa.universo > 0 ? ` · ${fmtInt(fa.universo)} na coleta sem completar agora` : '')}>
           {fa.universo === 0 ? (
             <Vazio texto="Ninguém com documentação aberta agora." />
           ) : (

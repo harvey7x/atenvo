@@ -812,50 +812,73 @@
 .v2 .d5-qd-n small { font-size: 12px; font-weight: 500; color: var(--txt-2); letter-spacing: 0; }
 .v2 .d5-qd-sub { font-size: 11.5px; color: var(--txt-3); }
 .v2 .d5-qd .d5-var { margin-top: 2px; }
-.v2 .d5-iris-qds { grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); }
+/* funil da Iris: 6 cartões — 6 · 3 · 2 por linha, nunca um cartão sobrando sozinho */
+.v2 .d5-iris-qds { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .v2 .d5-iris-c-forte { border-color: var(--d5-fio-forte); background: rgba(var(--tint), .035); }
 
-/* ---- gráfico de ondas ---- */
+/* ---- gráfico de ondas (12/11, versão enxuta: desenhado em pixels reais) ---- */
 .v2 .d5-ondas-ctl { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.v2 .d5-graf-rolo { overflow-x: auto; margin: 0 calc(-1 * var(--d5-px)); padding: 2px var(--d5-px) 0; }
-.v2 .d5-graf { position: relative; min-width: 680px; }
-.v2 .d5-graf-svg { display: block; width: 100%; height: auto; }
-.v2 .d5-graf-guia { stroke: var(--d5-fio); stroke-width: 1; }
-.v2 .d5-graf-eixo { fill: var(--txt-3); font-size: 10.5px; }
-.v2 .d5-graf-linha { stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
-.v2 .d5-graf-area { pointer-events: none; }
-.v2 .d5-graf-mira { stroke: var(--d5-fio-forte); stroke-width: 1; stroke-dasharray: 3 3; }
-/* ponto sob o cursor: anel na cor do cartão, como o marcador da referência */
-.v2 .d5-graf-ponto { stroke: var(--vidro-a); stroke-width: 1.5; }
-.v2 .d5-graf-hits { position: absolute; inset: 0; }
-.v2 .d5-graf-hit {
-  position: absolute; top: 0; bottom: 0; transform: translateX(-50%);
-  min-width: 16px; background: transparent; border: 0; padding: 0; border-radius: 6px; cursor: default;
+.v2 .d5-ondas-ctl .segm button { font-size: 12px; padding: 4px 11px; }
+.v2 .d5-graf-bloco { min-width: 0; }
+.v2 .d5-graf { position: relative; outline: none; border-radius: 8px; cursor: default; }
+.v2 .d5-graf:focus-visible { box-shadow: 0 0 0 2px var(--d5-foco); }
+.v2 .d5-graf-svg { display: block; overflow: visible; }
+.v2 .d5-graf-guia { stroke: var(--d5-fio); stroke-width: 1; opacity: .7; }
+.v2 .d5-graf-base { stroke: var(--d5-fio-forte); stroke-width: 1; }
+.v2 .d5-graf-eixo { fill: var(--txt-3); font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.v2 .d5-graf-linha {
+  fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+  transition: opacity .12s var(--ease);
 }
-.v2 .d5-graf-hit:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: -2px; }
-/* tooltip da onda: título do balde + uma linha por série (ponto na cor · nome · valor) */
-.v2 .d5-graf-tip { display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.v2 .d5-graf-linha[data-apagada] { opacity: .18; }
+.v2 .d5-graf-area { pointer-events: none; }
+.v2 .d5-graf-mira { stroke: var(--d5-fio-forte); stroke-width: 1; }
+/* ponto sob a mira: anel na cor do cartão, como o marcador da referência */
+.v2 .d5-graf-ponto { stroke: var(--vidro-a); stroke-width: 2; }
+
+/* legenda = botões: ponto na cor · nome · leitura curta; clicar esconde/mostra a linha */
+.v2 .d5-graf-leg {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 4px 18px;
+}
+.v2 .d5-graf-leg-bt {
+  display: inline-flex; align-items: center; gap: 7px; padding: 3px 0;
+  border: 0; background: transparent; font: inherit; font-size: 12px; color: var(--txt-2); cursor: pointer;
+  transition: opacity .12s var(--ease);
+}
+.v2 .d5-graf-leg-bt:hover .d5-graf-leg-nome { color: var(--txt); }
+.v2 .d5-graf-leg-bt:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; border-radius: 4px; }
+.v2 .d5-graf-leg-bt i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: currentColor; }
+.v2 .d5-graf-leg-bt[aria-pressed="false"] { opacity: .5; }
+.v2 .d5-graf-leg-bt[aria-pressed="false"] i { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.v2 .d5-graf-leg-bt[aria-pressed="false"] .d5-graf-leg-nome { text-decoration: line-through; }
+.v2 .d5-graf-leg-nota { font-size: 11px; font-weight: 600; }
+.v2 .d5-graf-leg-ok { color: var(--verde); }
+.v2 .d5-graf-leg-er { color: var(--rubro); }
+.v2 .d5-graf-leg-am { color: var(--ambar); }
+
+/* dica da mira: ao lado do ponto, dentro do gráfico (mesma superfície da bolha .d5-pop) */
+.v2 .d5-graf-tip {
+  position: absolute; z-index: 2; pointer-events: none;
+  display: flex; flex-direction: column; gap: 5px; min-width: 170px;
+  padding: 9px 11px; border-radius: 8px;
+  font-size: 12px; line-height: 1.4; color: var(--txt);
+  background: linear-gradient(rgba(var(--tint), .06), rgba(var(--tint), .06)), var(--surface);
+  border: 1px solid rgba(var(--tint), .14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+:root[data-tema="light"] .v2 .d5-graf-tip {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(22, 25, 31, .06), 0 10px 28px rgba(22, 25, 31, .14);
+}
 .v2 .d5-graf-tip-t { font-weight: 650; font-size: 12px; margin-bottom: 1px; }
-.v2 .d5-graf-tip-l { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--txt-2); }
-.v2 .d5-graf-tip-l i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.v2 .d5-graf-tip-l { display: flex; align-items: center; gap: 8px; color: var(--txt-2); }
+.v2 .d5-graf-tip-l i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .v2 .d5-graf-tip-n { flex: 1; min-width: 0; }
 .v2 .d5-graf-tip-l b { color: var(--txt); font-weight: 650; }
+.v2 .d5-graf-tip-tot { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--d5-fio); }
+.v2 .d5-graf-tip-tot .d5-graf-tip-n { padding-left: 15px; }
 .v2 .d5-graf-nota { margin: 8px 0 0; font-size: 11.5px; color: var(--txt-3); }
-.v2 .d5-graf-leg { margin-bottom: 10px; }
-.v2 .d5-graf-leg svg { display: block; }
-.v2 .d5-ondas .d5-leg + .d5-graf-rolo { margin-top: 2px; }
-
-/* leitura das ondas (cresceu/caiu/recaída) */
-.v2 .d5-onda-leitura {
-  list-style: none; margin: 10px 0 0; padding: 0;
-  display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--txt-2);
-}
-.v2 .d5-onda-leitura li { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.v2 .d5-camp-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--txt); }
-.v2 .d5-camp-chip svg { display: block; }
-.v2 .d5-onda-tend.ok { color: var(--verde); font-weight: 600; }
-.v2 .d5-onda-tend.er { color: var(--rubro); font-weight: 600; }
-.v2 .d5-onda-rec { color: var(--ambar); font-weight: 600; }
 
 /* ---- funil em barras (parente / faltas de documento) ---- */
 .v2 .d5-par-topo { display: grid; grid-template-columns: 230px 1fr; gap: 14px; align-items: start; }
@@ -872,7 +895,7 @@
 .v2 .d5-par-sub .d5-par-rot { padding-left: 14px; font-size: 12px; }
 .v2 .d5-par-desf { margin-top: 12px; font-size: 12.5px; color: var(--txt-2); }
 .v2 .d5-par-desf-t { display: block; font-size: 11px; color: var(--txt-3); margin-bottom: 3px; }
-.v2 .d5-parente .d5-graf-rolo { margin-top: 14px; }
+.v2 .d5-parente .d5-graf-bloco { margin-top: 14px; }
 
 /* a dupla da aba Iris: metade a metade, cada cartão com a PRÓPRIA altura — sem
    esticar o mais raso até o fundo do vizinho ("partes muito em branco", dono 12/11) */
@@ -886,12 +909,15 @@
 .v2 .d5-ret-origens { font-size: 12px; color: var(--txt-2); }
 
 /* ---- página estreita ---- */
+@container d5pg (max-width: 1180px) {
+  .v2 .d5-iris-qds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @container d5pg (max-width: 980px) {
-  .v2 .d5-qds { grid-template-columns: 1fr 1fr; }
   .v2 .d5-par-topo { grid-template-columns: 1fr; }
 }
 @container d5pg (max-width: 640px) {
   .v2 .d5-qds { grid-template-columns: 1fr; }
+  .v2 .d5-iris-qds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2 .d5-ondas-ctl { justify-content: flex-start; }
   .v2 .d5-par-funil li { grid-template-columns: 1fr 44px; }
   .v2 .d5-par-funil li .d5-trilho { display: none; }

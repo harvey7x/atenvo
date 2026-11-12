@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { periodoDash } from '@/data/dashboard';
 import {
-  baldesDe, chaveBalde, leituraOnda, melhorCampanha, mesCafDe, semanaDe, somarEmBaldes,
+  baldesDe, chaveBalde, escalaBonita, leituraOnda, melhorCampanha, mesCafDe, semanaDe, somarEmBaldes,
 } from '@/data/dashboardV5.series';
 import { janelaV5 } from '@/data/dashboardV5';
 import { normalizarAtendentesAbaV5, normalizarCampanhasV5, normalizarIrisV5 } from '@/data/dashboardV5.abas';
@@ -56,6 +56,34 @@ describe('baldes (dia · semana · mês CAF)', () => {
 
   it('chaveBalde no modo dia é o próprio dia', () => {
     expect(chaveBalde('2026-11-12', 'dia')).toBe('2026-11-12');
+  });
+
+  it('rótulo longo da dica: dia da semana, semana e mês por extenso', () => {
+    expect(baldesDe('2026-11-08', '2026-11-09', 'dia')[0].rotuloLongo).toBe('dom 08/11');
+    expect(baldesDe('2026-11-12', '2026-11-13', 'dia')[0].rotuloLongo).toBe('qui 12/11');
+    expect(baldesDe('2026-11-03', '2026-11-04', 'semana')[0].rotuloLongo).toBe('semana de 02/11 a 08/11');
+    expect(baldesDe('2026-10-11', '2026-11-11', 'mes')[0].rotuloLongo).toBe('mês de 11/10 a 10/11');
+  });
+});
+
+describe('escala redonda do eixo', () => {
+  it('passos 1 · 2 · 2,5 · 5 × 10^k, sempre inteiros, topo justo cobrindo o máximo', () => {
+    expect(escalaBonita(132).ticks).toEqual([0, 50, 100, 150]);
+    expect(escalaBonita(66).ticks).toEqual([0, 25, 50, 75]);
+    expect(escalaBonita(7).ticks).toEqual([0, 2, 4, 6, 8]);
+    expect(escalaBonita(158).ticks).toEqual([0, 50, 100, 150, 200]);
+    expect(escalaBonita(5).ticks).toEqual([0, 2, 4, 6]);
+    expect(escalaBonita(3).ticks).toEqual([0, 1, 2, 3]);
+    expect(escalaBonita(1).ticks).toEqual([0, 1]);
+    expect(escalaBonita(1234).ticks).toEqual([0, 500, 1000, 1500]);
+    // sem dado: uma escala mínima válida (nunca divide por zero)
+    expect(escalaBonita(0)).toEqual({ topo: 1, passo: 1, ticks: [0, 1] });
+    for (const m of [1, 2, 3, 4, 6, 9, 13, 27, 58, 99, 101, 158, 999]) {
+      const e = escalaBonita(m);
+      expect(e.topo).toBeGreaterThanOrEqual(m);
+      expect(Number.isInteger(e.passo)).toBe(true);
+      expect(e.ticks.length).toBeLessThanOrEqual(5);
+    }
   });
 });
 

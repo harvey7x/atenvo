@@ -35,11 +35,11 @@ export const CAMPANHA_ROTULO: Record<string, string> = {
 export const rotuloCampanha = (slug: string): string => CAMPANHA_ROTULO[slug] ?? slug;
 
 /** As campanhas que viram LINHA no gráfico (na ordem e na cor fixas de cada uma). */
-export const CAMPANHAS_GRAF: readonly { slug: string; cor: string; tracejado?: string }[] = [
+export const CAMPANHAS_GRAF: readonly { slug: string; cor: string }[] = [
   { slug: 'diego', cor: 'var(--dado-1)' },
-  { slug: 'antonio', cor: 'var(--dado-2)', tracejado: '5 3' },
-  { slug: 'antonio2', cor: 'var(--dado-3)', tracejado: '2 3' },
-  { slug: 'juros', cor: 'var(--dado-4)', tracejado: '8 3 2 3' },
+  { slug: 'antonio', cor: 'var(--dado-2)' },
+  { slug: 'antonio2', cor: 'var(--dado-3)' },
+  { slug: 'juros', cor: 'var(--dado-4)' },
 ];
 
 export interface CanalDaCampanhaV5 { id: string; nome: string; numero: string | null }

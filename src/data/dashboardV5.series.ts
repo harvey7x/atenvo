@@ -16,6 +16,8 @@ export interface Balde {
   rotulo: string;
   /** fim EXCLUSIVO (data) — balde fechado quando fim ≤ hoje */
   fim: string;
+  /** rótulo completo da dica: 'sáb 08/11', 'semana de 03/11 a 09/11', 'mês de 11/10 a 10/11' */
+  rotuloLongo: string;
 }
 
 const DIA_MS = 86_400_000;
@@ -64,6 +66,14 @@ function rotuloBalde(chave: string, tipo: BaldeTipo): string {
   return `${ddmm(chave)}–${ddmm(addDiasSerie(fimBalde(chave, 'mes'), -1))}`;
 }
 
+const DOW_CURTO = ['', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+
+function rotuloLongoBalde(chave: string, tipo: BaldeTipo): string {
+  if (tipo === 'dia') return `${DOW_CURTO[dow(chave)]} ${ddmm(chave)}`;
+  const ult = ddmm(addDiasSerie(fimBalde(chave, tipo), -1));
+  return tipo === 'semana' ? `semana de ${ddmm(chave)} a ${ult}` : `mês de ${ddmm(chave)} a ${ult}`;
+}
+
 /** Fim de desenho de um período: nunca além de amanhã — período em andamento (mês
  *  corrente vai até o dia 10 seguinte) não ganha cauda de baldes futuros zerados. */
 export function fimComHoje(fimDateExcl: string, hoje: string): string {
@@ -78,7 +88,7 @@ export function baldesDe(iniDate: string, fimDateExcl: string, tipo: BaldeTipo):
   let c = chaveBalde(iniDate, tipo);
   // trava de segurança: 45 dias de período → no máximo ~46 baldes diários
   for (let i = 0; c < fimDateExcl && i < 400; i++) {
-    out.push({ chave: c, rotulo: rotuloBalde(c, tipo), fim: fimBalde(c, tipo) });
+    out.push({ chave: c, rotulo: rotuloBalde(c, tipo), fim: fimBalde(c, tipo), rotuloLongo: rotuloLongoBalde(c, tipo) });
     c = fimBalde(c, tipo);
   }
   return out;
@@ -144,4 +154,26 @@ export function leituraOnda(campanha: string, valores: number[], baldesFechados:
     } else if (viu) zerou = true;
   }
   return { campanha, tendencia, recaida };
+}
+
+/** Escala "redonda" do eixo das contagens: passo 1 · 2 · 2,5 · 5 × 10^k (2,5 só de 10
+ *  para cima, para nunca sair um passo fracionado), topo = o primeiro múltiplo do passo
+ *  que cobre o máximo. Tenta 3 e 4 divisões e fica com o topo mais justo (empate: o passo
+ *  menor, que dá mais guias). 132 → 0 · 50 · 100 · 150; 158 → 0 · 50 · … · 200; 7 → 0 · 2 · … · 8. */
+export function escalaBonita(max: number): { topo: number; passo: number; ticks: number[] } {
+  if (!(max > 0)) return { topo: 1, passo: 1, ticks: [0, 1] };
+  const tentar = (divisoes: number) => {
+    const bruto = max / divisoes;
+    const exp = Math.floor(Math.log10(bruto));
+    const base = 10 ** exp;
+    const f = bruto / base;
+    const nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 && exp >= 1 ? 2.5 : f <= 5 ? 5 : 10;
+    const passo = Math.max(1, Math.round(nf * base));
+    return { passo, topo: Math.max(passo, Math.ceil(max / passo) * passo) };
+  };
+  const [a, b] = [tentar(3), tentar(4)];
+  const melhor = b.topo < a.topo || (b.topo === a.topo && b.passo < a.passo) ? b : a;
+  const ticks: number[] = [];
+  for (let v = 0; v <= melhor.topo; v += melhor.passo) ticks.push(v);
+  return { ...melhor, ticks };
 }
