@@ -859,6 +859,33 @@ export function useWaMensagens(conversaId: string | null | undefined) {
   });
 }
 
+/** A conversa na FICHA da Fila da Iris (dono 12/11: "preciso das imagens e áudios, cvs completas"): as MAIS RECENTES
+ *  (sem sistema e nota interna, filtradas no banco), em ordem. O PostgREST corta em 1000 linhas e useWaMensagens busca
+ *  em ordem crescente — numa conversa com mais de 1000 a ficha ficaria nas antigas. Mesmo select e mapeamento do inbox. */
+export const LIMITE_CONVERSA_FICHA = 1000;
+export function useWaConversaFicha(conversaId: string | null | undefined) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  return useQuery({
+    queryKey: ['wa-ficha', orgId, conversaId ?? ''],
+    enabled: WA_REAL && !!conversaId,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<WaMessage[]> => {
+      const { data, error } = await supabase!
+        .from('mensagens')
+        .select(COLS_MSG_LISTA)
+        .eq('conversa_id', conversaId!)
+        .eq('organizacao_id', orgId)
+        .not('tipo', 'in', '(sistema,nota_interna)')
+        .order('criado_em', { ascending: false })
+        .limit(LIMITE_CONVERSA_FICHA);
+      if (error) throw new Error(error.message);
+      return mapMensagens(((data as unknown as DbMsg[]) ?? []).slice().reverse());
+    },
+  });
+}
+
 // ---- IA SDR: estado e liga/desliga por conversa (botão no cabeçalho do inbox) ----
 export interface IaPausa { acao: 'pausou' | 'religou'; origem: 'trava_envio' | 'cabecalho'; em: string; nome: string }
 export interface IaEstadoConversa {

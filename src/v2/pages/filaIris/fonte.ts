@@ -3,7 +3,7 @@
    - local: demonstração (clientes fictícios) e prévia (foto dos dados de hoje); marcações na página;
    - real: o banco (fonteReal.ts). Este arquivo não fala com o banco (a prévia em HTML usa só ele).
    ============================================================================ */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import type { Marca, TipoMarca } from './dados';
 import { textosDoLead, type Lead } from './lead';
 import { registrarFilaLocal, useDonosLocais } from './recados';
@@ -29,6 +29,9 @@ export interface FonteFila {
   /** a conversa com o cliente na ficha (dono 12/11: "aqui eu quero que apareça a conversa com o cliente"). É um
       GANCHO no real (lê o histórico como o WhatsApp); na demonstração/prévia, uma conversa de exemplo */
   usarConversa?: (l: Lead) => ConversaFicha;
+  /** o REAL: a seção inteira da conversa COMPLETA, com fotos e áudios (ConversaWa.tsx — a mesma bolha do WhatsApp;
+      fica fora da prévia para ela não carregar o WhatsApp) */
+  SecaoConversa?: ComponentType<{ l: Lead }>;
 }
 
 /** uma mensagem da conversa, como a ficha mostra */

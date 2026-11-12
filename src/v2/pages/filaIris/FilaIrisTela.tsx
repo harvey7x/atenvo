@@ -6,7 +6,7 @@
    seções que recolhem e linhas com a situação, a última mensagem do cliente e a campanha.
    Cada atendente vê só a própria fila; o administrador vê também a Equipe.
    ============================================================================ */
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { BotaoPrimario, BotaoSec, ConfirmDialogV2, Segmentado } from '../../components';
 import { criarRaizPortalV2 } from '../../components/portal';
@@ -594,7 +594,7 @@ function ConversaCliente({ l, usar }: { l: Lead; usar: (l: Lead) => ConversaFich
 }
 
 /** a ficha do cliente — janela de vidro no meio da tela (exportada para a amostra em cards) */
-export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado, conversa }: {
+export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado, conversa, SecaoConversa }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
   avisar: (t: string) => void; ehDono: boolean;
   /** o gestor olhando o cliente de outro atendente: o recado para o dono */
@@ -604,6 +604,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
   abrirConversa?: (l: Lead) => void;
   /** a conversa com o cliente (a fonte da fila); sem ela, só a última mensagem */
   conversa?: (l: Lead) => ConversaFicha;
+  /** o real: a conversa COMPLETA com fotos e áudios (ConversaWa) */
+  SecaoConversa?: ComponentType<{ l: Lead }>;
 }) {
   const marcas = l.marcas;
   const cartao = useRef<HTMLDivElement>(null);
@@ -617,6 +619,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement | null;
       if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return;
+      /* as setas num vídeo/áudio da conversa mexem no player, não trocam de cliente */
+      if (alvo?.closest?.('video, audio, select, [contenteditable="true"], [role="slider"]') && e.key !== 'Escape') return;
       if (document.querySelector('.p-modal')) return; /* a confirmação aberta é quem manda */
       if (e.key === 'Escape') aoFechar();
       else if (e.key === 'ArrowRight') ir(1);
@@ -632,7 +636,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
   }, [l.id]);
   const prenderTab = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Tab') return;
-    const focos = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled])')];
+    const focos = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], video[controls], audio[controls], [tabindex]:not([tabindex="-1"])')]
+      .filter((el) => el.getClientRects().length > 0);
     if (!focos.length) return;
     const i = focos.indexOf(document.activeElement as HTMLElement);
     if (e.shiftKey && i <= 0) { e.preventDefault(); focos[focos.length - 1].focus(); }
@@ -724,7 +729,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
               <Caminho l={l} comQuem={ehDono ? 'Com você' : `Com ${dono.nome}`} />
             </section>
 
-            {conversa ? <ConversaCliente l={l} usar={conversa} /> : <section className="fi-bloco fi-bloco-fim">
+            {SecaoConversa ? <SecaoConversa l={l} /> : conversa ? <ConversaCliente l={l} usar={conversa} /> : <section className="fi-bloco fi-bloco-fim">
               <h3 className="fi-bloco-t">Última mensagem do cliente</h3>
               {msg ? (
                 <div className="fi-ultima">
@@ -1255,7 +1260,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
       {raiz && clienteAberto && (
         <JanelaCliente l={clienteAberto} raiz={raiz} lista={navegacao} aoTrocar={setAberto}
           aoFechar={fecharJanela} avisar={avisar} ehDono={meuId != null && meuId === clienteAberto.atendente}
-          abrirConversa={conversa} conversa={fonte.usarConversa}
+          abrirConversa={conversa} conversa={fonte.usarConversa} SecaoConversa={fonte.SecaoConversa}
           recado={recados && admin && !(meuId != null && meuId === clienteAberto.atendente)
             /* só para um dono da equipe da fila (cliente sem dono ou fora dela: não há para quem mandar) */
             && EQUIPE.some((a) => a.id === clienteAberto.atendente)

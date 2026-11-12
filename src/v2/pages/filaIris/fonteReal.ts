@@ -8,29 +8,11 @@ import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { EQUIPE, equipeDoUid } from './dados';
 import { leadDeLinha, type Lead, type LinhaFila } from './lead';
-import { fimPeriodo, inicioPeriodo, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo } from './fonte';
-import { useWaMensagens } from '@/data/whatsapp';
+import { fimPeriodo, inicioPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
+import ConversaWa from './ConversaWa';
 import { EVENTO_FILA_RECARREGAR } from './recados';
 
 /* ---------------------------------------------------------------- real (banco) */
-/** a conversa com o cliente na ficha: o MESMO histórico que o WhatsApp lê (useWaMensagens — 15 s de frescor), sem as
-    notas internas e as mensagens de sistema; as últimas 60 (as anteriores ficam no WhatsApp) */
-const MAX_NA_FICHA = 60;
-function useConversaReal(l: Lead): ConversaFicha {
-  const q = useWaMensagens(l.conversaId ?? null);
-  const mensagens = useMemo<MensagemFicha[] | null>(() => {
-    if (!q.data) return null;
-    return q.data
-      .filter((m) => m.tipo !== 'sistema' && m.tipo !== 'nota_interna')
-      .slice(-MAX_NA_FICHA)
-      .map((m, i): MensagemFicha => ({
-        id: m.id ?? `m${i}`, dir: m.dir, texto: m.text ?? '', tipo: m.tipo ?? 'texto',
-        em: m.tsISO ? Date.parse(m.tsISO) : 0, quem: m.dir === 'out' ? (m.origemBot ? 'ia' : m.viaTelefone ? 'celular' : undefined) : undefined,
-        transcricao: m.transcricao,
-      }));
-  }, [q.data]);
-  return { mensagens, carregando: q.isLoading && !!l.conversaId, erro: q.error ? 'Não deu para carregar a conversa agora.' : null };
-}
 
 type LinhaNumero = { usuario_id: string; nome: string; recebidos: number; fechados: number };
 type LinhaMarcacoes = { usuario_id: string; marcacoes: number };
@@ -124,6 +106,7 @@ export function useFonteReal(): FonteFila {
     tirarDaFila: (id) => { void rpc('fila_iris_marcar', { p_contato: id, p_tipo: 'fora_da_fila', p_texto: 'tirado pelo atendente' }); },
     numeros: (p) => nums[p] ?? null,
     recarregar: carregar,
-    usarConversa: useConversaReal,
+    /* a conversa COMPLETA na ficha, com fotos e áudios (dono 12/11: "preciso das imagens e áudios, cvs completas") */
+    SecaoConversa: ConversaWa,
   }), [carregando, erro, leads, nums, rpc, carregar]);
 }
