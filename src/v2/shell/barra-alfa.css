@@ -82,6 +82,9 @@ html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:hover, :has(
 html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu])
   :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao) { opacity: 0; }
 html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu]) .ba-ponto { opacity: 1; }
+/* recolhida, o item e o quadrado da marca viram um "botão de ícone" de 40px: o destaque do ativo e o
+   hover ficam redondos em volta do ícone, em vez de cortados retos na borda do trilho */
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu]) :is(.ba-item, .ba-ws-gat) { width: 40px; }
 
 /* celular (gaveta): some; o botão do topo abre por cima, com o véu atrás */
 html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] { --ba-cheia: min(280px, 86vw); }
@@ -192,6 +195,10 @@ html[data-barra-alfa] .v2 .ba-ponto {
   position: absolute; top: -2px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--azul); box-shadow: 0 0 0 2px var(--ba-fundo); opacity: 0; transition: opacity .15s;
 }
+
+/* a trilha do topo ("Cobranças / Painel") já diz onde a pessoa está: o rótulo pequeno em caixa alta
+   que algumas páginas punham acima do título (COBRANÇAS, FERRAMENTAS) sai para não repetir */
+html[data-barra-alfa] .v2 .ph .cob-migalha { display: none; }
 
 /* ---- o pé: Configurações (Atendimento), Sair e a versão ---- */
 html[data-barra-alfa] .v2 .ba-pe {
