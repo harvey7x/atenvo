@@ -797,11 +797,11 @@
 
 /* Minha fila SEM a coluna Campanha · Kanban (dono 12/11): a última mensagem ganha o espaço */
 .v2 .fi-lista-cheia :is(.fi-colunas, .fi-lin) {
-  grid-template-columns: minmax(230px, 1fr) minmax(0, 1.35fr) minmax(0, 2.1fr) minmax(130px, .75fr) 40px;
+  grid-template-columns: minmax(230px, 1fr) minmax(0, 1.3fr) minmax(0, 1.75fr) minmax(170px, 1.1fr) 40px;
 }
 @media (max-width: 1280px) {
   .v2 .fi-lista-cheia :is(.fi-colunas, .fi-lin) {
-    grid-template-columns: minmax(200px, 1fr) minmax(0, 1.3fr) minmax(0, 1.9fr) minmax(100px, .65fr) 36px;
+    grid-template-columns: minmax(200px, 1fr) minmax(0, 1.25fr) minmax(0, 1.6fr) minmax(140px, .95fr) 36px;
   }
 }
 
@@ -856,3 +856,30 @@
 .v2 .fi .fi-lin:hover { background: rgba(var(--tint), .075); }
 :root[data-tema="light"] .v2 .fi .fi-lin:hover { background: rgba(var(--tint), .055); }
 .v2 .fi .fi-lin[data-ativo] { background: var(--fi-sel); }
+
+/* as marcações em MAIÚSCULAS (dono 12/11: "deixa tudo em maiúsculo"): um ponto menor e um respiro entre as letras para
+   caber o mesmo texto; a coluna ganhou largura da "Última mensagem" */
+.v2 .fi-chip-marca { text-transform: uppercase; font-size: 11px; letter-spacing: .03em; }
+.v2 .fi-chip-marca .fi-chip-n { letter-spacing: 0; }
+
+/* ---------------------------------------------------------------- a conversa com o cliente na ficha (dono 12/11) */
+.v2 .fi-conversa-rolo {
+  display: flex; flex-direction: column; gap: 5px; max-height: 360px; overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 10px 12px; border-radius: var(--fi-r); background: var(--fi-sutil); border: 1px solid var(--fi-borda);
+}
+.v2 .fi-conversa-rolo:focus-visible { outline: 2px solid rgba(var(--azul-rgb), .45); outline-offset: 1px; }
+.v2 .fi-conv-dia { align-self: center; margin: 6px 0 2px; padding: 1px 9px; border-radius: 9px; background: rgba(var(--tint), .07); font-size: 11px; color: var(--txt-2); }
+.v2 .fi-conv-msg { display: flex; flex-direction: column; gap: 2px; max-width: 84%; }
+.v2 .fi-conv-msg[data-dir="in"] { align-self: flex-start; align-items: flex-start; }
+.v2 .fi-conv-msg[data-dir="out"] { align-self: flex-end; align-items: flex-end; }
+.v2 .fi-conv-msg .fi-bolha-cli { margin-top: 0; white-space: pre-line; text-align: left; }
+/* a nossa: o mesmo azul-marinho das bolhas enviadas no WhatsApp */
+.v2 .fi-bolha-nos {
+  padding: 7px 11px; border-radius: 10px 10px 3px 10px; background: rgba(var(--azul-rgb), .16); border: 1px solid rgba(var(--azul-rgb), .26);
+  font-size: 13px; color: var(--txt); overflow-wrap: anywhere; white-space: pre-line; text-align: left;
+}
+:root[data-tema="light"] .v2 .fi-bolha-nos { background: rgba(var(--azul-rgb), .09); border-color: rgba(var(--azul-rgb), .2); }
+.v2 .fi-conv-quem { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .fi-conv-h { font-size: 11px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .fi-conv-midia { color: var(--txt-2); font-style: italic; }
+.v2 .fi-conv-transc { display: block; margin-top: 3px; color: var(--txt-2); font-style: italic; }

@@ -26,6 +26,46 @@ export interface FonteFila {
   numeros: (p: Periodo) => NumeroAtendente[] | null;
   /** relê a fila agora (o real; local não precisa) — o "Ver na fila" do aviso da Iris pede a fila fresca */
   recarregar?: () => Promise<void>;
+  /** a conversa com o cliente na ficha (dono 12/11: "aqui eu quero que apareça a conversa com o cliente"). É um
+      GANCHO no real (lê o histórico como o WhatsApp); na demonstração/prévia, uma conversa de exemplo */
+  usarConversa?: (l: Lead) => ConversaFicha;
+}
+
+/** uma mensagem da conversa, como a ficha mostra */
+export interface MensagemFicha {
+  id: string;
+  dir: 'in' | 'out';
+  texto: string;
+  /** texto | imagem | audio | video | documento */
+  tipo: string;
+  em: number;
+  /** a nossa: veio da IA (robô/Iris) ou do celular */
+  quem?: 'ia' | 'celular';
+  transcricao?: string;
+}
+export interface ConversaFicha { mensagens: MensagemFicha[] | null; carregando: boolean; erro: string | null; exemplo?: 'demo' | 'previa' }
+
+/** a conversa de EXEMPLO da demonstração e da prévia (no real são as mensagens de verdade): o caminho de sempre
+    (a Iris abre, o cliente responde, os documentos) e termina na última mensagem do cliente que a fila conhece */
+export function conversaDeExemplo(l: Lead, modo: 'demo' | 'previa'): ConversaFicha {
+  const fim = l.ud ?? l.nu ?? Date.now() - 60 * 60_000;
+  const t = (min: number) => fim - min * 60_000;
+  const nome = l.nome.split(/\s+/)[0] ?? '';
+  const m: MensagemFicha[] = [
+    { id: 'e1', dir: 'out', quem: 'ia', tipo: 'texto', em: t(180), texto: `Olá${nome ? `, ${nome}` : ''}! Aqui é a Iris, da CAF. Vi que você pediu informações sobre o seu benefício. Posso te ajudar?` },
+    { id: 'e2', dir: 'in', tipo: 'texto', em: t(170), texto: 'Oi, pode sim' },
+    { id: 'e3', dir: 'out', quem: 'ia', tipo: 'texto', em: t(165), texto: 'Para começar, me mande uma foto do seu documento com foto (frente e verso) e um comprovante de residência.' },
+  ];
+  if (l.cat === 'quente' || l.cat === 'documentacao' || l.docPessoal) m.push({ id: 'e4', dir: 'in', tipo: 'imagem', em: t(120), texto: 'Imagem' });
+  if (l.cat === 'quente') m.push({ id: 'e5', dir: 'in', tipo: 'imagem', em: t(110), texto: 'Imagem' }, { id: 'e6', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi tudo, obrigado! Já passei para o seu atendente seguir com você.' });
+  if (l.cat === 'documentacao') m.push({ id: 'e5', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi o documento. Falta só o comprovante de residência para seguir.' });
+  if (l.cat === 'sem_resposta') m.push({ id: 'e5', dir: 'out', quem: 'ia', tipo: 'texto', em: t(60), texto: 'Oi! Conseguiu separar os documentos? Estou aqui para te ajudar.' });
+  /* a última mensagem do cliente que a fila conhece (texto ou "[audio]"/"[imagem]"…) fecha a conversa */
+  const disse = l.disse.replace(/\s+/g, ' ').trim();
+  const midia = disse.match(/^\[(\w+)\]$/);
+  if (midia) m.push({ id: 'e9', dir: 'in', tipo: midia[1] === 'image' ? 'imagem' : midia[1], em: fim, texto: '' });
+  else if (disse) m.push({ id: 'e9', dir: 'in', tipo: 'texto', em: fim, texto: disse });
+  return { mensagens: m.sort((a, b) => a.em - b.em), carregando: false, erro: null, exemplo: modo };
 }
 
 /** começo do período (horário de Brasília). Mês = o mês da casa, do dia 11 ao dia 10 (regra do placar do CAF). */
@@ -99,5 +139,6 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     corrigirDocs: (id, estado) => mexer(id, (l) => comDocs(l, estado)),
     tirarDaFila: (id) => mexer(id, () => null),
     numeros: (p) => numeros?.[p] ?? null,
+    usarConversa: (l) => conversaDeExemplo(l, modo),
   }), [comDono, modo, rotulo, numeros]);
 }

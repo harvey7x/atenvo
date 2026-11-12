@@ -18,7 +18,7 @@ import {
 import {
   PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, type Lead,
 } from './lead';
-import { textoPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
+import { textoPeriodo, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo } from './fonte';
 import {
   IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcIris, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
 } from './icones';
@@ -530,8 +530,71 @@ function ListaRecados({ fonte, aoConversa }: { fonte: FonteRecados; aoConversa: 
   );
 }
 
+/* ---------------------------------------------------------------- a conversa com o cliente na ficha */
+const ROTULO_MIDIA: Record<string, string> = {
+  imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', sticker: 'Figurinha', figurinha: 'Figurinha', localizacao: 'Localização', contato: 'Contato',
+};
+const pad2 = (n: number) => String(n).padStart(2, '0');
+function diaDaConversa(t: number): string {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  if (t >= hoje.getTime()) return 'Hoje';
+  if (t >= hoje.getTime() - 86_400_000) return 'Ontem';
+  const d = new Date(t);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+}
+function BolhaConversa({ m }: { m: MensagemFicha }) {
+  const midia = ROTULO_MIDIA[m.tipo];
+  const texto = m.texto.trim();
+  const corpo = midia
+    ? <>
+        <span className="fi-conv-midia">{midia}{texto && texto !== midia ? ` · ${texto}` : ''}</span>
+        {m.transcricao ? <span className="fi-conv-transc">“{m.transcricao}”</span> : null}
+      </>
+    : texto || <span className="fi-conv-midia">Mensagem sem texto</span>;
+  return (
+    <div className="fi-conv-msg" data-dir={m.dir}>
+      {m.dir === 'out' && m.quem ? <span className="fi-conv-quem">{m.quem === 'ia' ? 'IA' : 'Celular'}</span> : null}
+      <div className={m.dir === 'in' ? 'fi-bolha-cli' : 'fi-bolha-nos'}>{corpo}</div>
+      {m.em ? <span className="fi-conv-h">{pad2(new Date(m.em).getHours())}:{pad2(new Date(m.em).getMinutes())}</span> : null}
+    </div>
+  );
+}
+/** dono 12/11: "aqui eu quero que apareça a conversa com o cliente" — as mensagens recentes dos dois lados, abrindo no
+    fim (o mais recente), com o dia; para responder segue o "Abrir conversa" (o WhatsApp) */
+function ConversaCliente({ l, usar }: { l: Lead; usar: (l: Lead) => ConversaFicha }) {
+  const c = usar(l);
+  const rolo = useRef<HTMLDivElement>(null);
+  const lista = c.mensagens ?? [];
+  useEffect(() => { const el = rolo.current; if (el) el.scrollTop = el.scrollHeight; }, [lista.length, l.id]);
+  let diaAntes = '';
+  return (
+    <section className="fi-bloco fi-bloco-fim fi-conversa">
+      <h3 className="fi-bloco-t">Conversa com o cliente{lista.length ? <span className="fi-bloco-n">{plural(lista.length, 'mensagem', 'mensagens')}</span> : null}</h3>
+      {!l.conversaId && !c.exemplo ? <p className="fi-conv-nota">Este cliente ainda não tem conversa no WhatsApp.</p>
+        : c.carregando ? <p className="fi-conv-nota">Carregando a conversa…</p>
+          : c.erro ? <p className="fi-conv-nota" role="alert">{c.erro}</p>
+            : !lista.length ? <p className="fi-conv-nota">Ainda não há mensagens nesta conversa.</p>
+              : (
+                <div className="fi-conversa-rolo" ref={rolo} tabIndex={0} aria-label={`Conversa com ${l.nome}`}>
+                  {lista.map((m) => {
+                    const dia = m.em ? diaDaConversa(m.em) : '';
+                    const sep = dia && dia !== diaAntes ? <span className="fi-conv-dia">{dia}</span> : null;
+                    if (dia) diaAntes = dia;
+                    return <Fragment key={m.id}>{sep}<BolhaConversa m={m} /></Fragment>;
+                  })}
+                </div>
+              )}
+      <p className="fi-conv-nota">
+        {c.exemplo === 'previa' ? 'Prévia: conversa de exemplo — no sistema aparecem as mensagens de verdade. '
+          : c.exemplo === 'demo' ? 'Demonstração: conversa fictícia. ' : ''}
+        Para responder ao cliente, use “Abrir conversa”.
+      </p>
+    </section>
+  );
+}
+
 /** a ficha do cliente — janela de vidro no meio da tela (exportada para a amostra em cards) */
-export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado }: {
+export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado, conversa }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
   avisar: (t: string) => void; ehDono: boolean;
   /** o gestor olhando o cliente de outro atendente: o recado para o dono */
@@ -539,6 +602,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
   aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
   aoCorrigirDocs: (estado: 'completos' | 'incompletos' | null) => void; aoTirarDaFila: () => void;
   abrirConversa?: (l: Lead) => void;
+  /** a conversa com o cliente (a fonte da fila); sem ela, só a última mensagem */
+  conversa?: (l: Lead) => ConversaFicha;
 }) {
   const marcas = l.marcas;
   const cartao = useRef<HTMLDivElement>(null);
@@ -659,7 +724,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
               <Caminho l={l} comQuem={ehDono ? 'Com você' : `Com ${dono.nome}`} />
             </section>
 
-            <section className="fi-bloco fi-bloco-fim">
+            {conversa ? <ConversaCliente l={l} usar={conversa} /> : <section className="fi-bloco fi-bloco-fim">
               <h3 className="fi-bloco-t">Última mensagem do cliente</h3>
               {msg ? (
                 <div className="fi-ultima">
@@ -668,7 +733,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
                 </div>
               ) : <p className="fi-conv-nota">O cliente ainda não escreveu nesta conversa.</p>}
               <p className="fi-conv-nota">A conversa completa fica no WhatsApp. Use “Abrir conversa” para responder ao cliente.</p>
-            </section>
+            </section>}
           </div>
 
           <div className="fi-modal-col">
@@ -1190,7 +1255,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
       {raiz && clienteAberto && (
         <JanelaCliente l={clienteAberto} raiz={raiz} lista={navegacao} aoTrocar={setAberto}
           aoFechar={fecharJanela} avisar={avisar} ehDono={meuId != null && meuId === clienteAberto.atendente}
-          abrirConversa={conversa}
+          abrirConversa={conversa} conversa={fonte.usarConversa}
           recado={recados && admin && !(meuId != null && meuId === clienteAberto.atendente)
             /* só para um dono da equipe da fila (cliente sem dono ou fora dela: não há para quem mandar) */
             && EQUIPE.some((a) => a.id === clienteAberto.atendente)
