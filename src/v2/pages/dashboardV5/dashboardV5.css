@@ -782,3 +782,11 @@
   .v2 .d5-vg-fx-n { font-size: 22px; }
   .v2 .d5-vg-chip { height: 30px; }
 }
+
+/* situação (o vigia é só da Iris): uma linha; a exceção em rubro com ponto */
+.v2 .d5-vg-tab b.d5-vg-sit { font-weight: 500; font-size: 12.5px; color: var(--txt); }
+.v2 .d5-vg-tab b.d5-vg-sit[data-alerta] { color: var(--rubro); font-weight: 600; }
+.v2 .d5-vg-tab b.d5-vg-sit[data-alerta]::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rubro); margin-right: 6px; vertical-align: 1px;
+}

@@ -1,12 +1,13 @@
 import type { MotivoVigia, QuemDeve, Severidade, VigiaCaso, VigiaDados, VigiaSaude } from './vigiaRespostas';
 
 /* ------------------------------------------------------------------
-   Fixture do modo demo do Vigia de respostas — espelha a foto real de 12/11:
-   236 casos abertos (205 de atendente humano, 29 do robô, 2 da Iris), 156 com
-   mais de 24 h, ~80 entre 1 h e 24 h e poucos com menos de 1 h. Sorteio com
-   semente FIXA (mulberry32): a mesma lista em toda recarga. Só tipos do
-   contrato; nenhum campo que o banco não devolva.
-   Variantes (só no demo, via ?vigia=): 'parado', 'erro', 'vazio', 'cortada'.
+   Fixture do modo demo do Vigia da Iris — 236 casos no total, mas o painel
+   é SÓ DA IRIS (dono 12/11): 9 casos dela, variados; os 198 de atendentes e
+   os 29 do robô ficam na fixture de propósito, para provar que o painel os
+   deixa de fora. Sorteio com semente FIXA (mulberry32): a mesma lista em toda
+   recarga. Só tipos do contrato; nenhum campo que o banco não devolva.
+   Variantes (só no demo, via ?vigia=): 'parado', 'erro', 'vazio' e 'cortada'
+   (300 casos da Iris na lista, 412 abertos — o corte do banco).
    ------------------------------------------------------------------ */
 
 function mulberry32(a: number): () => number {
@@ -38,12 +39,12 @@ const MENSAGENS = [
   'Pode falar agora', 'Obrigado, fico no aguardo', 'A senhora consegue ver isso pra mim?', '[audio]', '[imagem]',
 ];
 
-/** 205 donos dos casos de atendente humano (a distribuição real de 12/11; null = sem atendente). */
+/** 198 donos dos casos de atendente humano (fora do painel; null = sem atendente). */
 function poolDonos(rng: () => number): (string | null)[] {
   const pool: (string | null)[] = [];
   const põe = (nome: string | null, n: number) => { for (let i = 0; i < n; i++) pool.push(nome); };
-  põe('Juliana Andrade', 61); põe('Matheus Vargas', 48); põe('Giovana Ribeiro', 40);
-  põe('Isadora Campos', 33); põe('Luiz Fernando Prates', 18); põe(null, 5);
+  põe('Juliana Andrade', 59); põe('Matheus Vargas', 46); põe('Giovana Ribeiro', 39);
+  põe('Isadora Campos', 32); põe('Luiz Fernando Prates', 17); põe(null, 5);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -83,28 +84,39 @@ export function demoVigia({ variante = null }: { variante?: string | null } = {}
   };
 
   const casos: VigiaCaso[] = [];
-  // Menos de 1 h (4): as duas da Iris, uma do robô e uma de atendente
+  // ---- OS 9 DA IRIS (o painel é só deles) ----
+  // Menos de 1 h (3): travada reativada, na fila e a cura esgotada (a exceção em rubro)
   casos.push(caso('iris', 'iris_travada', 'atencao', 18, { dono: 'Matheus Vargas', tentativasCura: 1, ultimaMsg: 'Pode me ligar à tarde?' }));
+  casos.push(caso('iris', 'iris_na_fila', 'atencao', 12, { dono: 'Juliana Andrade', ultimaMsg: 'Tenho sim' }));
   casos.push(caso('iris', 'iris_parada', 'critica', 46, { dono: 'Matheus Vargas', tentativasCura: 2, ultimaMsg: 'Oi, ainda tá aí?' }));
+  // De 1 h a 24 h (4)
+  casos.push(caso('iris', 'iris_na_fila', 'alta', 65, { dono: 'Giovana Ribeiro', ultimaMsg: 'Mandei o extrato, recebeu?' }));
+  casos.push(caso('iris', 'iris_travada', 'alta', 180, { dono: 'Isadora Campos', tentativasCura: 2, ultimaMsg: '[audio]' }));
+  casos.push(caso('iris', 'iris_parada', 'alta', 310, { dono: 'Matheus Vargas', tentativasCura: 1, ultimaMsg: 'Qual o número do protocolo?' }));
+  casos.push(caso('iris', 'iris_na_fila', 'alta', 1320, { dono: 'Luiz Fernando Prates', ultimaMsg: 'Bom dia, alguma novidade?' }));
+  // Mais de 24 h (2): uma parada antiga e um número desconectado
+  casos.push(caso('iris', 'iris_parada', 'critica', 2980, { dono: 'Juliana Andrade', ultimaMsg: 'Obrigado, fico no aguardo' }));
+  casos.push(caso('iris', 'canal_desconectado', 'critica', 4620, { dono: 'Matheus Vargas', ultimaMsg: 'A senhora consegue ver isso pra mim?' }));
+  // ---- fora do painel (provam o filtro): 29 do robô e 198 de atendentes ----
   casos.push(caso('robo', 'robo_fluxo', 'atencao', 9, { ultimaMsg: 'Tenho sim' }));
   casos.push(humano(52, 'atencao'));
-  // De 1 h a 24 h (76): 66 de atendentes e 10 do robô
-  for (let i = 0; i < 66; i++) casos.push(humano(60 + Math.floor(rng() * 1380), 'alta'));
+  for (let i = 0; i < 61; i++) casos.push(humano(60 + Math.floor(rng() * 1380), 'alta'));
   for (let i = 0; i < 10; i++) casos.push(caso('robo', 'robo_fluxo', 'alta', 60 + Math.floor(rng() * 1380)));
-  // Mais de 24 h (156): o backlog antigo, de 1 a 12 dias — 138 de atendentes e 18 do robô
-  for (let i = 0; i < 138; i++) casos.push(humano(1440 + Math.floor(rng() * (17280 - 1440)), 'critica'));
+  for (let i = 0; i < 136; i++) casos.push(humano(1440 + Math.floor(rng() * (17280 - 1440)), 'critica'));
   for (let i = 0; i < 18; i++) casos.push(caso('robo', 'robo_fluxo', 'critica', 1440 + Math.floor(rng() * (17280 - 1440))));
-  // dois números desconectados e alguns dados faltando (a tela precisa aguentar)
+  // um número desconectado de atendente e alguns dados faltando (a tela precisa aguentar)
   const antigosComDono = casos.filter((c) => c.quemDeve === 'humano' && c.dono && c.esperaMin >= 1440);
   antigosComDono[3].motivo = 'canal_desconectado';
-  antigosComDono[11].motivo = 'canal_desconectado';
   antigosComDono[5].nome = 'Cliente sem nome';
   antigosComDono[7].telefone = null;
   antigosComDono[9].ultimaMsg = null;
 
   if (variante === 'cortada') {
-    // o banco corta em 300 (os MAIS RECENTES ficam de fora): 300 na lista, 412 abertos
-    for (let i = 0; i < 64; i++) casos.push(humano(1440 + Math.floor(rng() * (17280 - 1440)), 'critica'));
+    // o corte do banco: a lista vem com 300 casos DA IRIS e há 412 abertos (os mais recentes ficam de fora)
+    const base = casos.filter((c) => c.quemDeve === 'iris');
+    casos.length = 0;
+    casos.push(...base);
+    for (let i = 0; i < 291; i++) casos.push(caso('iris', 'iris_parada', 'critica', 1440 + Math.floor(rng() * (17280 - 1440)), { dono: 'Matheus Vargas' }));
   }
   if (variante === 'vazio') casos.length = 0;
 

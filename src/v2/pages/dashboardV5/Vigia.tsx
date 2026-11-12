@@ -3,27 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { fmtEspera, useVigiaRespostas, type Severidade, type VigiaCaso, type VigiaDados, type VigiaSaude } from '@/data/vigiaRespostas';
 import {
-  GRUPOS_ESPERA, LIMITE_LISTA, PASSO, VISTA_INICIAL, chaveQuem, hhmm, limiteDe, montarVista,
-  type EstadoVista, type FiltroQuem, type GrupoEspera, type OpcaoQuem, type Vista,
+  GRUPOS_ESPERA, LIMITE_LISTA, PASSO, VISTA_INICIAL, hhmm, limiteDe, montarVista,
+  type EstadoVista, type GrupoEspera, type Vista,
 } from '@/data/vigiaRespostas.vista';
-import { initials } from '@/lib/avatar';
 import { BotaoSec, Skeleton } from '../../components';
-import { ICONES } from '../../shell/icones';
 import { IcCheck, IcX } from '../filaIris/icones';
 import { Pop, Secao, ancoraDe, type Ancora } from './comum';
 import { TabelaVigia } from './VigiaTabela';
 
-/* Vigia de respostas 24h (dono 12/11): o banco confere a cada 3 minutos, de dia e de noite, se
-   algum cliente ficou sem resposta, e a Iris travada é reativada sozinha. Este painel só mostra:
-   o selo de situação (rubro se o vigia parou), a faixa por tempo de espera, a barra "quem deve
-   responder" e a lista em seções. Só o gestor (admin) vê; não depende do período do Dashboard.
-   A organização da lista é pura (vigiaRespostas.vista.ts); aqui só a casca. */
+/* Vigia da Iris (dono 12/11: "eu só quero vigia pra Iris, porque várias vezes ela deixa cliente
+   sem resposta"): o banco confere a cada 3 minutos, de dia e de noite, se algum cliente ficou
+   esperando a IRIS responder, e a Iris travada é reativada sozinha. Atendentes e robô ficam FORA
+   (o Radar já cobra os humanos). Este painel só mostra: o selo de situação (rubro se o vigia
+   parou), a faixa por tempo de espera, a busca e a lista em seções. Só o gestor (admin) vê; não
+   depende do período do Dashboard. A organização da lista é pura (vigiaRespostas.vista.ts). */
 
-const AJUDA = 'A cada 3 minutos, de dia e de noite, o vigia procura conversas em que a última mensagem é do cliente e ninguém respondeu. '
-  + 'O cliente entra na lista depois de 5 minutos quando quem deve responder é a Iris ou o robô, e depois de 15 minutos úteis '
-  + '(segunda a sexta, das 9h às 18h) quando é um atendente. Se a Iris travar, o vigia a reativa sozinho, até 2 vezes, nas primeiras 24 horas. '
-  + 'O cliente sai da lista quando alguém responde ou quando a conversa é arquivada. Cortesias como "ok" e "obrigado" não entram. '
-  + 'Não depende do período escolhido no topo.';
+const AJUDA = 'A cada 3 minutos, de dia e de noite, o vigia procura conversas em que a última mensagem é do cliente e a Iris ainda não respondeu. '
+  + 'O cliente entra na lista depois de 5 minutos sem resposta. Se a Iris travar, o vigia a reativa sozinho, até 2 vezes, nas primeiras 24 horas. '
+  + 'O cliente sai da lista quando a Iris (ou alguém da equipe) responde, ou quando a conversa é arquivada. Cortesias como "ok" e "obrigado" não entram. '
+  + 'Clientes de atendentes e do robô não entram aqui. Não depende do período escolhido no topo.';
 
 const UM_DIA = 1440;
 const CHAVE_VISTA = 'd5-vigia-vista';
@@ -37,8 +35,6 @@ function lerVista(): EstadoVista | null {
     const v = JSON.parse(bruto) as Partial<EstadoVista> | null;
     if (!v || typeof v !== 'object') return null;
     const espera = v.espera === 'menos1h' || v.espera === 'de1a24h' || v.espera === 'mais24h' ? v.espera : 'todas';
-    const quem: FiltroQuem = typeof v.quem === 'string' && (v.quem === 'iris' || v.quem === 'robo' || v.quem === 'sem' || v.quem.startsWith('p:'))
-      ? (v.quem as FiltroQuem) : 'todos';
     const mostrando: EstadoVista['mostrando'] = {};
     if (v.mostrando && typeof v.mostrando === 'object') {
       for (const g of ['menos1h', 'de1a24h', 'mais24h'] as const) {
@@ -46,24 +42,18 @@ function lerVista(): EstadoVista | null {
         if (typeof n === 'number' && Number.isFinite(n) && n > 0) mostrando[g] = n;
       }
     }
-    return { espera, quem, mostrando, busca: '' }; // a busca não é guardada
+    return { espera, quem: 'todos', mostrando, busca: '' }; // a busca não é guardada; o vigia é só da Iris
   } catch { return null; }
 }
 
-/** A frase-veredito do cabeçalho: diz em 2 segundos como está ("agora" = menos de 24 h). */
+/** A frase-veredito do cabeçalho: diz em 2 segundos como a Iris está ("agora" = menos de 24 h). */
 function veredito(casos: VigiaCaso[]): string {
-  const agora = casos.filter((c) => c.esperaMin < UM_DIA);
-  const antigos = casos.length - agora.length;
+  const agora = casos.filter((c) => c.esperaMin < UM_DIA).length;
+  const antigos = casos.length - agora;
   const antigosTx = antigos ? `${antigos} ${antigos === 1 ? 'antigo' : 'antigos'}` : '';
-  if (!agora.length) return `Tudo em dia: ninguém esperando resposta agora.${antigos ? ` · ${antigosTx}, há mais de 24 h` : ''}`;
-  const iris = agora.filter((c) => c.quemDeve === 'iris').length;
-  const robo = agora.filter((c) => c.quemDeve === 'robo').length;
-  const atend = agora.length - iris - robo;
+  if (!agora) return `A Iris está com as respostas em dia.${antigos ? ` · ${antigosTx}, há mais de 24 h` : ''}`;
   return [
-    `${agora.length} ${agora.length === 1 ? 'cliente esperando resposta agora' : 'clientes esperando resposta agora'}`,
-    iris ? `${iris} da Iris` : '',
-    robo ? `${robo} do robô` : '',
-    atend ? `${atend} de atendentes` : '',
+    `${agora} ${agora === 1 ? 'cliente esperando a Iris responder' : 'clientes esperando a Iris responder'}`,
     antigosTx,
   ].filter(Boolean).join(' · ');
 }
@@ -123,16 +113,16 @@ const TITULO_FAIXA: Record<GrupoEspera, string> = {
 };
 const SEV_FAIXA: Record<GrupoEspera, Severidade> = { menos1h: 'atencao', de1a24h: 'alta', mais24h: 'critica' };
 
-function FaixaEspera({ vista, s, truncada, quemLigado, valor, aoMudar }: {
-  vista: Vista; s: VigiaSaude; truncada: boolean; quemLigado: boolean;
+function FaixaEspera({ vista, s, truncada, valor, aoMudar }: {
+  vista: Vista; s: VigiaSaude; truncada: boolean;
   valor: GrupoEspera | 'todas'; aoMudar: (g: GrupoEspera) => void;
 }) {
   return (
     <div className="d5-vg-faixa" role="group" aria-label="Filtrar pelo tempo de espera">
       {GRUPOS_ESPERA.map((g) => {
         const f = vista.faixa[g.id];
-        // lista cortada pelo banco: sem filtro de pessoa, vale a contagem exata (por_severidade)
-        const n = truncada && !quemLigado ? s.porSeveridade[SEV_FAIXA[g.id]] ?? f.n : f.n;
+        // lista cortada pelo banco: vale a contagem exata (por_severidade)
+        const n = truncada ? s.porSeveridade[SEV_FAIXA[g.id]] ?? f.n : f.n;
         const apoio = truncada ? 'lista incompleta' : n === 0 ? 'ninguém esperando' : `maior espera ${fmtEspera(f.maiorEspera)}`;
         const ativo = valor === g.id;
         return (
@@ -150,45 +140,21 @@ function FaixaEspera({ vista, s, truncada, quemLigado, valor, aoMudar }: {
         <span className="d5-vg-fx-r">Resolvidos em 24 h</span>
         <span className="d5-vg-fx-n num" data-zero={s.resolvidos24h === 0 ? '' : undefined}>{s.resolvidos24h}</span>
         <span className="d5-vg-fx-s">
-          {quemLigado ? 'no total, sem filtro'
-            : s.curas24h === 0 ? 'nenhuma reativação da Iris'
-              : s.curas24h === 1 ? '1 reativação da Iris' : `${s.curas24h} reativações da Iris`}
+          {s.curas24h === 0 ? 'nenhuma reativação da Iris'
+            : s.curas24h === 1 ? '1 reativação da Iris' : `${s.curas24h} reativações da Iris`}
         </span>
       </div>
     </div>
   );
 }
 
-/* ---------- barra "quem deve responder" + busca + contagem viva ---------- */
-function ChipQuem({ o, ativo, aoClicar }: { o: OpcaoQuem; ativo: boolean; aoClicar: () => void }) {
-  const title = ativo ? 'Ver todos de novo'
-    : o.tipo === 'iris' ? 'Clientes que a Iris deve responder'
-      : o.tipo === 'robo' ? 'Clientes que o robô deve responder'
-        : o.tipo === 'sem' ? 'Clientes sem atendente responsável'
-          : `Clientes que ${o.nomeCompleto} ainda não respondeu · maior espera ${fmtEspera(o.maiorEspera)}`;
-  return (
-    <button type="button" className="d5-vg-chip" aria-pressed={ativo} disabled={o.n === 0 && !ativo}
-      aria-label={`${o.rotulo}: ${o.n} ${o.n === 1 ? 'cliente' : 'clientes'}`} title={title} onClick={aoClicar}>
-      {o.tipo === 'pessoa' ? <span className="d5-vg-av" aria-hidden>{initials(o.nomeCompleto ?? o.rotulo)}</span>
-        : o.tipo === 'sem' ? <span className="d5-vg-av" data-vazio="" aria-hidden />
-          : <span className="d5-vg-av" aria-hidden>{o.tipo === 'iris' ? ICONES.ia : ICONES.fluxos}</span>}
-      <span>{o.rotulo}</span>
-      <b className="num">{o.n}</b>
-    </button>
-  );
-}
-
-function BarraQuem({ opcoes, valor, aoMudar, busca, aoBuscar, filtrados, total, temFiltro, aoLimpar }: {
-  opcoes: OpcaoQuem[]; valor: FiltroQuem; aoMudar: (k: FiltroQuem) => void;
+/* ---------- busca + contagem viva (o vigia é só da Iris: sem filtro de pessoa) ---------- */
+function BarraBusca({ busca, aoBuscar, filtrados, total, temFiltro, aoLimpar }: {
   busca: string; aoBuscar: (v: string) => void;
   filtrados: number; total: number; temFiltro: boolean; aoLimpar: () => void;
 }) {
   return (
     <div className="d5-vg-barra">
-      <span className="d5-vg-barra-rot">Quem deve responder</span>
-      <div className="d5-vg-chips" role="group" aria-label="Filtrar por quem deve responder">
-        {opcoes.map((o) => <ChipQuem key={o.chave} o={o} ativo={valor === o.chave} aoClicar={() => aoMudar(o.chave)} />)}
-      </div>
       <div className="d5-vg-barra-dir">
         <input type="search" className="d5-vg-busca" value={busca} onChange={(e) => aoBuscar(e.target.value)}
           placeholder="Buscar cliente ou telefone" aria-label="Buscar cliente pelo nome ou telefone" />
@@ -207,7 +173,7 @@ function VazioVigia({ parado }: { parado: boolean }) {
     <div className="d5-vg-zero">
       <span className="d5-vg-zero-ic" aria-hidden><IcCheck t={16} /></span>
       <span className="d5-vg-zero-tx">
-        <b>{parado ? 'Nenhum cliente sem resposta na última conferência.' : 'Nenhum cliente sem resposta.'}</b>
+        <b>{parado ? 'Nenhum cliente esperando a Iris na última conferência.' : 'Nenhum cliente esperando a Iris.'}</b>
         {!parado && <span>O vigia confere de novo em até 3 minutos.</span>}
       </span>
     </div>
@@ -217,7 +183,7 @@ function VazioVigia({ parado }: { parado: boolean }) {
 /* ---------- carregando e erro ---------- */
 export function VigiaSkeleton() {
   return (
-    <Secao className="d5-vg" titulo="Vigia de respostas" sub="Lendo o vigia…">
+    <Secao className="d5-vg" titulo="Vigia da Iris" sub="Lendo o vigia…">
       <div className="d5-vg-faixa" aria-hidden>
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="d5-vg-fx">
@@ -236,7 +202,7 @@ export function VigiaSkeleton() {
 
 function VigiaErro({ mensagem, aoTentar }: { mensagem?: string | null; aoTentar: () => void }) {
   return (
-    <Secao className="d5-vg" titulo="Vigia de respostas">
+    <Secao className="d5-vg" titulo="Vigia da Iris">
       <div className="d5-vg-alerta" role="alert">
         <b>{mensagem || 'Não foi possível ler o vigia agora.'}</b>
         <span>A tela tenta de novo sozinha a cada 30 segundos.</span>
@@ -257,21 +223,17 @@ export function PainelVigia({ d, inicial, erroLeitura }: { d: VigiaDados; inicia
   }, [estado]);
 
   const s = d.saude;
-  // um chip de pessoa (ou "sem atendente") que não existe mais volta para "todos"
-  const estadoEf = useMemo<EstadoVista>(() => {
-    const q = estado.quem;
-    if (q === 'todos' || q === 'iris' || q === 'robo') return estado;
-    return d.casos.some((c) => chaveQuem(c) === q) ? estado : { ...estado, quem: 'todos' };
-  }, [estado, d.casos]);
-  const vista = useMemo(() => montarVista(d.casos, estadoEf), [d.casos, estadoEf]);
-  const truncada = s.abertos > d.casos.length && d.casos.length >= LIMITE_LISTA;
-  const temFiltro = estadoEf.quem !== 'todos' || estadoEf.espera !== 'todas' || estadoEf.busca.trim() !== '';
+  // SÓ A IRIS (dono 12/11): caso de atendente ou do robô que ainda venha do banco fica de fora
+  const casos = useMemo(() => d.casos.filter((c) => c.quemDeve === 'iris'), [d.casos]);
+  const estadoEf = estado;
+  const vista = useMemo(() => montarVista(casos, estadoEf), [casos, estadoEf]);
+  const truncada = s.abertos > casos.length && casos.length >= LIMITE_LISTA;
+  const temFiltro = estadoEf.espera !== 'todas' || estadoEf.busca.trim() !== '';
 
   // mudar um filtro volta as seções ao tamanho inicial (o "mostrar mais" é por seção)
   const mudarEspera = (g: GrupoEspera) => setEstado((e) => ({ ...e, espera: e.espera === g ? 'todas' : g, mostrando: {} }));
-  const mudarQuem = (k: FiltroQuem) => setEstado((e) => ({ ...e, quem: e.quem === k ? 'todos' : k, mostrando: {} }));
   const mudarBusca = (v: string) => setEstado((e) => ({ ...e, busca: v, mostrando: {} }));
-  const limpar = () => setEstado((e) => ({ ...e, espera: 'todas', quem: 'todos', busca: '', mostrando: {} }));
+  const limpar = () => setEstado((e) => ({ ...e, espera: 'todas', busca: '', mostrando: {} }));
   const mais = (g: GrupoEspera) => setEstado((e) => ({ ...e, mostrando: { ...e.mostrando, [g]: limiteDe(e, g) + PASSO } }));
   const menos = (g: GrupoEspera) => setEstado((e) => {
     const m = { ...e.mostrando };
@@ -282,23 +244,21 @@ export function PainelVigia({ d, inicial, erroLeitura }: { d: VigiaDados; inicia
 
   return (
     <Secao className={'d5-vg' + (s.vigiaOk ? '' : ' d5-vg-parado')} id="vigia-respostas"
-      titulo="Vigia de respostas" ajuda={AJUDA} sub={veredito(d.casos)}
+      titulo="Vigia da Iris" ajuda={AJUDA} sub={veredito(casos)}
       acao={<EstadoVigia s={s} lidoEm={d.lidoEm} />}>
       {erroLeitura && (
         <p className="d5-aviso" role="status">Não foi possível atualizar o vigia agora. Mostrando a leitura das {hhmm(d.lidoEm)}.</p>
       )}
       {!s.vigiaOk && <AvisoParado s={s} />}
-      <FaixaEspera vista={vista} s={s} truncada={truncada} quemLigado={estadoEf.quem !== 'todos'}
-        valor={estadoEf.espera} aoMudar={mudarEspera} />
+      <FaixaEspera vista={vista} s={s} truncada={truncada} valor={estadoEf.espera} aoMudar={mudarEspera} />
       {vista.total === 0 ? (
         <VazioVigia parado={!s.vigiaOk} />
       ) : (
         <>
-          <BarraQuem opcoes={vista.quem} valor={estadoEf.quem} aoMudar={mudarQuem}
-            busca={estadoEf.busca} aoBuscar={mudarBusca}
+          <BarraBusca busca={estadoEf.busca} aoBuscar={mudarBusca}
             filtrados={vista.filtrados} total={vista.total} temFiltro={temFiltro} aoLimpar={limpar} />
           {truncada && (
-            <p className="d5-vg-nota">A lista traz os {d.casos.length} casos mais graves de {s.abertos}. Os mais recentes podem ficar de fora.</p>
+            <p className="d5-vg-nota">A lista traz os {casos.length} casos mais graves de {s.abertos}. Os mais recentes podem ficar de fora.</p>
           )}
           <TabelaVigia grupos={vista.grupos} lidoEm={d.lidoEm} truncada={truncada} porSeveridade={s.porSeveridade}
             mostrando={estadoEf.mostrando} aoMais={mais} aoMenos={menos} aoAbrir={abrirConversa} aoLimpar={limpar} />

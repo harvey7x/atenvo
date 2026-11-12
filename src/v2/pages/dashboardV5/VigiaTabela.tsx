@@ -6,8 +6,6 @@ import {
   type GrupoEspera, type GrupoVista,
 } from '@/data/vigiaRespostas.vista';
 import { fmtTelefone } from '@/data/dashboardV5.formato';
-import { initials } from '@/lib/avatar';
-import { ICONES } from '../../shell/icones';
 import { IcX } from '../filaIris/icones';
 import { Ajuda } from './comum';
 
@@ -18,22 +16,17 @@ import { Ajuda } from './comum';
    mantêm a semântica de tabela quando o display muda (Safari/VoiceOver). */
 
 const AJUDA_ESPERA = 'Tempo desde a primeira mensagem do cliente que ficou sem resposta. Embaixo, quando ele escreveu.';
-const TITULO_SEC = 'Quem espera há mais tempo aparece primeiro. A Iris que não voltou e o número desconectado ficam no topo.';
+const TITULO_SEC = 'Quem espera há mais tempo aparece primeiro. A Iris que não voltou depois das tentativas e o número desconectado ficam no topo.';
 const SEV_DO_GRUPO: Record<GrupoEspera, Severidade> = { menos1h: 'atencao', de1a24h: 'alta', mais24h: 'critica' };
 
-/** Coluna "Quem deve responder": avatar/ícone + nome em cima, o motivo curto embaixo
- *  (as exceções em rubro, com ponto). */
-function QuemCelula({ c }: { c: VigiaCaso }) {
+/** Coluna "Situação": o que houve com a resposta da Iris (as exceções em rubro, com ponto).
+ *  O título da célula guarda o motivo por extenso e de quem é o cliente. */
+function SituacaoCelula({ c }: { c: VigiaCaso }) {
   const sit = situacaoDe(c);
+  const texto = sit.nota ? sit.nota.charAt(0).toLocaleUpperCase('pt-BR') + sit.nota.slice(1) : '—';
   return (
     <span className="d5-cel2 d5-cel2-dir" title={sit.titulo}>
-      <b className="d5-vg-qm" data-sem={sit.tipo === 'sem' ? '' : undefined}>
-        {sit.tipo === 'pessoa' && <span className="d5-vg-av" aria-hidden>{initials(c.dono ?? '')}</span>}
-        {sit.tipo === 'iris' && <span className="d5-vg-ic" aria-hidden>{ICONES.ia}</span>}
-        {sit.tipo === 'robo' && <span className="d5-vg-ic" aria-hidden>{ICONES.fluxos}</span>}
-        <span className="d5-vg-qm-tx">{sit.quem}</span>
-      </b>
-      <small data-alerta={sit.alerta ? '' : undefined}>{sit.nota}</small>
+      <b className="d5-vg-sit" data-alerta={sit.alerta ? '' : undefined}>{texto}</b>
     </span>
   );
 }
@@ -68,7 +61,7 @@ function LinhaVigia({ c, lidoEm, aoAbrir }: { c: VigiaCaso; lidoEm: string; aoAb
       <td className="d5-dir d5-vg-c-msg" role="cell">
         <span className="d5-vg-msg" title={msg.midia ? msg.texto : c.ultimaMsg ?? undefined}>{msg.texto}</span>
       </td>
-      <td className="d5-dir d5-vg-c-quem" role="cell"><QuemCelula c={c} /></td>
+      <td className="d5-dir d5-vg-c-quem" role="cell"><SituacaoCelula c={c} /></td>
       <td className="d5-dir d5-vg-c-num" role="cell"><span className="d5-vg-num">{c.canal ?? '—'}</span></td>
       <td className="d5-dir d5-vg-c-esp" role="cell">
         <span className="d5-cel2 d5-cel2-dir">
@@ -134,7 +127,7 @@ export function TabelaVigia({ grupos, lidoEm, truncada, porSeveridade, mostrando
   if (!grupos.length) {
     return (
       <div className="d5-vg-filtro-vazio">
-        <span>Nenhum cliente sem resposta com este filtro.</span>
+        <span>Nenhum cliente esperando a Iris com este filtro.</span>
         <button type="button" className="d5-vg-limpar" onClick={aoLimpar}>Limpar filtro<IcX t={10} /></button>
       </div>
     );
@@ -142,12 +135,12 @@ export function TabelaVigia({ grupos, lidoEm, truncada, porSeveridade, mostrando
   return (
     <div className="d5-tab-rolo">
       <table className="d5-tab d5-vg-tab" role="table">
-        <caption className="d5-sr">Clientes sem resposta, agrupados pelo tempo de espera</caption>
+        <caption className="d5-sr">Clientes esperando a Iris, agrupados pelo tempo de espera</caption>
         <thead role="rowgroup">
           <tr role="row">
             <th scope="col" role="columnheader" className="d5-vg-c-cli">Cliente</th>
             <th scope="col" role="columnheader" className="d5-dir d5-vg-c-msg">Última mensagem</th>
-            <th scope="col" role="columnheader" className="d5-dir d5-vg-c-quem">Quem deve responder</th>
+            <th scope="col" role="columnheader" className="d5-dir d5-vg-c-quem">Situação</th>
             <th scope="col" role="columnheader" className="d5-dir d5-vg-c-num">Número</th>
             <th scope="col" role="columnheader" className="d5-dir d5-vg-c-esp">
               <span className="d5-th-ajuda"><Ajuda rotulo="Esperando há" texto={AJUDA_ESPERA} /><span>Esperando há</span></span>

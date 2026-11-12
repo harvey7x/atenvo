@@ -34,7 +34,7 @@ const caso = (i: number, extra: Partial<VigiaCaso> = {}): VigiaCaso => {
   return {
     casoId: `t${seq}`, conversaId: `vt${seq}`, nome: `Cliente ${String.fromCharCode(65 + i)}`,
     telefone: `55519942612${String(10 + i)}`, canal: 'JUROS ABUSIVO', dono: 'Juliana Andrade',
-    quemDeve: 'humano', motivo: 'humano_atrasado', severidade: 'alta', esperaMin: 100 + i,
+    quemDeve: 'iris', motivo: 'iris_na_fila', severidade: 'alta', esperaMin: 100 + i,
     tentativasCura: 0, ultimaMsg: 'oi, tudo bem?', abertoEm: null, ...extra,
   };
 };
@@ -48,19 +48,23 @@ const dados = (casos: VigiaCaso[]): VigiaDados => ({
 });
 
 describe('Vigia (painel do dashboard)', () => {
-  it('o admin vê o selo verde, a faixa, os chips, o veredito e os links das conversas', () => {
+  it('o admin vê o selo verde, a faixa, o veredito da Iris e os links das conversas', () => {
     estado.role = 'admin'; estado.variante = null;
     const h = abrir();
+    expect(h).toContain('Vigia da Iris');
     expect(h).toContain('Conferido há 1 min');
     expect(h).toContain('Menos de 1 h');
     expect(h).toContain('De 1 h a 24 h');
     expect(h).toContain('Mais de 24 h');
     expect(h).toContain('Resolvidos em 24 h');
-    expect(h).toContain('80 clientes esperando resposta agora');
-    expect(h).toContain('Juliana');                 // chip da atendente com mais casos
-    expect(h).toContain('236 clientes');            // contagem viva
+    expect(h).toContain('7 clientes esperando a Iris responder · 2 antigos');
+    expect(h).toContain('9 clientes');              // contagem viva: SÓ os da Iris
     expect(h).toContain('/whatsapp?conversa=');
     expect(h).toContain('Buscar cliente ou telefone');
+    // atendentes e robô ficam FORA (dono 12/11): nem chips, nem as linhas deles
+    expect(h).not.toContain('Quem deve responder');
+    expect(h).not.toContain('>Robô<');
+    expect(h).not.toContain('236');
   });
 
   it('com 10 casos acima de 24 h, aparecem 3 nomes e "Mostrar os outros 7"', () => {
@@ -73,16 +77,26 @@ describe('Vigia (painel do dashboard)', () => {
     expect(h).toContain('Mostrar os outros 7');
   });
 
-  it('com inicial {quem}, só aparecem os clientes daquela atendente', () => {
+  it('caso de atendente ou do robô que ainda venha do banco fica fora do painel', () => {
     const d = dados([
       caso(0), caso(1),
-      caso(2, { dono: 'Luiz Prates' }), caso(3, { dono: 'Luiz Prates' }),
+      caso(2, { quemDeve: 'humano', motivo: 'humano_atrasado' }),
+      caso(3, { quemDeve: 'robo', motivo: 'robo_fluxo' }),
     ]);
-    const h = render(<PainelVigia d={d} inicial={{ quem: 'p:Juliana Andrade' }} />);
+    const h = render(<PainelVigia d={d} />);
     expect(h).toContain('Cliente A');
     expect(h).toContain('Cliente B');
     expect(h).not.toContain('Cliente C');
-    expect(h).toContain('2 de 4 clientes');
+    expect(h).not.toContain('Cliente D');
+    expect(h).toContain('2 clientes');
+  });
+
+  it('a busca filtra por nome (sem acento) e por telefone', () => {
+    const d = dados([caso(0, { nome: 'João Araújo' }), caso(1), caso(2)]);
+    const h = render(<PainelVigia d={d} inicial={{ busca: 'joao' }} />);
+    expect(h).toContain('João Araújo');
+    expect(h).not.toContain('Cliente B');
+    expect(h).toContain('1 de 3 clientes');
   });
 
   it('vigia parado: selo rubro, aviso role=alert e o contorno no cartão', () => {
@@ -97,7 +111,7 @@ describe('Vigia (painel do dashboard)', () => {
   it('vazio: bloco calmo com a frase dos 3 minutos', () => {
     estado.role = 'admin'; estado.variante = 'vazio';
     const h = abrir();
-    expect(h).toContain('Nenhum cliente sem resposta.');
+    expect(h).toContain('Nenhum cliente esperando a Iris.');
     expect(h).toContain('O vigia confere de novo em até 3 minutos.');
   });
 
@@ -106,6 +120,13 @@ describe('Vigia (painel do dashboard)', () => {
     const h = abrir();
     expect(h).toContain('A lista traz os 300 casos mais graves de 412.');
     expect(h).toContain('lista incompleta');
+  });
+
+  it('a situação mostra a exceção em rubro (não voltou depois das tentativas)', () => {
+    const d = dados([caso(0, { severidade: 'critica', esperaMin: 50, tentativasCura: 2 })]);
+    const h = render(<PainelVigia d={d} />);
+    expect(h).toContain('Não voltou depois de 2 tentativas');
+    expect(h).toContain('data-alerta');
   });
 
   it('mídia na última mensagem é traduzida', () => {

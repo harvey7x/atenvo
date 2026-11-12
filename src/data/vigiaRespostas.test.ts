@@ -51,31 +51,26 @@ describe('vigia de respostas', () => {
     expect(fmtEspera(17280)).toBe('12 d');
   });
 
-  it('a demo espelha a foto real de 12/11 (236 casos, mesma distribuição)', () => {
+  it('a demo tem 9 casos da Iris (o painel é só deles) e mantém os demais para provar o filtro', () => {
     const d = demoVigia();
     expect(d.casos).toHaveLength(236);
     const por = (q: string) => d.casos.filter((c) => c.quemDeve === q).length;
-    expect(por('humano')).toBe(205);
+    expect(por('iris')).toBe(9);
     expect(por('robo')).toBe(29);
-    expect(por('iris')).toBe(2);
-    expect(d.casos.filter((c) => c.esperaMin < 60)).toHaveLength(4);
-    expect(d.casos.filter((c) => c.esperaMin >= 60 && c.esperaMin < 1440)).toHaveLength(76);
-    expect(d.casos.filter((c) => c.esperaMin >= 1440)).toHaveLength(156);
-    // uma Iris com a cura esgotada (crítica, 2 tentativas, antes das 24 h) e dois números desconectados
-    const esgotada = d.casos.filter((c) => c.quemDeve === 'iris' && c.severidade === 'critica' && c.esperaMin < 1440);
+    expect(por('humano')).toBe(198);
+    const iris = d.casos.filter((c) => c.quemDeve === 'iris');
+    expect(iris.filter((c) => c.esperaMin < 60)).toHaveLength(3);
+    expect(iris.filter((c) => c.esperaMin >= 60 && c.esperaMin < 1440)).toHaveLength(4);
+    expect(iris.filter((c) => c.esperaMin >= 1440)).toHaveLength(2);
+    // uma Iris com a cura esgotada (crítica, 2 tentativas, antes das 24 h) e um número desconectado dela
+    const esgotada = iris.filter((c) => c.severidade === 'critica' && c.esperaMin < 1440);
     expect(esgotada).toHaveLength(1);
     expect(esgotada[0].tentativasCura).toBe(2);
-    expect(d.casos.filter((c) => c.motivo === 'canal_desconectado')).toHaveLength(2);
+    expect(iris.filter((c) => c.motivo === 'canal_desconectado')).toHaveLength(1);
     // por_severidade bate com a contagem da própria lista
     const conta = (s: string) => d.casos.filter((c) => c.severidade === s).length;
     expect(d.saude.porSeveridade).toEqual({ atencao: conta('atencao'), alta: conta('alta'), critica: conta('critica') });
     expect(d.saude.abertos).toBe(236);
-    // donos com a distribuição combinada (e 5 sem atendente)
-    const donos = new Map<string | null, number>();
-    for (const c of d.casos.filter((x) => x.quemDeve === 'humano')) donos.set(c.dono, (donos.get(c.dono) ?? 0) + 1);
-    expect(donos.get('Juliana Andrade')).toBe(61);
-    expect(donos.get('Matheus Vargas')).toBe(48);
-    expect(donos.get(null)).toBe(5);
     // a mesma semente gera a mesma lista
     expect(demoVigia().casos.map((c) => c.nome)).toEqual(d.casos.map((c) => c.nome));
   });
@@ -88,6 +83,7 @@ describe('vigia de respostas', () => {
     expect(demoVigia({ variante: 'vazio' }).casos).toHaveLength(0);
     const cortada = demoVigia({ variante: 'cortada' });
     expect(cortada.casos).toHaveLength(300);
+    expect(cortada.casos.every((c) => c.quemDeve === 'iris')).toBe(true);
     expect(cortada.saude.abertos).toBe(412);
   });
 });
