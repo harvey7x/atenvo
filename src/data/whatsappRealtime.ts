@@ -355,17 +355,23 @@ export function etapasDeOportunidades(linhas: OppLinha[]): Map<string, EtapaCont
 
 /* ===================== IA por conversa ===================== */
 
-export interface IaEstadoLista { iaAtiva: boolean; iaStatus: string }
+export interface IaEstadoLista { iaAtiva: boolean; iaStatus: string; iaAtendendo: boolean; iaIris: boolean }
+/** Números onde a IA atende AGORA (RPC ia_canais_atendendo): id do número → é a Iris. */
+export type CanaisComIa = ReadonlyMap<string, boolean>;
 /** iaAtiva = MESMA fórmula do botão do cabeçalho: existe && status='ativa' && !desativado_manual.
- *  `desativado_manual` vem enxuto do select (`dados->desativado_manual`: true/false/null). */
-export function iaDaLinha(r: { status: string | null; desativado_manual?: unknown }): IaEstadoLista {
+ *  `desativado_manual` vem enxuto do select (`dados->desativado_manual`: true/false/null).
+ *  iaAtendendo (12/11, trava do envio) = iaAtiva E o número da sessão atende agora (conectado e com a IA
+ *  ligada) — a mesma regra do banco (ia_atendendo_agora). Sessão "ativa" em número caído não conta. */
+export function iaDaLinha(r: { status: string | null; desativado_manual?: unknown; canal_id?: string | null }, canais?: CanaisComIa): IaEstadoLista {
   const status = r.status ?? '';
-  return { iaAtiva: status === 'ativa' && r.desativado_manual !== true, iaStatus: status };
+  const iaAtiva = status === 'ativa' && r.desativado_manual !== true;
+  const iris = r.canal_id ? canais?.get(r.canal_id) : undefined;
+  return { iaAtiva, iaStatus: status, iaAtendendo: iaAtiva && iris !== undefined, iaIris: iris === true };
 }
 
 /** Etapa + IA no card recém-mapeado (MUTA e devolve o próprio card — só para cards novos). */
 export function aplicarSatelites(c: WaContact, e: EtapaContato | null | undefined, ia: IaEstadoLista | null | undefined): WaContact {
-  if (ia) { c.iaAtiva = ia.iaAtiva; c.iaStatus = ia.iaStatus; }
+  if (ia) { c.iaAtiva = ia.iaAtiva; c.iaStatus = ia.iaStatus; c.iaAtendendo = ia.iaAtendendo; c.iaIris = ia.iaIris; }
   if (e) {
     c.etapa = e.etapa; c.etapaCor = e.cor; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;
     c.oppStatus = e.status; c.oppRespId = e.respId;
@@ -501,11 +507,12 @@ export function aplicarIaNaLista(
   for (let i = 0; i < lista.length; i++) {
     const c = lista[i];
     const e = ia.get(c.id);
-    const iaAtiva = e?.iaAtiva, iaStatus = e?.iaStatus;
-    if (c.iaAtiva === iaAtiva && c.iaStatus === iaStatus) continue;
+    const iaAtiva = e?.iaAtiva, iaStatus = e?.iaStatus, iaAtendendo = e?.iaAtendendo, iaIris = e?.iaIris;
+    // ausente e false são o mesmo para os campos novos (card montado antes deles não conta como mudança)
+    if (c.iaAtiva === iaAtiva && c.iaStatus === iaStatus && !!c.iaAtendendo === !!iaAtendendo && !!c.iaIris === !!iaIris) continue;
     if (desconfiar(c)) continue;
     if (!out) out = lista.slice();
-    out[i] = { ...c, iaAtiva, iaStatus };
+    out[i] = { ...c, iaAtiva, iaStatus, iaAtendendo, iaIris };
     mudadas.push(c.id);
   }
   return { lista: out ?? lista, mudadas };
@@ -771,7 +778,7 @@ export function aplicarPatchComDesfazer(
 
 /* ===================== Reconciliação: medição ===================== */
 
-export const CAMPOS_RECONCILIACAO = ['unread', 'aguardando', 'last', 'respId', 'atendenteId', 'etapa', 'oppStatus', 'iaAtiva', 'canalId', 'arquivada', 'name'] as const;
+export const CAMPOS_RECONCILIACAO = ['unread', 'aguardando', 'last', 'respId', 'atendenteId', 'etapa', 'oppStatus', 'iaAtiva', 'iaAtendendo', 'canalId', 'arquivada', 'name'] as const;
 export interface Divergencias { faltam: number; sobram: number; campos: Partial<Record<(typeof CAMPOS_RECONCILIACAO)[number], number>>; total: number }
 
 /** Quanto o cache (patches + buscas-alvo) divergia da carga completa nova. Métrica do log

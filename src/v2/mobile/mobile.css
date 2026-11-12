@@ -322,3 +322,16 @@
 }
 .v2 .m-env svg { width: 19px; height: 19px; }
 .v2 .m-env:disabled { opacity: .4; cursor: default; }
+
+/* trava do envio enquanto a Iris atende (dono, 12/11) — o mesmo aviso do computador */
+.v2 .m-trava-ia { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; margin: 8px 10px; border-radius: 12px;
+  background: rgba(var(--verde-rgb), .07); border: 1px solid rgba(var(--verde-rgb), .28); }
+.v2 .m-trava-ia .tx { display: flex; flex-direction: column; gap: 2px; }
+.v2 .m-trava-ia .tx b { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .m-trava-ia .tx span { font-size: 13px; color: var(--txt-2); }
+.v2 .m-trava-ia .bt { border: 0; border-radius: 10px; padding: 12px 14px; font: inherit; font-size: 14px; font-weight: 600; background: var(--txt); color: var(--base); }
+.v2 .m-trava-ia .bt:disabled { opacity: .55; }
+.v2 .m-iris { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--verde); border: 1px solid rgba(var(--verde-rgb), .35); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.v2 .m-iris i { width: 5px; height: 5px; border-radius: 99px; background: var(--verde); animation: wa-iris-pulso 1.8s ease-in-out infinite; }
+@keyframes wa-iris-pulso { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }

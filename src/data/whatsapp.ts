@@ -350,11 +350,21 @@ export async function etapasPorContato(orgId: string, signal?: AbortSignal | nul
    funcionando, só sem o selo de IA. conversa_id é UNIQUE em ia_sessoes (uma sessão por conversa).
    iaAtiva reproduz a MESMA fórmula do botão do cabeçalho (iaDaLinha). ENXUTA: só
    dados->desativado_manual, não o `dados` inteiro (1,63 MB → ~0,3 MB por carga). */
-const SELECT_IA = 'conversa_id, status, desativado_manual:dados->desativado_manual';
-type RowIa = { conversa_id: string; status: string | null; desativado_manual?: unknown };
+const SELECT_IA = 'conversa_id, status, canal_id, desativado_manual:dados->desativado_manual';
+type RowIa = { conversa_id: string; status: string | null; canal_id?: string | null; desativado_manual?: unknown };
+/** Números onde a IA atende agora (12/11, trava do envio). Best-effort: sem o RPC (migration ainda não
+ *  aplicada) ou com erro, ninguém aparece como "Iris atendendo" — a lista segue igual à de antes. */
+async function canaisComIa(orgId: string): Promise<Map<string, boolean>> {
+  try {
+    const { data, error } = await supabase!.rpc('ia_canais_atendendo', { p_org: orgId });
+    if (error) return new Map();
+    return new Map(((data as { canal_id: string; iris: boolean }[]) ?? []).map((r) => [r.canal_id, !!r.iris]));
+  } catch { return new Map(); }
+}
 /** Todas as sessões de IA da org, enxutas. `melhorEsforco`: página com erro devolve o que juntou. */
 async function lerIaSessoes(orgId: string, signal: AbortSignal | null | undefined, melhorEsforco: boolean): Promise<Map<string, IaEstadoLista>> {
   const map = new Map<string, IaEstadoLista>();
+  const canais = await canaisComIa(orgId);
   // PAGINAÇÃO (18/09): idem etapasPorContato — com 1,3k+ sessões o corte de 1000 deixava conversas
   // com o selo de IA errado. Keyset por conversa_id (único, imutável); ordem não importa (mapa por chave).
   const linhas = await buscarKeyset<RowIa>(
@@ -372,7 +382,7 @@ async function lerIaSessoes(orgId: string, signal: AbortSignal | null | undefine
     (r) => r.conversa_id,
     { melhorEsforco, rotulo: 'ia_sessoes', signal },
   );
-  for (const r of linhas) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r));
+  for (const r of linhas) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r, canais));
   return map;
 }
 export async function iaSessoesPorConversa(orgId: string, signal?: AbortSignal | null): Promise<Map<string, IaEstadoLista>> {
@@ -420,6 +430,7 @@ async function etapasDosContatos(orgId: string, contatoIds: string[], signal?: A
 }
 async function iaDasConversas(orgId: string, conversaIds: string[], signal?: AbortSignal | null): Promise<Map<string, IaEstadoLista>> {
   const map = new Map<string, IaEstadoLista>();
+  const canais = await canaisComIa(orgId);
   for (let i = 0; i < conversaIds.length; i += LOTE_ALVO) {
     const lote = conversaIds.slice(i, i + LOTE_ALVO);
     const parte = await buscarKeyset<RowIa>(
@@ -438,7 +449,7 @@ async function iaDasConversas(orgId: string, conversaIds: string[], signal?: Abo
       (r) => r.conversa_id,
       { rotulo: 'ia_sessoes (alvo)', signal },
     );
-    for (const r of parte) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r));
+    for (const r of parte) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r, canais));
   }
   return map;
 }
@@ -849,7 +860,17 @@ export function useWaMensagens(conversaId: string | null | undefined) {
 }
 
 // ---- IA SDR: estado e liga/desliga por conversa (botão no cabeçalho do inbox) ----
-export interface IaEstadoConversa { existe: boolean; status?: string; etapa?: string; desativado_manual?: boolean; aguardando_humano?: string | null }
+export interface IaPausa { acao: 'pausou' | 'religou'; origem: 'trava_envio' | 'cabecalho'; em: string; nome: string }
+export interface IaEstadoConversa {
+  existe: boolean; status?: string; etapa?: string; desativado_manual?: boolean; aguardando_humano?: string | null;
+  /** 12/11: atende de verdade agora (sessão ativa num número conectado com a IA ligada) → trava a caixa de escrever.
+   *  Ausente (banco sem a migration da trava) = sem trava, como antes. */
+  atendendo_agora?: boolean;
+  /** o número da sessão é da Iris */
+  iris?: boolean;
+  /** quem pausou/religou e quando (as últimas 20), para o aviso dentro da conversa */
+  pausas?: IaPausa[];
+}
 export function useIaEstadoConversa(conversaId: string | null | undefined) {
   return useQuery({
     queryKey: ['ia-estado', conversaId ?? ''],
@@ -874,6 +895,27 @@ export function useIaToggle() {
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] });
       // selo/filtro de IA do card: ia_sessoes não tem realtime → busca-alvo da conversa
+      pedirBuscaAlvo(qc, currentOrg.id, { ids: [v.conversaId] });
+    },
+  });
+}
+/** Botão da trava do envio (12/11): pausa a Iris nesta conversa para o atendente responder — fica registrado
+ *  quem pausou e quando (ia_pausas, origem 'trava_envio'). */
+export function useIaPausarParaResponder() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async ({ conversaId }: { conversaId: string }) => {
+      const { data, error } = await supabase!.rpc('ia_pausar_para_responder', { p_conversa: conversaId });
+      if (error) throw new Error(error.message);
+      return data as { ok: boolean; ia: string };
+    },
+    onSuccess: (_d, v) => {
+      // a caixa destrava na hora; o refetch confirma com o estado do banco
+      qc.setQueryData<IaEstadoConversa>(['ia-estado', v.conversaId], (e) => (e ? { ...e, status: 'pausada', desativado_manual: true, atendendo_agora: false } : e));
+    },
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] });
       pedirBuscaAlvo(qc, currentOrg.id, { ids: [v.conversaId] });
     },
   });

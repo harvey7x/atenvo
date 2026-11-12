@@ -89,6 +89,11 @@ export interface WaContact {
   /** IA/bot atendendo esta conversa AGORA (ia_sessoes.status='ativa' && !desativado_manual) —
    *  MESMA fórmula do botão do cabeçalho. Chega pela lista via fetch paralelo (padrão etapasPorContato). */
   iaAtiva?: boolean;
+  /** 12/11 (trava do envio): a Iris/IA atende AGORA — iaAtiva E o número dela conectado com a IA ligada
+   *  (regra do banco ia_atendendo_agora). É o que trava a caixa de escrever e marca "Iris atendendo". */
+  iaAtendendo?: boolean;
+  /** o número da sessão é da Iris (iris_config.ativo) — o selo diz "Iris"; senão, "IA". */
+  iaIris?: boolean;
   /** status BRUTO da sessão de IA: 'ativa' | 'pausada' | 'handoff' | 'concluida' | 'encerrada' (undefined/null = sem sessão). */
   iaStatus?: string | null;
   /** DEMO da barra de IA: etapa atual do fluxo (real vem do RPC ia_conversa_estado, não da lista). */

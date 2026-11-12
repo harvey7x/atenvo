@@ -4,7 +4,7 @@ import {
   WA_REAL, useWaConversations, useWaMensagens, useSendWaMessage, useAtribuirAtendimento,
   useWaCanais, useWaCanalEnvioSaude, useIniciarConversaWa,
   waMarcarLida, waArquivar, waFixar, removerMensagemFalha, subirMidiaWa,
-  buscarConversasAgora, patchOtimistaLista, pedirBuscaAlvo,
+  buscarConversasAgora, patchOtimistaLista, pedirBuscaAlvo, useIaEstadoConversa, useIaPausarParaResponder,
 } from '@/data/whatsapp';
 import { WA_CONTACTS, type WaContact, type WaMessage } from '@/data/whatsappDemo';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
@@ -45,6 +45,9 @@ const EMPTY_CONTACT: WaContact = {
   id: '', name: '', phone: '', chip: '', time: '', unread: 0, tabs: [], status: '',
   last: '', email: '', stage: '', resp: '', origin: '', tags: [], lastInter: '', notes: '', doc: null, msgs: [],
 };
+
+/** O que o atendente vê quando tenta escrever com a Iris atendendo (12/11). */
+export const TEXTO_TRAVA_IA = 'A Iris está atendendo este cliente. Pause a Iris para responder.';
 
 export function useInboxWhatsApp(opts: {
   aoAvisar: (a: AvisoInbox) => void;
@@ -254,6 +257,32 @@ export function useInboxWhatsApp(opts: {
   const bloqueados = demo ? (opts.bloqueadosDemo ?? new Set<string>()) : (bloqueiosQ.data ?? new Set<string>());
   const optout = !!current.contatoId && bloqueados.has(current.contatoId);
 
+  /* trava do envio (dono, 12/11): com a Iris atendendo AGORA (ia_atendendo_agora: sessão ativa num número
+     conectado com a IA ligada), nenhuma rota de envio sai daqui — texto, reenvio, mídia, áudio, contato e
+     script — até o atendente pausar a Iris no botão da caixa de escrever (fica registrado quem pausou).
+     A mesma chave do cabeçalho (['ia-estado', id]): o React Query divide a consulta com a página. */
+  const iaEstadoQ = useIaEstadoConversa(WA_REAL ? current.id || null : null);
+  const [pausasDemo, setPausasDemo] = useState<Readonly<Record<string, string>>>({});   // demo: conversa → quando pausou
+  const iaTrava = WA_REAL ? !!iaEstadoQ.data?.atendendo_agora : !!current.iaAtendendo && !pausasDemo[current.id];
+  const iaTravaIris = WA_REAL ? !!iaEstadoQ.data?.iris : !!current.iaIris;
+  const iaTravaRef = useRef(iaTrava);
+  iaTravaRef.current = iaTrava;
+  const pausarMut = useIaPausarParaResponder();
+  const pausarIaParaResponder = useCallback(async () => {
+    if (!current.id || pausarMut.isPending) return;
+    if (!WA_REAL) {
+      setPausasDemo((s) => ({ ...s, [current.id]: new Date().toISOString() }));
+      const id = current.id;
+      setContacts((cur) => cur.map((c) => (c.id === id ? { ...c, iaAtiva: false, iaAtendendo: false, iaStatus: 'pausada' } : c)));
+      aoAvisar({ tom: 'ok', texto: 'Iris pausada nesta conversa. Pode responder — ficou registrado que você pausou.' });
+      return;
+    }
+    try {
+      await pausarMut.mutateAsync({ conversaId: current.id });
+      aoAvisar({ tom: 'ok', texto: 'Iris pausada nesta conversa. Pode responder — ficou registrado que você pausou.' });
+    } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Não foi possível pausar a Iris. Tente de novo.' }); }
+  }, [current.id, pausarMut, aoAvisar]);
+
   /* ---------- higiene (v1 L434-443) ---------- */
   const higQ = useHigieneConversa(WA_REAL ? current.id || null : null);
   const hig = higQ.data ?? HIGIENE_VAZIO;
@@ -324,6 +353,7 @@ export function useInboxWhatsApp(opts: {
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
     if (optout) { aoAvisar({ tom: 'erro', texto: 'Contato marcado como não incomodar — mensagens bloqueadas.' }); return; }
+    if (iaTravaRef.current) { aoAvisar({ tom: 'erro', texto: TEXTO_TRAVA_IA }); return; }
     if (bloquearPorHigiene()) return;                          // higiene NÃO vale para retry (v1 L677)
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
@@ -352,6 +382,7 @@ export function useInboxWhatsApp(opts: {
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
     if (optout) { aoAvisar({ tom: 'erro', texto: 'Contato marcado como não incomodar — mensagens bloqueadas.' }); return; }
+    if (iaTravaRef.current) { aoAvisar({ tom: 'erro', texto: TEXTO_TRAVA_IA }); return; }
     setRetryId(m.id);
     setContacts((cur) => aplicarRetry(cur, currentId, m.id!));
     if (!WA_REAL) { setRetryId(null); return; }
@@ -389,6 +420,7 @@ export function useInboxWhatsApp(opts: {
     if (WA_REAL && !currentId) throw new Error('Selecione uma conversa.');   // v1 L746/L758/L775
     if (descasada) throw new Error('Aguarde a conversa carregar para enviar.');
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
+    if (iaTravaRef.current) throw new Error(TEXTO_TRAVA_IA);
     if (!higieneBloqueia) return;
     // v1: motivo do bloqueio decide o texto (não o estado do dono)
     throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
@@ -482,6 +514,7 @@ export function useInboxWhatsApp(opts: {
     if (canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
     if (semDestino) throw new Error('Vincule um número confirmado para responder.');
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
+    if (iaTravaRef.current) throw new Error(TEXTO_TRAVA_IA);
     if (higieneBloqueia) throw new Error(textoBloqueio(higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
   };
   /** Bolha otimista de uma etapa de script (texto ou mídia do arsenal). */
@@ -653,6 +686,7 @@ export function useInboxWhatsApp(opts: {
     live, msgsQ, relogioMs,
     realCanais, canalSel, replyCanalId, replyChip, onReplyCanal, onReplyChip,
     canalConectado, canalIndisponivel, canalRestrito, semDestino, optout, bloqueados,
+    iaTrava, iaTravaIris, pausarIaParaResponder, pausandoIa: pausarMut.isPending, pausasDemo,
     envioSaude: envioSaudeQ.data?.estado ?? 'ok',
     higiene, higieneBloqueia, decNome, donoEfetivo, bloquearPorHigiene, adiarNome, nomeNaoInformado, adiando: adiarMut.isPending,
     replyTo, setReplyTo,

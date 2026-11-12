@@ -285,15 +285,21 @@ describe('etapaDoContato / etapasDeOportunidades = regra antiga (ganho grudento)
 
 describe('IA enxuta (desativado_manual:dados->desativado_manual) e satélites no card', () => {
   it('true / false / null', () => {
-    expect(iaDaLinha({ status: 'ativa', desativado_manual: true })).toEqual({ iaAtiva: false, iaStatus: 'ativa' });
-    expect(iaDaLinha({ status: 'ativa', desativado_manual: false })).toEqual({ iaAtiva: true, iaStatus: 'ativa' });
-    expect(iaDaLinha({ status: 'ativa', desativado_manual: null })).toEqual({ iaAtiva: true, iaStatus: 'ativa' });
-    expect(iaDaLinha({ status: 'handoff', desativado_manual: null })).toEqual({ iaAtiva: false, iaStatus: 'handoff' });
-    expect(iaDaLinha({ status: null })).toEqual({ iaAtiva: false, iaStatus: '' });
+    expect(iaDaLinha({ status: 'ativa', desativado_manual: true })).toEqual({ iaAtiva: false, iaStatus: 'ativa', iaAtendendo: false, iaIris: false });
+    expect(iaDaLinha({ status: 'ativa', desativado_manual: false })).toEqual({ iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false });
+    expect(iaDaLinha({ status: 'ativa', desativado_manual: null })).toEqual({ iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false });
+    expect(iaDaLinha({ status: 'handoff', desativado_manual: null })).toEqual({ iaAtiva: false, iaStatus: 'handoff', iaAtendendo: false, iaIris: false });
+    expect(iaDaLinha({ status: null })).toEqual({ iaAtiva: false, iaStatus: '', iaAtendendo: false, iaIris: false });
+    // 12/11 (trava do envio): "atendendo" só quando o número da sessão atende agora
+    const canais = new Map([['n-juros', true], ['n-velho', false]]);
+    expect(iaDaLinha({ status: 'ativa', canal_id: 'n-juros' }, canais)).toEqual({ iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: true });
+    expect(iaDaLinha({ status: 'ativa', canal_id: 'n-velho' }, canais)).toEqual({ iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: false });
+    expect(iaDaLinha({ status: 'ativa', canal_id: 'n-caido' }, canais)).toEqual({ iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false });
+    expect(iaDaLinha({ status: 'ativa', desativado_manual: true, canal_id: 'n-juros' }, canais)).toEqual({ iaAtiva: false, iaStatus: 'ativa', iaAtendendo: false, iaIris: true });
   });
   it('aplicarSatelites preenche etapa/opp/IA como a carga completa', () => {
     const e = etapaDoContato([opp('k', 'ganho', 1, col('Fechado', 'ganho'), 'u1')])!;
-    const c = aplicarSatelites(conv({ id: 'a' }), e, { iaAtiva: true, iaStatus: 'ativa' });
+    const c = aplicarSatelites(conv({ id: 'a' }), e, { iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false });
     expect(c).toMatchObject({ etapa: 'Fechado', stage: 'Fechado', etapaResultado: 'ganho', oppStatus: 'ganho', oppRespId: 'u1', iaAtiva: true, iaStatus: 'ativa' });
     const sem = aplicarSatelites(conv({ id: 'b' }), null, null);
     expect(sem.etapa).toBeUndefined();
@@ -383,9 +389,9 @@ describe('aplicarIaNaLista (refresh enxuto de IA)', () => {
     const b = conv({ id: 'b', iaAtiva: true, iaStatus: 'ativa' });
     const c = conv({ id: 'c' });
     const d = conv({ id: 'd', iaAtiva: true, iaStatus: 'ativa' });
-    const ia = new Map([['a', { iaAtiva: false, iaStatus: 'pausada' }], ['b', { iaAtiva: true, iaStatus: 'ativa' }], ['d', { iaAtiva: false, iaStatus: 'encerrada' }]]);
+    const ia = new Map([['a', { iaAtiva: false, iaStatus: 'pausada', iaAtendendo: false, iaIris: false }], ['b', { iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false }], ['d', { iaAtiva: false, iaStatus: 'encerrada', iaAtendendo: false, iaIris: false }]]);
     const r = aplicarIaNaLista([a, b, c, d], ia, (x) => x.id === 'd');
-    expect(r.lista[0]).toMatchObject({ iaAtiva: false, iaStatus: 'pausada' });
+    expect(r.lista[0]).toMatchObject({ iaAtiva: false, iaStatus: 'pausada', iaAtendendo: false, iaIris: false });
     expect(r.lista[1]).toBe(b);
     expect(r.lista[2]).toBe(c);
     expect(r.lista[3]).toBe(d);                                   // tocado depois do início da leitura

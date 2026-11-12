@@ -137,7 +137,7 @@ describe('satélites da carga completa (best-effort, mas o aborto vence)', () =>
       { conversa_id: 'c', status: 'ativa', desativado_manual: null },
     ] };
     const m = await iaSessoesPorConversa('org-1');
-    expect(h.estado.chamadas[0].searchParams.get('select')).toBe('conversa_id,status,desativado_manual:dados->desativado_manual');
+    expect(h.estado.chamadas[0].searchParams.get('select')).toBe('conversa_id,status,canal_id,desativado_manual:dados->desativado_manual');
     expect([m.get('a')?.iaAtiva, m.get('b')?.iaAtiva, m.get('c')?.iaAtiva]).toEqual([false, true, true]);
     const ctl = new AbortController();
     ctl.abort();

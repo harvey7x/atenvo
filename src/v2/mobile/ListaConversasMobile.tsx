@@ -144,6 +144,7 @@ export default function ListaConversasMobile() {
                   <span className="m-hora num">{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
                 </span>
                 <span className="m-l2">
+                  {c.iaAtendendo && <span className="m-iris" title={c.iaIris ? 'A Iris está atendendo' : 'A IA está atendendo'}><i aria-hidden />{c.iaIris ? 'Iris' : 'IA'}</span>}
                   <span className="m-prev">{c.last || '—'}</span>
                   {(c.unread ?? 0) > 0 && <span className="m-nl num">{c.unread > 99 ? '99+' : c.unread}</span>}
                 </span>

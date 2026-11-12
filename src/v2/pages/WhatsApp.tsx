@@ -32,7 +32,7 @@ import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { FichaJudicialModal } from '@/components/FichaJudicialModal';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage, useAssinaturaMarca } from '@/data/whatsapp';
-import { useIaEstadoConversa, useIaToggle, useIaRecomecar, type IaEstadoConversa } from '@/data/whatsapp';
+import { useIaEstadoConversa, useIaToggle, useIaRecomecar, type IaEstadoConversa, type IaPausa } from '@/data/whatsapp';
 import { PROGRESSO_WA } from '@/data/whatsapp';
 import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
@@ -373,6 +373,30 @@ function etapaIaLabel(slug: string | null | undefined): string | null {
   };
   return M[slug] ?? slug.replace(/_/g, ' ').toLowerCase();
 }
+
+type ItemFio = ItemConversa<WaMessage> | { tipo: 'handoff'; chave: string } | { tipo: 'pausa'; chave: string; pausa: IaPausa };
+/** Põe um evento sintético no fio ANTES da primeira mensagem posterior ao instante dele; sem instante (ou sendo o
+ *  último), no fim. Evento de VÉSPERA entra ACIMA do separador de dia da mensagem seguinte — senão "· 23:50"
+ *  sob o rótulo "Hoje" leria como hora de hoje. (Antes só o handoff usava; 12/11 a pausa da Iris também.) */
+function inserirNoFio(itens: ItemFio[], ev: ItemFio, emIso: string | null): ItemFio[] {
+  const em = emIso ? Date.parse(emIso) : NaN;
+  if (Number.isFinite(em)) {
+    const idx = itens.findIndex((it) => {
+      if (it.tipo !== 'msg') return false;
+      const ts = it.msg.tsISO ? Date.parse(it.msg.tsISO) : NaN;
+      return Number.isFinite(ts) && ts >= em;
+    });
+    if (idx >= 0) {
+      const alvo = itens[idx];
+      const antes = itens[idx - 1];
+      const diaEv = chaveDiaSP(emIso);
+      const pos = antes?.tipo === 'sep' && alvo.tipo === 'msg' && !!diaEv && diaEv !== chaveDiaSP(alvo.msg.tsISO ?? null) ? idx - 1 : idx;
+      return [...itens.slice(0, pos), ev, ...itens.slice(pos)];
+    }
+  }
+  return [...itens, ev];
+}
+const horaSP = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
 export default function WhatsAppV2() {
   const nav = useNavigate();
@@ -914,29 +938,19 @@ export default function WhatsAppV2() {
   const handoffHora = current.precisaHumanoEm
     ? new Date(current.precisaHumanoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
     : null;
-  const itensFio = useMemo((): (ItemConversa<WaMessage> | { tipo: 'handoff'; chave: string })[] => {
-    if (!handoffAtivo) return itensConversa;
-    const ev = { tipo: 'handoff' as const, chave: 'handoff-' + current.id };
-    const em = current.precisaHumanoEm ? Date.parse(current.precisaHumanoEm) : NaN;
-    if (Number.isFinite(em)) {
-      const idx = itensConversa.findIndex((it) => {
-        if (it.tipo !== 'msg') return false;
-        const ts = it.msg.tsISO ? Date.parse(it.msg.tsISO) : NaN;
-        return Number.isFinite(ts) && ts >= em;
-      });
-      // insere ANTES da primeira mensagem posterior ao pedido. Handoff de VÉSPERA (pedido
-      // num dia anterior ao da mensagem seguinte) entra ACIMA do separador de dia dela —
-      // senão "· 23:50" renderizado sob o rótulo "Hoje" leria como hora de hoje.
-      if (idx >= 0) {
-        const alvo = itensConversa[idx];
-        const antes = itensConversa[idx - 1];
-        const diaEv = chaveDiaSP(current.precisaHumanoEm);
-        const pos = antes?.tipo === 'sep' && alvo.tipo === 'msg' && !!diaEv && diaEv !== chaveDiaSP(alvo.msg.tsISO ?? null) ? idx - 1 : idx;
-        return [...itensConversa.slice(0, pos), ev, ...itensConversa.slice(pos)];
-      }
-    }
-    return [...itensConversa, ev];
-  }, [itensConversa, handoffAtivo, current.id, current.precisaHumanoEm]);
+  // trava do envio (12/11): cada vez que alguém pausou ou religou a Iris fica marcado no fio, com o nome e a hora
+  // (ficha ia_pausas — "fica registrado"). Na demo, a pausa feita na tela entra como "Você".
+  const pausasFio = useMemo((): IaPausa[] => {
+    if (WA_REAL) return iaEstado?.pausas ?? [];
+    const em = inbox.pausasDemo[current.id];
+    return em ? [{ acao: 'pausou', origem: 'trava_envio', em, nome: 'Você' }] : [];
+  }, [iaEstado?.pausas, inbox.pausasDemo, current.id]);
+  const itensFio = useMemo((): ItemFio[] => {
+    let fio: ItemFio[] = itensConversa;
+    if (handoffAtivo) fio = inserirNoFio(fio, { tipo: 'handoff', chave: 'handoff-' + current.id }, current.precisaHumanoEm ?? null);
+    pausasFio.forEach((p, k) => { fio = inserirNoFio(fio, { tipo: 'pausa', chave: 'pausa-' + k + '-' + p.em, pausa: p }, p.em); });
+    return fio;
+  }, [itensConversa, handoffAtivo, current.id, current.precisaHumanoEm, pausasFio]);
 
   /* ---------- popovers em portal (regra 10) ---------- */
   const raizPop = useMemo(() => {
@@ -1258,7 +1272,7 @@ export default function WhatsAppV2() {
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>; })()}
                             {/* Radar: UM selo logo após a situação (pedido > último > 2º > 1º) + Ligar à parte; só do dono */}
                             <RadarSelosCard r={radarPorConv.get(c.id)} diaUtil={diaUtilRadar} />
-                            {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
+                            {c.iaAtendendo && <span className="cchip iris" title={c.iaIris ? 'A Iris está atendendo este cliente agora — para escrever, pause a Iris na conversa' : 'A IA está atendendo este cliente agora — para escrever, pause a IA na conversa'}><span className="pulso" aria-hidden /><IcBot />{c.iaIris ? 'Iris atendendo' : 'IA atendendo'}</span>}
                             {(() => {
                               const rp = repassePorConv.get(c.id);
                               if (!rp) return null;
@@ -1450,6 +1464,18 @@ export default function WhatsAppV2() {
                       </span>
                     </span>
                   </div>
+                ) : item.tipo === 'pausa' ? (
+                  <div className="wa-pausa-ia" key={item.chave}>
+                    <span className="tt">
+                      <span className="glifo" aria-hidden><IcBot /></span>
+                      <span className="tx">
+                        <b>{item.pausa.nome}</b> {item.pausa.acao === 'pausou'
+                          ? (item.pausa.origem === 'trava_envio' ? 'pausou a Iris para responder' : 'pausou a Iris')
+                          : 'religou a Iris'}
+                        <span className="hh num"> · {horaSP(item.pausa.em)}</span>
+                      </span>
+                    </span>
+                  </div>
                 ) : item.tipo === 'sep' ? (
                   <div className="dia" key={'sep-' + i}>{item.label}</div>
                 ) : (
@@ -1540,6 +1566,21 @@ export default function WhatsAppV2() {
                 </div>
               )}
 
+              {inbox.iaTrava ? (
+                /* trava do envio (dono, 12/11): com a Iris atendendo, o atendente não interrompe sem pausar.
+                   O botão pausa a Iris nesta conversa e destrava a caixa; quem pausou fica registrado. */
+                <div className="wa-trava-ia" role="region" aria-label={inbox.iaTravaIris ? 'A Iris está atendendo' : 'A IA está atendendo'}>
+                  <span className="glifo" aria-hidden><IcBot /></span>
+                  <span className="dot" aria-hidden />
+                  <div className="tx">
+                    <b>{inbox.iaTravaIris ? 'A Iris está atendendo este cliente' : 'A IA está atendendo este cliente'}</b>
+                    <span>{iaAguardaVivo ? 'Ela pediu um atendente. ' : ''}Para escrever, pause o atendimento dela. Fica registrado que você pausou.</span>
+                  </div>
+                  <button type="button" className="bt" disabled={inbox.pausandoIa} onClick={() => { void inbox.pausarIaParaResponder(); }}>
+                    {inbox.pausandoIa ? 'Pausando…' : inbox.iaTravaIris ? 'Pausar a Iris e responder' : 'Pausar a IA e responder'}
+                  </button>
+                </div>
+              ) : (
               <div className="cmsg">
                 <textarea
                   ref={textareaRef} rows={1} value={draft} placeholder={placeholder} disabled={composerBloqueado}
@@ -1591,6 +1632,7 @@ export default function WhatsAppV2() {
                 })()}
                 <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
               </div>
+              )}
             </div>
           </>
         )}

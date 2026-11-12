@@ -25,7 +25,7 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-maria', name: 'Maria Aparecida Souza', phone: '5551988124407', contatoId: 'wa-maria-ct',
       time: '14:38', unread: 2, lastAtMs: agora - 4 * min, aguardando: true, aguardandoDesde: iso(agora - 4 * min),
-      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'coleta_docs',
+      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: true, iaEtapa: 'coleta_docs',
       last: 'Áudio · 0:34', lastInter: 'há 4 min', tags: ['Urgente'], notes: 'Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.',
       msgs: [
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
@@ -50,7 +50,7 @@ export function seedWa(): WaContact[] {
       time: '14:02', unread: 1, lastAtMs: agora - 58 * min, aguardando: true, aguardandoDesde: iso(agora - 58 * min),
       /* sessão AINDA ATIVA com aguardando_humano = o estado âmbar VIVO (a IA está de pé,
          esperando um humano ajudar com a senha; se fosse 'pausada' o flag seria resto morto) */
-      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
+      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: true, iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
       precisaHumanoMotivo: 'auxilio_senha', precisaHumanoEm: iso(agora - 57 * min),
       last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min', tags: ['Revisão de contrato'],
       msgs: [

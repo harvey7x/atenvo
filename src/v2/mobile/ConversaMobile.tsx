@@ -311,6 +311,18 @@ export default function ConversaMobile() {
             <button type="button" className="x" aria-label="Cancelar resposta" onClick={() => inbox.setReplyTo(null)}>×</button>
           </div>
         )}
+        {selecionada && inbox.iaTrava ? (
+          /* trava do envio (dono, 12/11): mesma regra do computador — pausar a Iris destrava e fica registrado */
+          <div className="m-trava-ia" role="region" aria-label={inbox.iaTravaIris ? 'A Iris está atendendo' : 'A IA está atendendo'}>
+            <div className="tx">
+              <b>{inbox.iaTravaIris ? 'A Iris está atendendo este cliente' : 'A IA está atendendo este cliente'}</b>
+              <span>Para escrever, pause o atendimento dela. Fica registrado que você pausou.</span>
+            </div>
+            <button type="button" className="bt" disabled={inbox.pausandoIa} onClick={() => { void inbox.pausarIaParaResponder(); }}>
+              {inbox.pausandoIa ? 'Pausando…' : inbox.iaTravaIris ? 'Pausar a Iris e responder' : 'Pausar a IA e responder'}
+            </button>
+          </div>
+        ) : (<>
         {/* barra de ferramentas — as mesmas funções do composer desktop */}
         <div className="m-tools">
           <button type="button" className="tool" title="Enviar imagem" aria-label="Enviar imagem" disabled={midiaDisabled} onClick={() => setMidiaModal('imagem')}><IcImg /></button>
@@ -333,6 +345,7 @@ export default function ConversaMobile() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 12l16-8-6 16-2.5-6.5z" /></svg>
           </button>
         </div>
+        </>)}
       </div>
 
       <ConfirmDialogV2

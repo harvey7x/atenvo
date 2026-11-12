@@ -369,7 +369,7 @@ describe('criarMotorRealtime — achados da revisão', () => {
     let ultimaCarga = Date.now();
     let visivel = true;
     let resposta: Promise<Map<string, IaEstadoLista>> | null = null;
-    const buscarIa = vi.fn(async () => resposta ?? new Map([['a', { iaAtiva: false, iaStatus: 'pausada' }], ['b', { iaAtiva: true, iaStatus: 'ativa' }]]));
+    const buscarIa = vi.fn(async () => resposta ?? new Map([['a', { iaAtiva: false, iaStatus: 'pausada', iaAtendendo: false, iaIris: false }], ['b', { iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false }]]));
     const b = conv({ id: 'b', iaAtiva: true, iaStatus: 'ativa' });
     const t = montar([conv({ id: 'a', iaAtiva: true, iaStatus: 'ativa' }), b], async () => [], {
       buscarIa, iaIntervaloMs: 60_000, relogioMs: 15_000, ultimaCargaCompletaEm: () => ultimaCarga, visivel: () => visivel,
@@ -377,7 +377,7 @@ describe('criarMotorRealtime — achados da revisão', () => {
     const marco = t.carimbos.abrir();                           // uma carga aberta segura o carimbo para conferir
     await vi.advanceTimersByTimeAsync(75_000);
     expect(buscarIa).toHaveBeenCalledTimes(1);
-    expect(achar(t.cache, 'a')).toMatchObject({ iaAtiva: false, iaStatus: 'pausada' });
+    expect(achar(t.cache, 'a')).toMatchObject({ iaAtiva: false, iaStatus: 'pausada', iaAtendendo: false, iaIris: false });
     expect(achar(t.cache, 'b')).toBe(b);
     expect(t.carimbos.tocadosDepois(marco).ids).toEqual(['a']);
     t.carimbos.fechar(marco);
@@ -387,9 +387,9 @@ describe('criarMotorRealtime — achados da revisão', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(buscarIa).toHaveBeenCalledTimes(2);
     ultimaCarga = Date.now();
-    pend.resolve(new Map([['a', { iaAtiva: true, iaStatus: 'ativa' }]]));
+    pend.resolve(new Map([['a', { iaAtiva: true, iaStatus: 'ativa', iaAtendendo: false, iaIris: false }]]));
     await vi.advanceTimersByTimeAsync(0);
-    expect(achar(t.cache, 'a')).toMatchObject({ iaAtiva: false, iaStatus: 'pausada' });
+    expect(achar(t.cache, 'a')).toMatchObject({ iaAtiva: false, iaStatus: 'pausada', iaAtendendo: false, iaIris: false });
     resposta = null;
     visivel = false;
     await vi.advanceTimersByTimeAsync(600_000);

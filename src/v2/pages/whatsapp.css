@@ -994,3 +994,37 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
 .v2 .wa-iris-filtros .chip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px; color: var(--txt-3); background: transparent; border: 1px solid rgba(var(--tint), .12); cursor: pointer; }
 .v2 .wa-iris-filtros .chip.on { color: var(--txt-1); border-color: rgba(var(--tint), .35); background: rgba(var(--tint), .08); }
 .v2 .conv2 .cchip.iris-era { margin-left: 6px; text-transform: none; max-width: 120px; vertical-align: middle; }
+
+/* ===== Trava do envio enquanto a Iris atende (dono, 12/11) =====
+   A caixa de escrever vira um aviso com um botão: pausar a Iris destrava e fica registrado. Cor só no
+   semântico (verde = a Iris atendendo); superfície sólida, como a faixa de estado da IA. */
+.v2 .wa-trava-ia { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(var(--verde-rgb), .07); border: 1px solid rgba(var(--verde-rgb), .28); }
+.v2 .wa-trava-ia .glifo { display: inline-flex; color: var(--verde); flex-shrink: 0; }
+.v2 .wa-trava-ia .glifo svg { width: 18px; height: 18px; }
+.v2 .wa-trava-ia .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--verde); flex-shrink: 0; animation: wa-iris-pulso 1.8s ease-in-out infinite; }
+.v2 .wa-trava-ia .tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.v2 .wa-trava-ia .tx b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .wa-trava-ia .tx span { font-size: 12px; color: var(--txt-2); }
+.v2 .wa-trava-ia .bt { flex-shrink: 0; border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  background: var(--txt); color: var(--base); }
+.v2 .wa-trava-ia .bt:hover:not(:disabled) { opacity: .9; }
+.v2 .wa-trava-ia .bt:disabled { opacity: .55; cursor: default; }
+.v2 .wa-trava-ia .bt:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+@keyframes wa-iris-pulso { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .v2 .wa-trava-ia .dot, .v2 .conv2 .cchip.iris .pulso, .v2 .m-iris i { animation: none; } }
+
+/* aviso no fio: quem pausou/religou a Iris e quando (ficha ia_pausas) */
+.v2 .wa-pausa-ia { align-self: stretch; display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 11px; color: var(--txt-2); }
+.v2 .wa-pausa-ia::before, .v2 .wa-pausa-ia::after { content: ''; flex: 1; height: 1px; background: rgba(var(--tint), .12); }
+.v2 .wa-pausa-ia .tt { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(var(--tint), .14); border-radius: 99px; padding: 3.5px 12px; }
+.v2 .wa-pausa-ia .glifo { display: inline-flex; color: var(--txt-3); }
+.v2 .wa-pausa-ia .glifo svg { width: 12px; height: 12px; }
+.v2 .wa-pausa-ia .tt b { color: var(--txt); font-weight: 600; }
+.v2 .wa-pausa-ia .hh { font-size: 9.5px; color: var(--txt-3); }
+
+/* marca da lista: "Iris atendendo" (só quando ela atende de verdade agora) */
+.v2 .conv2 .cchip.iris { display: inline-flex; align-items: center; gap: 4px; max-width: 128px; color: var(--verde);
+  border-color: rgba(var(--verde-rgb), .35); background: rgba(var(--verde-rgb), .08); letter-spacing: .05em; }
+.v2 .conv2 .cchip.iris svg { width: 9px; height: 9px; flex-shrink: 0; }
+.v2 .conv2 .cchip.iris .pulso { width: 5px; height: 5px; border-radius: 99px; background: var(--verde); flex-shrink: 0; animation: wa-iris-pulso 1.8s ease-in-out infinite; }
