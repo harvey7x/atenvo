@@ -144,6 +144,10 @@ if (typeof document !== 'undefined') aplicarRepaginada(true);
 // Atendimento renovado do Atenvo (inbox pro) FIXO: marca [data-inbox-pro] antes do primeiro paint (sem comparador)
 if (typeof document !== 'undefined') aplicarInboxPro(true);
 
+// Barra lateral e topo da ALFA (dono 12/11, referência "Dashboard Sidebar"): marca [data-barra-alfa] antes
+// do primeiro paint — Reviza de verdade e a demo (shell/BarraAlfa.tsx, shell/barra-alfa.css)
+if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) document.documentElement.setAttribute('data-barra-alfa', '');
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
 });

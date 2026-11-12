@@ -36,6 +36,19 @@ import { getCobrancaRepo } from '../data/cobranca/cobrancaRepo';
 import { chavesCobranca } from '../data/cobranca/keys';
 import type { Dados } from '../data/cobranca/types';
 import { BotaoDesfazer } from './BotaoDesfazer';
+import { BarraAlfa, TopoAlfa, IcFechar, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
+
+/* ALFA (Reviza de verdade e a demo): barra lateral e topo no desenho da referência "Dashboard
+   Sidebar" (dono 12/11) — BarraAlfa.tsx. O Atenvo (fora daqui) segue com a cápsula flutuante. */
+const ALFA = isRevizaMode || isDemoMode;
+/* preferência da barra (por aparelho): aberta (260px) ou recolhida (trilho de ícones) */
+const CHAVE_BARRA = 'reviza.barra';
+const lerPrefBarra = (): 'aberta' | 'trilho' | null => {
+  try { const v = localStorage.getItem(CHAVE_BARRA); return v === 'aberta' || v === 'trilho' ? v : null; } catch { return null; }
+};
+/* celular (gaveta): a barra some e abre por cima pelo botão do topo */
+const MQ_CELULAR = '(max-width: 760px)';
+const ehCelularAgora = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(MQ_CELULAR).matches;
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
 const IconeSol = () => (
@@ -72,7 +85,7 @@ const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Gestão',
     itens: [
-      // Kanban sem admin: a equipe vê o quadro (cada um os seus cards); Dashboard = administrador e gestor
+      // Kanban sem admin: a equipe vê o quadro (cada um os seus cards); Dashboard só o administrador (como no Atenvo)
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
     ],
@@ -159,6 +172,13 @@ const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
 // Reviza: Cobranças vem primeiro — é o início de quem tem os dois ambientes (o coração da Reviza)
 const MODULOS: Modulo[] = isRevizaMode ? [MOD_COBRANCAS, MOD_ATENDIMENTO] : [MOD_ATENDIMENTO, MOD_COBRANCAS];
+/* o nome da página na trilha do topo ("Cobranças / Painel"): o do item do menu (o da instância ganha) */
+const TITULOS_PAGINA: Record<string, string> = {
+  integracoes: 'Integrações',
+  ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES].map((i) => [i.slug, i.rotulo])),
+};
+const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 /* ícones das seções de cobrança (mesma família traço 1.7) */
 const IcC = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d={d} /></svg>
@@ -242,7 +262,7 @@ type ItemPaleta =
   | { tipo: 'secao'; slug: string; rotulo: string; grupo: string }
   | { tipo: 'cliente'; id: string; nome: string; comercial: string; dia: number };
 
-function PaletaBusca({ secoes, raiz, aoFechar, comClientes }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void; comClientes: boolean }) {
+function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void; comClientes: boolean; alfa?: boolean }) {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [ativo, setAtivo] = useState(0);
@@ -310,7 +330,12 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes }: { secoes: SecaoPal
           <input ref={inputRef} className="pal-inp" type="text" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder={comClientes ? 'Buscar cliente (nome, CPF, telefone) ou seção…' : 'Buscar seção…'}
             aria-label="Buscar" autoComplete="off" spellCheck={false} />
-          <kbd>Esc</kbd>
+          {alfa ? (
+            <>
+              <kbd onClick={aoFechar} aria-hidden>ESC</kbd>
+              <button type="button" className="pal-fechar" onClick={aoFechar} aria-label="Fechar a busca"><IcFechar /></button>
+            </>
+          ) : <kbd>Esc</kbd>}
         </div>
         <div className="pal-lista" ref={listaRef}>
           {itens.map((it, i) => {
@@ -580,6 +605,48 @@ export default function AppShellV2() {
   // busca de CLIENTES na paleta ⌘K: só no ambiente Cobranças e só para quem tem Cobranças
   // (no Atendimento a busca é a do Atenvo: só as seções)
   const buscaClientes = (isRevizaMode || isDemoMode) && temCob && moduloAtivo === 'cobrancas';
+
+  // BARRA DA ALFA: aberta (260px) ou recolhida (trilho) — preferência deste aparelho, e o padrão
+  // segue a largura da tela; no celular vira gaveta (o botão do topo abre por cima)
+  const [prefBarra, setPrefBarra] = useState<'aberta' | 'trilho'>(() => lerPrefBarra() ?? (typeof window !== 'undefined' && window.innerWidth < 1200 ? 'trilho' : 'aberta'));
+  const [celular, setCelular] = useState(ehCelularAgora);
+  const [gavetaAberta, setGavetaAberta] = useState(false);
+  useEffect(() => {
+    if (!ALFA || typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(MQ_CELULAR);
+    // o 'change' da media query não dispara em janela emulada: o resize cobre
+    const ver = () => setCelular(mq.matches);
+    mq.addEventListener?.('change', ver);
+    window.addEventListener('resize', ver);
+    return () => { mq.removeEventListener?.('change', ver); window.removeEventListener('resize', ver); };
+  }, []);
+  useEffect(() => { setGavetaAberta(false); }, [location.pathname, celular]);
+  const modoBarra: ModoBarra = celular ? 'gaveta' : prefBarra;
+  const alternarBarra = useCallback(() => {
+    if (celular) { setGavetaAberta((v) => !v); return; }
+    setPrefBarra((v) => {
+      const prox = v === 'aberta' ? 'trilho' : 'aberta';
+      try { localStorage.setItem(CHAVE_BARRA, prox); } catch { /* sem storage: vale só nesta aba */ }
+      return prox;
+    });
+  }, [celular]);
+  const fecharGaveta = useCallback(() => setGavetaAberta(false), []);
+  // os itens da barra: os MESMOS do menu (mesmo filtro de papel), com o ícone e o contador de cada um
+  const itemDaBarra = (i: ItemNav): ItemBarra => ({
+    slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
+    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : undefined,
+    badgeTitulo: i.slug === 'whatsapp' ? plural(badgePop, 'mensagem nova', 'mensagens novas')
+      : i.slug === 'cobrancas/avisos' ? plural(avisosNaoLidos, 'aviso não lido', 'avisos não lidos')
+      : i.slug === 'cobrancas/novos' ? `${pendentesAprovacao} aguardando aprovação` : undefined,
+    atalho: i.slug === 'configuracoes' ? ',' : undefined,
+  });
+  const gruposBarra: GrupoBarra[] = modulo.grupos.filter((g) => !g.fixo)
+    .map((g) => ({ rotulo: g.rotulo, itens: filtrarItensNav(g.itens).map(itemDaBarra) }))
+    .filter((g) => g.itens.length > 0);
+  const rodapeBarra: ItemBarra[] = modulo.grupos.filter((g) => g.fixo).flatMap((g) => filtrarItensNav(g.itens)).map(itemDaBarra);
+  // ⌘, (Ctrl+, no Windows) abre Configurações — só onde o item está no pé (Atendimento)
+  const atalhoConfigRef = useRef(false);
+  atalhoConfigRef.current = ALFA && !acessoCarregando && rodapeBarra.some((i) => i.slug === 'configuracoes');
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
     navigate(m.home);
@@ -590,7 +657,10 @@ export default function AppShellV2() {
   const fecharPaleta = useCallback(() => setPaletaAberta(false), []);
   useEffect(() => {
     const aoTecla = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletaAberta((v) => !v); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletaAberta((v) => !v); return; }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ',' && atalhoConfigRef.current && !e.repeat) {
+        e.preventDefault(); navigate('/configuracoes');
+      }
     };
     window.addEventListener('keydown', aoTecla);
     return () => window.removeEventListener('keydown', aoTecla);
@@ -633,7 +703,21 @@ export default function AppShellV2() {
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
-      <div className="p-app">
+      <div className="p-app" data-barra={ALFA ? modoBarra : undefined} data-gaveta={ALFA && modoBarra === 'gaveta' && gavetaAberta ? '' : undefined}>
+        {ALFA ? (
+          <BarraAlfa
+            modo={modoBarra} gavetaAberta={gavetaAberta} aoFecharGaveta={fecharGaveta}
+            org={org}
+            ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo }))}
+            ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
+            aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}
+            carregando={acessoCarregando}
+            grupos={gruposBarra} rodape={rodapeBarra}
+            aoBuscar={() => setPaletaAberta(true)} buscaAberta={paletaAberta}
+            aoSair={sair}
+            versao={isRevizaMode && import.meta.env.VITE_BUILD_TS ? String(import.meta.env.VITE_BUILD_TS) : null}
+          />
+        ) : (<>
         <aside className="p-sidebar" ref={sidebarRef} onMouseLeave={alinharNav}>
           {/* marca + seletor de módulo numa linha só, como no Atenvo: recolhida, sobra
               só a marca no rail; aberta, módulo + organização ao lado */}
@@ -713,10 +797,15 @@ export default function AppShellV2() {
         <div className="sb-rail" aria-hidden />
         <div className="sb-fundo vidro-pro" aria-hidden ref={fundoRef} />
         <div className="sb-sombra" aria-hidden />
+        </>)}
 
         <main className="principal">
           <div className="p-topbar">
-            {/* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */}
+            {ALFA ? (
+              <TopoAlfa modo={modoBarra} gavetaAberta={gavetaAberta} aoAlternar={alternarBarra}
+                ambiente={acessoCarregando ? '' : modulo.rotulo} pagina={tituloDaRota(location.pathname)} />
+            ) : (
+            /* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */
             <button type="button" className="busca" title="Buscar (⌘K)" aria-haspopup="dialog" aria-expanded={paletaAberta}
               onClick={() => setPaletaAberta(true)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -724,6 +813,7 @@ export default function AppShellV2() {
               </svg>
               <span className="busca-texto">{buscaClientes ? 'Buscar clientes e seções…' : 'Buscar seções do sistema…'}</span><kbd>⌘K</kbd>
             </button>
+            )}
             <div className="top-dir">
               {(isRevizaMode || isDemoMode) && <BotaoDesfazer />}
               <button
@@ -771,7 +861,7 @@ export default function AppShellV2() {
               )}
               <div className="top-usuario">
                 <button ref={avatarRef} type="button" className="avatar avatar-btn" aria-label="Menu do usuário" aria-haspopup="menu"
-                  aria-expanded={menuUsuario} title={nome} style={{ width: 33, height: 33 }}
+                  aria-expanded={menuUsuario} title={nome} style={ALFA ? undefined : { width: 33, height: 33 }}
                   onClick={abrirMenuUsuario}>{iniciaisDe(nome)}</button>
               </div>
               {menuUsuario && createPortal(
@@ -827,7 +917,7 @@ export default function AppShellV2() {
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
-        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} />}
+        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} alfa={ALFA} />}
         <AvisoAtualizacao />
       </div>
 
