@@ -143,7 +143,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
       </Secao>
 
       <Secao className="d5-ondas" titulo="Ondas por campanha"
-        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana (seg–dom)' : 'mês da casa (11 a 10)'} no período escolhido. Linhas retas entre os pontos — nada é suavizado.`}
+        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana (seg–dom)' : 'mês da casa (11 a 10)'} no período escolhido. A curva passa por todos os pontos medidos — nada é inventado entre eles.`}
         acao={(
           <div className="d5-ondas-ctl">
             <Segmentado<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="Métrica do gráfico" />
