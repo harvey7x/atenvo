@@ -1,5 +1,5 @@
 /* Contrato das ABAS do Dashboard (12/11/2026) — Campanhas, Atendentes e Iris.
-   Três RPCs novas, uma por aba (supabase/migrations/20261112060000_dashboard_abas.sql),
+   Três RPCs novas, uma por aba (supabase/migrations/20261112080000_dashboard_abas.sql),
    jsonb em snake_case; dashboardV5.abas.ts normaliza para os tipos abaixo. A aba
    Visão geral segue no contrato antigo (dashboardV5.tipos.ts). O demo
    (dashboardV5.abas.demo.ts) já nasce nesta forma.
