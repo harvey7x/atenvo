@@ -583,13 +583,8 @@ export default function AppShellV2() {
 
         <main className="principal">
           <div className="p-topbar">
-            <div className="busca">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
-              </svg>
-              <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
-            </div>
-            {/* Radar de Atendimento: cápsula Em negociação · Fechados · Ligar · Decisões no vão entre a busca e os ícones */}
+            {/* a busca "Buscar contatos, conversas, cobranças… ⌘K" SAIU (dono 12/11): era só enfeite, não buscava nada */}
+            {/* Radar de Atendimento: cápsula Em negociação · Fechados · Ligar · Decisões no vão à esquerda dos ícones */}
             {/* o perfil gestor (Murilo) não vê a Central de Avisos por enquanto (dono 30/10) */}
             {!gestorBomDia && <div className="radar-slot"><RadarBarra /></div>}
             <div className="top-dir">

@@ -247,22 +247,13 @@ html:root[data-repaginada][data-repaginada] .v2 .glabel {
   font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
 }
 
-/* ---- 6. BARRA SUPERIOR: superfície da página + fio; controles fantasmas;
-   busca como campo afundado (a cápsula do Radar v5 já nasce neutra, sem
-   emoji, no mesmo desenho da busca) ---- */
+/* ---- 6. BARRA SUPERIOR: superfície da página + fio; controles fantasmas
+   (a busca saiu 12/11; a cápsula do Radar v5 já nasce neutra, sem emoji) ---- */
 html:root[data-repaginada][data-repaginada] .v2 .p-topbar {
   height: 58px; padding: 0 24px 0 22px; gap: 12px;
   background: transparent; border-bottom: 1px solid var(--linha);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-html:root[data-repaginada][data-repaginada] .v2 .busca {
-  width: 340px; height: 34px; border-radius: 9px;
-  background: var(--rp-campo); border-color: var(--rp-campo-fio); box-shadow: none;
-  transition: border-color .15s;
-}
-html:root[data-repaginada][data-repaginada] .v2 .busca:hover { border-color: var(--rp-campo-fio-hover); }
-html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .busca { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
-html:root[data-repaginada][data-repaginada] .v2 .busca kbd { border-radius: 5px; background: rgba(var(--tint), .06); }
 html:root[data-repaginada][data-repaginada] .v2 .p-topbar .ib {
   width: 34px; height: 34px; border-radius: 9px;
   background: transparent; border-color: transparent; color: var(--txt-2);
