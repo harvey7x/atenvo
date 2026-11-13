@@ -52,3 +52,5 @@
 .v2 .num-remover:disabled { opacity: .5; cursor: default; }
 .v2 .num-rodape-esp { flex: 1 1 auto; }
 .v2 .nowrap { white-space: nowrap; }
+/* texto de situação do modal do número alinhado à esquerda (o QR continua no centro) */
+html[data-barra-alfa] .v2 .p-modal .cm-qr > p { text-align: left; }

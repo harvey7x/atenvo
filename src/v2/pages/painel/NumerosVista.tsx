@@ -104,7 +104,7 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
           pe={<><b className="num">{alcanceN.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} em cobrança</>}
           visual={<div className="pn-trilho"><i className={alcanceN ? 'at' : 'er'} style={{ width: `${pct(alcanceN, totalCob)}%` }} /></div>} />
         <Indicador rotulo="Com telefone cadastrado" valor={<>{pct1(pct(totalTel, totalCob))}<span className="pn-cent">%</span></>}
-          pe={<><b className="num">{totalTel.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} clientes · {alcanceTel.toLocaleString('pt-BR')} alcançados pela régua</>}
+          pe={<><b className="num">{totalTel.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} · {alcanceTel.toLocaleString('pt-BR')} alcançados pela régua</>}
           visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${pct(totalTel, totalCob)}%` }} /></div>} />
         <Indicador rotulo="Comerciais sem número" valor={<>{semNumero.length}<span className="pn-cent"> de {cobertura.filter((c) => c.emCobranca > 0).length}</span></>} tom={semNumero.length ? 'er' : 'ok'}
           pe={semNumero.length ? <><b className="num">{semNumero.reduce((s, c) => s + c.emCobranca, 0).toLocaleString('pt-BR')}</b> clientes aguardando um número</> : 'Todos cobrindo a própria carteira'}

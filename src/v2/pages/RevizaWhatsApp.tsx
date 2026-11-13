@@ -492,7 +492,8 @@ export function ConversasReviza() {
     : f.wa_envios?.origem === 'regua' && !reguaLigada ? { t: 'Parada', tom: 'atencao' }
     : { t: 'Na fila', tom: 'atencao' };
   const ROT_PROX: Record<string, { t: string; tom: 'ok' | 'atencao' | 'erro' | 'neutro' }> = {
-    vai_receber: { t: reguaLigada ? 'Vai receber' : 'Sairia', tom: 'ok' }, gerado: { t: 'Já gerada', tom: 'neutro' },
+    // futuro = cinza; verde só para o que já aconteceu (o mesmo sentido de Envios)
+    vai_receber: { t: reguaLigada ? 'Vai receber' : 'Sairia', tom: 'neutro' }, gerado: { t: 'Já gerada', tom: 'neutro' },
     aguardando: { t: 'Aguardando', tom: 'atencao' }, pulado: { t: 'Não recebe', tom: 'neutro' },
   };
   const situacaoSel = linhaSel?.cancelamento ? `Cancelados · ${ROTULO_CANCELAMENTO[linhaSel.cancelamento]}`
@@ -647,7 +648,7 @@ export function ConversasReviza() {
                         <b>{f.wa_envios?.origem === 'regua' ? f.passo_nome ?? 'Régua' : f.wa_envios?.nome ?? 'Envio'}</b>
                         <span className="num">{f.wa_envios?.origem === 'regua' ? 'Régua · ' : 'Manual · '}{new Date(f.enviado_em ?? (f.status === 'pendente' ? f.wa_envios?.agendado_para : null) ?? f.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}{f.canal_nome ? ` · por ${nomeGente(f.canal_nome)}` : ''}</span>
                       </div>
-                      <span className="ev-st">{f.status === 'enviado' && <Checks status={f.entrega ?? 'enviada'} />}<BadgeStatus tom={st.tom}>{st.t}</BadgeStatus></span>
+                      <BadgeStatus tom={st.tom}>{st.t}</BadgeStatus>
                     </div>
                   ); })}
                 </div>
