@@ -1,0 +1,107 @@
+/* ==================================================================
+   MENSAGEM DO MURILLO PARA A EQUIPE (dono 13/11) — prefixo único .meq-, escopo .v2.
+   - Quem recebe: o cartão do RECADO no meio da tela (.rcd-veu/.rcd-aviso de recado.css: vidro escuro nos
+     dois temas, filete âmbar, zero emoji), com o texto da mensagem grande. O véu leva também .meq-veu.
+   - O administrador: o botão fantasma da barra do topo e a janela do sistema (ModalV2, claro/escuro pelos tokens).
+   ================================================================== */
+
+/* ---------------------------------------------------------------- o botão da barra do topo (a cara dos ícones) */
+.v2 .meq-topo {
+  height: 34px; padding: 0 12px 0 10px; display: inline-flex; align-items: center; gap: 7px; flex: none;
+  border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--txt-2);
+  font-family: var(--fonte); font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.v2 .meq-topo:hover { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .meq-topo[aria-expanded="true"] { background: rgba(var(--tint), .09); color: var(--txt); }
+.v2 .meq-topo svg { flex: none; }
+@media (max-width: 760px) {
+  .v2 .meq-topo { width: 34px; padding: 0; justify-content: center; }
+  .v2 .meq-topo .meq-topo-rot { display: none; }
+}
+
+/* ---------------------------------------------------------------- quem recebe: o texto grande no meio da tela */
+/* um degrau abaixo do recado do administrador (95): se o recado chegar com a mensagem aberta, ele já aparece por cima
+   (a mensagem sai em seguida e volta depois dele) */
+.v2 .rcd-veu.meq-veu { z-index: 94; }
+.v2 .meq-texto {
+  margin: 0; font-size: 15px; line-height: 1.5; color: var(--rcd-txt); white-space: pre-line; overflow-wrap: anywhere;
+  max-height: 46vh; overflow-y: auto;
+}
+.v2 .rcd-veu .meq-texto { font-size: 18px; letter-spacing: -.005em; }
+.v2 .meq-acoes { justify-content: flex-end; padding-top: 2px; }
+
+/* ---------------------------------------------------------------- a janela do administrador */
+.v2 .meq-cab { display: flex; align-items: flex-start; gap: 12px; }
+.v2 .meq-cab-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.v2 .meq-cab-t { display: inline-flex; align-items: center; gap: 7px; }
+.v2 .meq-cab-t svg { color: var(--txt-2); }
+.v2 .meq-fechar {
+  flex: none; width: 28px; height: 28px; margin: -3px -6px 0 0; display: grid; place-items: center; padding: 0;
+  border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--txt-2); cursor: pointer;
+}
+.v2 .meq-fechar:hover { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .meq-janela { display: flex; flex-direction: column; gap: 16px; }
+.v2 .meq-campo-bloco { display: flex; flex-direction: column; gap: 7px; }
+.v2 .meq-rot { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .meq-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .meq-chip {
+  height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(var(--tint), .14);
+  background: rgba(var(--tint), .04); color: var(--txt); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.v2 .meq-chip:hover { background: rgba(var(--tint), .08); }
+.v2 .meq-chip[data-on] { background: var(--txt); color: var(--base); border-color: transparent; font-weight: 600; }
+.v2 .meq-quem { margin: 0; font-size: 12px; color: var(--txt-2); }
+.v2 .meq-campo {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 92px; max-height: 40vh; padding: 9px 11px;
+  border-radius: 10px; border: 1px solid rgba(var(--tint), .16); background: rgba(var(--tint), .035);
+  color: var(--txt); font: inherit; font-size: 13.5px; line-height: 1.45;
+}
+.v2 .meq-campo:focus { outline: none; border-color: rgba(var(--tint), .34); box-shadow: 0 0 0 3px rgba(var(--tint), .07); }
+.v2 .meq-campo::placeholder { color: var(--txt-3); }
+.v2 .meq-campo[readonly] { opacity: .7; }
+.v2 .meq-envio { display: flex; align-items: center; gap: 10px; }
+.v2 .meq-dica { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--txt-3); }
+.v2 .meq-enviar { flex: none; }
+.v2 .meq-erro { margin: 0; font-size: 12.5px; color: var(--rubro); }
+.v2 .meq-feito { margin: 0; font-size: 12.5px; color: var(--txt-2); }
+.v2 .meq-chip:focus-visible, .v2 .meq-fechar:focus-visible, .v2 .meq-tirar:focus-visible, .v2 .meq-topo:focus-visible {
+  outline: 2px solid rgba(var(--tint), .55); outline-offset: 2px;
+}
+
+/* as dos últimos 7 dias: quem viu e quem deu ok */
+.v2 .meq-lista { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--linha); }
+.v2 .meq-vazio { margin: 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .meq-itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2 .meq-item {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(var(--tint), .025);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.v2 .meq-item[data-tirada] .meq-item-texto, .v2 .meq-item[data-tirada] .meq-dest { opacity: .55; }
+.v2 .meq-item-cab { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--txt-3); min-width: 0; }
+.v2 .meq-item-quando { flex: none; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+.v2 .meq-item-de { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .meq-item-conta { flex: none; font-variant-numeric: tabular-nums; }
+.v2 .meq-item-texto {
+  margin: 0; font-size: 13px; line-height: 1.45; color: var(--txt); white-space: pre-line; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.v2 .meq-dest { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 12px; }
+.v2 .meq-dest li { display: inline-flex; align-items: baseline; gap: 5px; }
+.v2 .meq-dest-nome { color: var(--txt); font-weight: 500; }
+.v2 .meq-dest-sit { color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .meq-dest li[data-sit="ok"] .meq-dest-sit { color: var(--txt-2); }
+.v2 .meq-dest li[data-sit="nao_viu"] .meq-dest-nome { color: var(--txt-2); font-weight: 400; }
+.v2 .meq-item-pe { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .meq-tirar {
+  height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid rgba(var(--tint), .14); background: transparent;
+  color: var(--txt-2); font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.v2 .meq-tirar:hover { color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .meq-tirar[data-confirmar] { color: var(--txt); border-color: rgba(var(--tint), .32); background: rgba(var(--tint), .08); font-weight: 600; }
+.v2 .meq-item-tirada, .v2 .meq-item-aviso { font-size: 11.5px; color: var(--txt-3); }
+
+/* estilo Linear (linear.css): o horário da lista em mono, como os outros horários do sistema */
+html:root[data-linear][data-linear][data-linear] .v2 .meq-item-quando {
+  font-family: var(--mono); font-size-adjust: .5; letter-spacing: 0; word-spacing: -.3em; font-feature-settings: 'zero' 0;
+}

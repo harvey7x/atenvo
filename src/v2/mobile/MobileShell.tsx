@@ -10,6 +10,7 @@ import './mobile.css';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { aplicarTema, lerTema } from '../lib/tema';
 import { seedWa } from '../pages/whatsappSeed';
+import { AvisoMensagemEquipe } from '../components/AvisoMensagemEquipe';
 
 /* ------------------------------------------------------------------
    Shell do chat MOBILE (/m) — layout route fora do AppShellV2 (sem
@@ -70,6 +71,8 @@ export default function MobileShell() {
     <div className="v2 m-app">
       {aviso && <div className={'m-toast ' + aviso.tom} role="status">{aviso.texto}</div>}
       <Outlet context={{ inbox, aoAvisar } satisfies CtxMobile} />
+      {/* Mensagem do Murillo (dono 13/11: "em qualquer ocasião"): quem atende pelo celular também recebe no meio da tela */}
+      <AvisoMensagemEquipe />
     </div>
   );
 }

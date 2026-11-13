@@ -28,6 +28,7 @@ import { AssistenteBalao, vozLiberadaPara } from '../components/AssistenteBalao'
 import { LembreteAviso } from '../components/LembreteAviso';
 import { AvisoIris } from '../components/AvisoIris';
 import { AvisoRecado } from '../components/AvisoRecado';
+import { AvisoMensagemEquipe, BotaoMensagemEquipe } from '../components/AvisoMensagemEquipe';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
@@ -588,6 +589,8 @@ export default function AppShellV2() {
             {/* o perfil gestor (Murilo) não vê a Central de Avisos por enquanto (dono 30/10) */}
             {!gestorBomDia && <div className="radar-slot"><RadarBarra /></div>}
             <div className="top-dir">
+              {/* Mensagem para a equipe (dono 13/11): só o administrador vê; aparece no meio da tela deles, como Murillo */}
+              <BotaoMensagemEquipe />
               <button
                 type="button" className="ib"
                 aria-label={`Acento do sistema: ${ROTULO_ACENTO[acento]} — clique para alternar`}
@@ -701,6 +704,8 @@ export default function AppShellV2() {
         <AvisoRecado oculto={bomDia !== null} acesso={acessoFila} />
         {/* Aviso da Iris (dono 12/11): "a Iris passou para você" em qualquer página; acima do lembrete */}
         <AvisoIris oculto={bomDia !== null} acesso={acessoFila} />
+        {/* Mensagem do Murillo (dono 13/11): no meio da tela de quem recebeu, em qualquer página, até o "Ok, entendi" */}
+        <AvisoMensagemEquipe oculto={bomDia !== null} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL
             (nunca num build publicado, nem no demo de cliente) */}
         {import.meta.env.DEV && DEMO_MODE && <ComparadorVisual />}

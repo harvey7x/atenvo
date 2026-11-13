@@ -24,8 +24,10 @@ import { baseDoAviso, SELETOR_OCUPADO } from './LembreteAviso';
    ================================================================== */
 
 const FOLGA = 12;
-/** janelas por cima de tudo: a ficha do cliente da Fila da Iris e os diálogos do sistema */
-export const SELETOR_JANELA = '.fi-veu, .p-modal';
+/** janelas por cima de tudo: a ficha do cliente da Fila da Iris, os diálogos do sistema e os do v1 que o WhatsApp
+    ainda abre (enviar imagem, sequência de scripts, ficha judicial: .atv-modal-overlay, z 1000; a foto ampliada do
+    v1: .atv-lightbox) — sem eles, o cartão do meio da tela abria POR BAIXO e puxava o foco (revisão 13/11) */
+export const SELETOR_JANELA = '.fi-veu, .p-modal, .atv-modal-overlay, .atv-lightbox';
 /** depois de "Ver na fila", o cartão espera a ficha abrir (sem piscar atrás do véu) */
 const PAUSA_VER_FILA_MS = 2500;
 const useLayoutIso = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -71,7 +73,9 @@ export function useBaseNoCanto(ativo: boolean, abaixo: string): number {
 /** o que há na tela que manda o aviso esperar (bom dia, cartão de voz, tela cheia do Radar, janela aberta) */
 export function useOcupadoNoCanto(ativo: boolean, alemDisso = ''): boolean {
   const [oc, setOc] = useState(false);
-  useEffect(() => {
+  /* antes da pintura: o cartão que acabou de chegar não aparece nem por um quadro por cima de uma janela aberta (nem
+     puxa o foco de quem está escrevendo nela) — revisão 13/11 */
+  useLayoutIso(() => {
     if (!ativo) { setOc(false); return; }
     const sel = `${SELETOR_OCUPADO}, ${SELETOR_JANELA}${alemDisso ? `, ${alemDisso}` : ''}`;
     const conferir = () => { const v = !!document.querySelector(sel); setOc((x) => (x === v ? x : v)); };
