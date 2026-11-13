@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { melhorarImagem, sugerirModo, type ModoImagem } from '../lib/imagemMelhor';
 import { pedirMelhoriaIa, situacaoIa, urlImagemIa, type RegistroIa, type SituacaoIa } from '@/data/midiaIa';
+import { urlAssinadaMidiaWa, urlDownloadMidiaWa } from '@/data/whatsapp';
 import { Segmentado } from './Segmentado';
 import './componentes.css';
 
@@ -10,7 +11,11 @@ import './componentes.css';
      · Documento / Foto — no navegador, na hora, sem custo (só luz, cor e nitidez);
      · Com IA — Gemini imagem + conferência (ver midia-melhorar-ia): UMA vez por cliente, só conta se
        a conferência aprovar; fica salva no cliente (reabrir não custa de novo).
-   O ORIGINAL nunca é alterado. */
+   O ORIGINAL nunca é alterado.
+   O link da foto que vem da bolha é assinado e VENCE EM 10 MIN (a conversa costuma ficar aberta mais
+   que isso). Vencido, o servidor responde um erro em JSON — e o "Baixar" salvava esse erro como
+   "<id>.json" ("O site não está disponível" no Chrome, 13/11). Por isso, com o caminho do anexo, o
+   visualizador pede link novo ao abrir e o "Baixar" pede outro na hora do clique. */
 
 type Ajuste = Exclude<ModoImagem, 'original'> | 'ia';
 type Versao = { url: string; blob: Blob };
@@ -18,14 +23,60 @@ type Versao = { url: string; blob: Blob };
 function baixarBlob(blob: Blob, nome: string) {
   const a = document.createElement('a'); const u = URL.createObjectURL(blob);
   a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(u), 4000);
+  setTimeout(() => URL.revokeObjectURL(u), 60_000);
+}
+/** Baixa direto do link de download (o servidor manda como arquivo, já com o nome) — o mesmo caminho do
+    "Baixar" do documento e do ícone da bolha. */
+function baixarLink(href: string, nome: string) {
+  const a = document.createElement('a');
+  a.href = href; a.download = nome; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+/** Lê a imagem para baixar. Resposta de erro do servidor (link vencido = JSON) NUNCA vira arquivo. */
+export async function blobDaImagem(u: string): Promise<Blob> {
+  const r = await fetch(u);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const blob = await r.blob();
+  const tipo = blob.type.toLowerCase();
+  if (tipo && !tipo.startsWith('image/') && !tipo.startsWith('application/octet-stream')) throw new Error(`não é imagem: ${tipo}`);
+  return blob;
+}
+/** Extensão pelo tipo da imagem ("image/jpeg;charset=…" → jpg); sem tipo de imagem, a do nome. */
+export function extDaImagem(blob: Blob, nome?: string): string {
+  const sub = /^image\/([a-z0-9.+-]+)/i.exec(blob.type)?.[1]?.toLowerCase();
+  if (sub) return sub === 'jpeg' ? 'jpg' : sub.split('+')[0];
+  return /\.([a-z0-9]{2,5})$/i.exec(nome ?? '')?.[1]?.toLowerCase() ?? 'jpg';
+}
+/** O que o "Baixar" do original faz (fora do componente, para o teste). Com anexo: link de download NOVO,
+    pedido agora (vale 60 s), nunca o da tela, que pode ter vencido. Sem anexo (ou sem link novo): a foto da
+    tela, só se o servidor devolver imagem. */
+export async function baixarOriginalImagem(
+  o: { anexoPath?: string | null; nome: string; url: string; base: string },
+  saida: { link: (href: string, nome: string) => void; blob: (b: Blob, nome: string) => void } = { link: baixarLink, blob: baixarBlob },
+): Promise<void> {
+  if (o.anexoPath) {
+    try { saida.link(await urlDownloadMidiaWa(o.anexoPath, o.nome), o.nome); return; }
+    catch { /* sem link novo: tenta com a foto da tela, abaixo */ }
+  }
+  const blob = await blobDaImagem(o.url);
+  saida.blob(blob, `${o.base}.${extDaImagem(blob, o.nome)}`);
+}
+const ERRO_BAIXAR = 'Não deu pra baixar agora. Tente de novo.';
+/** Registro da IA desta imagem: o que ocupa a vaga do cliente, se for esta; senão o desta. Sem situação
+    (carregando) ou sem mensagem (foto do robô, do Painel da Equipe, recém-enviada) = nenhum. Antes, sem
+    mensagem, `undefined === undefined` fazia ler `null.ocupada` e a tela inteira caía (13/11). */
+export function registroIaDaImagem(sit: SituacaoIa | null, mensagemId?: string): RegistroIa | null {
+  if (!sit || !mensagemId) return null;
+  return sit.ocupada?.mensagem_id === mensagemId ? sit.ocupada : sit.desta ?? null;
 }
 const dataCurta = (iso: string) => { try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return ''; } };
 
-export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar }: {
+export function VisualizadorImagem({ url: urlRecebida, nome, mensagemId, contatoId, anexoPath, aoFechar }: {
   url: string; nome?: string;
   /** id da mensagem + cliente: habilitam "Com IA" (bolha otimista sem id não tem). */
   mensagemId?: string; contatoId?: string | null;
+  /** caminho do anexo no bucket privado (script-midia): com ele o link é renovado (ver o topo). Fora do demo. */
+  anexoPath?: string | null;
   aoFechar: () => void;
 }) {
   const podeIa = !!mensagemId && !!contatoId;
@@ -34,15 +85,33 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
   const [versoes, setVersoes] = useState<Partial<Record<Exclude<Ajuste, 'ia'>, Versao>>>({});
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [baixando, setBaixando] = useState(false);
+  const [erroBaixar, setErroBaixar] = useState<string | null>(null);
   const urlsRef = useRef<string[]>([]);
   const base = (nome || 'imagem').replace(/\.[a-z0-9]+$/i, '');
+  const nomeOriginal = nome || anexoPath?.split('/').pop() || 'imagem.jpg';
+
+  // link novo ao abrir: a foto da tela, o "Salvar imagem como…" e o "Melhorar qualidade" usam ele.
+  // Até chegar, segue o que veio (a foto já está na memória do navegador; a troca não pisca). Renova a
+  // cada 9 min: o atendente costuma deixar a foto aberta enquanto copia os dados para outro sistema.
+  const [urlNova, setUrlNova] = useState<string | null>(null);
+  useEffect(() => {
+    setUrlNova(null);
+    if (!anexoPath) return;
+    let vivo = true;
+    const renovar = () => { urlAssinadaMidiaWa(anexoPath).then((u) => { if (vivo) setUrlNova(u); }).catch(() => { /* segue com o último link */ }); };
+    renovar();
+    const t = setInterval(renovar, 9 * 60_000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [anexoPath]);
+  const url = urlNova ?? urlRecebida;
 
   // ---- IA ----
   const [sitIa, setSitIa] = useState<SituacaoIa | null>(null);
   const [urlIa, setUrlIa] = useState<string | null>(null);
   const [pedindoIa, setPedindoIa] = useState(false);
   const [erroIa, setErroIa] = useState<string | null>(null);
-  const regIa: RegistroIa | null = sitIa?.ocupada?.mensagem_id === mensagemId ? sitIa!.ocupada : sitIa?.desta ?? null;
+  const regIa = registroIaDaImagem(sitIa, mensagemId);
   const usadaEmOutra = !!sitIa?.ocupada && sitIa.ocupada.mensagem_id !== mensagemId;
 
   const atualizarIa = useCallback(async () => {
@@ -113,19 +182,26 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
   }
 
   async function baixarOriginal() {
+    if (baixando) return;
+    setBaixando(true); setErroBaixar(null);
     try {
-      const blob = await (await fetch(url)).blob();
-      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-      baixarBlob(blob, `${base}.${ext}`);
-    } catch { window.open(url, '_blank', 'noopener'); }
+      await baixarOriginalImagem({ anexoPath, nome: nomeOriginal, url, base });
+    } catch (e) {
+      // link público sem CORS (não vence): abre em outra aba para salvar dali; o resto avisa na tela
+      if (!anexoPath && e instanceof TypeError) window.open(url, '_blank', 'noopener');
+      else setErroBaixar(ERRO_BAIXAR);
+    } finally { setBaixando(false); }
   }
   async function baixarMelhorada() {
+    setErroBaixar(null);
     if (ajuste === 'ia') {
-      if (!urlIa) return;
+      if (!regIa || regIa.status !== 'aprovada' || baixando) return;
+      setBaixando(true);
       try {
-        const blob = await (await fetch(urlIa)).blob();
+        const blob = await blobDaImagem(await urlImagemIa(regIa));   // link novo na hora (o da tela vence em 10 min)
         baixarBlob(blob, `${base}_melhorada_ia.${blob.type.includes('png') ? 'png' : 'jpg'}`);
-      } catch { window.open(urlIa, '_blank', 'noopener'); }
+      } catch { setErroBaixar(ERRO_BAIXAR); }
+      finally { setBaixando(false); }
       return;
     }
     if (melhorada) baixarBlob(melhorada.blob, `${base}_melhorada.jpg`);
@@ -184,7 +260,7 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
         {!comparando ? (
           <>
             <button type="button" className="p-btn btn-pri btn-mini" onClick={() => setComparando(true)} title="Gera uma versão melhorada e mostra lado a lado com a original">Melhorar qualidade</button>
-            <button type="button" className="p-btn btn-sec btn-mini" onClick={baixarOriginal}>Baixar</button>
+            <button type="button" className="p-btn btn-sec btn-mini" onClick={baixarOriginal} disabled={baixando}>Baixar</button>
           </>
         ) : (
           <>
@@ -201,6 +277,7 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
             )}
           </>
         )}
+        {erroBaixar && <span className="vimg-erro vimg-erro-baixar" role="alert">{erroBaixar}</span>}
         <button type="button" className="p-btn btn-mini vimg-x" aria-label="Fechar" onClick={aoFechar}>×</button>
       </div>
 
@@ -213,7 +290,7 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
           <figure className="vimg-lado">
             <figcaption>Antes <span>· como o cliente enviou</span></figcaption>
             <div className="vimg-moldura"><img src={url} alt="Imagem original" className="vimg-img" /></div>
-            <button type="button" className="p-btn btn-sec btn-mini" onClick={baixarOriginal}>Baixar original</button>
+            <button type="button" className="p-btn btn-sec btn-mini" onClick={baixarOriginal} disabled={baixando}>Baixar original</button>
           </figure>
           <figure className="vimg-lado">
             <figcaption>Depois <span>· {legenda}</span></figcaption>
@@ -233,7 +310,7 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
               </span>
             )}
             {(ajuste !== 'ia' || regIa?.status === 'aprovada') && (
-              <button type="button" className="p-btn btn-pri btn-mini" onClick={baixarMelhorada} disabled={!podeBaixar}>Baixar melhorada</button>
+              <button type="button" className="p-btn btn-pri btn-mini" onClick={baixarMelhorada} disabled={!podeBaixar || baixando}>Baixar melhorada</button>
             )}
           </figure>
         </div>

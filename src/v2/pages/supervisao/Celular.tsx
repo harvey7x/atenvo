@@ -23,7 +23,7 @@ export function Celular({ convs, aberta, aoAbrir, agora, nomeAtendente, zoom, ao
   nomeAtendente: string;
   zoom: number;
   aoAbrirNoAtenvo: (conversaId: string) => void;
-  aoAmpliar: (url: string, nome: string) => void;
+  aoAmpliar: (url: string, nome: string, anexoPath?: string) => void;
 }) {
   const conversa = aberta ? convs.find((c) => c.id === aberta) ?? null : null;
   const outras = useMemo(

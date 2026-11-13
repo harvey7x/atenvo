@@ -119,7 +119,7 @@ export interface BolhaProps {
   /** quem fala de cada lado (avatar do áudio e nome da citação) */
   nomeAtendente: string;
   nomeCliente: string;
-  aoAmpliar: (url: string, nome: string) => void;
+  aoAmpliar: (url: string, nome: string, anexoPath?: string) => void;
 }
 
 export function ZapBolha({ m, cauda, nomeAtendente, nomeCliente, aoAmpliar }: BolhaProps) {
@@ -159,7 +159,7 @@ export function ZapBolha({ m, cauda, nomeAtendente, nomeCliente, aoAmpliar }: Bo
       )}
 
       {tipo === 'imagem' && (
-        <button type="button" className="zp-img" onClick={() => url && aoAmpliar(url, nomeArquivoMidia(m))} disabled={!url} aria-label="Ampliar a foto">
+        <button type="button" className="zp-img" onClick={() => url && aoAmpliar(url, nomeArquivoMidia(m), m.anexoPath)} disabled={!url} aria-label="Ampliar a foto">
           {url ? <img src={url} alt="" loading="lazy" /> : <span className="zp-img-vazia">{semUrl || !m.anexoPath ? 'Foto indisponível' : 'Carregando foto…'}</span>}
           {!legenda && <span className="zp-hh zp-hh-sobre">{m.time}{saida && <Tiques status={m.status} />}</span>}
         </button>

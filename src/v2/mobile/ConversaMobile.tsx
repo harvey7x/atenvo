@@ -88,7 +88,7 @@ export default function ConversaMobile() {
 
   const [draft, setDraft] = useState('');
   const [verTodas, setVerTodas] = useState(false);
-  const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string; anexoPath?: string } | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
@@ -267,7 +267,7 @@ export default function ConversaMobile() {
               aoVerErro={(m) => aoAvisar({ tom: 'erro', texto: traduzErroEnvio(m.erro ?? '') })}
               aoRetry={inbox.retryMsg}
               aoRemover={(m) => setRemoverAlvo(m)}
-              aoLightbox={(url, nome, mensagemId) => setLightbox({ url, nome, mensagemId })}
+              aoLightbox={(url, nome, mensagemId, anexoPath) => setLightbox({ url, nome, mensagemId, anexoPath })}
               aoRecarregarAudio={async (m) => {
                 if (!WA_REAL || !m.id) return;
                 try { await waRecarregarAudio(currentOrg.id, m.id); await inbox.msgsQ.refetch(); }
@@ -457,7 +457,7 @@ export default function ConversaMobile() {
         }}
         aoCancelar={() => setCancelarAgId(null)}
       />
-      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} mensagemId={lightbox.mensagemId} contatoId={conv?.contatoId ?? null} aoFechar={() => setLightbox(null)} />}
+      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} mensagemId={lightbox.mensagemId} anexoPath={lightbox.anexoPath} contatoId={conv?.contatoId ?? null} aoFechar={() => setLightbox(null)} />}
     </>
   );
 }

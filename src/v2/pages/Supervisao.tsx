@@ -70,7 +70,7 @@ function useAgora(passoMs = 15_000): number {
 function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, aoAbrir, aoFicha, aoAbrirNoAtenvo, aoAmpliar }: {
   p: DadosPosto; rotuloPeriodo: string; agora: number; zoom: number; aberta: string | null; foco: boolean;
   aoAbrir: (conversaId: string | null) => void; aoFicha: () => void;
-  aoAbrirNoAtenvo: (conversaId: string) => void; aoAmpliar: (url: string, nome: string) => void;
+  aoAbrirNoAtenvo: (conversaId: string) => void; aoAmpliar: (url: string, nome: string, anexoPath?: string) => void;
 }) {
   const { membro: m, resumo, radar, stats: s } = p;
   const espera = resumo.esperaMaisAntiga ? Date.parse(resumo.esperaMaisAntiga) : 0;
@@ -206,8 +206,8 @@ export default function SupervisaoV2() {
     navigate(`/whatsapp?conversa=${encodeURIComponent(conversaId)}`);
   }, [navigate]);
 
-  const [foto, setFoto] = useState<{ url: string; nome: string } | null>(null);
-  const aoAmpliar = useCallback((url: string, nome: string) => setFoto({ url, nome }), []);
+  const [foto, setFoto] = useState<{ url: string; nome: string; anexoPath?: string } | null>(null);
+  const aoAmpliar = useCallback((url: string, nome: string, anexoPath?: string) => setFoto({ url, nome, anexoPath }), []);
 
   const rotuloPeriodo = ROTULO_PERIODO[preset];
   const larguraTel = Math.round(LARGURA_TEL * zoom);
@@ -320,7 +320,7 @@ export default function SupervisaoV2() {
         aoFechar={() => setFichaId(null)}
         aoAbrirConversa={irParaConversa}
       />
-      {foto && <VisualizadorImagem url={foto.url} nome={foto.nome} aoFechar={() => setFoto(null)} />}
+      {foto && <VisualizadorImagem url={foto.url} nome={foto.nome} anexoPath={foto.anexoPath} aoFechar={() => setFoto(null)} />}
     </div>
   );
 }

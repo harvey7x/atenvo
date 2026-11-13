@@ -69,7 +69,7 @@ export function ZapConversa({ conversa, nomeAtendente, agora, outrasNaoLidas, ao
   outrasNaoLidas: number;
   aoVoltar: () => void;
   aoAbrirNoAtenvo: (conversaId: string) => void;
-  aoAmpliar: (url: string, nome: string) => void;
+  aoAmpliar: (url: string, nome: string, anexoPath?: string) => void;
 }) {
   const { msgs, carregando, erro } = useMensagensSupervisao(conversa.id);
   // a lista já traz a última mensagem: enquanto o histórico chega, o fio mostra o que tem
