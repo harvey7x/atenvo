@@ -86,7 +86,8 @@ const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
-      { slug: 'whatsapp', rotulo: 'WhatsApp' },
+      // ALFA: "Conversas", o mesmo nome do título da tela e do item de Cobranças (o grupo já diz WhatsApp)
+      { slug: 'whatsapp', rotulo: ALFA ? 'Conversas' : 'WhatsApp' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
       { slug: 'scripts', rotulo: 'Scripts' },
     ],
@@ -835,8 +836,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // os itens da barra: os MESMOS do menu (mesmo filtro de papel), com o ícone e o contador de cada um
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
-    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : undefined,
+    // contador onde há trabalho: Conversas de Cobranças = mensagens não lidas (o mesmo número do sino)
+    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/conversas' ? waNaoLidas : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : undefined,
     badgeTitulo: i.slug === 'whatsapp' ? plural(badgePop, 'mensagem nova', 'mensagens novas')
+      : i.slug === 'cobrancas/conversas' ? plural(waNaoLidas, 'mensagem não lida', 'mensagens não lidas')
       : i.slug === 'cobrancas/avisos' ? plural(avisosNaoLidos, 'aviso não lido', 'avisos não lidos')
       : i.slug === 'cobrancas/novos' ? `${pendentesAprovacao} aguardando aprovação` : undefined,
     atalho: i.slug === 'configuracoes' ? ',' : undefined,
@@ -1027,6 +1030,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
             {ALFA ? (
               <TopoAlfa modo={modoBarra} sobreposta={sobreposta} aoAlternar={alternarBarra}
                 ambiente={acessoCarregando || semAcessoAoAmbiente ? '' : modulo.rotulo}
+                inicioAmbiente={naoEncontrada || location.pathname !== modulo.home ? modulo.home : undefined}
                 pagina={acessoCarregando || semAcessoAoAmbiente ? '' : naoEncontrada ? 'Página não encontrada' : tituloDaRota(location.pathname)} />
             ) : (
             /* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */

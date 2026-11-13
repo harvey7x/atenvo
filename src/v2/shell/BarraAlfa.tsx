@@ -20,7 +20,7 @@
    - 'gaveta'  — no celular (≤760px) ela some; o botão do topo abre por cima, com um véu atrás.
    ===================================================================== */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import './barra-alfa.css';
 
 export type ModoBarra = 'aberta' | 'trilho' | 'gaveta';
@@ -151,7 +151,7 @@ function ItemLink({ item, aoEscolher }: { item: ItemBarra; aoEscolher?: () => vo
       </span>
       <span className="ba-item-lado">
         {item.atalho && <kbd className="ba-kbd" aria-hidden>{rotuloAtalho(item.atalho)}</kbd>}
-        {temBadge && <span className="ba-badge num" title={item.badgeTitulo}>{item.badge}</span>}
+        {temBadge && <span className="ba-badge num" title={item.badgeTitulo}>{(item.badge ?? 0) > 99 ? '99+' : item.badge}</span>}
       </span>
     </NavLink>
   );
@@ -263,7 +263,7 @@ export function BarraAlfa(p: BarraAlfaProps) {
           <nav ref={nav} className="ba-grupos" aria-label="Navegação principal" data-rolagem={rolagem || undefined}>
             {!p.carregando && (
               <div className="ba-grupo">
-                <button type="button" className="ba-item" onClick={() => { escolher?.(); p.aoBuscar(); }}
+                <button type="button" className="ba-item ba-busca" onClick={() => { escolher?.(); p.aoBuscar(); }}
                   aria-haspopup="dialog" aria-expanded={p.buscaAberta} aria-keyshortcuts="Meta+K Control+K">
                   <span className="ba-item-pri"><span className="ba-ico"><IcBusca /></span><span className="ba-item-tx">Buscar</span></span>
                   <span className="ba-item-lado"><kbd className="ba-kbd" aria-hidden>{rotuloAtalho('K')}</kbd></span>
@@ -297,8 +297,10 @@ export function BarraAlfa(p: BarraAlfaProps) {
 }
 
 /* ---------- o lado esquerdo da barra do topo: recolher + "ambiente / página" ---------- */
-export function TopoAlfa({ modo, sobreposta, aoAlternar, ambiente, pagina }: {
+export function TopoAlfa({ modo, sobreposta, aoAlternar, ambiente, pagina, inicioAmbiente }: {
   modo: ModoBarra; sobreposta: boolean; aoAlternar: () => void; ambiente: string; pagina: string;
+  /** o início do ambiente: o primeiro nível da trilha vira link para ele (fora da própria página inicial) */
+  inicioAmbiente?: string;
 }) {
   const aberta = modo === 'aberta' || sobreposta;
   const rotulo = modo === 'gaveta' ? (sobreposta ? 'Fechar o menu' : 'Abrir o menu') : aberta ? 'Recolher a barra lateral' : 'Abrir a barra lateral';
@@ -309,7 +311,9 @@ export function TopoAlfa({ modo, sobreposta, aoAlternar, ambiente, pagina }: {
         <IcPainel aberto={aberta} />
       </button>
       <nav className="ba-trilha" aria-label="Você está em">
-        {ambiente && <span className="ba-trilha-amb">{ambiente}</span>}
+        {ambiente && (inicioAmbiente
+          ? <Link to={inicioAmbiente} className="ba-trilha-amb" title={`Ir para o início de ${ambiente}`}>{ambiente}</Link>
+          : <span className="ba-trilha-amb">{ambiente}</span>)}
         {ambiente && pagina && <span className="ba-trilha-sep" aria-hidden>/</span>}
         {pagina && <span className="ba-trilha-pag" aria-current="page">{pagina}</span>}
       </nav>
