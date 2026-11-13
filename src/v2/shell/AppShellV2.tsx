@@ -86,7 +86,6 @@ const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
-      // ALFA: "Conversas", o mesmo nome do título da tela e do item de Cobranças (o grupo já diz WhatsApp)
       { slug: 'whatsapp', rotulo: 'WhatsApp' }, // o nome que o dono usou ao pedir o Atendimento (11/11)
       { slug: 'presenciais', rotulo: 'Presenciais' },
       { slug: 'scripts', rotulo: 'Scripts' },
@@ -1155,7 +1154,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               {acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
-                : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar às Conversas'} />
+                : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar ao WhatsApp'} />
                 : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
                 : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
                 : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />
