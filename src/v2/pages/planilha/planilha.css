@@ -586,3 +586,6 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-rn { color: var(--plx-b
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   white-space: normal; overflow-wrap: anywhere; line-height: 12px; font-size: 11px; max-width: 100%;
 }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-c { letter-spacing: .01em; }
+/* mês em aberto com só a data do vencimento escrita: texto discreto (a data repetida virava ruído) */
+.v2 .plx-c.plx-c-data { color: var(--txt-3); font-size: 11.5px; }

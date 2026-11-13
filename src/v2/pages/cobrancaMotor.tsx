@@ -3370,8 +3370,8 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
     <ModalV2 aberto aoFechar={aoFechar} largura={580}
       titulo={<div>Ciclos (turmas de vencimento)<div className="mod-sub">Clique num ciclo para mudar o dia da cobrança — move todos os clientes dele de uma vez.</div></div>}
       rodape={<>
-        <BotaoSec onClick={() => { setSelAbrir(null); setAbrindo(true); }} title="Cria um ciclo VAZIO num dia — depois é só direcionar/mover clientes pra ele.">＋ Abrir ciclo</BotaoSec>
-        {totalComDia > 0 && <BotaoSec onClick={() => setConfEsvaziar(true)} title="Todos os clientes saem dos ciclos e ficam aguardando — pra redistribuir do zero." style={{ color: 'var(--rubro)' }}>Esvaziar ciclos…</BotaoSec>}
+        <BotaoSec onClick={() => { setSelAbrir(null); setAbrindo(true); }} title="Cria um ciclo VAZIO num dia — depois é só direcionar ou mover clientes para ele.">＋ Abrir ciclo</BotaoSec>
+        {totalComDia > 0 && <button type="button" className="cic-esv" onClick={() => setConfEsvaziar(true)} title="Todos os clientes saem dos ciclos e ficam aguardando — para redistribuir do zero.">Esvaziar ciclos…</button>}
         <span style={{ flex: 1 }} />
         <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>
       </>}>
@@ -3383,19 +3383,20 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditar(dia); } }}>
             <span className="cm-ciclo-cod">{t.codigo}</span>
             <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{t.leads.length} cliente{t.leads.length === 1 ? '' : 's'} nesta turma</span></div>
-            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto pra este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
-              <BotaoSec mini onClick={() => setConfUm(dia)} title="Remove TODAS as pessoas deste ciclo (ficam aguardando). O ciclo continua aberto e as datas do calendário dele permanecem.">Esvaziar</BotaoSec>
+            {/* só Enter/Espaço ficam aqui (abririam a linha); o Esc segue até o modal e fecha */}
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}>
+              <button type="button" className="cic-esv" onClick={() => setConfUm(dia)} title="Remove TODAS as pessoas deste ciclo (ficam aguardando). O ciclo continua aberto e as datas do calendário dele permanecem.">Esvaziar</button>
+              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto para este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
             </span>
-            <span className="fin-ciclo-acoes" style={{ opacity: 0.55, fontSize: 20, paddingRight: 4 }} aria-hidden>›</span>
+            <span className="fin-ciclo-acoes cic-seta" aria-hidden><IcT d="m9 18 6-6-6-6" s={16} mr={0} /></span>
           </div>
         ) : (
           <div className="fin-ciclo-row" key={dia} style={{ opacity: 0.8 }}>
             <span className="cm-ciclo-cod">D{d2(dia)}</span>
-            <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{novosPorDia(dia) > 0 ? `${novosPorDia(dia)} novo${novosPorDia(dia) === 1 ? '' : 's'} vence${novosPorDia(dia) === 1 ? '' : 'm'} aqui — ninguém em cobrança` : 'vazio — direcione ou mova clientes pra cá'}</span></div>
+            <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{novosPorDia(dia) > 0 ? `${novosPorDia(dia)} novo${novosPorDia(dia) === 1 ? '' : 's'} vence${novosPorDia(dia) === 1 ? '' : 'm'} aqui — ninguém em cobrança` : 'vazio — direcione ou mova clientes para cá'}</span></div>
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto pra este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
-              <BotaoSec mini onClick={() => aoFecharDia(dia)} title="Tira este dia da lista de abertos (os clientes que vencem nele não mudam).">Fechar ciclo</BotaoSec>
+              <BotaoSec mini onClick={() => aoFecharDia(dia)} title="Retira este dia da lista de abertos (os clientes que vencem nele não mudam).">Fechar ciclo</BotaoSec>
+              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto para este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
             </span>
           </div>
         ))}
@@ -3403,7 +3404,7 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
       </div>
       {abrindo && (
         <ModalV2 aberto aoFechar={() => setAbrindo(false)} largura={360}
-          titulo={<div>Abrir ciclo<div className="mod-sub">Escolha o dia do mês — o ciclo nasce vazio, pronto pra receber clientes.</div></div>}
+          titulo={<div>Abrir ciclo<div className="mod-sub">Escolha o dia do mês — o ciclo nasce vazio, pronto para receber clientes.</div></div>}
           rodape={<><BotaoSec onClick={() => setAbrindo(false)}>Cancelar</BotaoSec><BotaoPrimario disabled={selAbrir == null} onClick={() => { if (selAbrir != null) { aoAbrir(selAbrir); setAbrindo(false); } }}>{selAbrir != null ? `Abrir dia ${d2(selAbrir)}` : 'Escolha um dia'}</BotaoPrimario></>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
             {Array.from({ length: 31 }, (_, k) => k + 1).map((dd0) => (
@@ -3417,26 +3418,26 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
       )}
       {turmaConfUm && (
         <ModalV2 aberto aoFechar={() => setConfUm(null)} largura={420}
-          titulo={<div>Esvaziar o ciclo {turmaConfUm.codigo}?<div className="mod-sub">Remove todas as pessoas — o ciclo fica pronto pra receber gente nova.</div></div>}
-          rodape={<><BotaoSec onClick={() => setConfUm(null)}>Cancelar</BotaoSec><BotaoPrimario disabled={salvando} onClick={() => { aoEsvaziarUm(turmaConfUm.dia); setConfUm(null); }}>{salvando ? 'Esvaziando…' : `Esvaziar ${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)} cliente${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia) === 1 ? '' : 's'}`}</BotaoPrimario></>}>
+          titulo={<div>Esvaziar o ciclo {turmaConfUm.codigo}?<div className="mod-sub">Remove todas as pessoas — o ciclo fica pronto para receber clientes novos.</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfUm(null)}>Cancelar</BotaoSec><button type="button" className="p-btn btn-perigo" disabled={salvando} onClick={() => { aoEsvaziarUm(turmaConfUm.dia); setConfUm(null); }}>{salvando ? 'Esvaziando…' : `Esvaziar ${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)} cliente${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia) === 1 ? '' : 's'}`}</button></>}>
           <p className="cm-hint" style={{ margin: 0 }}>
             Os <b>{turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)}</b> clientes do dia {d2(turmaConfUm.dia)} ({turmaConfUm.leads.length} em cobrança{novosPorDia(turmaConfUm.dia) > 0 ? ` + ${novosPorDia(turmaConfUm.dia)} novos` : ''}) saem do ciclo e ficam
             <b> aguardando ciclo</b> — nenhum cadastro nem pagamento é apagado. O ciclo <b>D{d2(turmaConfUm.dia)} continua aberto</b> e as
-            <b> datas do calendário dele permanecem</b> — é só subir/direcionar as pessoas novas pra ele.
+            <b> datas do calendário dele permanecem</b> — basta subir ou direcionar os clientes novos para ele.
           </p>
-          <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>⚠ Dá pra reverter num clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
+          <p className="cm-hint" style={{ margin: '8px 0 0' }}>É possível reverter com um clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
         </ModalV2>
       )}
       {confEsvaziar && (
         <ModalV2 aberto aoFechar={() => setConfEsvaziar(false)} largura={420}
-          titulo={<div>Esvaziar todos os ciclos?<div className="mod-sub">Pra reorganizar a estrutura do zero.</div></div>}
-          rodape={<><BotaoSec onClick={() => setConfEsvaziar(false)}>Cancelar</BotaoSec><BotaoPrimario disabled={salvando} onClick={() => { aoEsvaziar(); setConfEsvaziar(false); }}>{salvando ? 'Esvaziando…' : `Esvaziar tudo (${totalComDia})`}</BotaoPrimario></>}>
+          titulo={<div>Esvaziar todos os ciclos?<div className="mod-sub">Para reorganizar a estrutura do zero.</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfEsvaziar(false)}>Cancelar</BotaoSec><button type="button" className="p-btn btn-perigo" disabled={salvando} onClick={() => { aoEsvaziar(); setConfEsvaziar(false); }}>{salvando ? 'Esvaziando…' : `Esvaziar tudo (${totalComDia})`}</button></>}>
           <p className="cm-hint" style={{ margin: 0 }}>
             Todos os <b>{totalComDia}</b> clientes com dia ({totalCobranca} em cobrança + {totalNovos} novos) saem dos ciclos e ficam
             <b> aguardando ciclo</b> — nenhum cadastro nem pagamento é apagado. Depois você redistribui: abre os dias que quiser e
-            direciona os clientes pra eles. As datas manuais do calendário (deste mês em diante) também são limpas.
+            direciona os clientes para eles. As datas manuais do calendário (deste mês em diante) também são limpas.
           </p>
-          <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>⚠ Dá pra reverter TUDO num clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
+          <p className="cm-hint" style={{ margin: '8px 0 0' }}>É possível reverter TUDO com um clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
         </ModalV2>
       )}
       {alvo && <EditorDiaCiclo ciclo={alvo} turmas={turmas} novosPorDia={novosPorDia} datasManuaisDe={datasManuaisDe} salvando={salvando} aoMover={(de, para) => { aoMover(de, para); setEditar(null); }} aoFechar={() => setEditar(null)} />}

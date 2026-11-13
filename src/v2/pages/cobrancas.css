@@ -1667,3 +1667,13 @@ html[data-barra-alfa]:not(#rv-sis) .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-pa
 .v2 .cm-num-av.nv-ic-novo { color: var(--txt-2); font-size: 0; }
 /* cabeçalho do cartão de Novos: filtros à esquerda das ações, a principal por último */
 .v2 .fin-head .fin-filtros .mm { flex: none; }
+/* Ciclos (Gerenciar): "Esvaziar" é destrutivo — texto vermelho, sem fundo (confirmação no clique) */
+.v2 .cic-esv {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 8px;
+  border: 0; border-radius: 8px; background: none; cursor: pointer;
+  color: var(--cor-erro-txt, var(--rubro)); font: 500 12px var(--fonte); white-space: nowrap;
+}
+.v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .1); }
+.v2 .cic-esv:focus-visible { outline: 2px solid rgba(var(--rubro-rgb), .5); outline-offset: 1px; }
+.v2 .p-modal-rodape .cic-esv { height: 32px; font-size: 13px; }
+.v2 .cic-seta { display: inline-flex; align-items: center; color: var(--txt-3); padding-right: 2px; }

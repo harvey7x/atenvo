@@ -568,6 +568,7 @@ function renderCel(l: PlLinha, c: ColV, dest: string, senha: SenhaPar | undefine
   } else if (!cab && c.tipo === 'mes' && txt && !trava) {
     // cor AUTOMÁTICA só de texto; estilo explícito sempre vence
     if (ehNaoPagou(txt)) cls += ' plx-np';
+    else if (RE_SO_DATA.test(txt)) cls += ' plx-c-data';   // só a data do vencimento (mês em aberto): discreta, não compete com os valores
     else { const v = valorBR(txt); if (v != null && v > 0) cls += ' plx-pg'; }
   }
   if (dest && txt && !trava && semAcento(txt).includes(dest)) cls += ' plx-hit';
