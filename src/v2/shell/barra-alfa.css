@@ -485,3 +485,23 @@ html[data-barra-alfa] .v2 .p-app[data-barra="trilho"]:has(> .ba-barra:is(:has(:f
 @media (prefers-reduced-motion: no-preference) {
   html[data-barra-alfa][data-perf="lite"] .v2 .p-app[data-barra="trilho"]::after { transition: opacity .2s var(--ba-e) !important; }
 }
+
+/* ---- troca de ambiente: título, ícone no quadro de 28px, nome + descrição e o atual marcado ---- */
+html[data-barra-alfa] .v2 .ba-menu { gap: 2px; padding: 6px; border-radius: 10px; }
+html[data-barra-alfa] .v2 .ba-menu-tit {
+  padding: 4px 8px 6px; font-size: 11px; font-weight: 600; line-height: 16px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ba-rotulo);
+}
+html[data-barra-alfa] .v2 .ba-menu .ba-menu-item { gap: 10px; min-height: 44px; padding: 6px 8px; line-height: 18px; }
+html[data-barra-alfa] .v2 .ba-menu-ico {
+  display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid var(--ba-fio); background: rgba(var(--tint), .04); color: var(--ba-mudo);
+}
+html[data-barra-alfa] .v2 .ba-menu-tx { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+html[data-barra-alfa] .v2 .ba-menu-nome { font-size: 13px; font-weight: 500; color: var(--ba-txt); }
+html[data-barra-alfa] .v2 .ba-menu-desc { font-size: 12px; line-height: 16px; color: var(--ba-mudo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ba-menu-check { flex: none; color: var(--ba-ativo-ico); }
+/* o atual: o destaque da seleção fica no quadro do ícone e no check (o fundo dourado ficava pesado com 2 linhas) */
+html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] { background: rgba(var(--tint), .05); color: var(--ba-txt); font-weight: 400; }
+html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] .ba-menu-ico { border-color: color-mix(in srgb, var(--azul) 40%, transparent); background: var(--ba-ativo); color: var(--ba-ativo-ico); }
+html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] .ba-menu-nome { font-weight: 600; }

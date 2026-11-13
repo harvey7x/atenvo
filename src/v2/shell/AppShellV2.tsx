@@ -177,6 +177,11 @@ const COB_GRUPO_DE: Record<string, string> = {
 const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equipe']
   .map((rotulo) => ({ rotulo, itens: COB_SECOES.filter((i) => (COB_GRUPO_DE[i.slug.replace('cobrancas/', '')] ?? 'Equipe') === rotulo) }))
   .filter((g) => g.itens.length > 0);
+/* a linha de descrição de cada ambiente no menu de troca da barra */
+const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
+  cobrancas: 'Carteira, pagamentos e régua',
+  atendimento: 'Conversas, Kanban e presenciais',
+};
 const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS };
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
 // Reviza: Cobranças vem primeiro — é o início de quem tem os dois ambientes (o coração da Reviza)
@@ -817,7 +822,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
           <BarraAlfa
             modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
             org="ALFA GROUP"
-            ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo }))}
+            ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: DESCRICAO_AMBIENTE[m.id] }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
             aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}
             carregando={acessoCarregando}

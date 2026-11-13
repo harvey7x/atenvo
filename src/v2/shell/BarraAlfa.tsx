@@ -26,7 +26,7 @@ import './barra-alfa.css';
 export type ModoBarra = 'aberta' | 'trilho' | 'gaveta';
 export type ItemBarra = { slug: string; rotulo: string; icone: ReactNode; badge?: number; badgeTitulo?: string; atalho?: string };
 export type GrupoBarra = { rotulo: string; itens: ItemBarra[] };
-export type AmbienteBarra = { id: string; rotulo: string };
+export type AmbienteBarra = { id: string; rotulo: string; descricao?: string };
 
 /* a tecla do atalho como a pessoa vê no teclado dela: ⌘ no Mac, Ctrl no Windows */
 const EH_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
@@ -53,6 +53,13 @@ function MarcaAlfa() {
     </svg>
   );
 }
+
+/* ícone de cada ambiente no menu de troca (quadro de 28px): Cobranças = recibo; Atendimento = balão */
+const ICONE_AMBIENTE: Record<string, ReactNode> = {
+  cobrancas: svg(<><path d="M5 3.5h14v17l-2.4-1.5-2.3 1.5-2.3-1.5-2.3 1.5-2.3-1.5L5 20.5z" /><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" /></>, 16),
+  atendimento: svg(<path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.6A7.5 7.5 0 1 1 20 11.5z" />, 16),
+};
+const IcCheck = () => svg(<path d="M20 6 9 17l-5-5" />, 16, 'ba-menu-check');
 
 /* ---------- troca de ambiente (o "workspace" da referência) ---------- */
 function TrocaAmbiente({ org, atual, ambientes, carregando, aoTrocar, aoMudarAberto }: {
@@ -112,11 +119,18 @@ function TrocaAmbiente({ org, atual, ambientes, carregando, aoTrocar, aoMudarAbe
         {corpo}
       </button>
       {aberto && (
-        <div className="ba-menu" id={menuId} role="menu" aria-label="Ambientes" onKeyDown={teclas}>
+        /* o conceito central do produto: título, ícone, descrição e o ambiente atual marcado (crítica 12/11) */
+        <div className="ba-menu" id={menuId} role="menu" aria-labelledby={menuId + '-t'} onKeyDown={teclas}>
+          <span className="ba-menu-tit" id={menuId + '-t'}>Ambientes</span>
           {ambientes.map((a) => (
             <button key={a.id} type="button" role="menuitemradio" aria-checked={a.id === atual?.id} tabIndex={-1}
               className="ba-menu-item" onClick={() => { setAberto(false); gatilho.current?.focus({ preventScroll: true }); aoTrocar(a.id); }}>
-              {a.rotulo}
+              <span className="ba-menu-ico" aria-hidden>{ICONE_AMBIENTE[a.id] ?? ICONE_AMBIENTE.cobrancas}</span>
+              <span className="ba-menu-tx">
+                <span className="ba-menu-nome">{a.rotulo}</span>
+                {a.descricao && <span className="ba-menu-desc">{a.descricao}</span>}
+              </span>
+              {a.id === atual?.id && <IcCheck />}
             </button>
           ))}
         </div>
