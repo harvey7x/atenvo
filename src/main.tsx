@@ -16,6 +16,8 @@ import './v2/movimento.css'; // camada de movimento do Atenvo (22/10)
 import './v2/repaginada.css'; // visual do Atenvo (repaginada 27/10) — age com [data-repaginada] na raiz
 import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua do Atenvo (depois da repaginada)
 import './v2/reviza-sistema.css'; // a régua única da ALFA (crítica de design 12/11) — por último
+import './v2/reviza-linear.css'; // estilo Linear na Reviza (dono 13/11) — só age com [data-linear] + [data-barra-alfa]
+import { aplicarLinearAlfa, lerLinearAlfa } from './v2/lib/linearAlfa';
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
@@ -148,6 +150,8 @@ if (typeof document !== 'undefined') aplicarInboxPro(true);
 // Barra lateral e topo da ALFA (dono 12/11, referência "Dashboard Sidebar"): marca [data-barra-alfa] antes
 // do primeiro paint — Reviza de verdade e a demo (shell/BarraAlfa.tsx, shell/barra-alfa.css)
 if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) document.documentElement.setAttribute('data-barra-alfa', '');
+// Estilo Linear (dono 13/11): [data-linear] antes do primeiro paint, só na ALFA; padrão ligado.
+if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarLinearAlfa(lerLinearAlfa());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

@@ -743,3 +743,15 @@ html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg :is(.d5-quem-leg small, .d5-calor-p
   .v2 .d5-par-funil li { grid-template-columns: 1fr 44px; }
   .v2 .d5-par-funil li .d5-trilho { display: none; }
 }
+
+/* ===== abas do Atenvo na Reviza (13/11) — gráfico de ondas com VÁRIAS linhas =====
+   A paleta neutra da Cobrança (--dado-1 cinza) serve a barra e o mapa, mas linhas de campanhas
+   ou de atendentes precisam se distinguir: no cartão que tem legenda com mais de uma série, as
+   cores de série voltam (íris, céu, verde, rosa, cinza — tons médios, legíveis nos dois temas).
+   A Reviza não tinha --dado-2…5 (vieram com a repaginada do Atenvo depois do fork). */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg { --dado-2: #4CB0D9; --dado-3: #3FB868; --dado-4: #D1789B; --dado-5: #8496AB; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg { --dado-2: #1F7E95; --dado-3: #1E8A44; --dado-4: #A14A77; --dado-5: #5E7183; }
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .d5-sec:has(.d5-graf-leg li + li) { --dado-1: #7C83F2; --dado-1-rgb: 124, 131, 242; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .d5-sec:has(.d5-graf-leg li + li) { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }
+/* aba Atendentes: a 1ª coluna (nome + "fecha mais por …") não espreme em três linhas quando a tabela rola */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab th.d5-nome { min-width: 176px; }

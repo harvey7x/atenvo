@@ -14,7 +14,7 @@ import { GrafLinhas, LegendaGraf, useLinhasGraf, type SerieGraf } from './GrafLi
    (dono) —, por qual campanha cada um fecha, tempo de resposta, as ondas de fechados
    da equipe e as fotos de agora (vácuo, carteira, parados). */
 
-const AJUDA_FECHADOS = 'Fechados do placar do CAF creditados ao vendedor do caso — o mesmo número do pódio. '
+const AJUDA_FECHADOS = 'Fechados do placar da ALFA creditados ao vendedor do caso — o mesmo número do pódio. '
   + 'O administrativo lança em dia útil e re-sincroniza a cada 5 minutos: números passados podem mudar.';
 const AJUDA_CLI = 'Relógio do CLIENTE: da entrada do lead até o fechamento, mediana. É o tempo que o cliente esperou, '
   + 'independente de quantas mãos o lead passou.';
@@ -115,7 +115,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   return (
     <>
       <Secao className="d5-at d5-at-aba" titulo="Desempenho por atendente"
-        sub="Fechados pelo placar do CAF; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar.">
+        sub="Fechados pelo placar da ALFA; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar.">
         {d.atendentes.length === 0 ? (
           <Vazio texto="Ninguém da equipe teve movimento no período." />
         ) : (
@@ -189,7 +189,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
 
       {serieEquipe.length > 0 && (
         <Secao className="d5-ondas d5-ondas-eq" titulo="Fechados da equipe, no tempo"
-          ajuda={'Fechados do placar do CAF por atendente. O administrativo lança em dia útil: fim de semana e feriado '
+          ajuda={'Fechados do placar da ALFA por atendente. O administrativo lança em dia útil: fim de semana e feriado '
             + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
             + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'}
           sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}

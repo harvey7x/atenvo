@@ -46,7 +46,7 @@ function Seletor<V extends string>({ valor, opcoes, aoMudar, rotulo }: {
   );
 }
 
-const AJUDA_FECHADOS = 'Fechado = caso completo no sistema do administrativo (a régua do placar do CAF), '
+const AJUDA_FECHADOS = 'Fechado = caso completo no sistema do administrativo (a régua do placar da ALFA), '
   + 'pelo número por onde o cliente entrou. Parceiros e casos tirados da conta não pontuam; fim de semana '
   + 'e feriado mostram 0 porque o administrativo lança em dia útil. Números passados podem mudar ao re-sincronizar.';
 const AJUDA_MELHOR = 'Melhor do dia = mais entradas (fechados do dia só aparecem quando o administrativo lança). '
