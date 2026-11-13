@@ -22,6 +22,7 @@ import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
 import { tempoCelula } from '../lib/tempo';
+import { formatarTelefone } from '../lib/telefone';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
@@ -40,7 +41,7 @@ import './configuracoes.css';
    ------------------------------------------------------------------ */
 
 const TABS = [
-  { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais' },
+  { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais e integrações' },
   { id: 'atendimento', label: 'Atendimento' }, { id: 'notif', label: 'Notificações' }, { id: 'prefs', label: 'Preferências' },
 ];
 /* REVIZA (dono 11/11: "em configurações, criar usuários que nem na Reviza — criar, excluir, mudar de senha"):
@@ -58,21 +59,25 @@ const WA_ST: Record<string, { t: string; tom: TomStatus }> = {
 const TIPO_ORIGEM: Record<string, string> = { trafego: 'Tráfego', ura: 'URA', organico: 'Orgânico', indicacao: 'Indicação', campanha: 'Campanha', parceiro: 'Parceiro', outro: 'Outro' };
 const DIAS_SEMANA = [{ i: 0, l: 'Dom' }, { i: 1, l: 'Seg' }, { i: 2, l: 'Ter' }, { i: 3, l: 'Qua' }, { i: 4, l: 'Qui' }, { i: 5, l: 'Sex' }, { i: 6, l: 'Sáb' }];
 
-const NOTIF_EMAIL = [
-  { k: 'novos_leads', t: 'Novos contatos e leads', d: 'Receba um email quando um novo contato entrar.' },
-  { k: 'sem_resposta', t: 'Mensagens não respondidas', d: 'Resumo de mensagens de clientes sem resposta.' },
-  { k: 'cobrancas_vencendo', t: 'Cobranças vencendo', d: 'Avisos de parcelas próximas do vencimento.' },
-  { k: 'resumo_diario', t: 'Resumo diário', d: 'Um panorama do dia enviado de manhã.' },
-  { k: 'convite_aceito', t: 'Convite aceito', d: 'Aviso quando alguém aceitar um convite.' },
+/* cada aviso pertence a um ambiente (crítica 12/11: opções da Cobrança apareciam dentro do Atendimento) —
+   a tela agrupa por ambiente e mostra só os grupos a que a pessoa tem acesso */
+type AmbNotif = 'atendimento' | 'cobrancas' | 'geral';
+const NOTIF_EMAIL: { k: string; t: string; d: string; amb: AmbNotif; soAtenvo?: boolean }[] = [
+  { k: 'novos_leads', t: 'Novos contatos e leads', d: 'Receba um e-mail quando um novo contato entrar.', amb: 'atendimento' },
+  { k: 'sem_resposta', t: 'Mensagens não respondidas', d: 'Resumo de mensagens de clientes sem resposta.', amb: 'atendimento' },
+  { k: 'cobrancas_vencendo', t: 'Cobranças vencendo', d: 'Avisos de parcelas próximas do vencimento.', amb: 'cobrancas' },
+  { k: 'resumo_diario', t: 'Resumo diário', d: 'Um panorama do dia enviado de manhã.', amb: 'geral' },
+  { k: 'convite_aceito', t: 'Convite aceito', d: 'Aviso quando alguém aceitar um convite.', amb: 'geral', soAtenvo: true },
 ];
-const NOTIF_APP = [
-  { k: 'push', t: 'Notificações push', d: 'Alertas em tempo real na plataforma.' },
-  { k: 'som', t: 'Som de notificação', d: 'Toque sonoro ao receber atendimento.' },
-  { k: 'aguardando', t: 'Cliente aguardando atendimento', d: 'Destaque quando alguém espera resposta.' },
-  { k: 'novos_membros', t: 'Novos membros na equipe', d: 'Aviso quando alguém entrar na equipe.' },
-  { k: 'cobrancas', t: 'Cobranças', d: 'Alertas de cobranças e pagamentos.' },
-  { k: 'mencoes', t: 'Menções e atribuições', d: 'Quando você for atribuído a um atendimento.' },
+const NOTIF_APP: { k: string; t: string; d: string; amb: AmbNotif; soAtenvo?: boolean }[] = [
+  { k: 'push', t: 'Notificações push', d: 'Alertas em tempo real na plataforma.', amb: 'geral' },
+  { k: 'som', t: 'Som de notificação', d: 'Toque sonoro ao receber atendimento.', amb: 'geral' },
+  { k: 'aguardando', t: 'Cliente aguardando atendimento', d: 'Destaque quando alguém espera resposta.', amb: 'atendimento' },
+  { k: 'novos_membros', t: 'Novos membros na equipe', d: 'Aviso quando alguém entrar na equipe.', amb: 'geral' },
+  { k: 'cobrancas', t: 'Cobranças', d: 'Alertas de cobranças e pagamentos.', amb: 'cobrancas' },
+  { k: 'mencoes', t: 'Menções e atribuições', d: 'Quando você for atribuído a um atendimento.', amb: 'atendimento' },
 ];
+const ROTULO_AMB_NOTIF: Record<AmbNotif, string> = { atendimento: 'Atendimento', cobrancas: 'Cobranças', geral: 'Geral' };
 
 /* avatar com iniciais (sem cores por nome do v1: platina neutro; foto quando houver) */
 function iniciais(n: string) { const p = (n || '').trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
@@ -203,7 +208,6 @@ export default function ConfiguracoesV2() {
       <div className="ph sobe">
         <div>
           <h2>Configurações</h2>
-          <p>Perfil, equipe e comportamento do sistema.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
       </div>
 
@@ -414,7 +418,7 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
               <Input id="cfa-cargo" value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} placeholder="Ex.: Atendente, Gestor" />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-email">{isRevizaMode ? 'Usuário' : 'Email'}</label>
+              <label htmlFor="cfa-email">{isRevizaMode ? 'Usuário' : 'E-mail'}</label>
               <div className="cfa-email">
                 <Input id="cfa-email" type={isRevizaMode ? 'text' : 'email'} value={email || ''} readOnly title={isRevizaMode ? 'O usuário de entrada é trocado pelo administrador, em Usuários' : undefined} />
                 {!isRevizaMode && <BotaoSec onClick={() => setEmailModal(true)}>Alterar</BotaoSec>}
@@ -459,7 +463,7 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
               <Input id="cfa-otel" value={org.telefone} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, telefone: e.target.value })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-oemail">Email</label>
+              <label htmlFor="cfa-oemail">E-mail</label>
               <Input id="cfa-oemail" type="email" value={org.email} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, email: e.target.value })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -894,12 +898,12 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="cfg-sec" style={{ marginBottom: 4 }}>WhatsApp</div>
-          <p style={{ fontSize: 11.5, color: 'var(--txt-2)', marginBottom: 13 }}>Resumo das conexões. A gestão (conectar/remover) fica em Integrações.</p>
+          <p style={{ fontSize: 12, color: 'var(--txt-2)', marginBottom: 13 }}>Resumo das conexões. Para conectar ou remover um número, abra Integrações.</p>
         </div>
         <BotaoSec onClick={() => onNav('/integracoes')}>Abrir Integrações</BotaoSec>
       </div>
       {waIndisponivel ? (
-        <p style={{ fontSize: 11.5, color: 'var(--txt-3)', padding: '10px 0' }}>Disponível com o backend configurado.</p>
+        <p style={{ fontSize: 12, color: 'var(--txt-3)', padding: '10px 0' }}>Os canais ainda não estão disponíveis nesta instalação.</p>
       ) : (!demo && waQ.isLoading) ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-hidden><Skeleton altura={44} raio={10} /><Skeleton altura={44} raio={10} largura="80%" /></div>
       ) : wa.length === 0 ? (
@@ -911,7 +915,7 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
             <div className="tx">
               <div className="t">{c.alias}</div>
               <div className="d">
-                {c.numero || 'Sem número'}
+                {formatarTelefone(c.numero) || 'Sem número'}
                 {TIPO_ORIGEM[c.origemTipo || ''] ? ' · ' + TIPO_ORIGEM[c.origemTipo as string] : ''}
                 {c.gestorNome ? ' · Gestor: ' + c.gestorNome : ''}
               </div>
@@ -991,7 +995,7 @@ function PainelConfigAtendimento({ anima, demo, seed, setSeed, aoAvisar, podeGer
               <Input id="cfa-semresp" type="number" min={1} value={c.tempo_sem_resposta_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_sem_resposta_min: Number(e.target.value) || 0 })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-inat">Tempo de inatividade p/ encerrar (min)</label>
+              <label htmlFor="cfa-inat">Tempo de inatividade para encerrar (min) <span className="cfa-embreve" title="O encerramento automático por inatividade ainda não está ativo; a regra fica salva.">Em breve</span></label>
               <Input id="cfa-inat" type="number" min={0} value={c.tempo_inatividade_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_inatividade_min: Number(e.target.value) || 0 })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -1010,12 +1014,9 @@ function PainelConfigAtendimento({ anima, demo, seed, setSeed, aoAvisar, podeGer
               </div>
             </div>
             <div className="campo" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
-              <label htmlFor="cfa-msg">Mensagem fora do horário</label>
+              <label htmlFor="cfa-msg">Mensagem fora do horário <span className="cfa-embreve" title="A resposta automática fora do horário ainda não está ativa; a mensagem fica salva.">Em breve</span></label>
               <textarea id="cfa-msg" className="inp" rows={2} value={c.mensagem_fora_horario} disabled={dis} onChange={(e) => setC({ ...c, mensagem_fora_horario: e.target.value })} placeholder="Ex.: Nosso horário é das 8h às 18h. Retornaremos em breve." style={{ height: 'auto', padding: '8px 11px', resize: 'vertical', fontFamily: 'var(--fonte)' }} />
             </div>
-          </div>
-          <div className="cfa-nota" style={{ marginTop: 12 }}>
-            A aplicação automática (auto-resposta fora do horário, encerramento por inatividade, distribuição automática) depende de automação no backend — ainda não disponível; as regras ficam salvas e prontas.
           </div>
           {podeGerenciar && (
             <div className="cfa-rodape">
@@ -1238,6 +1239,10 @@ function PainelNotif({ anima, demo, seed, setSeed, aoAvisar }: {
   const [p, setP] = useState<Prefs | null>(null);
   const fonte = demo ? seed?.prefs ?? null : prefsQ.data ?? null;
   useEffect(() => { if (fonte) setP(fonte); }, [fonte]);
+  // só os grupos dos ambientes da pessoa (na Reviza, pelo perfil; fora dela, os dois)
+  const ambientesP = usePapel().data?.ambientes;
+  const temAmb = (a: 'cobrancas' | 'atendimento') => !isRevizaMode || !ambientesP || ambientesP.includes(a);
+  const gruposNotif: AmbNotif[] = [...(temAmb('atendimento') ? ['atendimento' as const] : []), ...(temAmb('cobrancas') ? ['cobrancas' as const] : []), 'geral'];
 
   async function flip(grupo: 'notif_email' | 'notif_app', k: string, v: boolean) {
     if (!p) return;
@@ -1252,23 +1257,27 @@ function PainelNotif({ anima, demo, seed, setSeed, aoAvisar }: {
   return (
     <CardVidro spot sobe={anima} className="cfg-painel" atraso={0.15}>
       <div className="cfg-sec" style={{ marginBottom: 4 }}>Notificações</div>
-      <p style={{ fontSize: 11.5, color: 'var(--txt-2)', marginBottom: 12 }}>Preferências individuais. As alterações são salvas automaticamente.</p>
-      <div className="cfa-nota" style={{ marginBottom: 12 }}>
-        O envio real de e-mail/push depende de integração de entrega — <b>Integração de envio pendente</b>. Suas preferências são persistidas mesmo assim.
-      </div>
+      <p style={{ fontSize: 12, color: 'var(--txt-2)', marginBottom: 12 }}>Preferências individuais. As alterações são salvas automaticamente.</p>
       {!p ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-hidden><Skeleton altura={30} raio={8} /><Skeleton altura={30} raio={8} largura="76%" /><Skeleton altura={30} raio={8} largura="60%" /></div>
       ) : (
         <>
-          <div className="cfg-sec" style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--txt-3)', marginBottom: 6 }}>Por email</div>
-          {NOTIF_EMAIL.map((n) => (
-            <LinhaToggle key={n.k} ligado={!!p.notif_email[n.k]} aoMudar={(v) => flip('notif_email', n.k, v)} titulo={n.t} descricao={n.d} />
-          ))}
-          <div className="cfg-div" />
-          <div className="cfg-sec" style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--txt-3)', marginBottom: 6 }}>No aplicativo</div>
-          {NOTIF_APP.map((n) => (
-            <LinhaToggle key={n.k} ligado={!!p.notif_app[n.k]} aoMudar={(v) => flip('notif_app', n.k, v)} titulo={n.t} descricao={n.d} />
-          ))}
+          {gruposNotif.map((amb, gi) => {
+            const linhas = [
+              ...NOTIF_EMAIL.filter((n) => n.amb === amb && (!n.soAtenvo || !isRevizaMode)).map((n) => ({ ...n, grupo: 'notif_email' as const })),
+              ...NOTIF_APP.filter((n) => n.amb === amb && (!n.soAtenvo || !isRevizaMode)).map((n) => ({ ...n, grupo: 'notif_app' as const })),
+            ];
+            return (
+              <div key={amb}>
+                {gi > 0 && <div className="cfg-div" />}
+                <div className="cfg-sec cfa-grupo-notif">{ROTULO_AMB_NOTIF[amb]}</div>
+                {linhas.map((n) => (
+                  <LinhaToggle key={n.grupo + n.k} ligado={!!p[n.grupo][n.k]} aoMudar={(v) => flip(n.grupo, n.k, v)}
+                    titulo={<>{n.t}<span className="cfa-canal-notif">{n.grupo === 'notif_email' ? 'E-mail' : 'No aplicativo'}</span></>} descricao={n.d} />
+                ))}
+              </div>
+            );
+          })}
         </>
       )}
     </CardVidro>

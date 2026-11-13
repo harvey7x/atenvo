@@ -210,3 +210,21 @@
 /* (popovers cfa-menu/cor-pop/cfa-cts herdam o par light dos tokens --surface/--shadow-pop) */
 :root[data-tema="light"] .v2 .cor-sw.sel { box-shadow: 0 0 0 2px var(--accent); }
 :root[data-tema="light"] .v2 .cfa-check input { accent-color: var(--accent); }
+
+/* ===== crítica 12/11 — atendimento (Configurações) ===== */
+/* selo discreto "Em breve" no controle que ainda não age sozinho (no lugar do recado de backend) */
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-embreve {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; margin-left: 6px; vertical-align: 1px;
+  border-radius: var(--selo-r, 6px); font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  color: var(--txt-2); background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .1);
+}
+/* notificações agrupadas por ambiente; o canal (E-mail / No aplicativo) num selo neutro ao lado do título */
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-grupo-notif { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 6px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-canal-notif {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; margin-left: 8px; vertical-align: 1px;
+  border-radius: var(--selo-r, 6px); font-size: 11px; font-weight: 500; color: var(--txt-2); background: rgba(var(--tint), .06);
+}
+/* mínimo de 11px e a régua 12/13 */
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-desc-c { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfg-nav .it { font-size: 13px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-nota { font-size: 12px; }
