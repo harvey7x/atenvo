@@ -9,13 +9,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { formatarTelefone } from '../lib/telefone';
 import { criarRaizPortalV2 } from '../components/portal';
-import { AudioRecorderV2, BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Input, ModalV2 } from '../components';
+import { AudioRecorderV2, BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Input, ModalV2, Toggle } from '../components';
+import { MenuMais } from './comunicacao/MenuMais';
+import { TextoComVariaveis } from './comunicacao/Variaveis';
 // import direto (fora do barril): a foto ilustrativa puxa a lista de nomes do IBGE (~90 KB) — só esta tela precisa dela
 import { FotoCliente } from '../components/FotoCliente';
 import { WaTexto } from '../components/BolhaWa';
 import {
-  CartoesReguaComercial, DiaDaVersao, EditorMsg, FichaLead, IcT, IC_PATH, IconeBloco, ROTULO_BLOCO, SeletorReguaDe,
-  decidirVersao, diaProprioValido, diaVaiColidir, passosDoComercial, type VersaoCom,
+  CartoesReguaComercial, DiaDaVersao, EditorMsg, FichaLead, IcT, IC_PATH, IconeBloco, ROTULO_BLOCO,
+  decidirVersao, diaProprioValido, diaVaiColidir, type VersaoCom,
   gruposNoDia, nomeComercial, previewMsg, quandoCurto, quandoExtenso, quandoSub, resumoBlocos, rid, rotuloCriterio, tiposUnicos, VARS_MSG, DICA_VAR,
   type Bloco, type CliMsg, type EdReg, type GrupoMsg, type MsgDef,
 } from './cobrancaMotor';
@@ -1911,6 +1913,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
   const [excluirDoCom, setExcluirDoCom] = useState<{ passo: MsgDef; com: string } | null>(null);
   const [ed, setEd] = useState<EdReg | null>(null);
   const [confirmaLigar, setConfirmaLigar] = useState(false);
+  const [confirmaDesligar, setConfirmaDesligar] = useState(false);
   const [excluir, setExcluir] = useState<ReguaMsgWA | null>(null);
   const [buscaCliEd, setBuscaCliEd] = useState('');
   const cfg = cfgQ.data;
@@ -1923,8 +1926,8 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
   const horarioMut = useHorarioComercialWA();
   const mudarHorario = (chave: string, nome: string, hora: number | null) => horarioMut.mutate({ comercial: chave, hora, nome }, {
     onSuccess: (r) => aoAvisar(r.depois != null
-      ? `As mensagens ${chave === minhaChave && souComercial ? 'dos seus clientes' : `dos clientes de ${nome}`} começam às ${String(r.depois).padStart(2, '0')}:00 (até ${String(r.fim).padStart(2, '0')}:00). Dá pra voltar pelo botão Desfazer.`
-      : `${chave === minhaChave && souComercial ? 'Seus clientes voltam' : `Os clientes de ${nome} voltam`} pro início geral (${String(r.inicio_geral).padStart(2, '0')}:00). Dá pra voltar pelo botão Desfazer.`),
+      ? `As mensagens ${chave === minhaChave && souComercial ? 'dos seus clientes' : `dos clientes de ${nome}`} começam às ${String(r.depois).padStart(2, '0')}:00 (até ${String(r.fim).padStart(2, '0')}:00). É possível voltar pelo botão Desfazer.`
+      : `${chave === minhaChave && souComercial ? 'Seus clientes voltam' : `Os clientes de ${nome} voltam`} para o início geral (${String(r.inicio_geral).padStart(2, '0')}:00). É possível voltar pelo botão Desfazer.`),
     onError: (er) => aoAvisar((er as Error).message, 'erro'),
   });
 
@@ -1966,22 +1969,22 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
     const fim = (txt: string) => ({ onSuccess: () => { setExcluirDoCom(null); aoAvisar(txt); }, onError: (e: unknown) => aoAvisar((e as Error).message) });
     if (excluida) {
       salvarVersao.mutate({ passo_id: passo.id, comercial: com, blocos, excluida: true, quando, nome: nomeDe(com) },
-        fim(`“${passo.nome}” excluída da régua de ${nomeDe(com)} — ${souComercial ? 'seus clientes' : `os clientes de ${nomeDe(com)}`} não recebem mais essa mensagem.`));
+        fim(`“${passo.nome}” excluída da régua de ${nomeDe(com)}: ${souComercial ? 'seus clientes' : `os clientes de ${nomeDe(com)}`} não recebem mais essa mensagem.`));
     } else if (v && (blocos.length || quando != null)) {
       if (diaVaiColidir(padraoAtivos, (pid) => versaoCom(pid, com), passo, quando ?? passo.quando, true)) {
-        aoAvisar('Outra mensagem dessa régua já sai no dia dela — mude o dia de uma delas antes de voltar a usar.'); return;
+        aoAvisar('Outra mensagem dessa régua já sai no dia dela. Mude o dia de uma delas antes de voltar a usar.'); return;
       }
       salvarVersao.mutate({ passo_id: passo.id, comercial: com, blocos, excluida: false, quando, nome: nomeDe(com) }, fim(`“${passo.nome}” volta a sair na régua de ${nomeDe(com)} (com o que tinha sido personalizado).`));
     } else if (v) {
       if (diaVaiColidir(padraoAtivos, (pid) => versaoCom(pid, com), passo, passo.quando, true)) {
-        aoAvisar('Outra mensagem dessa régua já sai no dia dela — mude o dia de uma delas antes de voltar a usar.'); return;
+        aoAvisar('Outra mensagem dessa régua já sai no dia dela. Mude o dia de uma delas antes de voltar a usar.'); return;
       }
       excluirVersao.mutate({ ...v, nome: nomeDe(com) }, fim(`“${passo.nome}” volta a sair na régua de ${nomeDe(com)}.`));
     }
   };
   const alternar = (r: ReguaMsgWA) => salvarMsg.mutate(
     { id: r.id, alvo: r.alvo, nome: r.nome, quando: r.quando, blocos: r.blocos, grupo_nome: r.grupo_nome, criterio: r.criterio, cli_id: r.cli_id, cli_nome: r.cli_nome, data_envio: r.data_envio, ativo: !r.ativo },
-    { onSuccess: () => aoAvisar(r.ativo ? `"${r.nome}" pausada — não sai mais até reativar.` : `"${r.nome}" reativada.`), onError: (e) => aoAvisar((e as Error).message) });
+    { onSuccess: () => aoAvisar(r.ativo ? `"${r.nome}" pausada: não sai mais até ser reativada.` : `"${r.nome}" reativada.`), onError: (e) => aoAvisar((e as Error).message) });
 
   // prévia REAL do motor (hoje e amanhã): o que sai, o que aguarda número, o que não sai
   const resumoDia = (d: string, chave?: string) => {
@@ -2013,7 +2016,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
   const cobDe = (k: string) => cobertura.find((c) => chaveComercial(c.comercial) === k) ?? null;
   const numeroDe = (k: string): NumeroDoComercial => {
     if (previaQ.isLoading) return null;
-    if (previaFalhou) return { conectado: false, rotulo: 'Indisponível', detalhe: 'não deu pra conferir agora' };
+    if (previaFalhou) return { conectado: false, rotulo: 'Indisponível', detalhe: 'não foi possível conferir agora' };
     const c = cobDe(k);
     if (!c?.numero) return { conectado: false, rotulo: 'Sem número', detalhe: c?.motivo ?? 'nenhum WhatsApp com esse comercial como dono' };
     const ok = !!c.numero.conectado;
@@ -2037,7 +2040,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
   const pedirPausa = (chave: string, nome: string, pausar: boolean) => {
     if (pausar) { setConfirmaPausa({ chave, nome }); return; }
     pausaMut.mutate({ comercial: chave, pausar: false, nome }, {
-      onSuccess: () => aoAvisar(`${chave === minhaChave && souComercial ? 'Sua régua voltou' : `A régua de ${nome} voltou`} a funcionar — as mensagens saem no próximo horário da janela. Dá pra voltar pelo botão Desfazer.`),
+      onSuccess: () => aoAvisar(`${chave === minhaChave && souComercial ? 'Sua régua voltou' : `A régua de ${nome} voltou`} a funcionar: as mensagens saem no próximo horário da janela. É possível voltar pelo botão Desfazer.`),
       onError: (er) => aoAvisar((er as Error).message, 'erro'),
     });
   };
@@ -2045,7 +2048,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
     if (!confirmaPausa) return;
     const { chave, nome } = confirmaPausa;
     pausaMut.mutate({ comercial: chave, pausar: true, nome }, {
-      onSuccess: () => { setConfirmaPausa(null); aoAvisar(`${chave === minhaChave && souComercial ? 'Sua régua foi pausada' : `A régua de ${nome} foi pausada`} — nenhuma mensagem automática sai pra esses clientes até retomar. Dá pra voltar pelo botão Desfazer.`); },
+      onSuccess: () => { setConfirmaPausa(null); aoAvisar(`${chave === minhaChave && souComercial ? 'Sua régua foi pausada' : `A régua de ${nome} foi pausada`}: nenhuma mensagem automática sai para esses clientes até ser retomada. É possível voltar pelo botão Desfazer.`); },
       onError: (er) => aoAvisar((er as Error).message, 'erro'),
     });
   };
@@ -2072,20 +2075,20 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
       const atual = versaoDe(pid, com);
       const d = decidirVersao({ blocos: ed.msg.blocos, blocosPadrao: (rowDe(pid)?.blocos ?? []) as Bloco[], quando: ed.msg.quando, q0: ed.q0, existe: !!atual });
       if (d.erro) { aoAvisar(d.erro); return; }
-      if (d.acao === 'nada') { aoAvisar('Igual à padrão (mensagem e dia) — nada foi salvo.'); setEd(null); return; }
+      if (d.acao === 'nada') { aoAvisar('Igual à padrão (mensagem e dia): nada foi salvo.'); setEd(null); return; }
       const passoBase = padraoAtivos.find((x) => x.id === pid);
       if (passoBase && diaVaiColidir(padraoAtivos, (x) => versaoCom(x, com), passoBase, d.acao === 'apagar' ? ed.q0 : d.quando ?? ed.q0)) {
-        aoAvisar('Já tem outra mensagem nessa régua nesse dia — escolha outro dia.'); return;
+        aoAvisar('Já existe outra mensagem nessa régua nesse dia. Escolha outro dia.'); return;
       }
       if (d.acao === 'apagar' && atual) {
-        excluirVersao.mutate({ ...atual, nome: nomeDe(com) }, { onSuccess: () => { aoAvisar(`Ficou igual à padrão — ${nomeDe(com)} volta a usar a padrão neste passo.`); setEd(null); }, onError: (e) => aoAvisar((e as Error).message) });
+        excluirVersao.mutate({ ...atual, nome: nomeDe(com) }, { onSuccess: () => { aoAvisar(`Ficou igual à padrão: ${nomeDe(com)} volta a usar a padrão neste passo.`); setEd(null); }, onError: (e) => aoAvisar((e as Error).message) });
         return;
       }
       const semArq = d.blocos.filter((b) => b.tipo !== 'texto' && !b.path);
       salvarVersao.mutate({ passo_id: pid, comercial: com, blocos: d.blocos, excluida: false, quando: d.quando, nome: nomeDe(com) }, {
         onSuccess: () => {
           aoAvisar(semArq.length
-            ? `Salvo na régua de ${nomeDe(com)} — atenção: ${semArq.map((b) => ROTULO_BLOCO[b.tipo]).join(', ')} sem arquivo salvo não sai no envio.`
+            ? `Salvo na régua de ${nomeDe(com)}. Atenção: ${semArq.map((b) => ROTULO_BLOCO[b.tipo]).join(', ')} sem arquivo salvo não sai no envio.`
             : `Salvo na régua de ${nomeDe(com)}.`);
           setEd(null);
         },
@@ -2111,9 +2114,9 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
     salvarMsg.mutate(payload, {
       onSuccess: () => {
         aoAvisar(!enviavel
-          ? 'Mensagem salva — atenção: nenhum bloco tem texto escrito nem arquivo salvo, então ela não sai no disparo automático.'
+          ? 'Mensagem salva. Atenção: nenhuma parte tem texto escrito nem arquivo salvo, então ela não sai no disparo automático.'
           : semArquivo.length
-          ? `Mensagem salva — atenção: ${semArquivo.map((b) => ROTULO_BLOCO[b.tipo]).join(', ')} sem arquivo salvo; ${semArquivo.length === 1 ? 'essa parte não sai' : 'essas partes não saem'} no envio.`
+          ? `Mensagem salva. Atenção: ${semArquivo.map((b) => ROTULO_BLOCO[b.tipo]).join(', ')} sem arquivo salvo; ${semArquivo.length === 1 ? 'essa parte não sai' : 'essas partes não saem'} no envio.`
           : 'Mensagem salva.');
         setEd(null);
       },
@@ -2126,12 +2129,12 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
   }, [buscaCliEd, clientesOrd]);
   const [comoAberto, setComoAberto] = useState(false);
   const h2 = (n: number) => String(n).padStart(2, '0');
-  const diasTxt = cfg?.dias_envio === 'uteis' ? 'só em dias úteis (vencimento em fim de semana/feriado vai pro próximo dia útil, como no Calendário)' : cfg?.dias_envio === 'uteis_sabado' ? 'em dias úteis e sábados' : 'todos os dias, na data exata do ciclo (ou na data marcada à mão no Calendário)';
+  const diasTxt = cfg?.dias_envio === 'uteis' ? 'só em dias úteis (vencimento em fim de semana ou feriado passa para o próximo dia útil, como no Calendário)' : cfg?.dias_envio === 'uteis_sabado' ? 'em dias úteis e sábados' : 'todos os dias, na data exata do ciclo (ou na data marcada à mão no Calendário)';
 
   const comoBloco = (
     <div className="rg-como">
       <div><b>Quem recebe</b><p>Cada cliente <b>em cobrança</b> recebe cada passo {diasTxt}, pelo número do comercial dele{cfg?.canal_reserva_id ? ' (ou pelo número reserva)' : ''}.</p></div>
-      <div><b>Quem não recebe</b><p>Quem já pagou o mês, mandou comprovante (aguardando o financeiro), foi marcado “fora” na Gestão ou pediu SAIR{cfg?.pausar_se_respondeu !== false ? ' — e quem respondeu uma mensagem da régua no mês (vira atendimento humano)' : ''}.</p></div>
+      <div><b>Quem não recebe</b><p>Quem já pagou o mês, mandou comprovante (aguardando o financeiro), foi marcado “fora” na Gestão ou pediu para sair{cfg?.pausar_se_respondeu !== false ? '; e quem respondeu uma mensagem da régua no mês (vira atendimento humano)' : ''}.</p></div>
       <div><b>Limites</b><p>Cada passo sai no máximo 1 vez por mês por cliente, só dentro do horário de envio. O que não sair no dia não sai atrasado no dia seguinte.</p></div>
     </div>
   );
@@ -2143,16 +2146,23 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
         <div className="rg-auto-cab">
           <span className={`ev-st-ic ${ligada ? 'ok' : 'neutro'}`}><IcT d={IC_PATH.relogio} s={16} mr={0} /></span>
           <div className="rg-auto-tt">
-            <div className="rg-auto-nm"><b>Régua automática</b><BadgeStatus tom={ligada ? 'ok' : 'neutro'}>{cfgQ.isLoading ? '…' : ligada ? 'Ligada' : 'Desligada'}</BadgeStatus></div>
+            <div className="rg-auto-nm"><b>Régua automática</b></div>
             <span className="ev-sub">{ligada
-              ? `Manda todo dia entre ${h2(horaCfg)}:00 e ${h2(fimCfg)}:00, cada passo pelo número do comercial do cliente.`
-              : 'Nada sai sozinho enquanto estiver desligada. Revise a configuração e o alcance abaixo e ligue quando estiver tudo pronto.'}</span>
+              ? `Envia todo dia entre ${h2(horaCfg)}:00 e ${h2(fimCfg)}:00, cada passo pelo número do comercial do cliente.`
+              : 'Nada sai sozinho enquanto estiver desligada. Revise a configuração e o alcance abaixo e ligue quando tudo estiver pronto.'}</span>
           </div>
           <div className="rg-acoes">
             <BotaoSec mini onClick={() => navigate('/cobrancas/envios?aba=proximos')}>Ver quem recebe</BotaoSec>
-            {gestor && (ligada
-              ? <BotaoSec mini onClick={() => salvar({ ativa: false }, 'Régua automática desligada — nada mais entra na fila sozinho (o que já estava na fila de hoje também para).')} disabled={salvarCfg.isPending}>Desligar</BotaoSec>
-              : <BotaoPrimario onClick={() => setConfirmaLigar(true)} disabled={salvarCfg.isPending || cfgQ.isLoading || cfgQ.isError || previaQ.isLoading || previaQ.isError} title={cfgQ.isError ? 'Não deu pra ler a configuração — atualize a página' : previaQ.isError ? 'A prévia falhou — confira antes de ligar' : undefined}>Ligar régua</BotaoPrimario>)}
+            {/* ligar/desligar = interruptor com confirmação nos dois sentidos (desligar não é mais um botão igual aos outros) */}
+            {gestor && (
+              <span className={ligada ? 'rg-liga on' : 'rg-liga'}
+                title={cfgQ.isError ? 'Não foi possível ler a configuração. Atualize a página.' : !ligada && previaQ.isError ? 'A prévia falhou. Confira antes de ligar.' : undefined}>
+                <span aria-hidden>{cfgQ.isLoading ? '…' : ligada ? 'Ligada' : 'Desligada'}</span>
+                <Toggle ligado={ligada} rotulo={ligada ? 'Régua automática ligada (clique para desligar)' : 'Régua automática desligada (clique para ligar)'}
+                  disabled={salvarCfg.isPending || cfgQ.isLoading || cfgQ.isError || (!ligada && (previaQ.isLoading || previaQ.isError))}
+                  aoMudar={(x) => (x ? setConfirmaLigar(true) : setConfirmaDesligar(true))} />
+              </span>
+            )}
           </div>
         </div>
 
@@ -2166,7 +2176,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
           ))}
           <div className="rg-tile">
             <span className="ev-rot">Alcance</span>
-            <div className="rg-tile-v"><b className="num">{previaQ.isLoading ? '…' : previaFalhou ? '—' : tot.cob}</b><span>{previaFalhou ? 'não deu pra calcular' : `de ${tot.cli} em cobrança`}</span></div>
+            <div className="rg-tile-v"><b className="num">{previaQ.isLoading ? '…' : previaFalhou ? '—' : tot.cob}</b><span>{previaFalhou ? 'não foi possível calcular' : `de ${tot.cli} em cobrança`}</span></div>
             <span className="ev-sub">com telefone e número do comercial conectado</span>
           </div>
         </div>
@@ -2185,7 +2195,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
           titulo={<div>Ligar a régua automática?<div className="mod-sub">As mensagens começam a sair de verdade, pelos números conectados</div></div>}
           rodape={<><BotaoSec onClick={() => setConfirmaLigar(false)}>Agora não</BotaoSec>
             <BotaoPrimario onClick={() => salvarCfg.mutate({ ativa: true }, {
-              onSuccess: () => { setConfirmaLigar(false); aoAvisar(`Régua automática LIGADA — a fila de cada dia é montada a partir das ${String(horaCfg).padStart(2, '0')}:00. Acompanhe em Envios.`); },
+              onSuccess: () => { setConfirmaLigar(false); aoAvisar(`Régua automática ligada: a fila de cada dia é montada a partir das ${String(horaCfg).padStart(2, '0')}:00. Acompanhe em Envios.`); },
               onError: (er) => aoAvisar((er as Error).message),
             })} disabled={salvarCfg.isPending}>{salvarCfg.isPending ? 'Ligando…' : 'Ligar agora'}</BotaoPrimario></>}>
           <div className="rg-ligar">
@@ -2197,31 +2207,65 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
             Passos ativos: {[...padrao].sort((a, b) => a.quando - b.quando).map((m) => `${m.nome} (${quandoCurto(m.quando)})`).join(', ') || 'nenhum'}. Sai só entre {h2(horaCfg)}:00 e {h2(fimCfg)}:00. Cada cliente recebe pelo número do comercial dele{cfg?.canal_reserva_id ? ' (ou pelo número reserva)' : ''}, com intervalo de {cfg?.delay_min ?? 20}–{cfg?.delay_max ?? 45}s entre clientes{cfg?.pausa_cada ? `, pausa de ${cfg.pausa_min} min a cada ${cfg.pausa_cada} mensagens` : ''}{cfg?.teto_diario ? ` e no máximo ${cfg.teto_diario} por número por dia` : ''}.
           </p>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'var(--txt-2)' }}>
-            Antes de cada envio o sistema confere de novo se o cliente pagou, mandou comprovante ou pediu SAIR — e valida se o número tem WhatsApp. Tudo aparece em <b>Envios</b> (número usado, horário, texto, entrega, leitura e resposta) e na conversa do cliente. Dá pra desligar aqui a qualquer momento.
+            Antes de cada envio o sistema confere de novo se o cliente pagou, mandou comprovante ou pediu para sair, e valida se o número tem WhatsApp. Tudo aparece em <b>Envios</b> (número usado, horário, texto, entrega, leitura e resposta) e na conversa do cliente. É possível desligar aqui a qualquer momento.
           </p>
-          {(rH.falta + rA.falta) > 0 && <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>{rH.falta + rA.falta} cliente(s) estão sem algum dado usado na mensagem (valor, vencimento…) — esses esperam até a Gestão ser completada; nunca sai mensagem quebrada.</p>}
+          {(rH.falta + rA.falta) > 0 && <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--cor-alerta-txt, var(--ambar))' }}>{rH.falta + rA.falta === 1 ? '1 cliente está' : `${rH.falta + rA.falta} clientes estão`} sem algum dado usado na mensagem (valor, vencimento…). Esses aguardam até a Gestão ser completada; nunca sai mensagem quebrada.</p>}
+        </ModalV2>
+      )}
+
+      {confirmaDesligar && (
+        <ModalV2 aberto aoFechar={() => { if (!salvarCfg.isPending) setConfirmaDesligar(false); }} largura={460}
+          titulo={<div>Desligar a régua automática?<div className="mod-sub">Nada mais entra na fila sozinho</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfirmaDesligar(false)} disabled={salvarCfg.isPending}>Cancelar</BotaoSec>
+            <button type="button" className="p-btn btn-perigo" disabled={salvarCfg.isPending}
+              onClick={() => salvarCfg.mutate({ ativa: false }, {
+                onSuccess: () => { setConfirmaDesligar(false); aoAvisar('Régua automática desligada: nada mais entra na fila sozinho (o que já estava na fila de hoje também para).'); },
+                onError: (er) => aoAvisar((er as Error).message, 'erro'),
+              })}>{salvarCfg.isPending ? 'Desligando…' : 'Desligar a régua'}</button></>}>
+          <p className="cm-hint" style={{ margin: 0 }}>Vale para todos os comerciais. O que ainda estava na fila de hoje também deixa de sair. As mensagens, os dias e a configuração ficam guardados, e é possível ligar de novo a qualquer momento.</p>
         </ModalV2>
       )}
 
       {papelCarregando ? (
         <div className="cm-exc-vazio">Carregando a régua…</div>
       ) : !gestor && !souComercial ? (
-        <div className="rt-vazio">Não deu pra identificar o seu perfil agora — atualize a página. Se continuar, fale com o administrador.</div>
+        <div className="rt-vazio">Não foi possível identificar o seu perfil agora. Atualize a página; se continuar, fale com o administrador.</div>
       ) : souComercial ? (
         <>
           <div className="rt-sec-tit"><h3>Minhas mensagens</h3></div>
           {data && carteira.filter((c) => chaveComercial(c.atendente) === minhaChave).length === 0 && (
-            <div className="ev-aviso" style={{ margin: '0 0 10px' }}><span className="ev-aviso-t">Nenhum cliente em cobrança está com o comercial <b>{nomeComercial(sessao?.nome ?? '')}</b> na Gestão — a sua régua só vale para os clientes com o seu nome na coluna Comercial.</span></div>
+            <div className="ev-aviso" style={{ margin: '0 0 10px' }}><span className="ev-aviso-t">Nenhum cliente em cobrança está com o comercial <b>{nomeComercial(sessao?.nome ?? '')}</b> na Gestão. A sua régua só vale para os clientes com o seu nome na coluna Comercial.</span></div>
           )}
         </>
       ) : (
       <>
       <AbasRegua aba={abaRg} aoMudar={setAbaRg} nComerciais={linhasCom.length} />
       {abaRg === 'mensagens' && (
-      <div className="cm-seg" role="tablist" aria-label="Tipo de mensagem">
-        <button type="button" role="tab" aria-selected={subaba === 'padrao'} className={subaba === 'padrao' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('padrao')}>Sequência padrão</button>
-        <button type="button" role="tab" aria-selected={subaba === 'grupos'} className={subaba === 'grupos' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('grupos')}>Grupos</button>
-        <button type="button" role="tab" aria-selected={subaba === 'cliente'} className={subaba === 'cliente' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('cliente')}>Cliente específico</button>
+      <div className="rg-controles">
+        <div className="cm-seg rg-seg" role="tablist" aria-label="Tipo de mensagem">
+          <button type="button" role="tab" aria-selected={subaba === 'padrao'} className={subaba === 'padrao' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('padrao')}>Sequência padrão</button>
+          <button type="button" role="tab" aria-selected={subaba === 'grupos'} className={subaba === 'grupos' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('grupos')}>Grupos</button>
+          <button type="button" role="tab" aria-selected={subaba === 'cliente'} className={subaba === 'cliente' ? 'cm-seg-btn on' : 'cm-seg-btn'} onClick={() => setSubaba('cliente')}>Cliente específico</button>
+        </div>
+        {subaba === 'padrao' && (
+          <label className="rg-de-sel">
+            <span>Régua de</span>
+            <select className="inp" value={reguaDe} onChange={(e) => setReguaDe(e.target.value)} aria-label="De quem é a régua">
+              <option value="">Padrão (todos)</option>
+              {opcoesDe.map((o) => <option key={o.chave} value={o.chave}>{o.nome}{o.proprias > 0 ? ` · ${o.proprias} ${o.proprias > 1 ? 'alterações' : 'alteração'}` : ''}</option>)}
+            </select>
+          </label>
+        )}
+        <span className="rg-controles-esp" />
+        {(() => {
+          // a ação principal da aba fica à vista (antes: botão fantasma no fim da lista, fora da dobra);
+          // dourado só com a régua ligada — desligada, o destaque é o interruptor do cabeçalho
+          const Botao = ligada ? BotaoPrimario : BotaoSec;
+          if (subaba === 'padrao' && !reguaDe) return <Botao onClick={() => setEd({ alvo: 'padrao', novo: true, msg: { id: rid('p'), nome: '', quando: -3, blocos: [{ tipo: 'texto', corpo: '' }] } })}>＋ Nova mensagem</Botao>;
+          if (subaba === 'grupos') return <Botao onClick={() => setEd({ alvo: 'grupo', novo: true, nome: '', criterio: 'todos', msg: { id: rid('g'), nome: '', quando: 0, blocos: [{ tipo: 'texto', corpo: '' }] } })}>＋ Novo grupo</Botao>;
+          if (subaba === 'cliente') return <Botao onClick={() => { setBuscaCliEd(''); setEd({ alvo: 'cliente', novo: true, cliId: '', data: hoje, msg: { id: rid('c'), nome: '', quando: 0, blocos: [{ tipo: 'texto', corpo: '' }] } }); }}>＋ Mensagem para um cliente</Botao>;
+          return null;
+        })()}
       </div>
       )}
       </>
@@ -2229,20 +2273,10 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
 
       {!papelCarregando && (souComercial || (gestor && abaRg === 'mensagens' && subaba === 'padrao')) && (() => {
         const passos = [...padrao].sort((a, b) => a.quando - b.quando);
-        const faixa = reguaAberta ? passosDoComercial(passos, (pid) => versaoCom(pid, reguaAberta)) : passos;
         return (
         <>
-          {gestor && <SeletorReguaDe valor={reguaDe} opcoes={opcoesDe} aoMudar={setReguaDe} />}
           {gestor && reguaAberta && cabecalhoDe(reguaAberta, false)}
-          <div className="rg-strip" role="list" aria-label="Cadência da régua">
-            {faixa.map((m, i) => (
-              <div className="rg-strip-node" role="listitem" key={m.id}>
-                <span className="rg-strip-quando num">{quandoCurto(m.quando)}</span>
-                <span className="rg-strip-nm">{m.nome}</span>
-                {i < faixa.length - 1 && <span className="rg-strip-seta" aria-hidden>→</span>}
-              </div>
-            ))}
-          </div>
+          {/* a faixa "3d → Dia D → +3d" repetia os cartões: saiu — os cartões viram uma linha do tempo (CSS) */}
           {reguaAberta ? (
             <CartoesReguaComercial passos={passos} nome={nomeDe(reguaAberta)} podeEditar={gestor || souComercial} minha={souComercial}
               carregando={q.isLoading || versoesQ.isLoading}
@@ -2263,20 +2297,22 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
                   {gestor && propriasDoPasso(m.id).length > 0 && <div className="rg-donos">Personalizada na régua de: {propriasDoPasso(m.id).join(', ')}</div>}
                   {gestor && excluidasDoPasso(m.id).length > 0 && <div className="rg-donos">Excluída na régua de: {excluidasDoPasso(m.id).join(', ')}</div>}
                   <div className="rg-tipos">{tiposUnicos(m.blocos).map((t) => <span className="rg-tipo" key={t}><IconeBloco tipo={t} /> {ROTULO_BLOCO[t]}</span>)}</div>
-                  <div className="rg-prev">{previewMsg(m)}</div>
+                  <div className="rg-prev"><TextoComVariaveis texto={previewMsg(m)} /></div>
                 </div>
                 {gestor && (
                   <div className="rg-acoes">
                     <BotaoSec mini onClick={() => setEd({ alvo: 'padrao', novo: false, msg: JSON.parse(JSON.stringify(m)) })}>Editar</BotaoSec>
-                    <button type="button" className="cm-num-lnk" onClick={() => { const r = rowDe(m.id); if (r) alternar(r); }}>Pausar</button>
-                    <button type="button" className="cm-num-lnk perigo" onClick={() => { const r = rowDe(m.id); if (r) setExcluir(r); }}>Excluir</button>
+                    <MenuMais rotulo={`Mais ações para ${m.nome}`} itens={[
+                      { rotulo: 'Pausar', dica: 'Para de sair até ser reativada', onClick: () => { const r = rowDe(m.id); if (r) alternar(r); } },
+                      'sep',
+                      { rotulo: 'Excluir', perigo: true, dica: 'Pede confirmação', onClick: () => { const r = rowDe(m.id); if (r) setExcluir(r); } },
+                    ]} />
                   </div>
                 )}
               </div>
             ))}
             {passos.length === 0 && !q.isLoading && <div className="cm-exc-vazio">Nenhuma mensagem ativa na sequência.</div>}
           </div>
-          {gestor && <div style={{ marginTop: 12 }}><BotaoSec mini onClick={() => setEd({ alvo: 'padrao', novo: true, msg: { id: rid('p'), nome: '', quando: -3, blocos: [{ tipo: 'texto', corpo: '' }] } })}>＋ Nova mensagem</BotaoSec></div>}
           </>)}
         </>
         );
@@ -2294,7 +2330,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
 
       {!papelCarregando && gestor && abaRg === 'mensagens' && subaba === 'grupos' && (
         <>
-          <p className="cm-hint" style={{ margin: '0 0 10px' }}>Pra quem está no grupo, a mensagem do grupo <b>substitui</b> a da sequência padrão do mesmo dia (ex.: inadimplentes recebem um texto mais firme no Dia D).</p>
+          <p className="cm-hint" style={{ margin: '0 0 10px' }}>Para quem está no grupo, a mensagem do grupo <b>substitui</b> a da sequência padrão do mesmo dia (ex.: inadimplentes recebem um texto mais firme no Dia D).</p>
           <div className="cm-msg-lista">
             {grupos.map((g) => { const n = contaMembros(g.criterio); return (
               <div className="cm-msg-lin" key={g.id}>
@@ -2304,20 +2340,22 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
                 </div>
                 {gestor && <div className="rg-acoes">
                   <BotaoSec mini onClick={() => setEd({ alvo: 'grupo', novo: false, nome: g.nome, criterio: g.criterio, msg: JSON.parse(JSON.stringify(g.msg)) })}>Editar</BotaoSec>
-                  <button type="button" className="cm-num-lnk" onClick={() => { const r = rowDe(g.id); if (r) alternar(r); }}>Pausar</button>
-                  <button type="button" className="cm-num-lnk perigo" onClick={() => { const r = rowDe(g.id); if (r) setExcluir(r); }}>Excluir</button>
+                  <MenuMais rotulo={`Mais ações para ${g.nome}`} itens={[
+                    { rotulo: 'Pausar', dica: 'Para de sair até ser reativada', onClick: () => { const r = rowDe(g.id); if (r) alternar(r); } },
+                    'sep',
+                    { rotulo: 'Excluir', perigo: true, dica: 'Pede confirmação', onClick: () => { const r = rowDe(g.id); if (r) setExcluir(r); } },
+                  ]} />
                 </div>}
               </div>
             ); })}
             {grupos.length === 0 && <div className="cm-exc-vazio">Nenhum grupo ainda.</div>}
           </div>
-          {gestor && <div style={{ marginTop: 12 }}><BotaoSec mini onClick={() => setEd({ alvo: 'grupo', novo: true, nome: '', criterio: 'todos', msg: { id: rid('g'), nome: '', quando: 0, blocos: [{ tipo: 'texto', corpo: '' }] } })}>＋ Novo grupo</BotaoSec></div>}
         </>
       )}
 
       {!papelCarregando && gestor && abaRg === 'mensagens' && subaba === 'cliente' && (
         <>
-          <p className="cm-hint" style={{ margin: '0 0 10px' }}>Uma mensagem pra um cliente num dia marcado (ex.: acordo, aviso pontual). Sai uma vez, a partir do horário da régua, pelo número do comercial do cliente.</p>
+          <p className="cm-hint" style={{ margin: '0 0 10px' }}>Uma mensagem para um cliente em um dia marcado (ex.: acordo, aviso pontual). Sai uma vez, a partir do horário da régua, pelo número do comercial do cliente.</p>
           <div className="cm-msg-lista">
             {porCli.map((c) => (
               <div className="cm-msg-lin" key={c.id}>
@@ -2327,13 +2365,12 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
                 </div>
                 {gestor && <div className="rg-acoes">
                   <BotaoSec mini onClick={() => { setBuscaCliEd(''); setEd({ alvo: 'cliente', novo: false, cliId: c.cliId, data: c.data, msg: JSON.parse(JSON.stringify(c.msg)) }); }}>Editar</BotaoSec>
-                  <button type="button" className="cm-num-lnk perigo" onClick={() => { const r = rowDe(c.id); if (r) setExcluir(r); }}>Excluir</button>
+                  <MenuMais rotulo={`Mais ações para ${c.cliNome}`} itens={[{ rotulo: 'Excluir', perigo: true, dica: 'Pede confirmação', onClick: () => { const r = rowDe(c.id); if (r) setExcluir(r); } }]} />
                 </div>}
               </div>
             ))}
             {porCli.length === 0 && <div className="cm-exc-vazio">Nenhuma mensagem por cliente ainda.</div>}
           </div>
-          {gestor && <div style={{ marginTop: 12 }}><BotaoSec mini onClick={() => { setBuscaCliEd(''); setEd({ alvo: 'cliente', novo: true, cliId: '', data: hoje, msg: { id: rid('c'), nome: '', quando: 0, blocos: [{ tipo: 'texto', corpo: '' }] } }); }}>＋ Mensagem pra um cliente</BotaoSec></div>}
         </>
       )}
 
@@ -2348,7 +2385,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
               </div>
               {gestor && <div className="rg-acoes">
                 <BotaoSec mini onClick={() => alternar(r)}>Reativar</BotaoSec>
-                <button type="button" className="cm-num-lnk perigo" onClick={() => setExcluir(r)}>Excluir</button>
+                <MenuMais rotulo={`Mais ações para ${r.alvo === 'grupo' ? r.grupo_nome ?? r.nome : r.nome}`} itens={[{ rotulo: 'Excluir', perigo: true, dica: 'Pede confirmação', onClick: () => setExcluir(r) }]} />
               </div>}
             </div>
           ))}
@@ -2357,7 +2394,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
 
       {!papelCarregando && gestor && abaRg === 'comerciais' && (
         <>
-          <div className="rt-sec-tit"><h3>Régua de cada comercial</h3><span>Quem começa a que horas, quem está com a régua pausada e por qual WhatsApp sai. {tot.cli} em cobrança · {tot.cob} alcançáveis hoje.</span></div>
+          <div className="rt-sec-tit"><h3>Régua de cada comercial</h3><span>{tot.cli} em cobrança · {tot.cob} alcançáveis hoje</span></div>
           <TabelaComerciaisRegua linhas={linhasCom} inicioGeral={horaCfg} fim={fimCfg} salvandoHorario={horarioMut.isPending} pausando={pausaMut.isPending}
             carregando={previaQ.isLoading} erro={previaFalhou ? (previaQ.error?.message ?? 'falhou') : null}
             aoHorario={(l, h) => mudarHorario(l.chave, l.nome, h)} aoPausar={(l, p) => pedirPausa(l.chave, l.nome, p)}
@@ -2377,7 +2414,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
       )}
 
       {!papelCarregando && gestor && abaRg === 'configuracao' && !cfg && (
-        <div className="rt-vazio">{cfgQ.isError ? `Não deu pra ler a configuração agora: ${(cfgQ.error as Error)?.message ?? ''} — atualize a página.` : 'Carregando a configuração…'}</div>
+        <div className="rt-vazio">{cfgQ.isError ? `Não foi possível ler a configuração agora: ${(cfgQ.error as Error)?.message ?? ''}. Atualize a página.` : 'Carregando a configuração…'}</div>
       )}
 
       {!papelCarregando && gestor && abaRg === 'configuracao' && cfg && (
@@ -2397,8 +2434,8 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
         <ModalV2 aberto aoFechar={() => setExcluir(null)} largura={420}
           titulo={<div>Excluir “{excluir.alvo === 'grupo' ? excluir.grupo_nome ?? excluir.nome : excluir.alvo === 'cliente' ? `${excluir.cli_nome ?? 'Cliente'} · ${excluir.nome}` : excluir.nome}”?<div className="mod-sub">A mensagem sai da régua de vez</div></div>}
           rodape={<><BotaoSec onClick={() => setExcluir(null)}>Cancelar</BotaoSec>
-            <BotaoPrimario style={{ background: 'var(--rubro)' }} disabled={excluirMsg.isPending} onClick={() => excluirMsg.mutate(excluir.id, { onSuccess: (r) => { setExcluir(null); aoAvisar(r.cancelados > 0 ? `Mensagem excluída da régua. ${r.cancelados} envio(s) dela que ainda esperavam na fila de hoje foram cancelados.` : 'Mensagem excluída da régua.'); }, onError: (e) => aoAvisar((e as Error).message) })}>{excluirMsg.isPending ? 'Excluindo…' : 'Excluir'}</BotaoPrimario></>}>
-          <p className="cm-hint" style={{ margin: 0 }}>O que ela ainda tiver na fila de hoje é cancelado junto. O histórico do que já foi enviado continua em Envios. Se só quer parar por um tempo, use <b>Pausar</b>.
+            <button type="button" className="p-btn btn-perigo" disabled={excluirMsg.isPending} onClick={() => excluirMsg.mutate(excluir.id, { onSuccess: (r) => { setExcluir(null); aoAvisar(r.cancelados > 0 ? `Mensagem excluída da régua. ${r.cancelados === 1 ? '1 envio dela que ainda esperava na fila de hoje foi cancelado' : `${r.cancelados} envios dela que ainda esperavam na fila de hoje foram cancelados`}.` : 'Mensagem excluída da régua.'); }, onError: (e) => aoAvisar((e as Error).message) })}>{excluirMsg.isPending ? 'Excluindo…' : 'Excluir'}</button></>}>
+          <p className="cm-hint" style={{ margin: 0 }}>O que ela ainda tiver na fila de hoje é cancelado junto. O histórico do que já foi enviado continua em Envios. Para parar só por um tempo, use <b>Pausar</b>.
             {excluir.alvo === 'padrao' && propriasDoPasso(excluir.id).length + excluidasDoPasso(excluir.id).length > 0 && <> <b>O que {[...propriasDoPasso(excluir.id), ...excluidasDoPasso(excluir.id)].join(', ')} {propriasDoPasso(excluir.id).length + excluidasDoPasso(excluir.id).length > 1 ? 'fizeram' : 'fez'} neste passo na régua própria também é apagado.</b></>}</p>
         </ModalV2>
       )}
@@ -2407,8 +2444,8 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
         <ModalV2 aberto aoFechar={() => setExcluirDoCom(null)} largura={440}
           titulo={<div>Excluir “{excluirDoCom.passo.nome}”?<div className="mod-sub">Só da régua de {nomeDe(excluirDoCom.com)}</div></div>}
           rodape={<><BotaoSec onClick={() => setExcluirDoCom(null)}>Cancelar</BotaoSec>
-            <BotaoPrimario style={{ background: 'var(--rubro)' }} disabled={salvarVersao.isPending} onClick={() => marcarExcluida(excluirDoCom.passo, excluirDoCom.com, true)}>{salvarVersao.isPending ? 'Excluindo…' : 'Excluir'}</BotaoPrimario></>}>
-          <p className="cm-hint" style={{ margin: 0 }}>{souComercial ? 'Seus clientes' : `Os clientes de ${nomeDe(excluirDoCom.com)}`} deixam de receber esta mensagem. A sequência padrão e a régua dos outros comerciais não mudam. Dá pra voltar a usar quando quiser (e pelo botão Desfazer).</p>
+            <button type="button" className="p-btn btn-perigo" disabled={salvarVersao.isPending} onClick={() => marcarExcluida(excluirDoCom.passo, excluirDoCom.com, true)}>{salvarVersao.isPending ? 'Excluindo…' : 'Excluir'}</button></>}>
+          <p className="cm-hint" style={{ margin: 0 }}>{souComercial ? 'Seus clientes' : `Os clientes de ${nomeDe(excluirDoCom.com)}`} deixam de receber esta mensagem. A sequência padrão e a régua dos outros comerciais não mudam. É possível voltar a usar quando quiser (e pelo botão Desfazer).</p>
         </ModalV2>
       )}
 
@@ -2423,14 +2460,14 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
               }
               excluirVersao.mutate({ ...v, nome: nomeDe(v.comercial) }, { onSuccess: () => { setUsarPadrao(null); aoAvisar(`${nomeDe(v.comercial)} volta a usar a mensagem padrão em “${rowDe(v.passo_id)?.nome ?? 'mensagem'}”.`); }, onError: (e) => aoAvisar((e as Error).message) }); }}>
               {excluirVersao.isPending ? 'Voltando…' : 'Usar a padrão'}</BotaoPrimario></>}>
-          <p className="cm-hint" style={{ margin: 0 }}>A mensagem própria de {nomeDe(usarPadrao.comercial)} neste passo é apagada e os clientes dele voltam a receber a mensagem padrão. Dá pra desfazer pelo botão Desfazer.</p>
+          <p className="cm-hint" style={{ margin: 0 }}>A mensagem própria de {nomeDe(usarPadrao.comercial)} neste passo é apagada e os clientes dele voltam a receber a mensagem padrão. É possível desfazer pelo botão Desfazer.</p>
         </ModalV2>
       )}
 
       {ed && (
         <ModalV2 aberto aoFechar={() => setEd(null)} largura={620}
           titulo={ed.alvo === 'versao'
-            ? <div>{nomeDe(ed.comercial)} · {ed.msg.nome}<div className="mod-sub">Régua de {nomeDe(ed.comercial)} — mensagem e dia só pros clientes dele (na padrão sai {quandoExtenso(ed.q0)})</div></div>
+            ? <div>{nomeDe(ed.comercial)} · {ed.msg.nome}<div className="mod-sub">Régua de {nomeDe(ed.comercial)}: mensagem e dia só para os clientes dele (na padrão sai {quandoExtenso(ed.q0)})</div></div>
             : <div>{ed.novo ? 'Nova mensagem' : 'Editar mensagem'}<div className="mod-sub">{ed.alvo === 'padrao' ? 'Sequência padrão' : ed.alvo === 'grupo' ? 'Mensagem de grupo (substitui a padrão do mesmo dia)' : 'Mensagem por cliente'}</div></div>}
           rodape={<><BotaoSec onClick={() => setEd(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={salvarEd} disabled={salvarMsg.isPending || salvarVersao.isPending || excluirVersao.isPending}>{salvarMsg.isPending || salvarVersao.isPending || excluirVersao.isPending ? 'Salvando…' : 'Salvar mensagem'}</BotaoPrimario></>}>
           {ed.alvo === 'grupo' && (
@@ -2440,7 +2477,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
                 <select className="inp" value={ed.criterio} onChange={(e) => setEd({ ...ed, criterio: e.target.value })}>
                   <option value="todos">Todos os clientes em cobrança</option>
                   {(['inadimplente', 'faltou', 'voltou', 'em_dia'] as Comportamento[]).map((c) => <option key={c} value={`comp:${c}`}>{ROTULO_COMP[c]}</option>)}
-                  {atendentes.map((a) => <option key={a} value={`atend:${a}`}>Atendente {a}</option>)}
+                  {atendentes.map((a) => <option key={a} value={`atend:${a}`}>Comercial {a}</option>)}
                 </select>
               </div>
             </div>
@@ -2449,7 +2486,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
             <div className="form-2col" style={{ marginBottom: 4 }}>
               <div className="campo"><label>Cliente</label>
                 {ed.cliId
-                  ? <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><b style={{ fontSize: 13 }}>{nomeCliMsg(ed.cliId)}</b><button type="button" className="cm-num-lnk" onClick={() => setEd({ ...ed, cliId: '' })}>trocar</button></div>
+                  ? <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><b style={{ fontSize: 13 }}>{nomeCliMsg(ed.cliId)}</b><BotaoSec mini onClick={() => setEd({ ...ed, cliId: '' })}>Trocar</BotaoSec></div>
                   : <>
                       <Input value={buscaCliEd} placeholder="Digite o nome do cliente…" autoFocus onChange={(e) => setBuscaCliEd(e.target.value)} />
                       {cliSugestoes.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
@@ -2460,7 +2497,7 @@ export function ReguaReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (
               <div className="campo"><label>Data do envio</label><Input type="date" min={hoje} value={ed.data} onChange={(e) => setEd({ ...ed, data: e.target.value })} /></div>
             </div>
           )}
-          <p className="cm-hint" style={{ margin: '0 0 8px' }}>As variáveis usam os números da Gestão: <b>{'{meia parcela}'}</b> = o valor que o cliente paga (a <b>meia parcela</b> da ficha) — é o único valor que se cobra · <b>{'{vencimento}'}</b> = dia do vencimento · <b>{'{nome do atendente}'}</b> = dono do número que envia.</p>
+          <p className="cm-hint rg-vars-dica" style={{ margin: '0 0 8px' }}>As variáveis usam os dados da Gestão: <span className="cc-var">meia parcela</span> é o valor que o cliente paga (o único que se cobra) · <span className="cc-var">vencimento</span> é o dia do vencimento · <span className="cc-var">nome do atendente</span> é o comercial dono do número que envia.</p>
           {ed.alvo === 'versao' && <div className="form-grid" style={{ marginBottom: 6 }}><DiaDaVersao q0={ed.q0} valor={ed.msg.quando} aoMudar={(q) => setEd((prev) => (prev && prev.alvo === 'versao' ? { ...prev, msg: { ...prev.msg, quando: q } } : prev))} /></div>}
           <EditorMsg msg={ed.msg} setMsg={(m) => setEd((prev) => (prev ? { ...prev, msg: m } : prev))} comQuando={ed.alvo !== 'cliente' && ed.alvo !== 'versao'} semNome={ed.alvo === 'versao'} setAviso={aoAvisar} aoSubirMidia={subirMidiaWA} />
         </ModalV2>

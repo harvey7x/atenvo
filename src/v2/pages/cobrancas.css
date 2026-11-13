@@ -1747,3 +1747,34 @@ html[data-barra-alfa] .v2 .reg-card .reg-tec-badge { font-size: 11px; text-trans
 html[data-barra-alfa] .v2 .reg-card .reg-tab-para { color: var(--txt); }
 html[data-barra-alfa] .v2 .reg-msg { padding: 16px 10px; font-size: 13px; color: var(--txt-3); }
 html[data-barra-alfa] .v2 .reg-mais { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 8px; font-size: 12px; color: var(--txt-3); }
+
+/* ---- RÉGUA DE MENSAGENS ---- */
+/* uma linha de controles: segmentado compacto · "Régua de" · ação principal à direita */
+html[data-barra-alfa] .v2 .rg-controles { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg { display: inline-flex; width: auto; margin: 0; flex: none; }
+html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg .cm-seg-btn { flex: none; }
+html[data-barra-alfa] .v2 .rg-controles-esp { flex: 1 1 auto; }
+html[data-barra-alfa] .v2 .rg-de-sel { display: inline-flex; align-items: center; gap: 8px; }
+html[data-barra-alfa] .v2 .rg-de-sel > span { font-size: 12px; font-weight: 500; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .rg-de-sel select.inp { width: auto; min-width: 190px; padding-right: 28px; }
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg { width: 100%; overflow-x: auto; }
+  html[data-barra-alfa] .v2 .rg-controles-esp { display: none; }
+}
+/* interruptor "Ligada" no cabeçalho da régua automática */
+html[data-barra-alfa] .v2 .rg-liga { display: inline-flex; align-items: center; gap: 10px; padding-left: 12px; margin-left: 2px; border-left: 1px solid var(--linha); font-size: 13px; font-weight: 600; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .rg-liga.on { color: var(--cor-ok-txt, var(--verde)); }
+/* blocos de hoje/amanhã/alcance: o rótulo do KPI do sistema (12/500, sem caixa alta) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .rg-tile .ev-rot { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
+/* os cartões dos passos viram uma LINHA DO TEMPO (fio ligando os dias) — no lugar da faixa que os repetia */
+html[data-barra-alfa] .v2 .rg-cards { position: relative; gap: 10px; }
+html[data-barra-alfa] .v2 .rg-cards::before { content: ''; position: absolute; left: 52px; top: 22px; bottom: 22px; width: 1px; background: linear-gradient(180deg, transparent, var(--linha) 12%, var(--linha) 88%, transparent); pointer-events: none; }
+html[data-barra-alfa] .v2 .rg-cards > .rg-card { position: relative; background: var(--vidro-a, rgba(var(--tint), .02)); }
+html[data-barra-alfa] .v2 .rg-quando b { font-size: 16px; font-weight: 600; }
+html[data-barra-alfa] .v2 .rg-quando i { font-size: 11px; }
+html[data-barra-alfa] .v2 .rg-prev { color: var(--txt-2); font-size: 13px; line-height: 1.55; border-left-color: rgba(var(--tint), .14); }
+html[data-barra-alfa] .v2 .rg-acoes { gap: 4px; }
+/* chips de variável no editor: o mesmo desenho da ficha da lista */
+html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn { padding: 2px; border-radius: 6px; background: transparent; border: 1px solid transparent; }
+html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn:hover { border-color: rgba(var(--tint), .16); background: rgba(var(--tint), .04); }
+html[data-barra-alfa] .v2 .rg-vars-dica .cc-var { margin: 0 2px; }
