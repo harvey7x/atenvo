@@ -44,8 +44,9 @@ export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 
     if (!aberto) return;
     const aoTeclar = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFecharRef.current(); };
     document.addEventListener('keydown', aoTeclar);
+    // o X do cabeçalho vem antes do corpo no DOM: fica fora do autofoco (o 1º campo segue ganhando)
     const t = setTimeout(() => {
-      cartaoRef.current?.querySelector<HTMLElement>('input,textarea,select,button')?.focus();
+      cartaoRef.current?.querySelector<HTMLElement>('input,textarea,select,button:not(.p-modal-x)')?.focus();
     }, 30);
     return () => { document.removeEventListener('keydown', aoTeclar); clearTimeout(t); };
   }, [aberto]);
@@ -55,7 +56,18 @@ export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 
     <div className="veu" onMouseDown={(e) => { if (fecharNoVeu && e.target === e.currentTarget) aoFechar(); }}>
       <div className="p-modal vidro" ref={cartaoRef} style={{ width: largura }} role="dialog" aria-modal="true"
         aria-labelledby={titulo != null ? tituloId : undefined} aria-describedby={descricaoId}>
-        {titulo != null && <div className="p-modal-cab" id={tituloId}>{titulo}</div>}
+        {titulo != null && (
+          <div className="p-modal-cab">
+            <div className="p-modal-tit" id={tituloId}>{titulo}</div>
+            {/* X de fechar (régua da ALFA: todo modal tem X no canto, além do Esc). Fora da ALFA
+                o CSS o esconde e o cabeçalho fica como sempre foi. */}
+            <button type="button" className="p-modal-x" aria-label="Fechar" title="Fechar (Esc)" onClick={aoFechar}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        )}
         <div className="p-modal-corpo">{children}</div>
         {rodape != null && <div className="p-modal-rodape">{rodape}</div>}
       </div>

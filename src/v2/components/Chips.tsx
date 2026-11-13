@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { comIconeDeGlifo } from './Botao';
 import './componentes.css';
 
 /** Linha de chips de filtro (.chips do mockup). */
@@ -20,7 +21,7 @@ export function Chip({ ativo, limpar, onClick, removivel, children }: ChipProps)
   const cls = ['chip', ativo ? 'on' : '', limpar ? 'limpar' : ''].filter(Boolean).join(' ');
   return (
     <button type="button" className={cls} onClick={onClick} aria-pressed={ativo}>
-      {children}
+      {comIconeDeGlifo(children)}
       {removivel && ativo && <span className="x" aria-hidden>×</span>}
     </button>
   );

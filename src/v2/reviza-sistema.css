@@ -16,24 +16,437 @@
      vermelho = erro, cinza = neutro — o mesmo sentido em todas as telas.
    - dourado: SÓ item ativo, 1 botão principal por tela e 1 destaque de dado
      (período/mês selecionado, barra do mês atual). Alerta NÃO é dourado.
+
+   ESPECIFICIDADE: o CSS de cada tela chega DEPOIS deste arquivo (vem com a tela, em
+   pedaço próprio). Para a régua valer em qualquer ordem sem !important, as regras de
+   componente usam o prefixo  html[data-barra-alfa]:not(#rv-sis)  — o :not(#id) soma o
+   peso de um id e casa com tudo. Só cor/forma/medida: nada de display/posição/largura.
    ===================================================================== */
+
+/* ---- 0. CAMADA SEMÂNTICA (a fonte única; as regras abaixo só referenciam estes nomes) ---- */
 html[data-barra-alfa] .v2 {
+  /* tipo */
   --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-16: 16px; --fs-23: 23px; --fs-26: 26px;
+  --fw-normal: 400; --fw-medio: 500; --fw-forte: 600; --fw-titulo: 650;
+  /* altura de controle e raio */
   --btn-h-p: 28px; --btn-h: 32px; --btn-h-g: 36px; --btn-r: 8px;
   --selo-h: 20px; --selo-r: 6px;
+  --r-selo: 6px; --r-controle: 8px; --r-cartao: 12px; --r-pilula: 999px;
+  /* espaço */
+  --esp-1: 4px; --esp-2: 8px; --esp-3: 12px; --esp-4: 16px; --esp-5: 24px; --esp-6: 32px;
+  /* ícone */
+  --ic-p: 14px; --ic: 16px; --ic-g: 20px; --ic-traco: 1.5;
+  /* cor — apelidos dos tokens do tema (cada um tem par claro/escuro na origem) */
+  --cor-fundo: var(--base);
+  --cor-sup-1: var(--vidro-a);
+  --cor-sup-2: var(--rp-elev, var(--surface));
+  --cor-sup-3: var(--rp-menu, var(--surface));
+  --cor-borda: var(--linha);
+  --cor-borda-ctl: var(--rp-campo-fio, rgba(var(--tint), .12));
+  --cor-txt-1: var(--txt); --cor-txt-2: var(--txt-2); --cor-txt-3: var(--txt-3);
+  --cor-acento: var(--azul);
+  --cor-acento-suave: color-mix(in srgb, var(--azul) 14%, transparent);
+  --cor-acento-fio: color-mix(in srgb, var(--azul) 42%, transparent);
+  --cor-ok: var(--verde); --cor-ok-suave: rgba(var(--verde-rgb), .14);
+  --cor-alerta: var(--ambar); --cor-alerta-suave: rgba(var(--ambar-rgb), .14);
+  --cor-erro: var(--rubro); --cor-erro-suave: rgba(var(--rubro-rgb), .14);
+  --cor-info: var(--dado-1); --cor-info-suave: rgba(var(--dado-1-rgb), .14);
+  --cor-neutro-suave: rgba(var(--tint), .07);
 }
 
-/* ALERTA ≠ DOURADO: o âmbar (atenção) era #CF9A3A, quase o mesmo do ouro — vira laranja próprio */
+/* ---- 1. CORES DO TEMA ---- */
+/* ALERTA ≠ DOURADO: o âmbar (atenção) era #CF9A3A, quase o mesmo do ouro — vira laranja próprio.
+   ESCURO: o cinza terciário sobe para #8A909A (4,9:1 sobre a superfície elevada; #7C828D ficava em 4,1) */
 html:root[data-barra-alfa][data-repaginada][data-repaginada]:not([data-tema="light"]) .v2,
 html:root[data-barra-alfa][data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2,
 html:root[data-barra-alfa][data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.portal-v2 {
+  --txt-3: #8A909A;
   --ambar: #E08A3C; --ambar-rgb: 224, 138, 60; --ambar-bg: rgba(224, 138, 60, .13);
+  /* texto de selo (≥4,5:1 sobre o fundo do próprio selo) */
+  --cor-ok-txt: var(--verde); --cor-alerta-txt: var(--ambar); --cor-erro-txt: #EA6A66;
+  --cor-acento-txt: var(--rv-tinta, var(--azul));
 }
 /* CLARO: o cinza terciário (#878D97, 3:1) não passava o AA em 29,5% dos textos → #666C76 (5,1:1);
-   e o laranja de atenção legível sobre branco */
+   verde, vermelho e laranja um degrau mais fundos (≥4,5:1 no branco E no fundo do próprio selo);
+   o dourado de texto (links/realces) desce para #7A5A12 (5,2:1 sobre o selo dourado) */
 html:root[data-barra-alfa][data-repaginada][data-repaginada][data-tema="light"] .v2,
 html:root[data-barra-alfa][data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2,
 html:root[data-barra-alfa][data-repaginada][data-repaginada][data-tema="light"] .v2.portal-v2 {
   --txt-3: #666C76;
-  --ambar: #B45309; --ambar-rgb: 180, 83, 9; --ambar-bg: rgba(180, 83, 9, .1);
+  --verde: #2A7352; --verde-rgb: 42, 115, 82; --verde-bg: rgba(42, 115, 82, .12);
+  --rubro: #A23F33; --rubro-rgb: 162, 63, 51; --rubro-bg: rgba(162, 63, 51, .11);
+  --ambar: #A84C08; --ambar-rgb: 168, 76, 8; --ambar-bg: rgba(168, 76, 8, .1);
+  --rv-tinta: #7A5A12;
+  --cor-ok-txt: #276B4D; --cor-alerta-txt: #A84C08; --cor-erro-txt: #9E3B2F;
+  --cor-acento-txt: #7A5A12;
+  --cor-ok-suave: rgba(42, 115, 82, .1); --cor-alerta-suave: rgba(168, 76, 8, .09); --cor-erro-suave: rgba(162, 63, 51, .09);
+}
+/* Kanban: o cinza próprio do quadro (#6E737C no escuro, 4,0:1; #8C929D no claro, 2,9:1) segue o --txt-3 do sistema */
+html[data-barra-alfa]:not(#rv-sis) .v2 .kb-pro { --kp-txt-3: var(--txt-3); }
+
+/* ---- 2. BOTÕES — um componente, 3 alturas, 4 variantes ----
+   As 71 famílias de botão de texto convergem para o .p-btn:
+   md 32 (padrão) · sm 28 (ação de linha/tabela, .btn-mini) · lg 36 (ação do cabeçalho da página).
+   Raio 8 · 13px · peso 500 (principal 600) · ícone 16 (14 no pequeno). */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn,
+  .gp-sc-ger, .pn-fin-ok, .pn-fin-nao, .fjb-btn, .ctx-status, .kb-add, .etq-add) {
+  height: var(--btn-h); min-height: var(--btn-h); padding-top: 0; padding-bottom: 0;
+  padding-left: 12px; padding-right: 12px;
+  border-radius: var(--btn-r); font-family: var(--fonte);
+  font-size: var(--fs-13); font-weight: var(--fw-medio); letter-spacing: 0; line-height: 1;
+  white-space: nowrap; transform: none;
+}
+/* sm 28: ações em linha de tabela/lista e o .btn-mini */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn.btn-mini, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv,
+  .fjb-btn, .ctx-status, .etq-add, td .p-btn, .pn-fin-ok, .pn-fin-nao) {
+  height: var(--btn-h-p); min-height: var(--btn-h-p); padding-left: 10px; padding-right: 10px;
+}
+/* lg 36: as ações do cabeçalho da página (a principal e quem estiver ao lado dela) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .ph :is(.acoes, .ph-acoes) :is(.p-btn, .pn-link) {
+  height: var(--btn-h-g); min-height: var(--btn-h-g); padding-left: 14px; padding-right: 14px;
+}
+/* ícone dentro do botão: 16 (14 no pequeno), traço 1,5 */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .gp-sc-ger, .kb-add) > svg {
+  width: var(--ic); height: var(--ic); flex-shrink: 0;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn.btn-mini, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .etq-add, .fjb-btn) > svg {
+  width: var(--ic-p); height: var(--ic-p);
+}
+
+/* PRINCIPAL (dourado): só o .btn-pri de tamanho normal/grande; peso 600 */
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-pri:not(.btn-mini) { font-weight: var(--fw-forte); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-pri:disabled { opacity: 1; filter: none; color: var(--txt-3); background: rgba(var(--tint), .06); border-color: rgba(var(--tint), .1); box-shadow: none; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-pri:disabled::after { display: none; }
+
+/* SECUNDÁRIO (contorno neutro). Ação de linha NUNCA é dourada: "Marcar débito parado" (Novos),
+   "Enviar" dos scripts (Conversas), "Editar"/"Criar ficha" da ficha do WhatsApp, "Confirmar"
+   (Financeiro, era verde cheio) e "Conversa" (Envios, era contorno verde) viram secundário. */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.p-btn.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: var(--txt);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel, inset 0 1px 0 rgba(255, 255, 255, .05)), 0 1px 2px rgba(0, 0, 0, .3);
+  filter: none;
+}
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.p-btn.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .17); color: var(--txt); filter: none;
+}
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.p-btn.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: var(--txt); background: #FFFFFF; border: 1px solid rgba(17, 24, 39, .13);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06); filter: none;
+}
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.p-btn.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  background: #F8F9FA; border-color: rgba(17, 24, 39, .2); color: var(--txt);
+}
+/* o brilho que corre no dourado não existe no secundário */
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-pri.btn-mini::after { display: none; }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn.btn-sec, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .gp-sc-ger, .pn-fin-ok, .pn-fin-nao, .fjb-btn):disabled {
+  opacity: .45; box-shadow: none;
+}
+
+/* PERIGO (contorno vermelho; o cheio fica só no "confirmar exclusão"): Remover (Novos), Não caiu
+   (Financeiro), o .btn-perigo pequeno */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.fin-btn:not(.fin-ok), .pn-fin-nao, .p-btn.btn-perigo.btn-mini) {
+  color: var(--cor-erro-txt, var(--rubro)); background: transparent;
+  border: 1px solid rgba(var(--rubro-rgb), .32); box-shadow: none; filter: none;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.fin-btn:not(.fin-ok), .pn-fin-nao, .p-btn.btn-perigo.btn-mini):hover:not(:disabled) {
+  color: var(--cor-erro-txt, var(--rubro)); background: rgba(var(--rubro-rgb), .1); border-color: rgba(var(--rubro-rgb), .5);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-perigo:not(.btn-mini) {
+  color: #fff; background: color-mix(in srgb, var(--rubro), #000 12%); border: 1px solid color-mix(in srgb, var(--rubro), #000 22%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-btn.btn-perigo:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--rubro), #000 22%); }
+
+/* FANTASMA (só texto): "Adicionar lead"/"Nova coluna" do Kanban, "＋ Etiqueta", barra da planilha */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kb-add, .etq-add) {
+  color: var(--txt-2); background: transparent; border: 1px solid transparent; box-shadow: none;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kb-add, .etq-add):hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .06); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-bt { height: var(--btn-h-p); border-radius: var(--btn-r); font-size: var(--fs-12); font-weight: var(--fw-medio); }
+
+/* LINKS: texto neutro sublinhado (não dourado) — "verificar", "Pausar", "Abrir régua", "Ver" */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.cm-num-lnk:not(.perigo), .fin-comp-link, .ev-link) {
+  color: var(--txt-2); font-size: var(--fs-12); font-weight: var(--fw-medio);
+  text-decoration: underline; text-decoration-color: rgba(var(--tint), .28); text-underline-offset: 3px;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.cm-num-lnk:not(.perigo), .fin-comp-link, .ev-link):hover:not(:disabled) {
+  color: var(--txt); text-decoration-color: currentColor;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .cm-num-lnk.perigo { color: var(--cor-erro-txt, var(--rubro)); font-size: var(--fs-12); font-weight: var(--fw-medio); }
+
+/* ---- 3. SELEÇÃO — 3 controles: ABAS · SEGMENTADO · CHIP DE FILTRO ---- */
+/* ABAS (sublinhado dourado de 2px, 36px, 13/600): Envios, Régua */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-aba, .rt-abas > button) {
+  height: 36px; padding: 0 12px; font-size: var(--fs-13); font-weight: var(--fw-forte); color: var(--txt-2);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-aba, .rt-abas > button):hover { color: var(--txt); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-aba.on, .rt-abas > button.on) { color: var(--txt); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-aba.on, .rt-abas > button.on)::after { background: var(--azul); left: 8px; right: 8px; height: 2px; }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-aba-n, .rt-abas > button .n, .rt-abas > button small) {
+  font-size: var(--fs-11); font-weight: var(--fw-forte); min-width: 18px; height: 18px; padding: 0 6px; border-radius: var(--r-pilula);
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+}
+
+/* SEGMENTADO (trilho 30, raio 8; item 26, raio 6; 12/500; polegar elevado neutro) */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.segm, .pn-fin-seg, .ev-seg, .cm-seg, .kb-ord, .gp-sc-caixa) {
+  padding: 2px; border-radius: var(--r-controle); gap: 2px; min-height: 30px; align-items: center;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.segm > button, .pn-fin-seg > button, .ev-seg > button, .cm-seg-btn, .kb-ord > .kb-fchip, .gp-sc-item) {
+  height: 26px; min-height: 26px; padding: 0 10px; border-radius: var(--r-selo);
+  font-size: var(--fs-12); font-weight: var(--fw-medio); letter-spacing: 0; line-height: 1;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.segm > button, .pn-fin-seg > button, .ev-seg > button, .cm-seg-btn, .kb-ord > .kb-fchip, .gp-sc-item):not(.on) {
+  color: var(--txt-2); background: transparent; box-shadow: none; border-color: transparent;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.segm > button, .pn-fin-seg > button, .ev-seg > button, .cm-seg-btn, .kb-ord > .kb-fchip, .gp-sc-item):not(.on):hover { color: var(--txt); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .kb-ord > .kb-fchip.on, .gp-sc-item.on) {
+  color: var(--txt); background: var(--cor-sup-2);
+}
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .kb-ord > .kb-fchip.on, .gp-sc-item.on) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .09), var(--rp-bisel, none);
+}
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .kb-ord > .kb-fchip.on, .gp-sc-item.on) {
+  background: #FFFFFF; box-shadow: 0 1px 2px rgba(16, 24, 40, .1), 0 0 0 1px rgba(17, 24, 39, .06);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kb-ord, .gp-sc-caixa) { background: var(--rp-trilho, rgba(var(--tint), .05)); }
+/* contador dentro do segmentado/aba = selo-contador neutro */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.pn-fin-seg > button span, .gp-sc-n, .wa-aba .n) {
+  font-size: var(--fs-11); font-weight: var(--fw-forte); letter-spacing: 0;
+}
+
+/* CHIP DE FILTRO (28, raio 8, 12/500; ligado = ouro 14% + fio ouro + texto normal) */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button.chip, .calx-chip, .kb-barra > .kb-fchip, .rg-de > button, .wa-aba) {
+  height: 28px; min-height: 28px; padding: 0 10px; border-radius: var(--r-controle);
+  font-size: var(--fs-12); font-weight: var(--fw-medio); letter-spacing: 0; line-height: 1;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button.chip, .calx-chip, .kb-barra > .kb-fchip, .rg-de > button):not(.on) {
+  color: var(--txt-2); background: transparent; border: 1px solid var(--cor-borda-ctl); box-shadow: none;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button.chip, .calx-chip, .kb-barra > .kb-fchip, .rg-de > button):not(.on):hover {
+  color: var(--txt); background: rgba(var(--tint), .045);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button.chip.on, .calx-chip.on, .kb-barra > .kb-fchip.on, .rg-de > button.on) {
+  color: var(--txt); background: var(--cor-acento-suave); border: 1px solid var(--cor-acento-fio); box-shadow: none;
+}
+/* "Foco" do Kanban: o vermelho é de erro — o chip é neutro como os outros */
+html[data-barra-alfa]:not(#rv-sis) .v2 .kb-barra > .kb-fchip.foco:not(.on) { color: var(--txt-2); }
+/* abas do WhatsApp (Todos · Meus · Não lidas…): o mesmo chip; a ligada = seleção em ouro suave
+   (no escuro era ouro SÓLIDO com texto escuro — a peça mais forte da coluna) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .wa-aba:not(.on) { color: var(--txt-2); background: transparent; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .wa-aba.on { color: var(--txt); background: var(--cor-acento-suave); box-shadow: inset 0 0 0 1px var(--cor-acento-fio); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .wa-aba.on .n:not(.urg) { color: var(--txt); background: rgba(var(--tint), .1); }
+/* chip de ambiente dentro da linha de Usuários: mesmo chip, um degrau menor (24) para a linha não crescer;
+   ligado em NEUTRO — o ouro repetido em toda linha virava uma coluna dourada */
+html[data-barra-alfa]:not(#rv-sis) .v2 td button.chip { height: 24px; min-height: 24px; padding: 0 8px; font-size: var(--fs-11); font-weight: var(--fw-forte); }
+html[data-barra-alfa]:not(#rv-sis) .v2 td button.chip.chip.on { color: var(--txt); background: rgba(var(--tint), .08); border-color: rgba(var(--tint), .18); }
+/* ciclos do Calendário: hoje "Todos" e cada ciclo ficam ligados juntos (a tela marca todos) — ligado em
+   neutro até a tela separar "Todos" dos ciclos; senão a linha inteira vira uma faixa dourada */
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chip.calx-chip.calx-chip.on { color: var(--txt); background: rgba(var(--tint), .07); border-color: rgba(var(--tint), .2); }
+
+/* ---- 4. SELO DE SITUAÇÃO — um só: 20px, raio 6, 11/600, sem caixa alta ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st, .ev-chip, .kc-chip, .kc-banco, .kc-etq, .kc-flag, .plx-leg-am, .rg-strip-quando,
+  .rg-pub, .rg-tipo, .d5-demo, .d5-kpi-fonte, .ctx-tag, .fjb-tag, .etqchip, .pn-delta.chip, .d5-var-chip, .kpi .delta, .pn-us-voce, .ag-pill) {
+  /* só medida/forma — o display de cada selo fica (o reticências do texto longo depende dele) */
+  box-sizing: border-box; min-height: var(--selo-h); height: auto; padding-top: 0; padding-bottom: 0; padding-left: 7px; padding-right: 7px;
+  border-radius: var(--selo-r); font-size: var(--fs-11); font-weight: var(--fw-forte);
+  text-transform: none; letter-spacing: 0; line-height: 18px; vertical-align: middle;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st, .pn-delta.chip, .d5-var-chip, .kpi .delta, .d5-kpi-fonte) { line-height: 20px; }
+/* a etiqueta "entrada" do Kanban: o mesmo selo, enxuto (mora ao lado do nome da coluna) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .tag-entrada {
+  font-size: var(--fs-11); font-weight: var(--fw-medio); letter-spacing: 0; padding: 0 5px; border-radius: var(--selo-r);
+  line-height: 16px; min-height: 18px; box-sizing: border-box;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-chip, .rg-strip-quando, .rg-pub, .rg-tipo, .d5-demo, .d5-kpi-fonte, .kc-banco, .kc-etq, .ag-pill, .pn-us-voce, .ctx-tag) {
+  /* etiqueta = selo NEUTRO (o "Régua · …" de Envios, o "você", o banco do Kanban) */
+  color: var(--txt-2) !important; background: var(--cor-neutro-suave) !important;
+  border: 1px solid rgba(var(--tint), .08); box-shadow: none;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .ev-chip { font-size: var(--fs-11) !important; }
+/* tons (mesmo sentido em todas as telas) */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st.s-ok, .d-ok, .pn-delta.chip.pos, .kc-flag.ganho) { color: var(--cor-ok-txt, var(--verde)); background: var(--cor-ok-suave); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st.s-at, .d-at) { color: var(--cor-alerta-txt, var(--ambar)); background: var(--cor-alerta-suave); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st.s-er, .d-er, .pn-delta.chip.neg, .kc-flag.perdido) { color: var(--cor-erro-txt, var(--rubro)); background: var(--cor-erro-suave); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.st.s-ne, .d-ne, .pn-delta.chip.neutro) { color: var(--txt-2); background: var(--cor-neutro-suave); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .st i { width: 6px; height: 6px; flex-shrink: 0; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .st.s-er i { box-shadow: none; }
+/* pílula (raio cheio) só para CONTADOR e "Ao vivo" */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-q, .cv2-n, .pn-fin-n, .cv2-badge, .cont.num, .ev-chip-n) {
+  font-size: var(--fs-11); font-weight: var(--fw-forte); border-radius: var(--r-pilula); letter-spacing: 0;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .selo-vivo { font-size: var(--fs-11); font-weight: var(--fw-forte); }
+/* contador neutro sobre o cinza do segmentado/chip: --txt-2 (o --txt-3 ficava em 3,7:1 no claro) */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.gp-sc-item:not(.on) .gp-sc-n, .pn-fin-seg > button .num, .pn-fin-seg > button span) { color: var(--txt-2); }
+/* contador de atenção (Envios "fila", Conversas não lidas): o laranja só no número */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-q, .cv2-n, .pn-fin-n) { line-height: 1; }
+
+/* avatares: 3 tamanhos (20 · 28 · 36); iniciais legíveis */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ev-av, .d5-av) { width: 28px; height: 28px; min-width: 28px; font-size: var(--fs-11); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.pn-av, .kc-av) { font-size: var(--fs-11); }
+/* avatar de CONTEÚDO não é dourado (Números) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .pn-num-av { color: var(--txt); background: rgba(var(--tint), .08); border-color: rgba(var(--tint), .12); box-shadow: none; }
+
+/* ---- 5. KPI — um só: o do Painel (número 26/650 tabular, centavos a 60%, rótulo 12/500) ----
+   O <Kpi> (Novos, Cancelados, Registros, Envios), o Dashboard, Conversas e a Régua convergem. */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi, .d5-kpi, .cv2-kpi) {
+  padding: 15px 17px 16px; gap: 6px; min-height: 112px; border-radius: var(--r-cartao);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .kpi { display: flex; flex-direction: column; }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi .rot, .d5-kpi-rot, .cv2-kpi > span, .pn-kpi-rot) {
+  font-size: var(--fs-12); font-weight: var(--fw-medio); color: var(--txt-2);
+  text-transform: none; letter-spacing: 0; line-height: 18px;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi .val, .d5-kpi-val, .cv2-kpi > b, .rg-tile-v b, .ev-regua-pct b, .ev-passo-num b, .d5-robo-val) {
+  font-size: var(--fs-26); font-weight: var(--fw-titulo); letter-spacing: -.03em; line-height: 1.1;
+  font-variant-numeric: tabular-nums; margin: 0;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi .val, .d5-kpi-val) { margin-top: 2px; }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi .val .cent, .d5-kpi-un) {
+  font-size: .6em; font-weight: var(--fw-medio); color: var(--txt-3); letter-spacing: 0; margin-left: 1px;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kpi .kpi-nota, .cv2-kpi > i, .d5-kpi-leg) { font-size: var(--fs-12); font-weight: var(--fw-normal); color: var(--txt-3); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .kpi .kpi-pe { margin: 0; }
+/* o KPI de atenção (Conversas: não lidas) — sem fundo laranja; o laranja fica só no número */
+html[data-barra-alfa]:not(#rv-sis) .v2 .cv2-kpi.atencao {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); border-color: var(--cor-borda);
+}
+
+/* ---- 6. TIPOGRAFIA — títulos de cartão 16/600, cabeçalho de tabela 11/600, mínimo 11px ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .an-cartao-tit, .ev-card-tit, .vidro > h3) {
+  font-size: var(--fs-16); font-weight: var(--fw-forte); letter-spacing: -.01em;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(thead th, .rt-tab-h > *, .pn-ord, .d5-ord, .d5-ord-tx, .pn-vh, .pn-barra-rot, .ev-rot, .gp-sc-tit, .gp-sc-gt, .d5-dir) {
+  font-size: var(--fs-11); font-weight: var(--fw-forte); letter-spacing: .06em;
+}
+/* textos abaixo de 11px (8–10,5px): sobem para 11 */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.calx-fer, .kc-flag, .ag-pill, .prev-mes, .prev-qtd, .prev-sub, .plx-sem-txt, .pn-mapa-fixa,
+  .gp-sc-n, .plx-letra-txt, .cv2-badge, .d5-calor-h, .d5-calor-tot, .var-hl, .reg-console-tt, .reg-live, .np-h, .kc-av) {
+  font-size: var(--fs-11);
+}
+/* variável do script: realce neutro (não dourado) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .var-hl { color: var(--txt); background: rgba(var(--tint), .08); }
+
+/* ---- 7. CAMPOS: 32 nas barras de ferramenta, 36 nos formulários e modais; 28 dentro da tabela ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(input.inp, select.inp) {
+  height: var(--btn-h); min-height: var(--btn-h); border-radius: var(--r-controle); font-size: var(--fs-13);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-modal, .drawer-v2, .campo, .cfg-painel, form) :is(input.inp, select.inp) { height: var(--btn-h-g); min-height: var(--btn-h-g); }
+html[data-barra-alfa]:not(#rv-sis) .v2 td select.inp { height: var(--btn-h-p); min-height: var(--btn-h-p); font-size: var(--fs-12); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.wa-busca, .kb-busca) > svg { width: var(--ic-p); height: var(--ic-p); }
+
+/* ---- 8. ÍCONES no conteúdo: traço 1,5 (o mesmo da barra lateral) ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button, .p-btn, [role="button"], .chip, .estado, .card-cab, .pn-card-cab, .ph, .wa-busca, .ev-st-ic) svg[stroke-width] { stroke-width: var(--ic-traco); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ib2, .tool, .pn-mes-seta, .calx-seta, .gp-sc-seta, .d5-ib) > svg { width: var(--ic); height: var(--ic); }
+
+/* ---- 9. CARTÕES: raio 12; borda + sombra sempre juntas ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 .vidro:not(.p-modal) { border-radius: var(--r-cartao); }
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.rg-tile, .cv2-kpi) {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); border: 1px solid var(--cor-borda); box-shadow: var(--sombra-1);
+}
+
+/* ---- 10. MODAL: X no canto (o ModalV2 desenha; Esc já fechava), título 16/600, rótulo 12/500 ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-cab:has(> .p-modal-x) {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-right: 12px;
+  font-size: var(--fs-16); font-weight: var(--fw-forte); letter-spacing: -.01em;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-cab > .p-modal-tit { min-width: 0; flex: 1; padding-top: 5px; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-cab .mod-sub { font-size: var(--fs-12); font-weight: var(--fw-normal); color: var(--txt-2); margin-top: 4px; letter-spacing: 0; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-cab .cm-dr-nm { font-size: var(--fs-16); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-x {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; margin: -2px 0 -4px; padding: 0; border: 0; border-radius: var(--r-controle);
+  background: transparent; color: var(--txt-2); cursor: pointer;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-x:hover { color: var(--txt); background: rgba(var(--tint), .07); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-x:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 1px; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-x svg { width: var(--ic); height: var(--ic); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo :is(.campo > label, label.lbl, .ev-lbl, .nv-lbl, .pr-lbl, .cm-lbl, .fm-lbl) {
+  font-size: var(--fs-12); font-weight: var(--fw-medio); text-transform: none; letter-spacing: 0; color: var(--txt-2); margin-bottom: 6px;
+}
+
+/* ---- 11. ESTADO VAZIO: ícone de verdade (svg 20px), título 13/500, texto 12 ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 .estado .ic { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-bottom: 6px;
+  border-radius: 10px; background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08); color: var(--txt-3); font-size: 0; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .estado .ic .ic-svg { display: block; width: var(--ic-g); height: var(--ic-g); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .estado .ic .ic-glifo { display: none; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .estado .t { font-size: var(--fs-13); font-weight: var(--fw-medio); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .estado .s { font-size: var(--fs-12); color: var(--txt-2); }
+/* fora da ALFA (Atenvo) o ícone segue o glifo de sempre */
+.v2 .estado .ic .ic-svg { display: none; }
+/* ícone do botão/chip (＋ ⇩ ◆ ★ → svg): na ALFA o svg, fora dela o glifo de sempre
+   (o -3px devolve ao glifo o espaço de uma letra, como era no texto corrido) */
+.v2 :is(.p-btn, .chip) .btn-ic-svg { display: none; }
+.v2 :is(.p-btn, .chip) > .btn-ic-glifo { margin-right: -3px; }
+html[data-barra-alfa] .v2 :is(.p-btn, .chip) .btn-ic-svg { display: block; width: var(--ic); height: var(--ic); flex-shrink: 0; }
+html[data-barra-alfa] .v2 :is(.p-btn.btn-mini, .chip) .btn-ic-svg { width: var(--ic-p); height: var(--ic-p); }
+html[data-barra-alfa] .v2 :is(.p-btn, .chip) > .btn-ic-glifo { display: none; }
+
+/* ---- 12. PALETA DA PLANILHA (Gestão) ligada aos semânticos: sem o verde/vermelho "neon" no
+   escuro nem as cores do Excel no claro; a linha 1 sai do preto e vira a superfície elevada ---- */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(.plx, .plx-legenda) {
+  --plx-ok-bg: rgba(var(--verde-rgb), .16);
+  --plx-ok-fg: var(--cor-ok-txt, var(--verde));
+  --plx-pend-bg: rgba(var(--ambar-rgb), .16);
+  --plx-pend-fg: var(--cor-alerta-txt, var(--ambar));
+  --plx-ruim-bg: rgba(var(--rubro-rgb), .16);
+  --plx-ruim-fg: var(--cor-erro-txt, var(--rubro));
+}
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 .plx { --plx-bloco: #1D1F23; --plx-bloco-txt: var(--txt); --plx-bloco-linha: rgba(255, 255, 255, .08); }
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 .plx { --plx-bloco: #EEF0F3; --plx-bloco-txt: var(--txt); --plx-bloco-linha: rgba(17, 24, 39, .1); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-leg-am.plx-st-ok { color: var(--plx-ok-fg); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-leg-am.plx-st-pend { color: var(--plx-pend-fg); }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-leg-am.plx-st-ruim { color: var(--plx-ruim-fg); }
+
+/* ---- 13. ATENÇÃO NÃO É DOURADO: as peças que ainda pintavam alerta/etiqueta de ouro ---- */
+/* sublinhado da aba ativa era o --ambar (agora laranja) — seleção é ouro */
+/* "Voltou a pagar" (Painel/Atendentes): o verde intermediário sumia (1,7:1 no claro) — ≥3:1 */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.pn-prop .ok2, .pn-ponto.ok2, .pn-leg-q.ok2) { background: rgba(var(--verde-rgb), .62); }
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.pn-prop .ok2, .pn-ponto.ok2, .pn-leg-q.ok2) { background: rgba(var(--verde-rgb), .72); }
+/* Novos › "Aguardando aprovação": o título em atenção era âmbar — fica neutro (o número/selo marca) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .nv-pend .fin-head h3 { color: var(--txt); }
+
+/* ---- 14. CABEÇALHO DE PÁGINA no celular (≤760px): título e ações quebram linha ---- */
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-sis) .v2 .ph { flex-wrap: wrap; row-gap: 12px; align-items: center; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .ph > div:first-child { flex: 1 1 100%; min-width: 0; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .ph > :is(.acoes, .ph-acoes, .kb-ph-dir) { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .ph p { max-width: none; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 :is(.kb-barra, .chips, .ars-cats .chips, .ev-barra-ferr .chips) { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+}
+
+/* ---- 15. TOQUE (celular/tablet): alvos de pelo menos 40px; ícones de linha com área de 36 ---- */
+@media (pointer: coarse) {
+  html[data-barra-alfa]:not(#rv-sis) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .chip, .calx-chip, .kb-fchip, .wa-aba, .segm > button, .pn-fin-seg > button) { min-height: 40px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ib2, .tool, .mbtn, .pn-fin-lixo, .resp-btn, .ident-btn, .scr-fav, .kb-col-add, .kc-wa, .d5-ajuda-btn, .p-modal-x) {
+    min-width: 36px; min-height: 36px;
+  }
+  html[data-barra-alfa]:not(#rv-sis) .v2 :is(input.inp, select.inp) { min-height: 40px; font-size: 16px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .conv2 { min-height: 64px; }
+}
+
+/* ---- 16. WHATSAPP NO CELULAR (≤760px): um painel por vez, cada um na largura da tela.
+   Sem o atributo de estado da tela (pedido ao Atendimento: data-cel-painel = lista|conversa|ficha),
+   os três painéis ficam lado a lado em faixa com encaixe — desliza de um para o outro em vez de
+   espremer três colunas em 390px. Com o atributo, só o painel da vez aparece. ---- */
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg {
+    overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none;
+  }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg > :is(.wa-fila, .wa-conv, .wa-ctx) {
+    flex: 0 0 100%; width: 100%; max-width: none; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always;
+  }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg > .wa-ctx { position: relative; inset: auto; box-shadow: none; z-index: auto; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg > .wa-ctx.recolhido { display: none; }
+  /* com o estado da tela: um painel só */
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg[data-cel-painel] { overflow-x: hidden; scroll-snap-type: none; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg[data-cel-painel="lista"] > :is(.wa-conv, .wa-ctx),
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg[data-cel-painel="conversa"] > :is(.wa-fila, .wa-ctx),
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg[data-cel-painel="ficha"] > :is(.wa-fila, .wa-conv) { display: none; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg .conv2 { min-height: 64px; }
 }

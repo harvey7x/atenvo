@@ -794,3 +794,6 @@ html:root[data-tema="light"] .v2 .fj-modal :is(.atv-input, .atv-select, .atv-tex
 
 /* --- Foto ilustrativa do cliente (FotoCliente, 30/10) — cobre as iniciais do avatar ---- */
 .v2 .foto-cli { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; pointer-events: none; }
+
+/* X do ModalV2: só a ALFA mostra (reviza-sistema.css); fora dela o cabeçalho segue como sempre */
+.v2 .p-modal-x { display: none; }
