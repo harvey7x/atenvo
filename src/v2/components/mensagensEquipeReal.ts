@@ -34,7 +34,9 @@ function doBanco(d: Resposta | null): Lido {
 /** prazo de cada chamada: uma chamada pendurada (rede que cai sem dar erro, sessão travada) não prende a janela de
     envio nem o cartão — o erro aparece e dá para tentar de novo (revisão 13/11) */
 const PRAZO_MS = 25_000;
-const NAO_RESPONDEU = 'O sistema não respondeu a tempo. Confira na lista antes de mandar de novo.';
+const NAO_RESPONDEU = 'O sistema não respondeu a tempo. Tente de novo.';
+/** o envio pode ter chegado ao banco antes de estourar: a lista diz (e o freio de 1 minuto barra a repetição) */
+const ENVIO_NAO_RESPONDEU = 'O sistema não respondeu a tempo. Confira na lista antes de mandar de novo.';
 
 /** o erro do banco em português de gente: as nossas mensagens (P0001/42501) passam; o resto vira uma frase */
 function erroDaMensagem(e: { message?: string; code?: string } | null | undefined): string {
@@ -91,12 +93,12 @@ export function useMensagensReais(ativo: boolean, intervalo: number | false = IN
       return doBanco(data as Resposta | null);
     },
   });
-  const rpc = useCallback(async <T = unknown>(nome: string, args: Record<string, unknown>): Promise<T | null> => {
+  const rpc = useCallback(async <T = unknown>(nome: string, args: Record<string, unknown>, aviso = NAO_RESPONDEU): Promise<T | null> => {
     if (!supabase || !org) throw new ErroMensagem('Sem conexão agora. Tente de novo em instantes.');
     let res: { data: unknown; error: { message?: string; code?: string } | null };
     const cliente = supabase;
     try {
-      res = await comPrazo((s) => cliente.rpc(nome, { p_org: org, ...args }).abortSignal(s));
+      res = await comPrazo((s) => cliente.rpc(nome, { p_org: org, ...args }).abortSignal(s), aviso);
     } catch (e) {
       if (e instanceof ErroMensagem) throw e;
       throw new ErroMensagem(erroDaMensagem({ message: e instanceof Error ? e.message : String(e) }));
@@ -119,7 +121,7 @@ export function useMensagensReais(ativo: boolean, intervalo: number | false = IN
     erro: erroLeitura,
     enviar: async (para, texto) => {
       /* null = todos (o banco calcula na hora); uma lista vai como lista — vazia, o banco recusa (nunca vira "todos") */
-      const d = await rpc<{ destinos?: number }>('mensagem_equipe_enviar', { p_para: para, p_mensagem: texto.trim() });
+      const d = await rpc<{ destinos?: number }>('mensagem_equipe_enviar', { p_para: para, p_mensagem: texto.trim() }, ENVIO_NAO_RESPONDEU);
       return { destinos: d?.destinos ?? 0 };
     },
     marcarVista: (id) => {

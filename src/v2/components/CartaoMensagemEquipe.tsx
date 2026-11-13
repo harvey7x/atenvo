@@ -85,6 +85,7 @@ export function CartaoMensagemEquipe({ mensagens, agora, aoOk }: PropsCartaoMens
         <p className="meq-texto" id={`${id}-t`}>{m.mensagem}</p>
         <div className="rcd-acoes meq-acoes">
           <button type="button" className="rcd-bt rcd-forte" disabled={enviando}
+            onKeyDown={(e) => { if (e.repeat) e.preventDefault(); /* a tecla segurada não vira clique repetido */ }}
             onClick={(e) => { if (e.detail > 1) return; void confirmar(); }}>
             {enviando ? 'Confirmando…' : 'Ok, entendi'}
           </button>
@@ -286,7 +287,9 @@ function ListaMensagensEnviadas({ fonte, agora }: { fonte: FonteMensagens; agora
                         {m.tiradaEm ? <span className="meq-item-tirada">Tirada das telas {horaCurta(m.tiradaEm, agora)}</span>
                           : faltam > 0 && (
                             <button type="button" className="meq-tirar" data-confirmar={confirmar === m.id ? '' : undefined}
-                              disabled={tirando === m.id} onClick={(e) => { if (e.detail > 1) return; void tirar(m); }}>
+                              disabled={tirando === m.id}
+                              onKeyDown={(e) => { if (e.repeat) e.preventDefault(); /* Enter segurado não confirma sozinho */ }}
+                              onClick={(e) => { if (e.detail > 1) return; void tirar(m); }}>
                               {tirando === m.id ? 'Tirando…'
                                 : confirmar === m.id ? `Confirmar: tirar da tela de ${faltam === 1 ? '1 pessoa' : `${faltam} pessoas`}` : 'Tirar das telas'}
                             </button>
@@ -368,6 +371,9 @@ export function PainelMensagemEquipe({ fonte, oculto = false }: { fonte: FonteMe
       if (el && document.contains(el) && (!outro || outro.contains(el))) { try { el.focus({ preventScroll: true }); } catch { /* segue */ } }
     };
   }, [centro]);
+  /* nada mais esperando (ok em outra aba, tirada das telas enquanto escondida): esquece o "onde estava" — a próxima
+     mensagem, mais tarde, não devolve o foco a um campo de outro momento (os cleanups acima rodam antes deste) */
+  useEffect(() => { if (!pendentes.length) focoAntes.current = null; }, [pendentes.length]);
   /* nenhuma tecla chega à página de trás enquanto a mensagem está na tela (o foco fora do cartão — clique no fundo,
      um atalho que puxou o foco — volta para ele; a paleta de scripts e o compositor do WhatsApp não recebem o que
      a pessoa digita sem ver). O Tab fica com a trava abaixo; janela aberta por cima é dela. */

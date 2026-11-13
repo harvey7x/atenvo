@@ -18,10 +18,12 @@ import { useMensagensReais } from './mensagensEquipeReal';
    ================================================================== */
 /** espera as janelas (diálogos do sistema, gavetas de edição, editores de pendência, a Central de Avisos aberta), os
     menus e painéis que ficam em portal POR CIMA do shell (menu do usuário/sino, paleta de scripts, menus e
-    etiquetas do WhatsApp — o véu da mensagem mora dentro do shell e ficaria por baixo deles) e o recado do
-    administrador; NÃO a si mesma (o véu dela também é .rcd-veu). As do v1 e a ficha da Fila vêm no SELETOR_JANELA
+    etiquetas do WhatsApp, o "⋮" dos cartões do Kanban, o alerta de lead quente, o seletor de cor das
+    Configurações — o véu da mensagem mora dentro do shell e ficaria por baixo deles) e o recado do administrador;
+    NÃO a si mesma (o véu dela também é .rcd-veu). As do v1 e a ficha da Fila vêm no SELETOR_JANELA
     (useOcupadoNoCanto). Tudo isso só existe enquanto está aberto. */
-const ESPERA = '.veu, .rcd-veu:not(.meq-veu), .rdr-central, .pd-ed, .drawer-v2, .um-backdrop, .spl, .wa-pop, .wa-etqpop';
+const ESPERA = '.veu, .rcd-veu:not(.meq-veu), .rdr-central, .pd-ed, .drawer-v2, .um-backdrop, .spl, .wa-pop, .wa-etqpop, '
+  + '.kb-menu, .alq-veu, .cor-pop';
 
 /** a equipe da demonstração (o "Ver como" da Fila diz quem está olhando; o Matheus é o administrador) */
 function useEquipeLocal() {
