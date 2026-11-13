@@ -254,7 +254,16 @@ export function criarBanco(): Banco {
       avisos: [],
       aviso_destinos: [],
       aviso_anexos: [],
-      registros: [],
+      // registros de exemplo (a tela de Registros mostra a lista, não só o vazio)
+      registros: [
+        { id: 7, quando: iso(agora - 0.3 * H), ator_id: 'u-eduardo', ator_nome: 'Eduardo', ator_papel: 'comercial', acao: 'lançou', entidade: 'pagamento', entidade_id: null, rotulo: 'Maria Aparecida Souza', detalhe: 'informou pagamento de R$ 65,00 (out/26)', mudancas: [] },
+        { id: 6, quando: iso(agora - 1.2 * H), ator_id: 'u-bruna', ator_nome: 'Bruna', ator_papel: 'financeiro', acao: 'confirmou', entidade: 'pagamento', entidade_id: null, rotulo: 'José Carlos Pereira', detalhe: 'pagamento de R$ 110,00 (out/26)', mudancas: [] },
+        { id: 5, quando: iso(agora - 3 * H), ator_id: 'u-paty', ator_nome: 'Paty', ator_papel: 'comercial', acao: 'editou', entidade: 'cliente', entidade_id: null, rotulo: 'Antônia Ferreira Lima', detalhe: 'atualizou o cadastro (2 campos)', mudancas: [{ c: 'telefone', de: '5199990001', para: '5199990002' }, { c: 'valor', de: '300', para: '350' }] },
+        { id: 4, quando: iso(agora - 5 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'comissão', entidade_id: null, rotulo: 'Eduardo', detalhe: 'comissão de 50% da mensalidade (antes 40%)', mudancas: [] },
+        { id: 3, quando: iso(agora - 26 * H), ator_id: 'u-bruna', ator_nome: 'Bruna', ator_papel: 'financeiro', acao: 'direcionou', entidade: 'cliente', entidade_id: null, rotulo: 'Sebastião R. Nunes', detalhe: 'para o ciclo dia 05', mudancas: [{ c: 'dia', de: null, para: '5' }] },
+        { id: 2, quando: iso(agora - 30 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'configurou', entidade: 'régua', entidade_id: null, rotulo: null, detalhe: 'ligou a régua automática', mudancas: [] },
+        { id: 1, quando: iso(agora - 52 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'cadastrou', entidade: 'usuário', entidade_id: null, rotulo: 'Carla', detalhe: 'papel Atendente · Atendimento', mudancas: [] },
+      ],
       comissoes: [],
       comissoes_hist: [],
     },
