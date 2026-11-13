@@ -6,7 +6,8 @@
    de número). Markup ÚNICO: real (NumerosReviza) e demo (AbaNumerosDemo) só mudam a fonte.
    As janelas (conectar/QR/gerenciar) continuam nos donos da tela. */
 import { useMemo } from 'react';
-import { BadgeStatus, CardVidro, EstadoVazio, BotaoPrimario } from '../../components';
+import { BadgeStatus, CardVidro, EstadoVazio, BotaoPrimario, BotaoSec } from '../../components';
+import { AcoesNoTopo } from '../comunicacao/MenuMais';
 import { Indicador, pct1 } from './PainelResumo';
 import './painel.css';
 
@@ -30,11 +31,18 @@ export interface ComercialCobertura { nome: string; emCobranca: number; comTelef
 const chave = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 const gente = (s: string) => s.trim().toLowerCase().replace(/(^|\s)(\p{L})/gu, (_m, a: string, c: string) => a + c.toUpperCase());
 const iniciais = (n: string) => (n || '?').trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+/** "22:21" se for hoje; "12/11 22:21" se não — curto, para o rodapé do cartão não quebrar no meio */
 const quando = (iso?: string | null) => {
   if (!iso) return null;
   const d = new Date(iso); if (isNaN(d.getTime())) return null;
-  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  const tz = { timeZone: 'America/Sao_Paulo' } as const;
+  const hoje = new Date().toLocaleDateString('pt-BR', tz) === d.toLocaleDateString('pt-BR', tz);
+  return hoje
+    ? d.toLocaleTimeString('pt-BR', { ...tz, hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString('pt-BR', { ...tz, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 };
+/** problema primeiro: desconectado → conectando → conectado (a ação que importa aparece de cara) */
+const ORDEM: Record<StatusNumero, number> = { desconectado: 0, sincronizando: 1, conectado: 2 };
 const ROT: Record<StatusNumero, string> = { conectado: 'Conectado', sincronizando: 'Conectando…', desconectado: 'Desconectado' };
 const TOM: Record<StatusNumero, 'ok' | 'atencao' | 'erro'> = { conectado: 'ok', sincronizando: 'atencao', desconectado: 'erro' };
 type Cobertura = 'proprio' | 'conectando' | 'desconectado' | 'reserva' | 'sem';
@@ -74,47 +82,43 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
   const semNumero = cobertura.filter((c) => (c.st === 'sem' || c.st === 'desconectado' || c.st === 'conectando') && c.emCobranca > 0);
   const conectados = numeros.filter((n) => n.status === 'conectado').length;
   const pct = (a: number, b: number) => (b ? (a / b) * 100 : 0);
+  const semNumeroProprio = cobertura.filter((c) => c.st === 'sem' || c.st === 'reserva');
   // carteira de um número = clientes EM COBRANÇA do dono (ou, sem dono, do nome do número — só informativo)
   const carteiraDe = (n: NumeroItem) => comerciais.find((c) => chave(c.nome) === chave(n.dono ?? n.nome)) ?? null;
 
   return (
     <div className="pn">
-      <div className="pn-barra sobe">
-        <div className="pn-barra-esq">
-          <span className="pn-barra-rot">WhatsApp da cobrança</span>
-          <span className="pn-barra-stat num"><b>{numeros.length}</b> número{numeros.length === 1 ? '' : 's'}</span>
-          <span className="pn-barra-stat num"><b>{conectados}</b> conectado{conectados === 1 ? '' : 's'}</span>
-        </div>
-        <div className="pn-barra-dir">
+      {(gestor || (!meuCanal && meuId)) && (
+        <AcoesNoTopo>
           {gestor && <BotaoPrimario onClick={() => aoConectar(null)}>＋ Conectar WhatsApp</BotaoPrimario>}
           {!gestor && !meuCanal && meuId && <BotaoPrimario onClick={() => aoConectar(meuId)}>＋ Conectar meu WhatsApp</BotaoPrimario>}
-        </div>
-      </div>
-      {!gestor && <p className="cm-hint" style={{ margin: '-6px 0 2px' }}>Os números da equipe aparecem pra todo mundo acompanhar — mas cada um só conecta e gerencia o <b>próprio</b> WhatsApp.</p>}
+        </AcoesNoTopo>
+      )}
+      {!gestor && <p className="cm-hint" style={{ margin: '0 0 2px' }}>Os números da equipe ficam visíveis para todos; cada pessoa conecta e gerencia só o <b>próprio</b> WhatsApp.</p>}
 
       <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
         <Indicador rotulo="Números conectados" valor={<>{conectados}<span className="pn-cent"> de {numeros.length}</span></>} tom={numeros.length && conectados === numeros.length ? 'ok' : conectados ? 'at' : 'er'}
-          pe={numeros.length - conectados > 0 ? <><b className="num">{numeros.length - conectados}</b> sem conexão agora</> : numeros.length ? 'todos enviando e recebendo' : 'nenhum número ainda'}
+          pe={numeros.length - conectados > 0 ? <><b className="num">{numeros.length - conectados}</b> sem conexão agora</> : numeros.length ? 'Todos enviando e recebendo' : 'Nenhum número ainda'}
           visual={<div className="pn-trilho"><i className="ok" style={{ width: `${pct(conectados, numeros.length)}%` }} /></div>} />
-        <Indicador rotulo="Clientes que a régua alcança" valor={<>{pct1(pct(alcanceN, totalCob))}<span className="pn-cent">%</span></>} tom={alcanceN === totalCob && totalCob ? 'ok' : alcanceN ? 'at' : 'er'}
-          pe={<><b className="num">{alcanceN.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} em cobrança têm o comercial com número</>}
+        <Indicador rotulo="Clientes com comercial conectado" valor={<>{pct1(pct(alcanceN, totalCob))}<span className="pn-cent">%</span></>} tom={alcanceN === totalCob && totalCob ? 'ok' : alcanceN ? 'at' : 'er'}
+          pe={<><b className="num">{alcanceN.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} em cobrança</>}
           visual={<div className="pn-trilho"><i className={alcanceN ? 'at' : 'er'} style={{ width: `${pct(alcanceN, totalCob)}%` }} /></div>} />
         <Indicador rotulo="Com telefone cadastrado" valor={<>{pct1(pct(totalTel, totalCob))}<span className="pn-cent">%</span></>}
-          pe={<><b className="num">{totalTel.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} clientes · {alcanceTel.toLocaleString('pt-BR')} já recebem</>}
+          pe={<><b className="num">{totalTel.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} clientes · {alcanceTel.toLocaleString('pt-BR')} alcançados pela régua</>}
           visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${pct(totalTel, totalCob)}%` }} /></div>} />
         <Indicador rotulo="Comerciais sem número" valor={<>{semNumero.length}<span className="pn-cent"> de {cobertura.filter((c) => c.emCobranca > 0).length}</span></>} tom={semNumero.length ? 'er' : 'ok'}
-          pe={semNumero.length ? <><b className="num">{semNumero.reduce((s, c) => s + c.emCobranca, 0).toLocaleString('pt-BR')}</b> clientes esperando um número</> : 'todos cobrindo a própria carteira'}
+          pe={semNumero.length ? <><b className="num">{semNumero.reduce((s, c) => s + c.emCobranca, 0).toLocaleString('pt-BR')}</b> clientes aguardando um número</> : 'Todos cobrindo a própria carteira'}
           visual={<div className="pn-trilho"><i className={semNumero.length ? 'er' : 'ok'} style={{ width: `${pct(semNumero.length, cobertura.filter((c) => c.emCobranca > 0).length)}%` }} /></div>} />
       </div>
 
       {numeros.length === 0 ? (
         <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
-          <EstadoVazio titulo="Nenhum WhatsApp conectado" descricao="Conecte o número de cada comercial — a cobrança sai pelo número de quem atende o cliente."
+          <EstadoVazio titulo="Nenhum WhatsApp conectado" descricao="Conecte o número de cada comercial: a cobrança sai pelo número de quem atende o cliente."
             acao={gestor ? { rotulo: 'Conectar WhatsApp', onClick: () => aoConectar(null) } : meuId ? { rotulo: 'Conectar meu WhatsApp', onClick: () => aoConectar(meuId) } : undefined} />
         </CardVidro>
       ) : (
         <div className="pn-nums sobe" style={{ animationDelay: '.08s' }}>
-          {numeros.map((n) => {
+          {[...numeros].sort((a, b) => ORDEM[a.status] - ORDEM[b.status]).map((n) => {
             const cart = carteiraDe(n);
             const semDono = !n.dono && !n.reserva;
             const titulo = gente(n.dono ?? n.nome);
@@ -127,21 +131,20 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
                     <b>{titulo}</b>
                     <span className="num">{n.numero ?? 'Sem número conectado'}</span>
                   </div>
-                  <BadgeStatus tom={TOM[n.status]}>{ROT[n.status]}</BadgeStatus>
+                  <span className="pn-num-selos">
+                    {n.reserva && <span className="pn-tag suave">Reserva</span>}
+                    <BadgeStatus tom={TOM[n.status]}>{ROT[n.status]}</BadgeStatus>
+                  </span>
                 </div>
 
-                {semDono ? (
+                {/* "Comercial dono: Alexandra" sob o título "Alexandra" só repetia: a linha fica só quando há algo a dizer */}
+                {semDono && (
                   <div className="pn-num-alerta">
                     <b>Sem comercial dono</b>
-                    <span>A régua não manda por este número até ele ter um dono.</span>
+                    <span>A régua não envia por este número até ele ter um dono.</span>
                     {gestor && (n.sugestao && aoDefinirDono
-                      ? <button type="button" className="pn-link" disabled={ocupado} onClick={() => aoDefinirDono(n.id, n.sugestao!.id, n.sugestao!.nome)}>Definir {gente(n.sugestao.nome)} como dono</button>
-                      : <button type="button" className="pn-link" onClick={() => aoGerenciar(n.id)}>Escolher o dono</button>)}
-                  </div>
-                ) : (
-                  <div className="pn-num-dono">
-                    <span>{n.reserva && !n.dono ? 'Número reserva da régua' : <>Comercial dono: <b>{gente(n.dono ?? '')}</b></>}</span>
-                    {n.reserva && n.dono && <span className="pn-tag suave">reserva</span>}
+                      ? <BotaoSec mini disabled={ocupado} onClick={() => aoDefinirDono(n.id, n.sugestao!.id, n.sugestao!.nome)}>Definir {gente(n.sugestao.nome)} como dono</BotaoSec>
+                      : <BotaoSec mini onClick={() => aoGerenciar(n.id)}>Escolher o dono</BotaoSec>)}
                   </div>
                 )}
 
@@ -155,12 +158,12 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
                 {n.ultimoErro && n.status !== 'conectado' && <p className="pn-num-erro">{n.ultimoErro}</p>}
 
                 <div className="pn-num-pe">
-                  <span className="pn-num-meta num">
-                    {v ? `conferido ${v}` : 'ainda não conferido'}{e ? ` · última mensagem ${e}` : ''}
+                  <span className="pn-num-meta num" title={`${v ? `Conexão conferida ${v}` : 'Conexão ainda não conferida'}${e ? ` · última mensagem ${e}` : ''}`}>
+                    {e ? `Última msg ${e}` : 'Sem mensagens'}{v ? ` · conferido ${v}` : ''}
                   </span>
                   {(gestor || ehMeu(n)) && (n.status === 'desconectado'
-                    ? <button type="button" className="pn-link" disabled={ocupado} onClick={() => aoReconectar(n.id)}>Conectar de novo</button>
-                    : <button type="button" className="pn-link" onClick={() => aoGerenciar(n.id)}>Gerenciar</button>)}
+                    ? <BotaoSec mini disabled={ocupado} onClick={() => aoReconectar(n.id)}>Conectar de novo</BotaoSec>
+                    : <BotaoSec mini onClick={() => aoGerenciar(n.id)}>Gerenciar</BotaoSec>)}
                 </div>
               </CardVidro>
             );
@@ -168,10 +171,10 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
         </div>
       )}
 
-      {cobertura.length > 0 && (
+      {semNumeroProprio.length > 0 && (
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.12s' }}>
           <div className="pn-card-cab">
-            <div><h3>Cobertura por comercial</h3><p>A régua manda cada cliente pelo número do comercial dele. Quem está sem número fica esperando.</p></div>
+            <div><h3>Comerciais sem número</h3><p>A régua envia cada cliente pelo número do comercial dele; estes ainda não têm um número próprio conectado.</p></div>
           </div>
           <div className="pn-mapa-rolo">
             <table className="pn-eq pn-fin-tab">
@@ -185,7 +188,7 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
                 </tr>
               </thead>
               <tbody>
-                {cobertura.map((c) => (
+                {semNumeroProprio.map((c) => (
                   <tr key={c.nome}>
                     <td><span className="pn-eq-nome estatico"><span className="pn-av" aria-hidden>{iniciais(gente(c.nome))}</span><span className="pn-eq-nm">{gente(c.nome)}</span></span></td>
                     <td className="num"><b>{c.emCobranca}</b></td>
@@ -204,9 +207,7 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
                         : <BadgeStatus tom="neutro">Sem número</BadgeStatus>}
                     </td>
                     <td className="pn-fin-acoes">
-                      {(gestor || ehMeuNaTabela(c)) && (c.st === 'sem' || c.st === 'reserva') && <button type="button" className="pn-link" onClick={() => aoConectar(gestor ? (c.usuarioId ?? null) : meuId)}>Conectar número</button>}
-                      {(gestor || ehMeuNaTabela(c)) && c.st === 'conectando' && c.numero && <button type="button" className="pn-link" onClick={() => aoGerenciar(c.numero!.id)}>Gerenciar</button>}
-                      {(gestor || ehMeuNaTabela(c)) && c.st === 'desconectado' && c.numero && <button type="button" className="pn-link" disabled={ocupado} onClick={() => aoReconectar(c.numero!.id)}>Conectar de novo</button>}
+                      {(gestor || ehMeuNaTabela(c)) && <BotaoSec mini onClick={() => aoConectar(gestor ? (c.usuarioId ?? null) : meuId)}>Conectar número</BotaoSec>}
                     </td>
                   </tr>
                 ))}

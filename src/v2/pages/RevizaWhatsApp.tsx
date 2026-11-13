@@ -157,7 +157,7 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
 
   const iniciar = () => {
     const u = atendentes.find((x) => x.id === donoSel);
-    if (!u) { aoAvisar('Escolha o atendente dono do número.'); return; }
+    if (!u) { aoAvisar('Escolha o comercial dono do número.'); return; }
     conectar.mutate({ nome: u.nome || u.usuario, dono_id: u.id }, {
       onSuccess: (r) => { setNovo(false); setDonoSel(''); if (r.canal_id) { setConfirmaRemover(false); setAberto(String(r.canal_id)); } },
       onError: (e) => aoAvisar((e as Error).message),
@@ -165,7 +165,7 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
   };
   // self-service (06/11): direto pro QR, sem escolher atendente — é sempre você mesmo
   const conectarMeuWhats = () => {
-    if (!meuId) { aoAvisar('Não deu pra identificar o seu usuário — atualize a página.'); return; }
+    if (!meuId) { aoAvisar('Não foi possível identificar o seu usuário. Atualize a página.'); return; }
     conectar.mutate({ nome: meuNome || 'Atendente', dono_id: meuId }, {
       onSuccess: (r) => { if (r.canal_id) { setConfirmaRemover(false); setAberto(String(r.canal_id)); } },
       onError: (e) => aoAvisar((e as Error).message),
@@ -185,24 +185,24 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
           aoGerenciar={(id) => { setConfirmaRemover(false); setAberto(id); }}
           aoReconectar={(id) => { const c = canais.find((x) => x.id === id); if (c) reconectar(c); }}
           aoDefinirDono={(canalId, uid, nome) => definirDono.mutate({ canal_id: canalId, dono_id: uid }, {
-            onSuccess: () => aoAvisar(`${nomeGente(nome)} agora é o dono do número — a régua passa a mandar por ele os clientes desse comercial, e ele vê as conversas.`),
+            onSuccess: () => aoAvisar(`${nomeGente(nome)} agora é o dono do número: a régua passa a enviar por ele os clientes desse comercial, e ele vê as conversas.`),
             onError: (e) => aoAvisar((e as Error).message),
           })} />
       )}
 
       {novo && (
         <ModalV2 aberto aoFechar={() => setNovo(false)} largura={420}
-          titulo={<div>Conectar WhatsApp<div className="mod-sub">Um número por atendente — pode conectar quantos precisar</div></div>}
+          titulo={<div>Conectar WhatsApp<div className="mod-sub">Um número por comercial; é possível conectar quantos forem necessários</div></div>}
           rodape={<><BotaoSec onClick={() => setNovo(false)}>Cancelar</BotaoSec><BotaoPrimario onClick={iniciar} disabled={conectar.isPending}>{conectar.isPending ? 'Preparando…' : 'Gerar QR code'}</BotaoPrimario></>}>
           <div className="form-grid">
-            <div className="campo"><label>Atendente (usuário do sistema)</label>
+            <div className="campo"><label>Comercial (usuário do sistema)</label>
               <select className="inp" value={donoSel} autoFocus onChange={(e) => setDonoSel(e.target.value)}>
-                <option value="">{usuariosQ.isLoading ? 'Carregando…' : 'Escolha o atendente'}</option>
+                <option value="">{usuariosQ.isLoading ? 'Carregando…' : 'Escolha o comercial'}</option>
                 {atendentes.map((u) => <option key={u.id} value={u.id}>{u.nome || u.usuario}</option>)}
               </select>
             </div>
-            <p className="cm-hint" style={{ margin: 0 }}>As conversas deste número vão aparecer <b>só para esse atendente e para os administradores</b>.</p>
-            <p className="cm-hint" style={{ margin: 0 }}>Na próxima tela aparece o QR code. Abra o WhatsApp do atendente → <b>Aparelhos conectados</b> → <b>Conectar aparelho</b>.</p>
+            <p className="cm-hint" style={{ margin: 0 }}>As conversas deste número aparecem <b>só para esse comercial e para os administradores</b>.</p>
+            <p className="cm-hint" style={{ margin: 0 }}>Na próxima tela aparece o QR code. Abra o WhatsApp do comercial → <b>Aparelhos conectados</b> → <b>Conectar aparelho</b>.</p>
           </div>
         </ModalV2>
       )}
@@ -212,41 +212,44 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
           titulo={<div>{canalAberto.estado === 'conectado' ? 'Número conectado' : 'Conectar número'}<div className="mod-sub">{canalAberto.nome}</div></div>}
           rodape={<>
             {gestor && !confirmaRemover && (
-              <BotaoSec onClick={() => setConfirmaRemover(true)} disabled={ocupado}>Remover</BotaoSec>
+              <button type="button" className="num-remover" onClick={() => setConfirmaRemover(true)} disabled={ocupado}>Remover número</button>
             )}
-            {gestor && confirmaRemover && (
-              <BotaoSec onClick={() => remover.mutate(canalAberto.id, { onSuccess: () => { fechar(); aoAvisar(`Número de ${canalAberto.nome} removido.`); }, onError: (e) => aoAvisar((e as Error).message) })} disabled={ocupado}>
-                {remover.isPending ? 'Removendo…' : 'Confirmar remoção'}
-              </BotaoSec>
-            )}
-            {(gestor || souDonoDoAberto) && canalAberto.estado !== 'conectado' && (
+            {gestor && confirmaRemover && (<>
+              <span className="num-rodape-esp" />
+              <BotaoSec onClick={() => setConfirmaRemover(false)} disabled={ocupado}>Voltar</BotaoSec>
+              <button type="button" className="p-btn btn-perigo" onClick={() => remover.mutate(canalAberto.id, { onSuccess: () => { fechar(); aoAvisar(`Número de ${canalAberto.nome} removido.`); }, onError: (e) => aoAvisar((e as Error).message) })} disabled={ocupado}>
+                {remover.isPending ? 'Removendo…' : 'Remover definitivamente'}
+              </button>
+            </>)}
+            {!confirmaRemover && <span className="num-rodape-esp" />}
+            {!confirmaRemover && (gestor || souDonoDoAberto) && canalAberto.estado !== 'conectado' && (
               <BotaoSec onClick={() => novoQr.mutate(canalAberto.id, { onError: (e) => aoAvisar((e as Error).message) })} disabled={ocupado}>
                 {novoQr.isPending ? 'Gerando…' : 'Gerar novo QR'}
               </BotaoSec>
             )}
-            {(gestor || souDonoDoAberto) && canalAberto.estado !== 'desconectado' && (
+            {!confirmaRemover && (gestor || souDonoDoAberto) && canalAberto.estado !== 'desconectado' && (
               <BotaoSec onClick={() => { desconectar.mutate(canalAberto.id, { onError: (e) => aoAvisar((e as Error).message) }); fechar(); }} disabled={ocupado}>Desconectar</BotaoSec>
             )}
-            <BotaoSec onClick={fechar}>Fechar</BotaoSec>
+            {!confirmaRemover && <BotaoSec onClick={fechar}>Fechar</BotaoSec>}
           </>}>
           {gestor && !confirmaRemover && (
             <div className="num-dono">
-              <div className="campo"><label>Atendente dono do número</label>
+              <div className="campo"><label>Comercial dono do número</label>
                 <select className="inp" value={canalAberto.dono_id ?? ''} disabled={definirDono.isPending || usuariosQ.isLoading}
                   onChange={(e) => definirDono.mutate({ canal_id: canalAberto.id, dono_id: e.target.value || null }, {
-                    onSuccess: () => aoAvisar(e.target.value ? 'Dono do número atualizado — a régua passa a mandar por este número os clientes desse comercial, e ele vê as conversas.' : 'Número sem dono: só os administradores veem as conversas.'),
+                    onSuccess: () => aoAvisar(e.target.value ? 'Dono do número atualizado: a régua passa a enviar por este número os clientes desse comercial, e ele vê as conversas.' : 'Número sem dono: só os administradores veem as conversas.'),
                     onError: (er) => aoAvisar((er as Error).message),
                   })}>
                   <option value="">{usuariosQ.isLoading ? 'Carregando…' : 'Sem dono (só administradores veem)'}</option>
                   {atendentes.map((u) => <option key={u.id} value={u.id}>{u.nome || u.usuario}</option>)}
                 </select>
               </div>
-              <p className="cm-hint" style={{ margin: 0 }}>A régua manda cada cliente pelo número do <b>comercial dele</b> — por isso o dono do número precisa ser o comercial certo. Ele (e os administradores) veem as conversas deste número.</p>
+              <p className="cm-hint" style={{ margin: 0 }}>A régua envia cada cliente pelo número do <b>comercial dele</b>; por isso o dono do número precisa ser o comercial certo. Ele e os administradores veem as conversas deste número.</p>
             </div>
           )}
           {(gestor || souDonoDoAberto) && !confirmaRemover && (
             <div className="num-dono">
-              {canalAberto.ultimo_erro && <p className="cm-hint" style={{ margin: 0, color: 'var(--ambar)' }}>{canalAberto.ultimo_erro}</p>}
+              {canalAberto.ultimo_erro && <p className="cm-hint" style={{ margin: 0, color: 'var(--cor-alerta-txt, var(--ambar))' }}>{canalAberto.ultimo_erro}</p>}
               <div><BotaoSec mini disabled={verificar.isPending} onClick={() => verificar.mutate(canalAberto.id, {
                 onSuccess: (x) => aoAvisar(`${canalAberto.nome}: ${x.estado === 'conectado' ? 'conectado' : String(x.estado)}${x.webhook_reaplicado ? ' · recebimento de respostas reconfigurado' : x.webhook_ok ? ' · recebendo respostas normalmente' : ''}${x.detalhe ? ` · ${String(x.detalhe)}` : ''}.`),
                 onError: (er) => aoAvisar((er as Error).message),
@@ -258,14 +261,14 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
               <p>Remover o número de <b>{canalAberto.nome}</b>? As conversas desse número saem da tela Conversas. Esta ação não pode ser desfeita.</p>
             ) : canalAberto.estado === 'conectado' ? (
               <>
-                <p>WhatsApp de <b>{canalAberto.nome}</b> conectado{canalAberto.numero ? <> no número <b className="num">{fmtTel(canalAberto.numero)}</b></> : null}. Pronto para enviar e receber.</p>
-                <p className="cm-hint" style={{ margin: '4px 0 0' }}>Conferido {canalAberto.verificado_em ? new Date(canalAberto.verificado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'ainda não'} · última mensagem recebida {canalAberto.ultimo_evento_em ? new Date(canalAberto.ultimo_evento_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                <p>WhatsApp de <b>{canalAberto.nome}</b> conectado{canalAberto.numero ? <> no número <b className="num nowrap">{fmtTel(canalAberto.numero)}</b></> : null}. Pronto para enviar e receber.</p>
+                <p className="cm-hint" style={{ margin: '4px 0 0' }}>Conferido <span className="num nowrap">{canalAberto.verificado_em ? new Date(canalAberto.verificado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : 'ainda não'}</span> · última mensagem recebida <span className="num nowrap">{canalAberto.ultimo_evento_em ? new Date(canalAberto.ultimo_evento_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '—'}</span></p>
               </>
             ) : canalAberto.qr ? (
               <>
                 <img src={canalAberto.qr} alt="QR Code para conectar o WhatsApp" width={232} height={232}
                   style={{ borderRadius: 12, background: '#fff', padding: 8, display: 'block', margin: '0 auto' }} />
-                <p>Abra o WhatsApp do atendente → <b>Aparelhos conectados</b> → <b>Conectar aparelho</b> e aponte a câmera. O código expira rápido — se falhar, gere um novo.</p>
+                <p>Abra o WhatsApp do comercial → <b>Aparelhos conectados</b> → <b>Conectar aparelho</b> e aponte a câmera. O código expira rápido; se falhar, gere um novo.</p>
               </>
             ) : (
               <>

@@ -45,3 +45,10 @@
   white-space: nowrap;
 }
 .v2 .cc-var.desconhecida { color: var(--cor-erro-txt, var(--rubro)); background: rgba(var(--rubro-rgb), .1); border-color: rgba(var(--rubro-rgb), .3); }
+
+/* modal "Número conectado": Remover como texto vermelho à esquerda, Desconectar no meio, Fechar à direita */
+.v2 .num-remover { margin-right: auto; padding: 0 4px; height: 32px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: var(--cor-erro-txt, var(--rubro)); cursor: pointer; border-radius: 6px; }
+.v2 .num-remover:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.v2 .num-remover:disabled { opacity: .5; cursor: default; }
+.v2 .num-rodape-esp { flex: 1 1 auto; }
+.v2 .nowrap { white-space: nowrap; }
