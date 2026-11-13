@@ -1648,3 +1648,66 @@
 
 /* demo: "ver a tela como" não estoura no celular */
 @media (max-width: 760px) { .v2 .rg-vercomo { flex-wrap: wrap; } .v2 .rg-vercomo select { max-width: 100%; min-width: 0; } }
+
+/* ===== crítica 12/11 — cob_comunicacao ===== */
+/* ---- ENVIOS ---- */
+/* faixa de status (régua · WhatsApp · envio automático): uma linha de ~80px no lugar dos 3 cartões altos */
+html[data-barra-alfa] .v2 .ev-faixa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; border-radius: var(--r-cartao, 12px); overflow: hidden; }
+html[data-barra-alfa] .v2 .ev-fx { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px; min-width: 0; }
+html[data-barra-alfa] .v2 .ev-fx + .ev-fx { border-left: 1px solid var(--linha); }
+html[data-barra-alfa] .v2 .ev-fx .ev-st-ic { width: 32px; height: 32px; border-radius: 8px; }
+html[data-barra-alfa] .v2 .ev-fx-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-barra-alfa] .v2 .ev-fx-rot { font-size: 12px; font-weight: 500; color: var(--txt-2); line-height: 16px; }
+html[data-barra-alfa] .v2 .ev-fx-val { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-fx-val b { font-size: 14px; font-weight: 600; color: var(--txt); letter-spacing: -.005em; }
+html[data-barra-alfa] .v2 .ev-fx-val b.ok { color: var(--cor-ok-txt, var(--verde)); }
+html[data-barra-alfa] .v2 .ev-fx-val b.atencao { color: var(--cor-alerta-txt, var(--ambar)); }
+html[data-barra-alfa] .v2 .ev-fx-val b.erro { color: var(--cor-erro-txt, var(--rubro)); }
+html[data-barra-alfa] .v2 .ev-fx-val > span { font-size: 12px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-fx-meta { font-size: 12px; color: var(--txt-3); line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-fx-prob { display: flex; align-items: center; gap: 12px; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .ev-fx-num { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-fx-num > i { width: 6px; height: 6px; border-radius: 50%; background: var(--rubro); flex-shrink: 0; }
+html[data-barra-alfa] .v2 .ev-fx-num > i.atencao { background: var(--ambar); }
+html[data-barra-alfa] .v2 .ev-fx-num .ev-link { padding: 0; font-size: 12px; }
+@media (max-width: 1080px) {
+  html[data-barra-alfa] .v2 .ev-faixa { grid-template-columns: 1fr; }
+  html[data-barra-alfa] .v2 .ev-fx + .ev-fx { border-left: 0; border-top: 1px solid var(--linha); }
+}
+/* "3d / Dia D / +3d" é rótulo, não alerta: neutro (laranja = atenção) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .ev-q { color: var(--txt-2); background: var(--cor-neutro-suave, rgba(var(--tint), .07)); padding: 2px 7px; }
+/* "hoje" nos próximos disparos: o destaque de dado em ouro suave (não laranja) */
+html[data-barra-alfa] .v2 .ev-data.hoje { background: var(--cor-acento-suave); border-color: var(--cor-acento-fio); }
+html[data-barra-alfa] .v2 .ev-data.hoje i { color: var(--cor-acento-txt, var(--azul)); }
+/* previsões (futuro) na cor do texto — verde só para o que já aconteceu */
+html[data-barra-alfa] .v2 .ev-dia-n.ok b { color: var(--txt); }
+
+/* tabela "Envios feitos": cabe em 1.150px (barra aberta, 1470) — larguras fixas, 1 linha por célula */
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab { table-layout: fixed; width: 100%; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td) { box-sizing: border-box; padding-left: 10px; padding-right: 10px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td):first-child { padding-left: 16px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td):last-child { padding-right: 14px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab tbody td { height: 54px; padding-top: 7px; padding-bottom: 7px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli { align-items: center; }
+html[data-barra-alfa] .v2 .ev-tab-feitos td.ini .ev-cli { align-items: flex-start; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > :is(b, span) { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > b { font-size: 13px; font-weight: 600; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > span { font-size: 12px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-previa { display: block; max-width: 100%; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-chip { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-det { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-saiu { display: block; font-size: 13px; font-weight: 500; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-hora > b { font-size: 13px; }
+html[data-barra-alfa] .v2 .ev-hora1 { white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-st-cel .st { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-resp { white-space: nowrap; }
+/* ação da linha: só o ícone (28×28), dentro da tabela — "Abrir a conversa" na dica e no leitor de tela */
+html[data-barra-alfa]:not(#rv-sis) .v2 .ev-tabela .ev-btn-conv.so-ic { width: 28px; min-width: 28px; padding: 0; justify-content: center; gap: 0; }
+@media (pointer: coarse) { html[data-barra-alfa]:not(#rv-sis) .v2 .ev-tabela .ev-btn-conv.so-ic { width: 40px; min-width: 40px; } }
+/* telefone, data e hora nunca quebram no meio */
+html[data-barra-alfa] .v2 :is(.ev-tabela, .ev-dw-quem, .ev-prev-i, .ev-tl-i) .num { white-space: nowrap; }
+/* campanhas: os erros à parte, em vermelho */
+html[data-barra-alfa] .v2 .ev-prog-err { font-style: normal; color: var(--cor-erro-txt, var(--rubro)); }
+html[data-barra-alfa] .v2 .ev-tabela .fin-acoes { display: inline-flex; gap: 6px; justify-content: center; }
+/* no celular a tabela rola de lado (as larguras fixas pediriam 900px) */
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab { min-width: 900px; } }

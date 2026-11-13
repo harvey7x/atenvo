@@ -1,0 +1,39 @@
+/* =====================================================================
+   Telas de comunicação e equipe da Cobrança (crítica de design 12/11):
+   menu "⋯" das linhas e a linha de ações quando a tela não tem cabeçalho.
+   ===================================================================== */
+.v2 .cc-acoes-local { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* botão "⋯": 28×28 na linha (área de clique 32 com a margem), ícone 16 */
+.v2 .mm-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; padding: 0; border-radius: 8px; cursor: pointer;
+  color: var(--txt-2); background: transparent; border: 1px solid transparent;
+}
+.v2 .mm-btn svg { width: 16px; height: 16px; }
+.v2 .mm-btn:hover, .v2 .mm-btn[aria-expanded="true"] { color: var(--txt); background: rgba(var(--tint), .07); border-color: rgba(var(--tint), .1); }
+.v2 .mm-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--azul) 55%, transparent); outline-offset: 1px; }
+@media (pointer: coarse) { .v2 .mm-btn { width: 36px; height: 36px; } }
+
+/* o menu (portal, posição fixa) */
+.v2 .mm-menu {
+  position: fixed; z-index: 1300; min-width: 184px; padding: 4px; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--rp-menu, var(--surface)); border: 1px solid var(--linha);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .38), 0 2px 6px rgba(0, 0, 0, .22);
+}
+:root[data-tema="light"] .v2 .mm-menu { background: #FFFFFF; border-color: rgba(17, 24, 39, .12); box-shadow: 0 12px 32px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .08); }
+.v2 .mm-item {
+  display: flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 6px; border: 0;
+  font: inherit; font-size: 13px; font-weight: 500; text-align: left; white-space: nowrap;
+  color: var(--txt); background: transparent; cursor: pointer;
+}
+.v2 .mm-item:hover:not(:disabled), .v2 .mm-item:focus-visible { background: rgba(var(--tint), .07); outline: none; }
+.v2 .mm-item:disabled { color: var(--txt-3); cursor: default; }
+.v2 .mm-item.perigo { color: var(--cor-erro-txt, var(--rubro)); }
+.v2 .mm-item.perigo:hover:not(:disabled), .v2 .mm-item.perigo:focus-visible { background: rgba(var(--rubro-rgb), .1); }
+.v2 .mm-item.perigo:disabled { color: var(--txt-3); }
+.v2 .mm-sep { height: 1px; margin: 4px 6px; background: var(--linha); }
+
+/* rótulo só para leitor de tela (cabeçalho de coluna de ação) — sem position:absolute, não escapa da rolagem */
+.v2 .cc-vh { display: inline-block; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; vertical-align: middle; }

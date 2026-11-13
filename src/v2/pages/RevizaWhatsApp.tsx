@@ -7,6 +7,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { formatarTelefone } from '../lib/telefone';
 import { criarRaizPortalV2 } from '../components/portal';
 import { AudioRecorderV2, BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Input, ModalV2 } from '../components';
 // import direto (fora do barril): a foto ilustrativa puxa a lista de nomes do IBGE (~90 KB) — só esta tela precisa dela
@@ -55,13 +56,8 @@ import {
 
 const VAZIO: Dados = { comps: [], linhas: [], pendentes: [], historico: [] };
 export const soDigitos = (s: string) => (s || '').replace(/\D/g, '');
-export const fmtTel = (t: string) => {
-  const d = soDigitos(t);
-  const n = d.startsWith('55') ? d.slice(2) : d;
-  if (n.length === 11) return `+55 ${n.slice(0, 2)} ${n.slice(2, 7)}-${n.slice(7)}`;
-  if (n.length === 10) return `+55 ${n.slice(0, 2)} ${n.slice(2, 6)}-${n.slice(6)}`;
-  return t;
-};
+/** telefone no FORMATO ÚNICO da ALFA — "(51) 99999-0101" (src/v2/lib/telefone.ts) */
+export const fmtTel = (t: string) => formatarTelefone(t) || t;
 /** "eduardo"/"JUNIOR"/"—" → "Eduardo"/"Junior"/"" (nome que o cliente lê) */
 const nomeGente = (n: string | null | undefined) => { const t = String(n ?? '').trim(); return !t || t === '—' ? '' : t.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_m, a: string, c: string) => a + c.toUpperCase()); };
 export const horaDe = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
