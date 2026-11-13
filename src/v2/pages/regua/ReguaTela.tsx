@@ -6,7 +6,7 @@
    Mensagens · Comerciais · Configuração.
    ===================================================================== */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BadgeStatus, BotaoPrimario, BotaoSec, Input, LinhaToggle, ModalV2 } from '../../components';
+import { BadgeStatus, BotaoPrimario, BotaoSec, Input, ModalV2, Toggle } from '../../components';
 import './regua-tela.css';
 
 const h2 = (n: number) => String(n).padStart(2, '0');
@@ -73,7 +73,7 @@ export function CabecalhoReguaComercial({ nome, minha, empresaLigada, inicioEmpr
   // as três formas da frase (sem "de os", "pra os")
   const sujeito = minha ? 'os seus clientes' : `os clientes de ${nome}`;
   const dos = minha ? 'dos seus clientes' : `dos clientes de ${nome}`;
-  const pros = minha ? 'pros seus clientes' : `pros clientes de ${nome}`;
+  const pros = minha ? 'para os seus clientes' : `para os clientes de ${nome}`;
   const inicio = horario.valor != null && horario.valor > horario.inicioGeral && horario.valor < horario.fim ? horario.valor : horario.inicioGeral;
   return (
     <section className={`rt-com${pausada ? ' pausada' : ''}`} aria-label={minha ? 'Minha régua' : `Régua de ${nome}`}>
@@ -108,7 +108,7 @@ export function CabecalhoReguaComercial({ nome, minha, empresaLigada, inicioEmpr
       {!pausada && !empresaLigada && (
         <div className="rt-aviso neutro" role="status">
           <b>A régua da empresa está desligada.</b>
-          <span>Nada sai sozinho até o administrador ligar — abaixo, o que sairia.</span>
+          <span>Nada sai sozinho até o administrador ligar. Abaixo, o que sairia.</span>
         </div>
       )}
       {!pausada && empresaLigada && numero && !numero.conectado && (
@@ -156,11 +156,11 @@ export function ConfirmarPausaRegua({ nome, minha, pausando, aoConfirmar, aoFech
 }) {
   return (
     <ModalV2 aberto aoFechar={() => { if (!pausando) aoFechar(); }} largura={460}
-      titulo={<div>{minha ? 'Pausar a sua régua?' : `Pausar a régua de ${nome}?`}<div className="mod-sub">As mensagens automáticas param só {minha ? 'pros seus clientes' : `pros clientes de ${nome}`}</div></div>}
+      titulo={<div>{minha ? 'Pausar a sua régua?' : `Pausar a régua de ${nome}?`}<div className="mod-sub">As mensagens automáticas param só {minha ? 'para os seus clientes' : `para os clientes de ${nome}`}</div></div>}
       rodape={<><BotaoSec onClick={aoFechar} disabled={pausando}>Cancelar</BotaoSec><BotaoPrimario onClick={aoConfirmar} disabled={pausando}>{pausando ? 'Pausando…' : 'Pausar'}</BotaoPrimario></>}>
       <div className="rt-modal-tx">
-        <p>Enquanto estiver pausada, nenhum cliente {minha ? 'seu' : `de ${nome}`} recebe a cobrança nem o lembrete — o que já estava na fila de hoje também não sai.</p>
-        <p>As mensagens, os dias e o horário ficam guardados. É só clicar em <b>Retomar</b> pra voltar a sair (no mesmo dia, se ainda estiver dentro da janela). Também dá pra voltar pelo botão Desfazer.</p>
+        <p>Enquanto estiver pausada, nenhum cliente {minha ? 'seu' : `de ${nome}`} recebe a cobrança nem o lembrete; o que já estava na fila de hoje também não sai.</p>
+        <p>As mensagens, os dias e o horário ficam guardados. Basta clicar em <b>Retomar</b> para voltarem a sair (no mesmo dia, se ainda estiver dentro da janela). Também é possível voltar pelo botão Desfazer.</p>
       </div>
     </ModalV2>
   );
@@ -177,7 +177,7 @@ export function TabelaComerciaisRegua({ linhas, inicioGeral, fim, salvandoHorari
   aoAbrir: (l: LinhaComercialRegua) => void; carregando?: boolean; erro?: string | null;
 }) {
   if (carregando && !linhas.length) return <div className="rt-vazio">Carregando os comerciais…</div>;
-  if (!linhas.length) return <div className="rt-vazio">{erro ? `Não deu pra carregar: ${erro}` : 'Nenhum comercial com clientes em cobrança.'}</div>;
+  if (!linhas.length) return <div className="rt-vazio">{erro ? `Não foi possível carregar: ${erro}` : 'Nenhum comercial com clientes em cobrança.'}</div>;
   return (
     <div className="rt-tab" role="table" aria-label="Régua de cada comercial">
       <div className="rt-tab-h" role="row">
@@ -201,7 +201,7 @@ export function TabelaComerciaisRegua({ linhas, inicioGeral, fim, salvandoHorari
               <span className="rt-tab-sub num">{l.comTelefone} com telefone · {p}%</span>
             </div>
             <div className="rt-tab-num" role="cell">
-              <BadgeStatus tom={l.numero ? (l.numero.conectado ? 'ok' : 'atencao') : 'neutro'}>{l.numero ? l.numero.rotulo : 'verificando…'}</BadgeStatus>
+              <BadgeStatus tom={l.numero ? (l.numero.conectado ? 'ok' : 'erro') : 'neutro'}>{l.numero ? l.numero.rotulo : 'Verificando…'}</BadgeStatus>
               {l.numero?.detalhe && <span className="rt-tab-sub num">{l.numero.detalhe}</span>}
             </div>
             <div role="cell">
@@ -210,12 +210,12 @@ export function TabelaComerciaisRegua({ linhas, inicioGeral, fim, salvandoHorari
             </div>
             <div role="cell">
               <button type="button" className={`rt-pill ${l.pausada ? 'pausada' : 'ativa'}`} disabled={pausando}
-                onClick={() => aoPausar(l, !l.pausada)} title={l.pausada ? 'Pausada — clique pra retomar' : 'Ativa — clique pra pausar'}>
+                onClick={() => aoPausar(l, !l.pausada)} title={l.pausada ? 'Pausada: clique para retomar' : 'Ativa: clique para pausar'}>
                 <i aria-hidden />{l.pausada ? 'Pausada' : 'Ativa'}
               </button>
             </div>
             <div className="rt-tab-acao" role="cell">
-              <button type="button" className="rt-link" onClick={() => aoAbrir(l)}>Abrir régua</button>
+              <BotaoSec mini onClick={() => aoAbrir(l)}>Abrir régua</BotaoSec>
             </div>
           </div>
         );
@@ -269,7 +269,7 @@ export function ConfigReguaLista({ v, numeros, salvando, aoSalvar }: {
   return (
     <div className="rt-cfg">
       <section className="rt-cfg-g">
-        <header><h3>Quando envia</h3><span>Vale pra toda a equipe. Cada comercial ainda pode começar mais tarde (aba Comerciais ou na régua dele).</span></header>
+        <header><h3>Quando envia</h3><span>Vale para toda a equipe. Cada comercial ainda pode começar mais tarde (aba Comerciais ou na régua dele).</span></header>
         <Linha titulo="Janela de envio" htmlFor="rt-cfg-ini" descricao={<>A régua só monta e manda dentro desta janela; o que não sair até {h2(v.hora_fim)}:00 não sai no dia. Recomendado: 05:00 às 10:00.</>}>
           <div className="rt-cfg-par">
             <select id="rt-cfg-ini" className="inp rt-sel-hora" aria-label="Começa às" value={v.hora_envio} disabled={salvando}
@@ -282,7 +282,7 @@ export function ConfigReguaLista({ v, numeros, salvando, aoSalvar }: {
             </select>
           </div>
         </Linha>
-        <Linha titulo="Dias de envio" htmlFor="rt-cfg-dias" descricao={v.dias_envio === 'todos' ? 'Na data exata do ciclo, ou na data marcada à mão no Calendário.' : 'Vencimento em fim de semana ou feriado vai pro próximo dia útil.'}>
+        <Linha titulo="Dias de envio" htmlFor="rt-cfg-dias" descricao={v.dias_envio === 'todos' ? 'Na data exata do ciclo, ou na data marcada à mão no Calendário.' : 'Vencimento em fim de semana ou feriado passa para o próximo dia útil.'}>
           <select id="rt-cfg-dias" className="inp rt-sel-larga" value={v.dias_envio} disabled={salvando} onChange={(e) => aoSalvar({ dias_envio: e.target.value as ValoresConfigRegua['dias_envio'] })}>
             <option value="todos">Todos os dias (data exata)</option>
             <option value="uteis">Só dias úteis (segue o Calendário)</option>
@@ -292,12 +292,12 @@ export function ConfigReguaLista({ v, numeros, salvando, aoSalvar }: {
       </section>
 
       <section className="rt-cfg-g">
-        <header><h3>Proteção dos números</h3><span>O cuidado contra bloqueio do WhatsApp — vale pra todos os números.</span></header>
+        <header><h3>Proteção dos números</h3><span>O cuidado contra bloqueio do WhatsApp; vale para todos os números.</span></header>
         <Linha titulo="Máximo por número, por dia" htmlFor="rt-cfg-teto" descricao="Quantas mensagens da régua cada número manda no dia. 0 = sem limite.">
           <div className="rt-cfg-par"><CampoNumero id="rt-cfg-teto" rotulo="Máximo por número por dia" valor={v.teto_diario} min={0} max={1000}
-            aoSalvar={(n) => aoSalvar({ teto_diario: n }, n ? `Cada número manda no máximo ${n} mensagens da régua por dia.` : 'Sem limite diário por número (0) — cuidado com bloqueio do WhatsApp.')} /><span>mensagens</span></div>
+            aoSalvar={(n) => aoSalvar({ teto_diario: n }, n ? `Cada número manda no máximo ${n} mensagens da régua por dia.` : 'Sem limite diário por número (0). Atenção ao risco de bloqueio do WhatsApp.')} /><span>mensagens</span></div>
         </Linha>
-        <Linha titulo="Intervalo entre clientes" htmlFor="rt-cfg-dmin" descricao="Sorteado a cada cliente, pra parecer envio humano. Recomendado: 40 a 90 segundos.">
+        <Linha titulo="Intervalo entre clientes" htmlFor="rt-cfg-dmin" descricao="Sorteado a cada cliente, para parecer envio humano. Recomendado: 40 a 90 segundos.">
           <div className="rt-cfg-par">
             <CampoNumero id="rt-cfg-dmin" rotulo="Intervalo mínimo em segundos" valor={v.delay_min} min={5} max={300}
               aoSalvar={(n) => aoSalvar({ delay_min: n, delay_max: Math.max(n, v.delay_max) })} />
@@ -320,17 +320,17 @@ export function ConfigReguaLista({ v, numeros, salvando, aoSalvar }: {
 
       <section className="rt-cfg-g">
         <header><h3>Situações especiais</h3><span>O que fazer quando falta número ou o cliente responde.</span></header>
-        <Linha titulo="Número reserva" htmlFor="rt-cfg-res" descricao="Só é usado pros clientes de comercial sem número conectado.">
+        <Linha titulo="Número reserva" htmlFor="rt-cfg-res" descricao="Só é usado para os clientes de comercial sem número conectado.">
           <select id="rt-cfg-res" className="inp rt-sel-larga" value={v.canal_reserva_id ?? ''} disabled={salvando}
             onChange={(e) => aoSalvar({ canal_reserva_id: e.target.value || null }, e.target.value ? 'Clientes de comercial sem número conectado passam a sair pelo número reserva.' : 'Sem reserva: cada cliente espera o número do próprio comercial.')}>
-            <option value="">Nenhum — espera o número do comercial</option>
+            <option value="">Nenhum (espera o número do comercial)</option>
             {numeros.map((n) => <option key={n.id} value={n.id}>{n.rotulo}</option>)}
           </select>
         </Linha>
-        <div className="rt-cfg-l rt-cfg-tgl">
-          <LinhaToggle titulo="Pausar quando o cliente responder" descricao="Os próximos passos do mês param pra esse cliente e a conversa vira atendimento humano."
-            ligado={v.pausar_se_respondeu} disabled={salvando} aoMudar={(x) => aoSalvar({ pausar_se_respondeu: x })} />
-        </div>
+        {/* mesma anatomia das outras linhas: título e explicação à esquerda, controle à direita */}
+        <Linha titulo="Pausar quando o cliente responder" descricao="Os próximos passos do mês param para esse cliente e a conversa vira atendimento humano.">
+          <Toggle ligado={v.pausar_se_respondeu} disabled={salvando} rotulo="Pausar quando o cliente responder" aoMudar={(x) => aoSalvar({ pausar_se_respondeu: x })} />
+        </Linha>
       </section>
     </div>
   );

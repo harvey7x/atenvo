@@ -37,3 +37,11 @@
 
 /* rótulo só para leitor de tela (cabeçalho de coluna de ação) — sem position:absolute, não escapa da rolagem */
 .v2 .cc-vh { display: inline-block; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; vertical-align: middle; }
+
+/* ficha de variável ({meia parcela} → "meia parcela"): neutra, 12px, raio 4 — o ouro fica para a seleção */
+.v2 .cc-var {
+  display: inline-block; padding: 0 5px; margin: 0 1px; border-radius: 4px; line-height: 18px; vertical-align: baseline;
+  font-size: 12px; font-weight: 500; color: var(--txt); background: rgba(var(--tint), .08); border: 1px solid rgba(var(--tint), .1);
+  white-space: nowrap;
+}
+.v2 .cc-var.desconhecida { color: var(--cor-erro-txt, var(--rubro)); background: rgba(var(--rubro-rgb), .1); border-color: rgba(var(--rubro-rgb), .3); }
