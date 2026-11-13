@@ -15,6 +15,7 @@ import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) —
 import './v2/movimento.css'; // camada de movimento do Atenvo (22/10)
 import './v2/repaginada.css'; // visual do Atenvo (repaginada 27/10) — age com [data-repaginada] na raiz
 import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua do Atenvo (depois da repaginada)
+import './v2/reviza-sistema.css'; // a régua única da ALFA (crítica de design 12/11) — por último
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
