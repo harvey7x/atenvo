@@ -1648,3 +1648,22 @@
 
 /* demo: "ver a tela como" não estoura no celular */
 @media (max-width: 760px) { .v2 .rg-vercomo { flex-wrap: wrap; } .v2 .rg-vercomo select { max-width: 100%; min-width: 0; } }
+
+/* ===== crítica 12/11 — cob_gestao ===== */
+/* Novos: ação da linha quieta (contorno só no hover da linha) e "remover" como ícone discreto */
+html[data-barra-alfa] .v2 .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover):not(:focus-visible) {
+  color: var(--txt-2); background: transparent; border-color: rgba(var(--tint), .1); box-shadow: none;
+}
+html[data-barra-alfa] .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover) { color: var(--txt); border-color: rgba(var(--tint), .18); }
+.v2 .nv-rm {
+  display: inline-grid; place-items: center; flex: none;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--txt-3); cursor: pointer;
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+.v2 .nv-rm:hover { color: var(--cor-erro-txt, var(--rubro)); background: rgba(var(--rubro-rgb), .1); }
+.v2 .nv-rm:focus-visible { outline: 2px solid rgba(var(--rubro-rgb), .5); outline-offset: 1px; }
+/* Novo cliente: ícone de pessoa com "+" no lugar das iniciais do título */
+.v2 .cm-num-av.nv-ic-novo { color: var(--txt-2); font-size: 0; }
+/* cabeçalho do cartão de Novos: filtros à esquerda das ações, a principal por último */
+.v2 .fin-head .fin-filtros .mm { flex: none; }

@@ -51,6 +51,9 @@ import {
 } from '../data/cobranca/novoCliente';
 import type { Papel } from '../data/cobranca/types';
 import { isDemoMode, isRevizaMode } from '@/lib/supabase';
+// crítica 12/11 (cob_gestao): "+ Novo cliente" do Painel abre o formulário (?novo=1); ações raras no "Mais"
+import { useSearchParams } from 'react-router-dom';
+import { MenuMais } from './planilha/MenuMais';
 
 /** tradução de erro das mutations (RLS/RPC/rede) p/ o aviso da tela */
 const msgErro = (e: unknown) => {
@@ -2631,7 +2634,7 @@ export function NovoCliente({ linhas, comps, comerciais, meuComercial, ocupado, 
 
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={760} fecharNoVeu={false}
-      titulo={<div className="cm-dr-titulo"><span className="cm-num-av" aria-hidden>{(c.nome.trim() || 'NC').slice(0, 2).toUpperCase()}</span><div><div className="cm-dr-nm">Novo cliente</div><div className="mod-sub">Entra nos Novos e aparece na Gestão com estes dados</div></div></div>}
+      titulo={<div className="cm-dr-titulo"><span className="cm-num-av nv-ic-novo" aria-hidden><IcT d="M15 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 3 17.5V19M9 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19 8v6M16 11h6" s={16} mr={0} /></span><div><div className="cm-dr-nm">Novo cliente</div><div className="mod-sub">Entra nos Novos e aparece na Gestão com estes dados</div></div></div>}
       rodape={<>
         <span className={faltam.length ? 'nc-status pend' : 'nc-status ok'} aria-live="polite">
           {faltam.length
@@ -4149,8 +4152,8 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       onSuccess: () => {
         setPedir(null);
         setAviso(podeAprovar
-          ? `${l.nome}: débito parado registrado — está em "Aguardando aprovação" aqui em cima. Defina o ciclo e o valor pra enviar à Gestão.`
-          : `${l.nome}: pedido enviado pra aprovação. O financeiro, o cadastro ou o administrador definem o ciclo e o valor — você é avisado no sino.`);
+          ? `${l.nome}: débito parado registrado — está em "Aguardando aprovação", logo acima. Defina o ciclo e o valor para enviar à Gestão.`
+          : `${l.nome}: pedido enviado para aprovação. O financeiro, o cadastro ou o administrador definem o ciclo e o valor — você é avisado no sino.`);
       },
       // fecha o modal: o aviso aparece na página (atrás do véu ninguém via o erro)
       onError: (e) => { setPedir(null); setAviso(msgErro(e)); },
@@ -4182,7 +4185,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     aprovarMut.mutate({ leadId: l.id, dia, valor, dataParou: aprParou, quem: meuNome }, {
       onSuccess: () => {
         setAprovar(null);
-        setAviso(`${l.nome}: aprovado — entrou na Gestão no ciclo D${d2(dia)}${valor != null ? ` com parcela de ${fmtBRL(valor)}` : ''}. Dá pra reverter no Desfazer.`);
+        setAviso(`${l.nome}: aprovado — entrou na Gestão no ciclo D${d2(dia)}${valor != null ? ` com parcela de ${fmtBRL(valor)}` : ''}. É possível reverter no Desfazer.`);
         if (l.cpf) enviarPraPlanilha({ ...l, situacao: 'cancelado', dataParou: aprParou, dia, valor: valor ?? l.valor }); // espelha na planilha (dedup por CPF)
       },
       onError: (e) => { setAprovar(null); setAviso(msgErro(e)); },
@@ -4203,7 +4206,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // 4) CANCELAR o próprio pedido (quem pediu)
   const cancelarPedido = (l: GLinha) => {
     cancelarMut.mutate({ leadId: l.id }, {
-      onSuccess: () => setAviso(`${l.nome}: pedido cancelado — voltou pra lista de Novos.`),
+      onSuccess: () => setAviso(`${l.nome}: pedido cancelado — voltou para a lista de Novos.`),
       onError: (e) => setAviso(msgErro(e)),
     });
   };
@@ -4239,6 +4242,15 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // e na Gestão (bloco Novos); o ciclo é escolhido por quem aprova o débito parado.
   const [erroNovo, setErroNovo] = useState('');
   const abrirNovo = () => { setErroNovo(''); setNovo(true); };
+  // "+ Novo cliente" do Painel chega com ?novo=1: abre o formulário direto (e limpa a URL)
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('novo') !== '1') return;
+    if (podeOperar) abrirNovo();
+    const p = new URLSearchParams(params); p.delete('novo');
+    setParams(p, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, podeOperar]);
   const criarLead = (l0: GLinha) => {
     setErroNovo('');
     criarMut.mutate({ ...l0 }, {
@@ -4257,14 +4269,14 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // remover UM novo (vai pra lixeira; Desfazer restaura só esse — useExcluirLead)
   const removerUm = (l: GLinha) => {
     excluirMut.mutate(l.id, {
-      onSuccess: () => { setConfRemover(null); setSel(null); setAviso(`${l.nome} removido — dá pra reverter no Desfazer (ou na Lixeira, na Gestão).`); },
+      onSuccess: () => { setConfRemover(null); setSel(null); setAviso(`${l.nome} removido — é possível reverter no Desfazer (ou na Lixeira, na Gestão).`); },
       onError: (e) => { setConfRemover(null); setAviso(msgErro(e)); },
     });
   };
   // remover TODOS os novos de uma vez (Desfazer traz todos de volta)
   const removerTodos = () => {
     removerNovosMut.mutate(undefined, {
-      onSuccess: (res) => { setConfRemoverTodos(false); setAviso(`${res.removidos.length} cliente${res.removidos.length === 1 ? '' : 's'} novo${res.removidos.length === 1 ? '' : 's'} removido${res.removidos.length === 1 ? '' : 's'} — dá pra trazer todos de volta no Desfazer (ou um a um na Lixeira).`); },
+      onSuccess: (res) => { setConfRemoverTodos(false); setAviso(`${res.removidos.length} cliente${res.removidos.length === 1 ? '' : 's'} novo${res.removidos.length === 1 ? '' : 's'} removido${res.removidos.length === 1 ? '' : 's'} — o Desfazer traz todos de volta (ou um a um, na Lixeira).`); },
       onError: (e) => { setConfRemoverTodos(false); setAviso(msgErro(e)); },
     });
   };
@@ -4278,8 +4290,12 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     { chave: 'recl', titulo: 'Data reclamação', dir: true, classe: 'num', render: (l) => l.dataReclamacao ? dataBRcurta(l.dataReclamacao) : '—' },
     { chave: 'ac', titulo: '', render: (l) => (
       <div className="fin-acoes">
-        {podeSolicitar ? <button type="button" className="fin-btn fin-ok" onClick={() => abrirPedir(l)} title="O desconto parou? Vira um pedido: o financeiro, o cadastro ou o administrador aprovam e definem ciclo e valor.">Marcar débito parado</button> : <BadgeStatus tom="ok">descontando</BadgeStatus>}
-        {gestor && <button type="button" className="fin-btn" style={{ color: 'var(--rubro)' }} onClick={() => setConfRemover(l)} title="Remove este cliente novo (vai pra Lixeira; reversível no Desfazer)">Remover</button>}
+        {podeSolicitar ? <button type="button" className="fin-btn fin-ok nv-parado" onClick={() => abrirPedir(l)} title="O desconto parou? Vira um pedido: o financeiro, o cadastro ou o administrador aprovam e definem ciclo e valor.">Marcar débito parado</button> : <BadgeStatus tom="ok">descontando</BadgeStatus>}
+        {gestor && (
+          <button type="button" className="nv-rm" onClick={() => setConfRemover(l)} aria-label={`Remover ${l.nome}`} title="Remover este cliente novo (vai para a Lixeira; reversível no Desfazer)">
+            <IcT d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5" s={15} mr={0} />
+          </button>
+        )}
       </div>
     ) },
   ];
@@ -4303,7 +4319,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
             <button type="button" className="fin-btn" style={{ color: 'var(--rubro)' }} onClick={() => { setRecusar(l); setRecMotivo(''); }}>Recusar</button>
           </>
         ) : l.paradoSolicitadoPor && l.paradoSolicitadoPor === meuId ? (
-          <button type="button" className="fin-btn" onClick={() => cancelarPedido(l)} disabled={cancelarMut.isPending} title="Tira o pedido — o cliente volta pra lista de Novos">Cancelar pedido</button>
+          <button type="button" className="fin-btn" onClick={() => cancelarPedido(l)} disabled={cancelarMut.isPending} title="Retira o pedido — o cliente volta para a lista de Novos">Cancelar pedido</button>
         ) : <BadgeStatus tom="atencao">aguardando</BadgeStatus>}
       </div>
     ) },
@@ -4315,21 +4331,18 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     <div className="fin-raiz">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
       <div className="kpis sobe">
-        <Kpi rotulo="Novos (débito ativo)" valor={normais.length} formato="mil" tomValor="ok" />
-        <Kpi rotulo="Aguardando aprovação" valor={pendentes.length} formato="mil" tomValor={pendentes.length > 0 ? 'erro' : undefined} nota={pendentes.length > 0 ? (podeAprovar ? 'defina ciclo e valor' : 'com o financeiro') : 'nada pendente'} />
-        <Kpi rotulo="Em parcelas/mês" valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " />
-        <Kpi rotulo="Total de leads" valor={linhas.length} formato="mil" />
+        <Kpi rotulo="Novos (débito ativo)" valor={normais.length} formato="mil" nota="clientes ainda com o desconto no benefício" />
+        <Kpi rotulo="Aguardando aprovação" valor={pendentes.length} formato="mil" nota={pendentes.length > 0 ? (podeAprovar ? 'defina o ciclo e o valor' : 'com o financeiro') : 'nada pendente'} />
+        <Kpi rotulo="Em parcelas/mês" valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " sufixo={`,${String(Math.round((emParcelas % 1) * 100)).padStart(2, '0')}`}
+          nota={`${ativos.length} parcela${ativos.length === 1 ? '' : 's'} ativa${ativos.length === 1 ? '' : 's'}`} />
+        <Kpi rotulo="Total de clientes" valor={linhas.length} formato="mil" nota="na planilha de cobranças" />
       </div>
-      <p className="cm-hint sobe" style={{ animationDelay: '.06s' }}>
-        Clientes que <b>ainda não pararam o desconto</b> — o débito segue ativo no benefício. Quando o desconto parar, clique em <b>Marcar débito parado</b>:
-        o cliente vai pra <b>Aguardando aprovação</b> e só entra na Gestão depois que o <b>financeiro, o cadastro ou o administrador</b> aprovar e definir o ciclo e o valor.
-      </p>
       {pendentes.length > 0 && (
         <CardVidro spot className="fin-panel nv-pend sobe" style={{ animationDelay: '.08s' }}>
           <div className="fin-head">
             <h3>Aguardando aprovação</h3>
             <span className="pl-count num">{pendentesVis.length}</span>
-            <span className="nv-pend-sub">{podeAprovar ? 'Débito parado marcado — defina o ciclo, o valor e a data pra enviar à Gestão.' : 'Débito parado marcado — aguardando o financeiro, o cadastro ou o administrador aprovar.'}</span>
+            <span className="nv-pend-sub">{podeAprovar ? 'Débito parado marcado — defina o ciclo, o valor e a data para enviar à Gestão.' : 'Débito parado marcado — aguardando o financeiro, o cadastro ou o administrador aprovar.'}</span>
           </div>
           {pendentesVis.length === 0
             ? <div className="fin-vazio">Nenhum pedido neste filtro.</div>
@@ -4338,15 +4351,23 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       )}
       <CardVidro spot className="fin-panel sobe" style={{ animationDelay: '.1s' }}>
         <div className="fin-head">
-          <h3>Novos — débito ativo</h3>
+          <h3 title="Clientes que ainda não pararam o desconto: o débito segue ativo no benefício. Quando o desconto parar, use Marcar débito parado — o cliente vai para Aguardando aprovação e só entra na Gestão depois que o financeiro, o cadastro ou o administrador aprovar e definir o ciclo e o valor.">Novos — débito ativo</h3>
           <span className="pl-count num">{visiveis.length}</span>
           <div className="fin-filtros">
+            <input className="inp" placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar cliente" />
+            <select className="inp pl-sel" value={fCom} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial"><option value="todos">Comercial: todos</option>{comerciais.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+            {gestor && ativos.length > 0 && <BotaoSec onClick={() => exportarXlsx(ativos, comps, 'clientes-novos')}><IcT d="M12 4v11m0 0 4-4m-4 4-4-4M4 20h16" />Exportar</BotaoSec>}
+            {gestor && (
+              <MenuMais titulo="Mais ações" so itens={[
+                { rotulo: 'Importar novos', icone: IC_PATH.importar, aoClicar: () => setImportOpen(true) },
+                ...(normais.length > 0 ? [{
+                  rotulo: 'Remover todos os novos', icone: 'M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5', perigo: true, separar: true,
+                  aoClicar: () => setConfRemoverTodos(true),
+                  dica: 'Remove TODOS os clientes novos de uma vez (vão para a Lixeira; o Desfazer traz todos de volta). Quem está aguardando aprovação fica.',
+                }] : []),
+              ]} />
+            )}
             {podeOperar && <BotaoPrimario onClick={abrirNovo}>＋ Novo cliente</BotaoPrimario>}
-            {gestor && <BotaoSec mini onClick={() => setImportOpen(true)}><IcT d={IC_PATH.importar} />Importar novos</BotaoSec>}
-            {gestor && ativos.length > 0 && <BotaoSec mini onClick={() => exportarXlsx(ativos, comps, 'clientes-novos')}>Exportar</BotaoSec>}
-            {gestor && normais.length > 0 && <BotaoSec mini onClick={() => setConfRemoverTodos(true)} style={{ color: 'var(--rubro)' }} title="Remove TODOS os clientes novos de uma vez (vão pra Lixeira; o Desfazer traz todos de volta). Quem está aguardando aprovação fica.">Remover todos</BotaoSec>}
-            <select className="inp pl-sel" value={fCom} onChange={(e) => setFCom(e.target.value)}><option value="todos">Comercial: todos</option>{comerciais.map((c) => <option key={c} value={c}>{c}</option>)}</select>
-            <input className="inp" placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         </div>
         {visiveis.length === 0
@@ -4356,15 +4377,15 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       {/* 1) PEDIR: só a data em que o desconto parou → aprovação */}
       <ModalV2 aberto={!!pedir} aoFechar={() => setPedir(null)} largura={420}
         titulo={pedir ? <div>Marcar débito parado<div className="mod-sub">{pedir.nome}{pedir.comercial ? ` · ${pedir.comercial}` : ''}</div></div> : ''}
-        rodape={<><BotaoSec onClick={() => setPedir(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarPedido} disabled={!pedirParou || solicitarMut.isPending}>{solicitarMut.isPending ? 'Enviando…' : 'Enviar pra aprovação'}</BotaoPrimario></>}>
+        rodape={<><BotaoSec onClick={() => setPedir(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarPedido} disabled={!pedirParou || solicitarMut.isPending}>{solicitarMut.isPending ? 'Enviando…' : 'Enviar para aprovação'}</BotaoPrimario></>}>
         {pedir && (
           <div>
             <label className="cd-f" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span>Data em que o desconto parou</span>
               <input className="inp" type="date" value={pedirParou} max={hojeIso()} onChange={(e) => setPedirParou(e.target.value)} />
             </label>
             <p className="cm-hint" style={{ margin: '12px 2px 0' }}>
-              O pedido vai pra <b>Aguardando aprovação</b>. O <b>financeiro, o cadastro ou o administrador</b> define o <b>ciclo</b> e o <b>valor</b> — aí o cliente entra na Gestão.
-              {podeAprovar ? ' Como você aprova, ele já aparece lá em cima pra você concluir.' : ' Você é avisado no sino quando aprovarem (ou recusarem).'}
+              O pedido vai para <b>Aguardando aprovação</b>. O <b>financeiro, o cadastro ou o administrador</b> define o <b>ciclo</b> e o <b>valor</b> — então o cliente entra na Gestão.
+              {podeAprovar ? ' Como você aprova, ele já aparece no topo da tela para você concluir.' : ' Você é avisado no sino quando aprovarem (ou recusarem).'}
             </p>
           </div>
         )}
@@ -4373,7 +4394,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       {/* 2) APROVAR: quem aprova decide ciclo, valor e data → Gestão */}
       <ModalV2 aberto={!!aprovar} aoFechar={() => setAprovar(null)} largura={460}
         titulo={aprovar ? <div>Aprovar débito parado<div className="mod-sub">{aprovar.nome}{aprovar.comercial ? ` · ${aprovar.comercial}` : ''}{aprovar.paradoSolicitadoNome ? ` · pedido por ${aprovar.paradoSolicitadoNome}` : ''}</div></div> : ''}
-        rodape={<><BotaoSec onClick={() => setAprovar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarAprovacao} disabled={!aprDia || aprovarMut.isPending}>{aprovarMut.isPending ? 'Aprovando…' : aprDia ? `Aprovar e enviar pro ciclo D${d2(aprDia)}` : 'Escolha o ciclo'}</BotaoPrimario></>}>
+        rodape={<><BotaoSec onClick={() => setAprovar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarAprovacao} disabled={!aprDia || aprovarMut.isPending}>{aprovarMut.isPending ? 'Aprovando…' : aprDia ? `Aprovar e enviar para o ciclo D${d2(aprDia)}` : 'Escolha o ciclo'}</BotaoPrimario></>}>
         {aprovar && (() => {
           const comp = mesesFut[mesIdx] ?? mesesFut[0];
           const marcado = aprDataCob ?? (aprDia ? `${comp}-${d2(aprDia)}` : undefined);

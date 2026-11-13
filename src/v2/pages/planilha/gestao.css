@@ -286,3 +286,75 @@
 .v2 .gp-inf-div b { color: var(--txt); font-weight: 600; margin-left: 3px; }
 .v2 .gp-inf-div-aviso { flex-basis: 100%; color: var(--ambar); font-weight: 500; }
 .v2 .gp-inf-div-nota { flex-basis: 100%; color: var(--txt-3); font-size: 11.5px; }
+
+/* =====================================================================
+   crítica 12/11 — a planilha ganha o espaço de volta (meta: 17+ linhas
+   a 1470×820). Título e ações numa linha; busca, comercial e ciclos na
+   faixa de baixo; a grade junta formatação e fórmula numa linha só.
+   ===================================================================== */
+.v2 .gp-raiz { gap: 10px; }
+.v2 .gp-raiz > .ph.gp-ph,
+html:root[data-repaginada][data-repaginada] .v2 .gp-raiz > .ph.gp-ph {
+  flex: none; align-items: center; flex-wrap: nowrap; gap: 16px;
+  margin: 0; padding: 0; border: 0; min-height: 36px;
+}
+.v2 .gp-ph > div:first-child { min-width: 0; }
+.v2 .gp-ph h2 { white-space: nowrap; }
+.v2 .gp-ph .gp-acoes { flex-wrap: nowrap; gap: 8px; min-width: 0; }
+.v2 .gp-ph .gp-salvando { margin-right: 4px; }
+/* tela cheia: só o ícone, quadrado do tamanho do botão */
+.v2 .gp-ph .p-btn.gp-cheia-bt { width: 36px; padding: 0; justify-content: center; }
+.v2 .gp-ph .p-btn.gp-cheia-bt > svg { margin: 0; }
+html[data-barra-alfa] .v2 .gp-ph .p-btn.gp-cheia-bt { width: var(--btn-h-g, 36px); padding-left: 0; padding-right: 0; }
+/* tela cheia: o cabeçalho encolhe (o título vai menor; a grade é o que importa) */
+.v2 .gp-raiz.gp-cheia > .ph.gp-ph h2 { font-size: 16px; }
+
+/* faixa de filtros: busca + comercial + ciclos (o seletor ocupa o resto da linha) */
+.v2 .gp-raiz > .gp-barra.gp-linha-chips { flex-wrap: nowrap; gap: 8px; }
+.v2 .gp-raiz > .gp-barra.gp-linha-chips .gp-busca { width: 240px; flex: none; }
+.v2 .gp-raiz > .gp-barra.gp-linha-chips .gp-sel { flex: none; }
+.v2 .gp-raiz > .gp-barra.gp-linha-chips > .gp-sc { flex: 1 1 auto; min-width: 0; margin-left: 4px; }
+.v2 .gp-raiz > .gp-barra.gp-linha-chips .gp-sc-tit { display: none; }
+/* o número do ciclo escolhido: neutro (o polegar já marca a seleção; laranja é alerta) */
+.v2 .gp-sc-item.on .gp-sc-n,
+:root[data-tema="light"] .v2 .gp-sc-item.on .gp-sc-n { background: rgba(var(--tint), .1); color: var(--txt); }
+@media (max-width: 1100px) {
+  .v2 .gp-raiz > .gp-barra.gp-linha-chips { flex-wrap: wrap; row-gap: 8px; }
+  .v2 .gp-raiz > .gp-barra.gp-linha-chips > .gp-sc { flex-basis: 100%; margin-left: 0; }
+}
+@media (max-width: 760px) {
+  .v2 .gp-raiz > .ph.gp-ph,
+  html:root[data-repaginada][data-repaginada] .v2 .gp-raiz > .ph.gp-ph { flex-wrap: wrap; row-gap: 10px; }
+  .v2 .gp-ph .gp-acoes { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; }
+  .v2 .gp-raiz > .gp-barra.gp-linha-chips .gp-busca { width: 100%; flex: 1 1 100%; }
+}
+
+/* menu "Mais" (ações raras) */
+.v2 .mm { position: relative; display: inline-flex; }
+.v2 .mm-gatilho { gap: 6px; }
+.v2 .mm-gatilho.mm-so { width: 32px; padding: 0; justify-content: center; }
+.v2 .mm-gatilho.mm-so.btn-mini { width: 28px; }
+.v2 .mm-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 45;
+  min-width: 232px; padding: 6px;
+  background: var(--surface); color: var(--txt);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  animation: mm-entra .14s var(--ease);
+}
+@keyframes mm-entra { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .v2 .mm-pop { animation: none; } }
+.v2 .mm-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  height: 32px; padding: 0 10px; border: 0; border-radius: 7px;
+  background: none; color: var(--txt); font: 500 13px var(--fonte); text-align: left; white-space: nowrap; cursor: pointer;
+}
+.v2 .mm-item > svg { flex: none; color: var(--txt-2); }
+.v2 .mm-item:hover:not(:disabled), .v2 .mm-item:focus-visible { background: rgba(var(--tint), .07); outline: none; }
+.v2 .mm-item:disabled { opacity: .45; cursor: default; }
+.v2 .mm-item.perigo, .v2 .mm-item.perigo > svg { color: var(--cor-erro-txt, var(--rubro)); }
+.v2 .mm-item.perigo:hover:not(:disabled) { background: var(--rubro-bg, rgba(var(--rubro-rgb), .1)); }
+.v2 .mm-ic-vazio { flex: none; width: 16px; }
+.v2 .mm-sep { height: 1px; margin: 5px 4px; background: var(--linha); }
+/* o popover de colunas abre do mesmo lugar do "Mais" */
+.v2 .mm.gp-cols-wrap > .gp-cols-pop { top: calc(100% + 6px); right: 0; }

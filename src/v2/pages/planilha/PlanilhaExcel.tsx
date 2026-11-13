@@ -107,6 +107,8 @@ export interface PlanilhaExcelProps {
   className?: string;
   /** algo da tela no meio da barra de formatação (ex.: a legenda das cores) */
   barraExtra?: ReactNode;
+  /** algo da tela no rodapé da grade, ao lado da contagem (crítica 12/11: a legenda das cores mora aqui) */
+  rodapeExtra?: ReactNode;
 
   /* ---- fluxo de pagamento (informar → financeiro aprova/recusa) ----
      A COR da célula de mês de cliente sai de estadoMesCelula (planilha.ts): o texto da
@@ -428,7 +430,7 @@ export function LegendaEstados({ className }: { className?: string }) {
         <span className="plx-rel"><Ic d={P.relogio} s={10} /></span>Aguardando financeiro
       </span>
       <span className="plx-leg-am plx-st-ruim" title="NÃO PAGOU, ou o financeiro recusou o pagamento informado">Não pago / recusado</span>
-      <span className="plx-leg-am plx-st-sem" title="Mês que já venceu e ninguém informou se o cliente pagou ou não">Sem pagamento informado</span>
+      <span className="plx-leg-am plx-st-sem" title="Sem pagamento informado: o mês já venceu e ninguém informou se o cliente pagou ou não">A informar</span>
     </div>
   );
 }
@@ -573,7 +575,7 @@ function renderCel(l: PlLinha, c: ColV, dest: string, senha: SenhaPar | undefine
     <div key={c.id} className={cls} style={st as CSSProperties} role="gridcell" aria-colindex={c.li + 2}
       title={trava ? 'Sem permissão para ver a senha' : ev ? ev.dica : txt || undefined}>
       {ev?.k === 'sem'
-        ? <span className="plx-sem-txt">Sem pagamento<br />informado</span>
+        ? <span className="plx-sem-txt">A informar</span>
         : <>{ev?.rel && <span className="plx-rel" aria-hidden="true"><Ic d={P.relogio} s={10} /></span>}{txt}</>}
     </div>
   );
@@ -2549,14 +2551,17 @@ export function PlanilhaExcel(props: PlanilhaExcelProps) {
 
   return (
     <div className={`plx${className ? ` ${className}` : ''}`}>
-      <BarraFerramentas api={api} congelado={congelar} aoCongelar={alternarCongelar} temBusca={!!props.onBuscar} extra={props.barraExtra} />
-      <div className="plx-fbar">
-        <input ref={nomeRef} className="plx-nome" aria-label="Referência da célula (digite para ir)" spellCheck={false}
-          autoComplete="off" onKeyDown={aoNomeTecla} onFocus={(e) => e.currentTarget.select()} onBlur={() => atualizarFbar()} />
-        <span className="plx-fx-rot" aria-hidden="true">fx</span>
-        <textarea ref={fxRef} className="plx-fx" rows={1} wrap="off" aria-label="Conteúdo da célula" spellCheck={false} autoComplete="off"
-          onFocus={aoFxFoco} onInput={aoFxInput} onKeyDown={aoFxTecla} onBlur={aoFxBlur} />
-      </div>
+      {/* crítica 12/11: formatação e barra de fórmula numa linha só (a grade ganha uma faixa) */}
+      <BarraFerramentas api={api} congelado={congelar} aoCongelar={alternarCongelar} temBusca={!!props.onBuscar} extra={props.barraExtra}
+        meio={(
+          <div className="plx-fbar">
+            <input ref={nomeRef} className="plx-nome" aria-label="Referência da célula (digite para ir)" spellCheck={false}
+              autoComplete="off" onKeyDown={aoNomeTecla} onFocus={(e) => e.currentTarget.select()} onBlur={() => atualizarFbar()} />
+            <span className="plx-fx-rot" aria-hidden="true">fx</span>
+            <textarea ref={fxRef} className="plx-fx" rows={1} wrap="off" aria-label="Conteúdo da célula" spellCheck={false} autoComplete="off"
+              onFocus={aoFxFoco} onInput={aoFxInput} onKeyDown={aoFxTecla} onBlur={aoFxBlur} />
+          </div>
+        )} />
       <div ref={gradeRef} className="plx-grade" role="grid" aria-label="Planilha de cobranças" aria-rowcount={dados.linhas.length + 1}
         aria-colcount={colsOrd.length + 1} aria-multiselectable="true"
         onMouseDown={aoMouseDown} onDoubleClick={aoDuploClique} onContextMenu={aoContexto} onKeyDown={aoTeclar}
@@ -2613,7 +2618,7 @@ export function PlanilhaExcel(props: PlanilhaExcelProps) {
         </div>
         {n === 0 && <div className="plx-vazio">Nenhuma linha para mostrar{filtro ? ' com esse filtro' : ''}.</div>}
       </div>
-      <Rodape api={api} ctl={rod} totais={totais} />
+      <Rodape api={api} ctl={rod} totais={totais} extra={props.rodapeExtra} />
       <MenuFlutuante ctl={menu} aoFechar={focar} />
       <Dialogos ctl={dlg} aoFechar={focar} />
     </div>
@@ -2758,7 +2763,7 @@ function PainelAtalhos({ temBusca, aoFechar }: { temBusca: boolean; aoFechar: ()
   );
 }
 
-function BarraFerramentas({ api, congelado, aoCongelar, temBusca, extra }: { api: ApiGrade; congelado: boolean; aoCongelar: () => void; temBusca: boolean; extra?: ReactNode }) {
+function BarraFerramentas({ api, congelado, aoCongelar, temBusca, extra, meio }: { api: ApiGrade; congelado: boolean; aoCongelar: () => void; temBusca: boolean; extra?: ReactNode; meio?: ReactNode }) {
   const [st, setSt] = useState({ b: false, i: false, al: '', bg: '', fg: '', podeD: false, podeR: false });
   const [aberto, setAberto] = useState<'' | 'bg' | 'fg' | 'atalhos'>('');
   const [ultBg, setUltBg] = useState<string | null>('#FFFF00');
@@ -2815,13 +2820,14 @@ function BarraFerramentas({ api, congelado, aoCongelar, temBusca, extra }: { api
       <button type="button" className={`plx-bt${st.al === 'r' ? ' on' : ''}`} onMouseDown={semFoco} onClick={() => api.alinhar('r')} title="Alinhar à direita" aria-label="Alinhar à direita" aria-pressed={st.al === 'r'}><Ic d={P.alDir} /></button>
       <span className="plx-sep" />
       <button type="button" className="plx-bt" onMouseDown={semFoco} onClick={() => api.formatar(null)} title="Limpar formatação (cores, negrito, itálico, alinhamento)" aria-label="Limpar formatação">
-        <Ic d={P.borracha} /><span className="plx-bt-txt">Limpar formatação</span>
+        <Ic d={P.borracha} />
       </button>
-      <span className="plx-esp" />
+      {meio ? <><span className="plx-sep" />{meio}</> : <span className="plx-esp" />}
       {extra && <span className="plx-barra-extra">{extra}</span>}
       <button type="button" className={`plx-bt${congelado ? ' on' : ''}`} onMouseDown={semFoco} onClick={aoCongelar} aria-pressed={congelado}
-        title={congelado ? 'Colunas A–C fixas ao rolar para o lado. Clique para soltar' : 'Fixar as colunas A–C ao rolar para o lado'}>
-        <Ic d={P.pino} /><span className="plx-bt-txt">Congelar A–C</span>
+        aria-label={congelado ? 'Soltar as colunas A–C' : 'Congelar as colunas A–C'}
+        title={congelado ? 'Colunas A–C congeladas ao rolar para o lado. Clique para soltar' : 'Congelar as colunas A–C ao rolar para o lado'}>
+        <Ic d={P.pino} />
       </button>
       <div className="plx-split">
         <button type="button" className={`plx-bt${aberto === 'atalhos' ? ' on' : ''}`} onMouseDown={semFoco} onClick={() => alternarPop('atalhos')} title="Atalhos de teclado" aria-label="Atalhos de teclado" aria-expanded={aberto === 'atalhos'}>
@@ -2837,7 +2843,7 @@ function BarraFerramentas({ api, congelado, aoCongelar, temBusca, extra }: { api
 
 const fmtNum = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
-function Rodape({ api, ctl, totais }: { api: ApiGrade; ctl: MutableRefObject<CtlRodape | null>; totais: { linhas: number; clientes: number } }) {
+function Rodape({ api, ctl, totais, extra }: { api: ApiGrade; ctl: MutableRefObject<CtlRodape | null>; totais: { linhas: number; clientes: number }; extra?: ReactNode }) {
   const [st, setSt] = useState<{ txt: string; trava: boolean }>({ txt: '', trava: false });
   const [av, setAv] = useState<{ msg: string; tom: 'info' | 'erro'; id: number } | null>(null);
   const raf = useRef(0);
@@ -2898,6 +2904,7 @@ function Rodape({ api, ctl, totais }: { api: ApiGrade; ctl: MutableRefObject<Ctl
     <>
       <div className="plx-rodape" role="status" aria-live="polite">
         <span className="plx-rod-esq">{st.txt}{st.trava && <span className="plx-trava-tag"> · somente leitura</span>}</span>
+        {extra && <span className="plx-rod-extra">{extra}</span>}
         <span className="plx-rod-num"><b>{totais.linhas.toLocaleString('pt-BR')}</b> linhas · <b>{totais.clientes.toLocaleString('pt-BR')}</b> clientes</span>
       </div>
       {av && <div key={av.id} className={`plx-aviso${av.tom === 'erro' ? ' erro' : ''}`} role="alert">{av.msg}</div>}
