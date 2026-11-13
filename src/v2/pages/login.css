@@ -90,6 +90,8 @@
    e um rodapé discreto — o cartão deixa de ficar solto numa tela vazia.
    ------------------------------------------------------------------ */
 .v2.tela-login { flex-direction: column; }
+/* em coluna o cartão não encolhe sozinho: no celular ele respeita o respiro de 24px */
+.v2 .lg-card { max-width: 100%; }
 .v2 .lg-topo {
   position: absolute; top: 24px; left: 28px; z-index: 2;
   display: flex; align-items: center; gap: 10px; pointer-events: none;
