@@ -558,3 +558,29 @@
   :root .v2 .d5-carr .d5-carr-ic i:nth-child(4) { animation-delay: -.75s !important; }
   :root .v2 .d5-carr .d5-carr-barra i { animation: d5-carr-indet 1.25s ease-in-out infinite !important; }
 }
+
+/* ===== crítica 12/11 — atendimento (Dashboard) =====
+   Só na ALFA. A mesma paleta de gráfico da Cobrança: barras e mapa NEUTROS (cinza), verde e vermelho só
+   na variação; o KPI e a pílula de variação já seguem o do Painel (régua do sistema). */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg { --dado-1: #A1A7B0; --dado-1-rgb: 161, 167, 176; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg { --dado-1: #5F6570; --dado-1-rgb: 95, 101, 112; }
+/* o vermelho/verde do mapa e das barras não existe: só a variação usa semântica */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-var-chip { font-family: var(--fonte); }
+/* 1ª coluna das tabelas por número: o telefone começa onde começa o nome (à esquerda), não centralizado */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome .d5-cel2 { align-items: flex-start; text-align: left; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome .d5-cel2 > small { text-align: left; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome-in { align-items: flex-start; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome-in .d5-ponto { margin-top: 5px; }
+/* células de dado alinhadas ao centro: a régua de CABEÇALHO (11/600 espaçado) não vale para os números */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab :is(td, tfoot th).d5-dir { font-size: 13px; font-weight: 400; letter-spacing: 0; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab td .d5-cel2 > small { letter-spacing: 0; font-size: 12px; }
+/* textos abaixo de 11px */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg :is(.d5-kpi-fonte, .d5-demo) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-kpi-rot { font-size: 12px; }
+/* a linha da tabela no hover: o fio à esquerda era dourado (o ouro fica na seleção) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab tbody tr:hover > :first-child { box-shadow: inset 2px 0 0 rgba(var(--tint), .25); }
+/* "já estava no sistema" é dado, não seleção: neutro (era dourado) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-ja { color: var(--txt); }
+/* o único destaque dourado da tela: o período escolhido no mapa (a linha "Hoje"/semana em foco) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje { outline-color: var(--cor-acento-fio); }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje .d5-calor-rot::before { background: var(--azul); }

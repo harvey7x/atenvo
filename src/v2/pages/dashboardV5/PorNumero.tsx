@@ -51,7 +51,7 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
   const repetidos = totEnt - kpis.entradas;
   return (
     <Secao className="d5-num" titulo="Entradas por número"
-      sub="Todos os números conectados, mesmo sem entrada. Entradas: tudo que entrou, cada dia, como no Gerenciador de Anúncios. Não elegíveis e fechados contam pelo dia da marcação.">
+      ajuda="Todos os números conectados, mesmo sem entrada. Entradas: tudo que entrou, cada dia, como no Gerenciador de Anúncios. Não elegíveis e fechados contam pelo dia da marcação.">
       <div className="d5-tab-rolo">
         <table className="d5-tab">
           <colgroup>
