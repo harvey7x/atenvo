@@ -658,3 +658,48 @@
 .v2 .pn-pct-previa b { color: var(--txt); font-weight: 600; }
 .v2 .pn-pct-agenda { display: block; margin-top: 4px; font-size: 11px; color: var(--ambar); white-space: nowrap; }
 .v2 .pn-pct-estender { display: block; margin-top: 4px; font-size: 11.5px; }
+
+/* ===== crítica 12/11 — cob_gestao ===== */
+/* tendência do KPI: o mês em aberto selecionado entra tracejado (não "despenca") */
+.v2 .pn-tend-linha.pn-tend-parcial { stroke-dasharray: 3 3; opacity: .7; }
+
+/* Previsão de faturamento: faixa compacta de 6 meses logo abaixo dos indicadores */
+.v2 .pn-prev { padding-bottom: 14px; }
+.v2 .pn-prev .pn-card-cab { margin-bottom: 10px; }
+.v2 .pn-prev-faixa { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; }
+.v2 .pn-prev-mes {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 4px 14px 2px; border-left: 1px solid var(--linha);
+}
+.v2 .pn-prev-mes:first-child { border-left: 0; padding-left: 0; }
+.v2 .pn-prev-rot { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--txt-2); white-space: nowrap; }
+.v2 .pn-prev-rot em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--azul, #F0BC4E); }
+.v2 .pn-prev-val { font-size: 16px; font-weight: 600; color: var(--txt); white-space: nowrap; letter-spacing: -.01em; }
+.v2 .pn-prev-val .pn-cent { font-size: .72em; }
+.v2 .pn-prev-sub { display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--txt-3); white-space: nowrap; min-width: 0; }
+.v2 .pn-prev-sub span { overflow: hidden; text-overflow: ellipsis; }
+.v2 .pn-prev-sub .atraso { color: var(--cor-erro-txt, var(--rubro)); }
+@media (max-width: 1100px) {
+  .v2 .pn-prev-faixa { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
+  .v2 .pn-prev-mes:nth-child(4) { border-left: 0; padding-left: 0; }
+}
+@media (max-width: 640px) {
+  .v2 .pn-prev-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .pn-prev-mes:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .v2 .pn-prev-mes:nth-child(4) { border-left: 1px solid var(--linha); padding-left: 14px; }
+}
+
+/* links do cabeçalho do cartão ("Ver equipe completa", "Abrir na Gestão") */
+.v2 .pn-card-cab .pn-ver { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.v2 .pn-card-cab .pn-ver > svg { margin-right: -2px; }
+/* Clientes que precisam de atenção: o nome abre a Gestão já filtrada */
+.v2 .pn-atencao .pn-at-nome { text-align: left; }
+
+/* mapa de calor: 2px entre as células (sem as "estrelinhas" nos cruzamentos), raio 4 */
+.v2 .pn-mapa td { border-left: 1px solid transparent; border-right: 1px solid transparent; border-radius: 4px; }
+/* média do gráfico: o rótulo fica fora das barras, à direita da linha */
+.v2 .pn-graf-media span { left: auto; right: 0; bottom: 3px; background: var(--surface, rgba(var(--tint), .07)); box-shadow: 0 0 0 1px rgba(var(--tint), .08); }
+
+/* "Voltou a pagar": tom próprio (azul-petróleo), distinto do verde de "Em dia" e ≥3:1 nos dois temas */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #4FB8C4; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #2B8A99; }
