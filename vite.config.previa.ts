@@ -75,13 +75,36 @@ const CANAIS_FICTICIOS: [string, string][] = [
   ["nome: 'ANTONIO CAMPANHA', numero: '555191655320'", "nome: 'CAMPANHA NOVEMBRO', numero: '555199990303'"],
   ["nome: 'MURILLO CHIP', numero: '555191035329'", "nome: 'GERÊNCIA', numero: '555199990404'"],
   ["nome: 'OFICIAL', numero: '555191781390'", "nome: 'NÚMERO ANTIGO', numero: '555199990505'"],
+  ["nome: 'ANTONIO 2.0', numero: '555189551944'", "nome: 'NOVEMBRO 2.0', numero: '555199990606'"],
+];
+/* a equipe do exemplo do Dashboard (Atenvo) vira a equipe de exemplo da prévia (Carla, Bianca, Paty, Eduardo) */
+const EQUIPE_FICTICIA: [string, string][] = [
+  ["nome: 'Juliana'", "nome: 'Carla'"],
+  ["nome: 'Isadora'", "nome: 'Bianca'"],
+  ["nome: 'Luiz'", "nome: 'Eduardo'"],
+  ["nome: 'Giovana'", "nome: 'Paty'"],
 ];
 const TROCAS_FICTICIAS: [RegExp, [string, string][]][] = [
   [/\/src\/data\/dashboardV5\.demo\.ts$/, [
     ...CANAIS_FICTICIOS,
+    ...EQUIPE_FICTICIA,
     ["'Empréstimo · Diego'", "'Principal · Carla'"],
     ["'Juros abusivos · Andrius'", "'Revisão de contrato · Bianca'"],
     ["'Empréstimo · Antônio'", "'Campanha novembro · Eduardo'"],
+  ]],
+  /* abas do Dashboard (13/11): as campanhas do CAF viram as campanhas de exemplo da ALFA (o 2.0 antes do
+     nome curto: a troca é por trecho) */
+  [/\/src\/data\/dashboardV5\.abas\.demo\.ts$/, [
+    ["'Empréstimo · Antônio 2.0'", "'Novembro 2.0 · Eduardo'"],
+    ["'Empréstimo · Diego'", "'Principal · Carla'"],
+    ["'Empréstimo · Antônio'", "'Campanha novembro · Eduardo'"],
+    ["'Juros abusivos · Andrius'", "'Revisão de contrato · Bianca'"],
+  ]],
+  [/\/src\/data\/dashboardV5\.abas\.tipos\.ts$/, [
+    ["diego: 'Diego'", "diego: 'Principal'"],
+    ["antonio: 'Antônio'", "antonio: 'Campanha novembro'"],
+    ["antonio2: 'Antônio 2.0'", "antonio2: 'Novembro 2.0'"],
+    ["juros: 'Juros abusivo'", "juros: 'Revisão de contrato'"],
   ]],
   [/\/src\/v2\/pages\/Kanban\.tsx$/, [["canalNome: 'ANDRIUS'", "canalNome: 'CAMPANHA'"], ["'LUIZA'", "'PRINCIPAL'"]]],
   [/\/src\/v2\/pages\/whatsappSeed\.ts$/, [["'LUIZA'", "'PRINCIPAL'"]]],

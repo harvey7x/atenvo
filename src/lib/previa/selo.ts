@@ -6,6 +6,7 @@
    e a foto ampliada. Em janela estreita ele não cobre a busca: vai para o vão entre a busca e os botões
    do topo e, se nem assim couber, encolhe (só "Prévia · Ver como"). */
 import { ambientesDoPerfil, ROTULO_AMBIENTE } from '@/v2/data/modulos';
+import { lerLinearAlfa, salvarLinearAlfa } from '@/v2/lib/linearAlfa';
 
 const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom, .ba-veu';
 type PerfilPrevia = { id: string; nome: string; papel: string; ativo: boolean; modulos?: unknown };
@@ -38,8 +39,14 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 #selo-previa .sp-rodape{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;margin-top:4px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);
   color:rgba(255,255,255,.6);font:500 11.5px/1.3 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
 #selo-previa .sp-rodape:hover{color:#fff}
+#selo-previa .sp-ad{display:inline-flex;padding:2px;gap:2px;border-radius:999px;background:rgba(255,255,255,.06)}
+#selo-previa .sp-ad button{all:unset;cursor:pointer;padding:3px 9px;border-radius:999px;color:rgba(255,255,255,.62);font:inherit;letter-spacing:.01em}
+#selo-previa .sp-ad button:hover{color:#fff}
+#selo-previa .sp-ad button[aria-pressed="true"]{color:#08090a;background:rgba(240,188,78,.95)}
+#selo-previa .sp-ad button:focus-visible{outline:2px solid rgba(240,188,78,.8);outline-offset:2px}
+#selo-previa.sp-curto .sp-ad{display:none}
 #selo-previa.sp-curto .sp-fict,#selo-previa.sp-curto .sp-ver b{display:none}
-@media (max-width:640px){#selo-previa .sp-fict,#selo-previa .sp-ver b{display:none}#selo-previa{top:12px}#selo-previa .sp-menu{min-width:260px}}
+@media (max-width:640px){#selo-previa .sp-fict,#selo-previa .sp-ver b,#selo-previa .sp-ad{display:none}#selo-previa{top:12px}#selo-previa .sp-menu{min-width:260px}}
 @media (prefers-reduced-motion:reduce){#selo-previa{transition:none}}
 `;
 
@@ -67,7 +74,21 @@ export function montarSeloPrevia(): void {
     menu.className = 'sp-menu';
     menu.setAttribute('role', 'menu');
     menu.hidden = true;
-    el.append(tx, bt, menu);
+    // Antes / Depois do estilo Linear (13/11): o dono compara na hora; a escolha fica neste navegador
+    const ad = document.createElement('span');
+    ad.className = 'sp-ad';
+    ad.setAttribute('role', 'group');
+    ad.setAttribute('aria-label', 'Comparar o visual');
+    const marcarAD = () => ad.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === lerLinearAlfa())));
+    for (const [v, rot] of [['0', 'Antes'], ['1', 'Depois']] as const) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.v = v; b.textContent = rot;
+      b.title = v === '1' ? 'Com o estilo Linear' : 'Como estava antes do estilo Linear';
+      b.addEventListener('click', () => { salvarLinearAlfa(v === '1'); marcarAD(); });
+      ad.append(b);
+    }
+    marcarAD();
+    el.append(tx, ad, bt, menu);
     document.body.appendChild(el);
 
     const seta = '<svg class="sp-seta" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
