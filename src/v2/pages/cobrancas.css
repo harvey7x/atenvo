@@ -1677,3 +1677,12 @@ html[data-barra-alfa]:not(#rv-sis) .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-pa
 .v2 .cic-esv:focus-visible { outline: 2px solid rgba(var(--rubro-rgb), .5); outline-offset: 1px; }
 .v2 .p-modal-rodape .cic-esv { height: 32px; font-size: 13px; }
 .v2 .cic-seta { display: inline-flex; align-items: center; color: var(--txt-3); padding-right: 2px; }
+/* Ficha do cliente: título de seção = marco (13/600 com divisória), não mais igual ao rótulo do campo */
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec {
+  font-size: var(--fs-13, 13px); font-weight: var(--fw-forte, 600); letter-spacing: -.005em; text-transform: none;
+  color: var(--txt); margin: 22px 0 12px; padding-top: 16px; border-top: 1px solid var(--linha);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec .gs-lab-nota { font-size: var(--fs-12, 12px); font-weight: 400; color: var(--txt-3); margin-left: 4px; }
+/* "Excluir cliente" à esquerda, vermelho sem fundo, separado das ações de salvar */
+.v2 .p-modal-rodape .ficha-excluir { margin-right: 8px; }

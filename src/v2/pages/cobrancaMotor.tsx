@@ -2418,7 +2418,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={640}
       titulo={<div className="cm-dr-titulo"><span className="cm-num-av" aria-hidden>{(d.nome || '??').slice(0, 2).toUpperCase()}</span><div><div className="cm-dr-nm">{novo ? 'Novo lead' : (d.nome || 'Lead')}</div><div className="mod-sub">{novo ? 'Preencha os dados da planilha' : `${d.comercial || '—'} · vence dia ${diaBR(d.dia)}`}</div></div></div>}
-      rodape={gestor ? <>{aoExcluir && !novo && <BotaoSec onClick={aoExcluir}>Excluir</BotaoSec>}{aoVoltarNovos && !novo && d.situacao === 'cancelado' && <BotaoSec onClick={aoVoltarNovos} title="O débito volta a ATIVO e o cliente reaparece nos Novos.">Voltar pros Novos</BotaoSec>}<span style={{ flex: 1 }} /><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario onClick={() => aoSalvar(paraSalvar(), Array.from(tocadosRef.current))}>{btn}</BotaoPrimario></> : <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>}>
+      rodape={gestor ? <>{aoExcluir && !novo && <button type="button" className="cic-esv ficha-excluir" onClick={aoExcluir} title="Exclui o cliente (vai para a Lixeira; reversível no Desfazer)">Excluir cliente</button>}{aoVoltarNovos && !novo && d.situacao === 'cancelado' && <BotaoSec onClick={aoVoltarNovos} title="O débito volta a ATIVO e o cliente reaparece nos Novos.">Voltar para Novos</BotaoSec>}<span style={{ flex: 1 }} /><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario onClick={() => aoSalvar(paraSalvar(), Array.from(tocadosRef.current))}>{btn}</BotaoPrimario></> : <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>}>
       <div className="cm-dr-sec">Cadastro</div>
       <div className="gs-form">
         <div className="campo gs-col2"><label>Cliente</label><Input value={d.nome} disabled={ro} onChange={(e) => set('nome', e.target.value)} /></div>
@@ -2474,7 +2474,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
       {!novo && !ro && sugestaoDia > 0 && sugestaoDia !== d.dia && (
         <p className="cm-hint" style={{ margin: '6px 0 0' }}>
           O último pagamento cai no dia <b>{d2(sugestaoDia)}</b>, mas o ciclo deste cliente é <b>D{d2(d.dia)}</b>.{' '}
-          <BotaoSec mini onClick={() => { set('dia', Math.min(31, Math.max(1, sugestaoDia))); setNovoCiclo(!ciclos.includes(sugestaoDia)); }}>Mudar pra D{d2(sugestaoDia)}</BotaoSec>
+          <BotaoSec mini onClick={() => { set('dia', Math.min(31, Math.max(1, sugestaoDia))); setNovoCiclo(!ciclos.includes(sugestaoDia)); }}>Mudar para D{d2(sugestaoDia)}</BotaoSec>
         </p>
       )}
       {dicaINSS && (
@@ -2502,7 +2502,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
           const travaSit = !!inicial.paradoPendente || !podeAprovar;
           const dica = inicial.paradoPendente ? 'Aguardando aprovação — aprove ou recuse na lista "Aguardando aprovação" dos Novos.'
             : !travaSit ? undefined
-            : inicial.situacao === 'ativo' ? 'Pra ir pra cobrança, use "Marcar débito parado" nos Novos — o financeiro/cadastro/administrador aprova.'
+            : inicial.situacao === 'ativo' ? 'Para ir para a cobrança, use "Marcar débito parado" nos Novos — o financeiro, o cadastro ou o administrador aprova.'
             : 'Tirar da cobrança é com o financeiro, o cadastro ou o administrador.';
           return (
             <div className="campo"><label>Situação</label>
@@ -3993,7 +3993,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
         {visiveis.length === 0 && <div className="pl-vazio">Nenhum lead com esses filtros.</div>}
       </div>
 
-      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar pro ciclo"
+      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar para o ciclo"
         rodape={<BotaoSec onClick={() => setDirOpen(false)}>Fechar</BotaoSec>}>
         {aguardando.length === 0 ? <div className="fin-vazio">Ninguém aguardando — todos os clientes estão em um ciclo.</div> : (
           <>
@@ -4009,7 +4009,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
                       {ciclosDisp.map((d) => <option key={d} value={d}>D{d2(d)} — cobra {dataBRcurta(proximaDoCiclo(d))} ({diaSemanaBR(proximaDoCiclo(d))})</option>)}
                     </select>
                     <BotaoPrimario onClick={() => direcionar(l, dia)} disabled={editarMut.isPending || !(dia >= 1)}>Aplicar</BotaoPrimario>
-                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta pros Novos com o débito ativo.">Voltar pros Novos</BotaoSec>
+                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta para os Novos com o débito ativo.">Voltar para Novos</BotaoSec>
                   </div>
                 );
               })}

@@ -1093,7 +1093,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
         )}
       </div>
 
-      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar pro ciclo"
+      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar para o ciclo"
         rodape={<BotaoSec onClick={() => setDirOpen(false)}>Fechar</BotaoSec>}>
         {aguardando.length === 0 ? <div className="fin-vazio">Ninguém aguardando — todos os clientes estão em um ciclo.</div> : (
           <>
@@ -1108,7 +1108,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
                       {ciclosDisp.map((d) => <option key={d} value={d}>D{d2(d)} — cobra {dataBRcurta(proximaDoCiclo(d))} ({diaSemanaBR(proximaDoCiclo(d))})</option>)}
                     </select>
                     <BotaoPrimario onClick={() => direcionar(l, dia)} disabled={editarMut.isPending || !(dia >= 1)}>Aplicar</BotaoPrimario>
-                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta pros Novos com o débito ativo.">Voltar pros Novos</BotaoSec>
+                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta para os Novos com o débito ativo.">Voltar para Novos</BotaoSec>
                   </div>
                 );
               })}
