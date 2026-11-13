@@ -179,8 +179,8 @@ const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equi
   .filter((g) => g.itens.length > 0);
 /* a linha de descrição de cada ambiente no menu de troca da barra */
 const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
-  cobrancas: 'Carteira, pagamentos e régua',
-  atendimento: 'Conversas, Kanban e presenciais',
+  cobrancas: 'Carteira e pagamentos',
+  atendimento: 'Conversas e funil de vendas',
 };
 const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS };
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
