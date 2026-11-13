@@ -2,7 +2,7 @@
    CANCELADOS (mig 79, dono 27/10): "uma nova aba para cancelados… um botão que a gente consiga
    mover clientes para os cancelados… selecionar mais que um… quando o cliente estiver lá
    cancelado, a gente vai reativar a cobrança dele… em processo de reativação, ou desconto
-   reativado". Reativado FICA aqui (AskUserQuestion 27/10) — alguém tira com "Voltar pra Gestão".
+   reativado". Reativado FICA aqui (AskUserQuestion 27/10) — alguém tira com "Voltar para Gestão".
 
    Nada é apagado: o cliente sai da Gestão, dos Novos, da carteira do painel e da régua; o
    histórico de pagamentos e comissões continua. O banco é a autoridade das permissões:
@@ -59,14 +59,14 @@ export function MoverCancelados({ candidatos, iniciais, aoFechar, aoMovido }: {
     setErro('');
     mut.mutate({ ids: escolhidos.map((l) => l.id), motivo }, {
       onSuccess: ({ n }) => aoMovido(n
-        ? `${nClientes(n)} ${n === 1 ? 'foi' : 'foram'} para os Cancelados — saem da Gestão e da régua. Dá pra desfazer no Desfazer.`
+        ? `${nClientes(n)} ${n === 1 ? 'foi' : 'foram'} para os Cancelados — saem da Gestão e da régua. É possível desfazer no Desfazer.`
         : 'Esses clientes já estavam nos Cancelados.'),
       onError: (e) => setErro(msgErro(e)),
     });
   };
   return (
     <ModalV2 aberto aoFechar={() => { if (!mut.isPending) aoFechar(); }} fecharNoVeu={!mut.isPending} largura={520}
-      titulo={<div>Mover para Cancelados<div className="mod-sub">Saem da Gestão, dos Novos e da régua. Nada é apagado — os pagamentos ficam no histórico e dá pra voltar pela aba Cancelados.</div></div>}
+      titulo={<div>Mover para Cancelados<div className="mod-sub">Saem da Gestão, dos Novos e da régua. Nada é apagado — os pagamentos ficam no histórico e é possível voltar pela aba Cancelados.</div></div>}
       rodape={<>
         <BotaoSec onClick={aoFechar} disabled={mut.isPending}>Cancelar</BotaoSec>
         <BotaoPrimario className="mc-bt-mover" onClick={mover} disabled={!escolhidos.length || mut.isPending}>
@@ -106,7 +106,7 @@ export function MoverCancelados({ candidatos, iniciais, aoFechar, aoMovido }: {
             ))}
           </ul>
         ) : (
-          <p className="cm-hint">Selecione as linhas na planilha antes de abrir (dá pra pegar várias de uma vez arrastando ou com Shift) ou busque o cliente aqui em cima.</p>
+          <p className="cm-hint">Selecione as linhas na planilha antes de abrir (é possível pegar várias de uma vez arrastando ou com Shift) ou busque o cliente aqui em cima.</p>
         )}
 
         <div className="campo">

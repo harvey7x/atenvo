@@ -28,7 +28,7 @@ function proximaCobranca(dia: number, ciclosDatas?: Dados['ciclosDatas']): strin
 }
 
 /* QUEM VÊ O QUÊ (dono 14/09 + 27/09: "pro comercial, esse dashboard deve aparecer de
-   forma individual de seus clientes, e pro financeiro, administrador deve aparecer geral"):
+   forma individual de seus clientes, e para o financeiro, administrador deve aparecer geral"):
    COMERCIAL = o MESMO painel, só com os clientes DELE (o RLS já filtra; o filtro por nome
    aqui é a segunda trava) + a comissão dele; financeiro/gestor/admin = painel GERAL. */
 export function PainelReviza() {
@@ -196,7 +196,7 @@ export function AtendentesReviza() {
       <EquipeVista linhas={linhas} comissoes={comissoes} podeEditarPct={!!sessao.gestor} salvando={salvarPct.isPending} aoAvisar={setAviso}
         aoSalvarPct={(comercial, pct, desde) => salvarPct.mutate({ comercial, pct, desde }, {
           onSuccess: (r) => setAviso(`Comissão de ${comercial}: ${pct}% da mensalidade ${desde === '2000-01' ? 'em todos os meses' : `a partir de ${mesAnoPct(desde)}`}${r.n ? ` — ${r.n.toLocaleString('pt-BR')} pagamento${r.n === 1 ? '' : 's'} refeito${r.n === 1 ? '' : 's'} na planilha` : ''}.`),
-          onError: (e) => setAviso(`Não deu pra salvar a comissão: ${(e as Error).message}`),
+          onError: (e) => setAviso(`Não foi possível salvar a comissão: ${(e as Error).message}`),
         })} />
     </>
   );

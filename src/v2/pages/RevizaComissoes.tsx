@@ -146,7 +146,7 @@ export function PainelComercialVista({ linha, compacto, de }: { linha: ComissaoL
         <Kpi rotulo={ultComComissao ? `${Sua} em ${rotComp(ultComComissao.comp)} (último mês com entradas)` : `${Sua} recebida`} {...kpiBRL(ultComComissao?.comissao ?? 0)} prefixo="R$ " tomValor="ok"
           nota={ultComComissao
             ? (linha.pct === 50
-              ? `igual ao que ficou pro escritório (${fmtBRL(ultComComissao.recebido)}) · clientes pagaram ${fmtBRL(ultComComissao.pagoClientes)}`
+              ? `igual ao que ficou para o escritório (${fmtBRL(ultComComissao.recebido)}) · clientes pagaram ${fmtBRL(ultComComissao.pagoClientes)}`
               : `escritório ficou com ${fmtBRL(ultComComissao.recebido)} · clientes pagaram ${fmtBRL(ultComComissao.pagoClientes)}`)
             : 'nenhum pagamento na competência ainda'} />
       </div>
@@ -176,8 +176,8 @@ export function PainelComercialVista({ linha, compacto, de }: { linha: ComissaoL
             </div>
             <p className="cm-hint" style={{ margin: '10px 0 0' }}>
               {linha.pct === 50
-                ? `O que entra na planilha é o líquido do escritório, e a parte ${sua} é o mesmo valor: o cliente pagou R$ 100 → R$ 50 ficam pro escritório e R$ 50 ${de ? `são de ${nm}` : 'são seus'}.`
-                : `O que entra na planilha é o líquido do escritório (${restoTxt}% do que o cliente paga); a parte ${sua} é ${pctTxt}%: o cliente pagou R$ 100 → R$ ${restoTxt} pro escritório e R$ ${pctTxt} ${de ? `de ${nm}` : 'seus'}.`}
+                ? `O que entra na planilha é o líquido do escritório, e a parte ${sua} é o mesmo valor: o cliente pagou R$ 100 → R$ 50 ficam para o escritório e R$ 50 ${de ? `são de ${nm}` : 'são seus'}.`
+                : `O que entra na planilha é o líquido do escritório (${restoTxt}% do que o cliente paga); a parte ${sua} é ${pctTxt}%: o cliente pagou R$ 100 → R$ ${restoTxt} para o escritório e R$ ${pctTxt} ${de ? `de ${nm}` : 'seus'}.`}
               {' '}Só entram pagamentos confirmados. Cada mês usa a % que valia na época.
             </p>
           </CardVidro>

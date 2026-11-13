@@ -2,7 +2,7 @@
    Dono 27/09: "melhore essa parte, deixe mais profissional, organizado e atraente".
    A demo e a instância real usam ESTE markup (demo é o contrato); só muda a fonte.
 
-   Organização (de cima pra baixo, do resumo ao detalhe):
+   Organização (de cima para baixo, do resumo ao detalhe):
      1. Topo: o MÊS DE REFERÊNCIA — um seletor só comanda a página inteira.
      2. Quatro indicadores com o mesmo desenho (rótulo · valor · contexto · visual).
      3. Saúde da carteira (composição) ao lado do Recebido por mês (tendência).
@@ -149,7 +149,7 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
   /** clientes nos Novos (débito ainda ativo) — contexto do topo */
   novos?: NovosResumo;
   /** painel INDIVIDUAL do comercial (dono 27/09: "pro comercial, individual de seus
-      clientes; pro financeiro e administrador, geral"): nome dele na barra e sem a
+      clientes; para o financeiro e administrador, geral"): nome dele na barra e sem a
       tabela de atendentes. Os números já chegam filtrados (RLS + filtro no RevizaPainel). */
   individual?: string;
   /** crítica 12/11: faixa logo abaixo dos indicadores (a Previsão de faturamento subiu para cá) */

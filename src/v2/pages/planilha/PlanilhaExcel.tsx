@@ -138,7 +138,7 @@ export interface PlanilhaExcelProps {
       botão da barra da tela abre o "Mover para Cancelados" já com eles */
   clientesSelRef?: MutableRefObject<(() => string[]) | null>;
   /** a célula ativa mudou (seleção). Chamado FORA do render e só quando muda — bom p/ guardar num ref
-      (ex.: o "Lançar pagamento" da barra aponta p/ a célula ativa). Evite setState aqui: cada seta
+      (ex.: o "Lançar pagamento" da barra aponta para a célula ativa). Evite setState aqui: cada seta
       re-renderizaria a tela */
   onCelulaAtiva?: (a: { linhaId: string; colunaId: string } | null) => void;
   /** a grade preenche com a função que devolve o foco a ela (sem rolar). A tela chama ao fechar
@@ -2073,7 +2073,7 @@ export function PlanilhaExcel(props: PlanilhaExcelProps) {
     menu.current?.abrir(x, y, itens, `Linha ${L.num[r]}`);
   }
   /** menu da célula (botão direito). `ci` = coluna clicada: nas de mês de cliente vêm primeiro as
-      ações de pagamento (informar, não pago; aprovar/recusar/comprovante p/ o financeiro) */
+      ações de pagamento (informar, não pago; aprovar/recusar/comprovante para o financeiro) */
   function abrirMenuCelula(r: number, ci: number, x: number, y: number) {
     const L = layRef.current;
     const pag = itensPagamento(r, ci);

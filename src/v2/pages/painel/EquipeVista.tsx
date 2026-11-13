@@ -1,5 +1,5 @@
 /* =================== ATENDENTES — equipe comercial (dono 27/09) ===================
-   "essa parte de atendente tem que ser mais profissional e não pode aparecer pro comercial".
+   "essa parte de atendente tem que ser mais profissional e não pode aparecer para o comercial".
    Mesma linguagem do Painel (painel.css, pn-*): barra de contexto · 4 indicadores ·
    desempenho da equipe (ordenável, saúde da carteira em barra, total no rodapé) ·
    comissões (editor de % para gestor/admin; financeiro só lê) · detalhe do comercial.
@@ -109,7 +109,7 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
     const cru = (edicao[l.nome] ?? '').trim().replace(',', '.');
     if (cru === '') return;
     const pct = Number(cru);
-    if (!Number.isFinite(pct) || pct < 0 || pct >= 100) { aoAvisar('A porcentagem precisa ser de 0 a 99 — com 100% não sobra nada pro escritório.'); return; }
+    if (!Number.isFinite(pct) || pct < 0 || pct >= 100) { aoAvisar('A porcentagem precisa ser de 0 a 99 — com 100% não sobra nada para o escritório.'); return; }
     if (pct === l.pct && !temOutraPct(l, pct)) { limpar(l.nome); return; }
     // a % tem histórico (mig 62): pergunta A PARTIR DE QUANDO vale — o que já foi pago fica com a % da época
     setMudarPct({ nome: l.nome, de: l.pct, para: pct, modo: 'frente', desde: proximoMes() });
@@ -187,7 +187,7 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
         return (
           <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
             <Indicador rotulo="Comissões previstas" valor={<Dinheiro v={comPrevista} />}
-              pe={<>por mês · {pct1(tot.recorrencia ? (comPrevista / tot.recorrencia) * 100 : 0)}% da recorrência de <b className="num">{brl(tot.recorrencia)}</b></>}
+              pe={<>por mês · {pct1(tot.recorrencia ? (comPrevista / tot.recorrencia) * 100 : 0)}% da recorrência mensal</>}
               visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${tot.recorrencia ? Math.min(100, (comPrevista / tot.recorrencia) * 100) : 0}%` }} /></div>} />
             <Indicador rotulo="Melhor adimplência" valor={melhor ? <>{melhor.adimplencia}<span className="pn-cent">%</span></> : '—'} tom={melhor ? tomDe(melhor.adimplencia ?? 0) : undefined}
               pe={melhor ? <><b>{melhor.nome}</b> · {melhor.brk.em_dia + melhor.brk.voltou} de {melhor.emCobranca} em dia · equipe {tot.adimplencia}%</> : 'nenhuma carteira em cobrança'}
@@ -328,7 +328,7 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
                             )}
                           </span>
                         ) : <span className="pn-tag suave">{fmtPct(l.pct)}%</span>}
-                        {l.agendada && <span className="pn-pct-agenda" title="Mudança já marcada pra um mês que ainda não chegou">{fmtPct(l.agendada.pct)}% a partir de {mesAno(l.agendada.desde)}</span>}
+                        {l.agendada && <span className="pn-pct-agenda" title="Mudança já marcada para um mês que ainda não chegou">{fmtPct(l.agendada.pct)}% a partir de {mesAno(l.agendada.desde)}</span>}
                       </td>
                       <td className="num">{l.carteiraAtiva}</td>
                       <td className="num">{brl(l.recorrencia)}</td>
@@ -417,7 +417,7 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
             <label className={mudarPct.modo === 'frente' ? 'pn-pct-op on' : 'pn-pct-op'}>
               <input type="radio" name="pn-pct-modo" checked={mudarPct.modo === 'frente'} onChange={() => setMudarPct({ ...mudarPct, modo: 'frente' })} />
               <span>
-                <b>Daqui pra frente</b>
+                <b>Daqui em diante</b>
                 <span className="pn-pct-sub">a partir de{' '}
                   <select className="inp" value={mudarPct.desde} aria-label="A partir de qual mês" disabled={mudarPct.modo !== 'frente'}
                     onChange={(e) => setMudarPct({ ...mudarPct, desde: e.target.value })}>
@@ -445,7 +445,7 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
                 <span>Nenhum pagamento lançado {previa.desde === '2000-01' ? '' : `de ${mesAno(previa.desde)} em diante `}muda — só os próximos lançamentos usam {fmtPct(mudarPct.para)}%.</span>
               )}
               {previa.nPend > 0 && <span>+ {previa.nPend} informe{previa.nPend === 1 ? '' : 's'} ainda pendente{previa.nPend === 1 ? '' : 's'} com o valor ajustado.</span>}
-              <span className="pn-mut">Ex.: cliente pagou R$ 100 → R$ {fmtPct(100 - mudarPct.para)} pro escritório e R$ {fmtPct(mudarPct.para)} pra {mudarPct.nome}.{previa.n > 0 ? ' Dá pra voltar pelo Desfazer, no topo.' : ''}</span>
+              <span className="pn-mut">Ex.: cliente pagou R$ 100 → R$ {fmtPct(100 - mudarPct.para)} para o escritório e R$ {fmtPct(mudarPct.para)} para {mudarPct.nome}.{previa.n > 0 ? ' É possível voltar pelo Desfazer, no topo.' : ''}</span>
             </div>
           </div>
         </ModalV2>

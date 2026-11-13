@@ -249,8 +249,8 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   const [fCom, setFCom] = useState(''); // '' = todos; senão o nome em MAIÚSCULAS
   const [fBloco, setFBloco] = useState<string | null>(null);
   /* busca vinda da paleta ⌘K do shell (sessionStorage 'alfa_paleta_busca'): consome
-     a chave (ler + remover) e preenche a busca da grade — no mount (navegou pra cá)
-     ou pelo evento (a tela já estava aberta). Zera comercial/ciclo pro cliente
+     a chave (ler + remover) e preenche a busca da grade — no mount (navegou para cá)
+     ou pelo evento (a tela já estava aberta). Zera comercial/ciclo para o cliente
      escolhido não ficar escondido atrás de um filtro ativo. */
   useEffect(() => {
     const consumir = () => {
@@ -294,8 +294,8 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   // célula ativa da grade (ref: a seleção muda a cada seta — não re-renderiza a tela)
   const celulaAtiva = useRef<{ linhaId: string; colunaId: string } | null>(null);
   /* o ÚLTIMO modal de pagamento da tela fechou (informar, recusar, comprovante, seletor): o foco
-     volta pra grade — senão fica no body e as setas/Enter/Delete param até clicar na grade de
-     novo. Depois do commit (o modal já saiu do DOM); passar de um modal pro outro (comprovante →
+     volta para grade — senão fica no body e as setas/Enter/Delete param até clicar na grade de
+     novo. Depois do commit (o modal já saiu do DOM); passar de um modal para o outro (comprovante →
      recusar, seletor → informar) não conta. Só quando ninguém pegou o foco. */
   const focarGradeRef = useRef<(() => void) | null>(null);
   const modalPagamento = !!informar || !!recusarId || !!verComp || lancarOpen || novoMesOpen;
@@ -313,7 +313,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
 
   /* ---------- a folha ---------- */
   /* CANCELADOS (mig 79): a linha do cliente fica na folha (no mesmo lugar, pra voltar), mas some
-     da tela — tudo daqui pra baixo (grade, contagens, filtros, exportar) já vê a folha sem eles.
+     da tela — tudo daqui para baixo (grade, contagens, filtros, exportar) já vê a folha sem eles.
      A folha só aparece depois que a lista de clientes chegou (é ela que diz quem está nos
      Cancelados — antes disso eles piscariam na grade, editáveis) */
   const folha = plQ.data;
@@ -660,13 +660,13 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   const direcionar = (l: GLinha, dia: number) => {
     if (!(dia >= 1 && dia <= 31)) return;
     editarMut.mutate({ id: l.id, patch: { dia } }, {
-      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: direcionado pro ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`); },
+      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: direcionado para o ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`); },
       onError: (e) => setAviso(msgErro(e)),
     });
   };
   const voltarNovos = (l: GLinha) => {
     editarMut.mutate({ id: l.id, patch: { situacao: 'ativo', dataParou: '' } }, {
-      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: voltou pros Novos — débito segue ativo.`); },
+      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: voltou para os Novos — débito segue ativo.`); },
       onError: (e) => setAviso(msgErro(e)),
     });
   };
@@ -1222,7 +1222,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
             return Object.entries(porComp).filter(([comp, w]) => comp >= compCorr && (w.cobranca || w.inicio || w.fim)).map(([comp]) => rotuloMes(comp));
           }}
           aoAbrir={(dia) => abrirCicloMut.mutate(dia, {
-            onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes pra ele.`),
+            onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes para ele.`),
             onError: (e) => setAviso(msgErro(e)),
           })}
           aoFecharDia={(dia) => fecharCicloMut.mutate(dia, {
@@ -1454,14 +1454,14 @@ function InformarPagamento({ nome, mes, ciclo, valorInicial, valorDigitado, divi
             {semPct ? (
               <span className={pctSituacao === 'erro' ? 'gp-inf-div-aviso' : undefined} role={pctSituacao === 'erro' ? 'alert' : undefined}>
                 {pctSituacao === 'erro'
-                  ? 'Não deu pra carregar a % da comissão — recarregue a página antes de enviar (sem ela a divisão sairia errada).'
+                  ? 'Não foi possível carregar a % da comissão — recarregue a página antes de enviar (sem ela a divisão sairia errada).'
                   : 'Carregando a % da comissão…'}
               </span>
             ) : valorOk && v != null && liquido != null ? (<>
               <span>Escritório <b className="num">{fmtBRL(liquido)}</b></span>
               {divisao
                 ? <span>{nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%) <b className="num">{fmtBRL(parteDoComercial(liquido, divisao.pct))}</b></span>
-                : <span>Cliente sem comercial — o valor todo fica pro escritório.</span>}
+                : <span>Cliente sem comercial — o valor todo fica para o escritório.</span>}
               {totalReg != null && totalReg !== Math.round(v * 100) / 100 && (
                 <span className="gp-inf-div-nota">Arredondamento da divisão: fica registrado que o cliente pagou {fmtBRL(totalReg)}.</span>
               )}
@@ -1472,9 +1472,9 @@ function InformarPagamento({ nome, mes, ciclo, valorInicial, valorDigitado, divi
                 <span className="gp-inf-div-aviso" role="status">Abaixo da mensalidade deste cliente (cerca de {fmtBRL(divisao.esperado)}) — confira.</span>
               )}
             </>) : divisao ? (
-              <span>Digite o total que o cliente pagou — aqui embaixo aparece quanto fica pro escritório e quanto é de {nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%).</span>
+              <span>Digite o total que o cliente pagou — aqui embaixo aparece quanto fica para o escritório e quanto é de {nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%).</span>
             ) : (
-              <span>Digite o total que o cliente pagou. Cliente sem comercial: o valor todo fica pro escritório.</span>
+              <span>Digite o total que o cliente pagou. Cliente sem comercial: o valor todo fica para o escritório.</span>
             )}
           </div>
         </div>
