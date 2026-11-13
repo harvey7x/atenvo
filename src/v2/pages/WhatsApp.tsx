@@ -1169,9 +1169,10 @@ export default function WhatsAppV2() {
     return out;
   };
 
-  /* aba sem conversas (crítica 12/11): o centro não segue mostrando a conversa de outra aba */
+  /* aba sem conversas (crítica 12/11): o centro não segue mostrando a conversa de outra aba. A BUSCA não
+     conta — procurar outro cliente no meio do atendimento não fecha a conversa aberta. */
   const carregandoLista = WA_REAL && inbox.live.isLoading && contacts.length === 0;
-  const abaVazia = !foco && visiveis.length === 0 && !carregandoLista && !(WA_REAL && inbox.live.isError && contacts.length === 0);
+  const abaVazia = !foco && !buscaAtiva && visiveis.length === 0 && !carregandoLista && !(WA_REAL && inbox.live.isError && contacts.length === 0);
   const temConversa = !!current.id && !abaVazia;
 
   /* ---------- render ---------- */
@@ -1378,8 +1379,8 @@ export default function WhatsAppV2() {
         ) : !temConversa ? (
           <div className="wa-conv-vazia">
             <IcWa />
-            <div className="t">{abaVazia ? (buscaAtiva ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa nesta aba') : 'Selecione uma conversa'}</div>
-            <div className="d">{abaVazia ? (buscaAtiva ? 'Revise a busca ou escolha outra aba.' : 'Escolha outra aba ou inicie um novo atendimento.') : 'Escolha uma conversa na lista ou inicie um novo atendimento.'}</div>
+            <div className="t">{abaVazia ? 'Nenhuma conversa nesta aba' : 'Selecione uma conversa'}</div>
+            <div className="d">{abaVazia ? 'Escolha outra aba ou inicie um novo atendimento.' : 'Escolha uma conversa na lista ou inicie um novo atendimento.'}</div>
             <BotaoPrimario onClick={() => setNovaConversa(true)}>Nova conversa</BotaoPrimario>
           </div>
         ) : (
