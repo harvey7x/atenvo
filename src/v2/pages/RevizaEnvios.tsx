@@ -181,7 +181,7 @@ export function EnviosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: 
         <Kpi rotulo="Enviadas hoje" valor={r?.enviadas ?? 0} nota={r ? `${r.entregues} entregues · ${r.lidas} lidas` : '—'} />
         <Kpi rotulo="Responderam hoje" valor={r?.responderam ?? 0} nota={r && r.enviadas ? `${pct(r.responderam, r.enviadas)}% de quem recebeu` : 'Nenhuma resposta ainda'} />
         <Kpi rotulo="Na fila agora" valor={r?.na_fila ?? 0} nota={`${(r?.na_fila ?? 0) > 0 ? (!cx.reguaLigada || foraDaJanela(cx) ? `Régua parada (desligada ou fora das ${cx.ini}h–${cx.fim}h); só os envios manuais saem` : 'Saindo com intervalo de segurança') : 'Fila vazia'}${r?.agendados ? ` · ${plural(r.agendados, 'agendada', 'agendadas')}` : ''}`} />
-        <Kpi rotulo="Com erro hoje" valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={(r?.pulados ?? 0) > 0 ? `${plural(r?.pulados ?? 0, 'não enviada', 'não enviadas')} por regra (pagou ou saiu da régua)` : 'Nenhuma deixada de fora'} />
+        <Kpi rotulo="Com erro hoje" valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={(r?.pulados ?? 0) > 0 ? `${plural(r?.pulados ?? 0, 'não enviada', 'não enviadas')} por regra` : 'Nenhuma deixada de fora'} />
       </div>
 
       <ReguaDeHoje prog={progQ.data ?? []} itens={previaHojeQ.data?.itens ?? []} passos={passosAtivos.map((p) => ({ nome: p.nome, quando: p.quando }))}
@@ -229,7 +229,7 @@ function StatusGeral({ cfg, canais, ultima, gestor, aoAvisar, aoConfigurar, aoNu
     onSuccess: (x) => aoAvisar(`${nomeCanal(c)}: ${x.estado === 'conectado' ? 'conectado' : String(x.estado)}${x.webhook_reaplicado ? ' · recebimento reconfigurado' : ''}${x.detalhe ? ` · ${String(x.detalhe)}` : x.webhook_ok ? ' · tudo certo' : ''}.`),
     onError: (e) => aoAvisar((e as Error).message),
   });
-  const ultimaAtiv = ultima ? (ultima.erro ? 'a última rodada falhou' : `${ultima.enviadas ? plural(ultima.enviadas, 'enviada', 'enviadas') : 'nenhuma enviada'}${ultima.falhas ? `, ${plural(ultima.falhas, 'erro', 'erros')}` : ''} na última rodada`) : '';
+  const ultimaAtiv = ultima ? (ultima.erro ? 'a última rodada falhou' : ultima.enviadas || ultima.falhas ? `${plural(ultima.enviadas, 'enviada', 'enviadas')}${ultima.falhas ? `, ${plural(ultima.falhas, 'erro', 'erros')}` : ''} na última rodada` : '') : '';
   return (
     <CardVidro spot sobe className="ev-faixa" style={{ animationDelay: '.02s' }}>
       <div className="ev-fx">
@@ -251,7 +251,7 @@ function StatusGeral({ cfg, canais, ultima, gestor, aoAvisar, aoConfigurar, aoNu
               {problemas.slice(0, 2).map((c) => (
                 <span key={c.id} className="ev-fx-num" title={`Conexão conferida ${tempoAtras(c.verificado_em)} · último sinal do WhatsApp ${tempoAtras(c.ultimo_evento_em)}`}>
                   <i className={c.estado === 'conectando' ? 'atencao' : 'erro'} aria-hidden />
-                  {nomeCanal(c)} {c.estado === 'conectando' ? 'conectando' : 'desconectado'}
+                  {nomeCanal(c)} · {c.estado === 'conectando' ? 'conectando' : 'desconectado'}
                   {gestor && <button type="button" className="ev-link" disabled={verificar.isPending} onClick={() => verificarCanal(c)}>{verificar.isPending && verificar.variables === c.id ? 'Verificando…' : 'Verificar'}</button>}
                 </span>
               ))}
