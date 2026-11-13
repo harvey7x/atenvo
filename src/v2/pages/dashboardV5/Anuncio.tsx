@@ -41,7 +41,7 @@ export function Anuncio({ canais }: { canais: CanalV5[] }) {
   };
   return (
     <Secao className="d5-anuncio" titulo="Anúncio e quem já estava no sistema"
-      sub="A quebra das entradas de cada número, contando cada dia como o Gerenciador de Anúncios. Compare a coluna Pelo anúncio com o Gerenciador.">
+      ajuda="A quebra das entradas de cada número, contando cada dia como o Gerenciador de Anúncios. Compare a coluna Pelo anúncio com o Gerenciador.">
       <div className="d5-tab-rolo">
         <table className="d5-tab">
           <colgroup>

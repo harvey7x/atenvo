@@ -119,7 +119,7 @@ export function Robo({ robo }: { robo: RoboV5 }) {
   const t = robo.total;
   return (
     <Secao className="d5-robo" titulo="Robô"
-      sub="Clientes novos que o robô atendeu no período: quantos concluíram o fluxo, quantos ele entregou à equipe e quantos desses seguem elegíveis.">
+      ajuda="Clientes novos que o robô atendeu no período: quantos concluíram o fluxo, quantos ele entregou à equipe e quantos desses seguem elegíveis.">
       {t.entraram === 0 ? (
         <Vazio texto="O robô não atendeu nenhum cliente novo no período." />
       ) : (

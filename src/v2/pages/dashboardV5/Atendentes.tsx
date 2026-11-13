@@ -90,7 +90,7 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
 
   return (
     <Secao className="d5-at" titulo="Desempenho por atendente"
-      sub="Quem teve movimento no período. Clique no título de uma coluna para ordenar.">
+      ajuda="Quem teve movimento no período. Clique no título de uma coluna para ordenar.">
       {atendentes.length === 0 ? (
         <Vazio texto="Ninguém da equipe teve movimento no período." detalhe="Recebidos, fechados, não elegíveis e respostas aparecem aqui quando acontecerem." />
       ) : (

@@ -49,6 +49,7 @@ import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
 import { seedWa } from './whatsappSeed';
+import { formatarTelefone } from '../lib/telefone';
 import { PaletaScripts, SCRIPTS_DEMO, CATEGORIAS_DEMO } from './scriptsPaleta';
 import './whatsapp.css';
 import './whatsappPro.css'; // atendimento renovado (dono 29/10) — só age com [data-inbox-pro] na raiz
@@ -142,6 +143,31 @@ const IcRaio = () => <Ic><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></Ic>;
 const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6" /><path d="M17.5 7.5h4.5" /><path d="M19.75 5.25v4.5" /></Ic>;
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
+// crítica 12/11: os emojis (🔕 🗄️ 📌) do cromo viram ícones de traço; voltar/dados no celular
+const IcSilencio = () => <Ic><path d="M9.5 20.5a2.5 2.5 0 0 0 5 0" /><path d="M17.5 13.5V11a5.5 5.5 0 0 0-8.6-4.5M6.5 9.6V16L5 18h12.5" /><path d="m3.5 3.5 17 17" /></Ic>;
+const IcArquivo = () => <Ic><rect x="3.5" y="4.5" width="17" height="4.5" rx="1.2" /><path d="M5 9v9.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V9" /><path d="M10 13h4" /></Ic>;
+const IcVoltar = () => <Ic><path d="m14.5 6-6 6 6 6" /></Ic>;
+const IcOk = () => <Ic><path d="m5 12.5 4.5 4.5L19 7.5" /></Ic>;
+const IcInfo = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><path d="M12 8h.01" /></Ic>;
+
+/* telefone no formato único (crítica 12/11): "(51) •••••-4407"; fora do padrão brasileiro, a máscara de sempre */
+const numeroMascarado = (n: string | null | undefined) => {
+  const f = formatarTelefone(n, { mascarar: true });
+  return f && f.includes('•') ? f : mascararNumero(n);
+};
+/* hora da última mensagem na lista (uma só marca de tempo por linha): hoje "14:38", ontem "Ontem",
+   na semana o dia ("seg."), antes a data ("12/11") — fuso de São Paulo */
+const FUSO = 'America/Sao_Paulo';
+function horaDaLista(ms: number | null | undefined, agoraMs: number): string {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const dia = (x: Date) => x.toLocaleDateString('pt-BR', { timeZone: FUSO });
+  const hoje = new Date(agoraMs);
+  if (dia(d) === dia(hoje)) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO });
+  if (dia(d) === dia(new Date(agoraMs - 86_400_000))) return 'Ontem';
+  if (agoraMs - ms < 6 * 86_400_000) return d.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: FUSO });
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO });
+}
 
 type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp'; x: number; y: number; acima?: boolean } | null;
 
@@ -537,8 +563,13 @@ export default function WhatsAppV2() {
   const [scrPop, setScrPop] = useState<DOMRect | null>(null); // seletor de scripts (mesmo tratamento glass)
   const scrBtnRef = useRef<HTMLButtonElement>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
-  const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
-  useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
+  // ficha do contato aberta/recolhida: escolha LEMBRADA neste aparelho (crítica 12/11)
+  const [ctxAberto, setCtxAberto] = useState(() => { try { return (localStorage.getItem('atenvo-wa-ctx') ?? sessionStorage.getItem('atenvo-wa-ctx')) !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
+  /* CELULAR (≤760px): um painel por vez — a lista, a conversa ou a ficha. O CSS do sistema
+     (reviza-sistema.css §16) mostra só o painel de data-cel-painel; no computador o atributo não age. */
+  const [celPainel, setCelPainel] = useState<'lista' | 'conversa' | 'ficha'>('lista');
+  const abrirFichaCel = () => { setCtxAberto(true); setCelPainel('ficha'); };
   const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string } | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
@@ -707,6 +738,7 @@ export default function WhatsAppV2() {
   useEffect(() => {
     if (!conversaParam) return;
     inbox.selecionarPorDeepLink(conversaParam);
+    setCelPainel('conversa');
     // revela o alvo: sem faceta ativa escondendo o card. Fechado/perdido moram SÓ nas abas
     // próprias — cair no 'todos' deixaria o card invisível (contatos ainda não carregados
     // caem no 'todos' como antes; a conversa em si abre do mesmo jeito).
@@ -866,6 +898,7 @@ export default function WhatsAppV2() {
   const abrirProximoRadar = (id: string) => {
     if (visiveis.some((c) => c.id === id)) {
       inbox.selectContact(id);
+      setCelPainel('conversa');
       window.setTimeout(() => document.querySelector(`[data-cid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }), 60);
       return;
     }
@@ -1136,9 +1169,15 @@ export default function WhatsAppV2() {
     return out;
   };
 
+  /* aba sem conversas (crítica 12/11): o centro não segue mostrando a conversa de outra aba. A BUSCA não
+     conta — procurar outro cliente no meio do atendimento não fecha a conversa aberta. */
+  const carregandoLista = WA_REAL && inbox.live.isLoading && contacts.length === 0;
+  const abaVazia = !foco && !buscaAtiva && visiveis.length === 0 && !carregandoLista && !(WA_REAL && inbox.live.isError && contacts.length === 0);
+  const temConversa = !!current.id && !abaVazia;
+
   /* ---------- render ---------- */
   return (
-    <div className="wa-pg">
+    <div className="wa-pg" data-cel-painel={!temConversa ? 'lista' : foco && celPainel === 'lista' ? 'conversa' : celPainel}>
       {/* ===================== FILA ===================== */}
       {!foco && (
         <aside className="wa-fila">
@@ -1220,7 +1259,7 @@ export default function WhatsAppV2() {
                 ))}
               </div>
             ) : visiveis.length === 0 ? (
-              <div className="wa-vazio">Nenhuma conversa nesta aba.</div>
+              <div className="wa-vazio">{buscaAtiva ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa nesta aba.'}</div>
             ) : (
               grupos.map(([respId, lista]) => {
                 // "Todos" é lista única (sem cabeçalho) — nunca recolhe
@@ -1250,51 +1289,64 @@ export default function WhatsAppV2() {
                   )}
                   {!fechado && lista.map((c) => {
                     const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
-                    const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
                     const alertas = alertasDe(c);
                     const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
                     const sit = situacaoDe(c);
                     const transporte = transporteDe(c.canalId);
-                    const oficial = transporte === 'cloud_api';
+                    const optoutC = !!c.contatoId && bloqueados.has(c.contatoId);
+                    const rdr = radarPorConv.get(c.id);
+                    const temRadar = !!rdr && (!!rdr.aviso || !!rdr.pedido || !!rdr.ligar);
+                    const rp = repassePorConv.get(c.id);
+                    const corSit = corDaSituacao(c, sit.texto);
+                    // "Espera 33 min" (a frase inteira, "Aguardando há 33 min", fica na dica): cabe ao lado da situação
+                    const rotEspera = wait ? wait.label.replace('Aguardando há ', 'Espera ').replace('Aguardando agora', 'Espera agora') : '';
+                    /* crítica 12/11 — linha 3 com NO MÁXIMO 2 selos: a situação e UM alerta escrito
+                       (prioridade: Não incomodar › Radar › Humano › espera fora do prazo › outro alerta ›
+                       repasse › espera › finalizado › etiqueta); o resto vai para a dica do item */
+                    const segundo = optoutC ? <span className="cchip alerta erro" title={optoutTexto}>Não incomodar</span>
+                      : temRadar ? <RadarSelosCard r={rdr} diaUtil={diaUtilRadar} />
+                      : c.precisaHumano ? <span className="cchip alerta" title={alertas.join(' · ')}>Humano{alertas.length > 1 ? ' +' + (alertas.length - 1) : ''}</span>
+                      : wait && wait.tier !== 'neutro' ? <span className={'cchip espera t-' + wait.tier} title={wait.label}>{rotEspera}</span>
+                      : alertas.length > 0 ? <span className="cchip alerta" title={alertas.join(' · ')}>{alertas[0].split(/ — |:/)[0]}{alertas.length > 1 ? ' +' + (alertas.length - 1) : ''}</span>
+                      : rp ? <span className="cchip repasse" title={[rt('extra.selo.era_de', { de: rp.deNome, para: rp.paraNome }).texto, rp.desfecho === 'fechado' ? rtTit('extra.painel.desfecho_fechou', { para: rp.paraNome }, rp.paraNome + ' fechou') + '.' : ''].filter(Boolean).join('\n')}><IcEraDe tamanho={9} />{rtTit('extra.selo.era_de', { de: rp.deNome }, 'Era de ' + rp.deNome)}</span>
+                      : finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) ? <span className="cchip fim">Finalizado</span>
+                      : c.tags.length > 0 ? <EtiquetaChip size="sm" nome={c.tags[0] + (c.tags.length > 1 ? ' +' + (c.tags.length - 1) : '')} cor={corDaEtiqueta(c.tags[0], etiquetasQ.data)} title={'Etiquetas: ' + c.tags.join(' · ')} />
+                      : null;
+                    const dica = [
+                      `Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'}`,
+                      `Canal: ${tituloCanal(c.chip, transporte)}`,
+                      finalizado ? 'Finalizado' : c.status || 'Em atendimento',
+                      c.lastAtMs ? 'Última mensagem ' + tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time,
+                      wait ? wait.label : '',
+                      c.iaAtiva ? 'IA atendendo' : '',
+                      ...alertas,
+                      c.tags.length ? 'Etiquetas: ' + c.tags.join(', ') : '',
+                    ].filter(Boolean).join(' · ');
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
                         className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
-                        title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: ${tituloCanal(c.chip, transporte)} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
-                        onClick={() => inbox.selectContact(c.id)}
+                        title={dica}
+                        onClick={() => { inbox.selectContact(c.id); setCelPainel('conversa'); }}
                       >
-                        <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} />{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
+                        <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} /></span>
                         <span className="tx">
                           <span className="n">
-                            {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
-                            {c.arquivada && <span className="fl" title="Arquivada">🗄️</span>}
-                            {nomeExibicao(c)}
+                            {c.silenciada && <span className="fl" title="Silenciada" aria-label="Silenciada"><IcSilencio /></span>}
+                            {c.arquivada && <span className="fl" title="Arquivada" aria-label="Arquivada"><IcArquivo /></span>}
+                            <span className="nm-tx">{nomeExibicao(c)}</span>
+                            {c.iaAtiva && <span className="ia-ic" title="A IA está atendendo esta conversa" aria-label="IA atendendo"><IcBot /></span>}
                             {tabEf === 'iris' && irisMapa.get(c.id)?.atendente_original_nome && <span className="cchip iris-era" title="Atendente original">Era: {irisMapa.get(c.id)?.atendente_original_nome}</span>}
                           </span>
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
-                            {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>; })()}
-                            {/* Radar: UM selo logo após a situação (pedido > último > 2º > 1º) + Ligar à parte; só do dono */}
-                            <RadarSelosCard r={radarPorConv.get(c.id)} diaUtil={diaUtilRadar} />
-                            {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
-                            {(() => {
-                              const rp = repassePorConv.get(c.id);
-                              if (!rp) return null;
-                              const dica = [rt('extra.selo.era_de', { de: rp.deNome, para: rp.paraNome }).texto, rp.desfecho === 'fechado' ? rtTit('extra.painel.desfecho_fechou', { para: rp.paraNome }, rp.paraNome + ' fechou') + '.' : ''].filter(Boolean).join('\n');
-                              return <span className="cchip repasse" title={dica}><IcEraDe tamanho={9} />{rtTit('extra.selo.era_de', { de: rp.deNome }, 'Era de ' + rp.deNome)}</span>;
-                            })()}
-                            {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
-                            {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
-                            {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
-                            {finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) && <span className="cchip fim">Finalizado</span>}
-                            {c.tags.slice(0, 2).map((t) => <EtiquetaChip key={t} size="sm" nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
-                            {c.tags.length > 2 && <EtiquetaChip size="sm" mais nome={'+' + (c.tags.length - 2)} title={c.tags.slice(2).join(' · ')} />}
+                            <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={corSit ? ({ ['--pt-cor']: corSit } as React.CSSProperties) : undefined}><i className="pt" aria-hidden />{sit.texto}</span>
+                            {segundo}
                           </span>
                         </span>
                         <span className="m">
-                          <span className="h2 num" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
+                          <span className="h2 num">{c.lastAtMs ? horaDaLista(c.lastAtMs, relogioMs) : c.time}</span>
                           {(c.unread ?? 0) > 0 && <span className="nl num" title={`${c.unread} não lidas`}>{(c.unread ?? 0) > 99 ? '99+' : c.unread}</span>}
-                          {wait && <span className={'cr num' + (atrasado ? ' g' : '')}>{wait.label.replace('Aguardando ', '').replace('há ', '')}</span>}
                         </span>
                         <span
                           role="button" tabIndex={-1}
@@ -1324,26 +1376,27 @@ export default function WhatsAppV2() {
         )}
         {!current.id && WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
           <IniciandoWhatsApp />
-        ) : !current.id ? (
+        ) : !temConversa ? (
           <div className="wa-conv-vazia">
             <IcWa />
-            <div className="t">Selecione uma conversa</div>
-            <div className="d">Escolha uma conversa na lista ou inicie um novo atendimento.</div>
+            <div className="t">{abaVazia ? 'Nenhuma conversa nesta aba' : 'Selecione uma conversa'}</div>
+            <div className="d">{abaVazia ? 'Escolha outra aba ou inicie um novo atendimento.' : 'Escolha uma conversa na lista ou inicie um novo atendimento.'}</div>
             <BotaoPrimario onClick={() => setNovaConversa(true)}>Nova conversa</BotaoPrimario>
           </div>
         ) : (
           <>
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
+              <button type="button" className="ib2 wa-cel-volta" title="Voltar para a lista" aria-label="Voltar para a lista de conversas" onClick={() => setCelPainel('lista')}><IcVoltar /></button>
               <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
-                  {current.phone ? mascararNumero(current.phone) : 'sem número'}
+                  {current.phone ? numeroMascarado(current.phone) : 'sem número'}
                   <SituacaoChipTopo lead={current} demo={demo} />
                   {inbox.canalSel
-                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}${presoNoSel ? `\n\n📌 Atendimento preso neste número: mensagem do cliente em outro número NÃO traz a conversa de volta. Para soltar, responda por outro número aqui pelo painel.` : ''}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}{presoNoSel ? ' 📌' : ''}</span>
-                    : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
+                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + numeroMascarado(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'oficial (API do WhatsApp/Meta)' : 'número conectado por QR Code'}${presoNoSel ? `\n\nAtendimento preso neste número: mensagem do cliente em outro número não traz a conversa de volta. Para soltar, responda por outro número aqui pelo painel.` : ''}`}>{canalEhCloud && <IcOk />}{inbox.canalSel.alias}{presoNoSel && <span className="preso" aria-label="Atendimento preso neste número"><IcPin /></span>}</span>
+                    : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' && <IcOk />}{current.chip}</span>; })()}
                   {WA_REAL && canalEhCloud && janelaQ.data && (
                     <span className={'janela' + (janelaQ.data.aberta ? '' : ' fechada')} title={janelaQ.data.aberta ? 'Dentro das 24 horas: dá para responder com texto livre por este número.' : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
                       {rotuloJanela(janelaQ.data)}
@@ -1395,7 +1448,8 @@ export default function WhatsAppV2() {
                     title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — clique para desligar e assumir') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — clique para reativar a IA' : 'Ligar a IA nesta conversa')}
                     onClick={alternarIa}>{iaAtiva ? 'IA ligada' : 'IA desligada'}</BotaoMini>
                 )}
-                {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
+                {!ctxAberto && <BotaoMini className="wa-dados-desk" title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
+                <button type="button" className="ib2 wa-cel-so" title="Dados do contato" aria-label="Abrir os dados do contato" onClick={abrirFichaCel}><IcInfo /></button>
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
@@ -1607,7 +1661,7 @@ export default function WhatsAppV2() {
                     </button>
                   );
                 })()}
-                <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+                <button type="button" className={'env-b' + (draft.trim() ? ' pronto' : '')} title="Enviar" aria-label="Enviar mensagem" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
               </div>
             </div>
           </>
@@ -1617,18 +1671,19 @@ export default function WhatsAppV2() {
       {/* ===================== CONTEXTO =====================
           O reabrir "Dados" agora é um botão irmão na fileira de ações do cabeçalho
           (.wa-ctopo .dir, condicionado a !ctxAberto) — não flutua mais solto sobre o header. */}
-      {current.id && (
+      {temConversa && (
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">
           <div className="ctx-topo spot">
+            <button type="button" className="ib2 wa-cel-volta ctx-volta" title="Voltar para a conversa" aria-label="Voltar para a conversa" onClick={() => setCelPainel('conversa')}><IcVoltar /></button>
             <div className="av2">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
             <div className="n2">{nomeExibicao(current)}</div>
             <div className="t2 num">
-              {current.phone ? mascararNumero(current.phone) : 'sem número'}
+              {current.phone ? numeroMascarado(current.phone) : 'sem número'}
               {current.phone && <button type="button" className="cp" title="Copiar telefone" onClick={copiarTelefone}><IcCopy /></button>}
             </div>
             <div className="bb">
-              <BotaoMini onClick={() => setCtxAberto(false)}>Recolher</BotaoMini>
+              <BotaoMini className="wa-dados-desk" onClick={() => setCtxAberto(false)}>Recolher</BotaoMini>
               {editMode
                 ? <BotaoPrimario mini disabled={salvandoEdicao} onClick={salvarEdicao}>{salvandoEdicao ? 'Salvando…' : 'Salvar'}</BotaoPrimario>
                 : <BotaoPrimario mini onClick={iniciarEdicao}>Editar</BotaoPrimario>}
@@ -1987,7 +2042,7 @@ export default function WhatsAppV2() {
           aoFechar={() => setNovaConversa(false)}
           aoIniciar={async (canalId, tel, nome) => {
             const ok = await inbox.iniciarNovaConversa(canalId, tel, nome);
-            if (ok) { setNovaConversa(false); window.setTimeout(() => textareaRef.current?.focus(), 60); }
+            if (ok) { setNovaConversa(false); setCelPainel('conversa'); window.setTimeout(() => textareaRef.current?.focus(), 60); }
             return ok;
           }}
         />
@@ -2197,7 +2252,8 @@ function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
   // assume — inclusive para mover/reabrir um cliente fechado. O chip fica só p/ conversa sem opp.
   if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).length > 0)) return null;
   const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
-  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>;
+  // selo neutro com o ponto na cor da etapa (crítica 12/11: a etapa pintava o chip inteiro de dourado)
+  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ ['--pt-cor']: cor } as React.CSSProperties) : undefined}><i className="pt" aria-hidden />{sit.texto}</span>;
 }
 
 /* ================================================================
@@ -2350,11 +2406,12 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar, s
             // própria coluna do Kanban (Documentos, Remarketing, Lead qualificado, etc.).
             const st = opp.status;
             const etapaNome = (opp.colunaNome || '').trim();
-            let fase: string, icon: string, titulo: string, sub: string;
-            if (st === 'ganho')          { fase = 'var(--verde)'; icon = '✓'; titulo = 'Cliente fechado'; sub = 'Ganho · negócio concluído'; }
-            else if (st === 'perdido')   { fase = 'var(--rubro)'; icon = '✕'; titulo = 'Cliente perdido'; sub = 'Oportunidade encerrada'; }
-            else if (st === 'cancelado') { fase = 'var(--txt-3)'; icon = '–'; titulo = 'Cancelado'; sub = 'Oportunidade cancelada'; }
-            else                         { fase = opp.colunaCor || '#6366f1'; icon = '●'; titulo = etapaNome || 'Em andamento'; sub = 'Etapa atual no funil'; }
+            // ícones de traço (crítica 12/11: nada de caractere de texto como ícone)
+            let fase: string, icon: React.ReactNode, titulo: string, sub: string;
+            if (st === 'ganho')          { fase = 'var(--verde)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>; titulo = 'Cliente fechado'; sub = 'Ganho · negócio concluído'; }
+            else if (st === 'perdido')   { fase = 'var(--rubro)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 7l10 10M17 7 7 17" /></svg>; titulo = 'Cliente perdido'; sub = 'Oportunidade encerrada'; }
+            else if (st === 'cancelado') { fase = 'var(--txt-3)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 12h10" /></svg>; titulo = 'Cancelado'; sub = 'Oportunidade cancelada'; }
+            else                         { fase = opp.colunaCor || '#6366f1'; icon = <i className="ctx-fase-pt" />; titulo = etapaNome || 'Em andamento'; sub = 'Etapa atual no funil'; }
             return (
               <div className="ctx-fase" style={{ ['--fase']: fase } as React.CSSProperties}>
                 <span className="ic" aria-hidden>{icon}</span>
