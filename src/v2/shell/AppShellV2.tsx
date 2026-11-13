@@ -87,7 +87,7 @@ const GRUPOS: GrupoNav[] = [
     rotulo: 'Operação',
     itens: [
       // ALFA: "Conversas", o mesmo nome do título da tela e do item de Cobranças (o grupo já diz WhatsApp)
-      { slug: 'whatsapp', rotulo: ALFA ? 'Conversas' : 'WhatsApp' },
+      { slug: 'whatsapp', rotulo: 'WhatsApp' }, // o nome que o dono usou ao pedir o Atendimento (11/11)
       { slug: 'presenciais', rotulo: 'Presenciais' },
       { slug: 'scripts', rotulo: 'Scripts' },
     ],
