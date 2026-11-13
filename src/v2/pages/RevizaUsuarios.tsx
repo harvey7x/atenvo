@@ -16,6 +16,7 @@ import {
 import type { Papel } from '../data/cobranca/types';
 import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
 import { lerDesfazer, useDesfazerEstado } from '../data/desfazer';
+import { AcoesNoTopo, MenuMais } from './comunicacao/MenuMais';
 import './painel/painel.css';
 
 const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
@@ -34,9 +35,8 @@ const opcoesPapel = (atual?: Papel): Papel[] => (atual && !PAPEIS.includes(atual
 const iniciais = (n: string) => (n || '?').trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 const desde = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', ''); };
 
-const IcLixo = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></svg>
-);
+/** ambientes como texto ("Cobranças · Atendimento") — na lista são informação; a troca fica em Editar */
+const ambientesTexto = (papel: Papel, modulos: readonly Ambiente[] | null | undefined) => ambientesDoPerfil(papel, modulos).map((a) => ROTULO_AMBIENTE[a]).join(' · ');
 
 /* ambientes da pessoa: chips Cobranças / Atendimento. Administrador e Atendente têm acesso fixo
    (chips travados, com o porquê na dica); os demais ligam/desligam (sempre fica pelo menos um). */
@@ -112,25 +112,18 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
   const alternarAtivo = (u: UsuarioRow) => {
     const b = bloqueioDesativar(u, usuarios, eu); if (b) { falha(new Error(b)); return; }
     setAtivo.mutate({ id: u.id, ativo: !u.ativo }, {
-      onSuccess: () => ok(u.ativo ? `${u.nome} não entra mais no sistema (dá pra reativar a qualquer hora).` : `${u.nome} voltou a ter acesso.`),
+      onSuccess: () => ok(u.ativo ? `${u.nome} não entra mais no sistema (é possível reativar a qualquer momento).` : `${u.nome} voltou a ter acesso.`),
       onError: falha,
     });
   };
 
   return (
     <div className="pn">
-      {/* barra: contexto + ação */}
-      <div className="pn-barra sobe">
-        <div className="pn-barra-esq">
-          <span className="pn-barra-rot">Equipe do sistema</span>
-          <span className="pn-barra-stat num"><b>{usuarios.length}</b> usuário{usuarios.length === 1 ? '' : 's'}</span>
-          <span className="pn-barra-stat num"><b>{ativos}</b> ativo{ativos === 1 ? '' : 's'}</span>
-          {primeiroAcesso > 0 && <span className="pn-barra-stat num"><b>{primeiroAcesso}</b> aguardando 1º acesso</span>}
-        </div>
-        <div className="pn-barra-dir">
-          <BotaoPrimario onClick={() => setJanela({ tipo: 'novo' })}>＋ Novo usuário</BotaoPrimario>
-        </div>
-      </div>
+      {/* a ação da tela no cabeçalho da página (em Cobranças); dentro de Configurações, numa linha própria.
+          A faixa de contadores saiu: o filtro (Todos · Ativos · Inativos) já mostra os números */}
+      <AcoesNoTopo>
+        <BotaoPrimario onClick={() => setJanela({ tipo: 'novo' })}>＋ Novo usuário</BotaoPrimario>
+      </AcoesNoTopo>
 
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAvisoSt(null)} aria-label="Fechar">×</button></div>}
 
@@ -150,16 +143,17 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
       )}
 
       <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.04s' }}>
-        <div className="pn-card-cab">
-          <div><h3>Usuários</h3><p>Quem entra no sistema, em qual ambiente (Cobranças e/ou Atendimento) e o que cada um pode ver. Desativar é reversível; excluir é definitivo.</p></div>
+        {/* sem título repetido ("Usuários" já é o título da página): o cartão abre com os filtros */}
+        <div className="pn-card-cab pn-us-cab">
           <div className="pn-us-filtros">
             <div className="pn-fin-seg" role="tablist" aria-label="Filtrar por situação">
               {([['todos', 'Todos', usuarios.length], ['ativos', 'Ativos', ativos], ['inativos', 'Inativos', usuarios.length - ativos]] as const).map(([id, rot, n]) => (
                 <button key={id} type="button" role="tab" aria-selected={filtro === id} className={filtro === id ? 'on' : undefined} onClick={() => setFiltro(id)}>{rot}<span className="num">{n}</span></button>
               ))}
             </div>
-            <input className="inp" type="search" placeholder="Buscar nome ou login…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar usuário" />
+            {primeiroAcesso > 0 && <span className="pn-us-1a-tot num">{primeiroAcesso} aguardando o primeiro acesso</span>}
           </div>
+          <input className="inp pn-us-busca" type="search" placeholder="Buscar nome ou login…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar usuário" />
         </div>
         {q.isLoading ? <p className="pn-vazio">Carregando…</p> : q.isError ? <p className="pn-vazio">Não foi possível carregar os usuários.</p> : lista.length === 0 ? (
           usuarios.length === 0
@@ -190,31 +184,21 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                           <span className="pn-eq-nm"><span>{u.nome || '—'}{souEu && <em className="pn-us-voce">você</em>}</span><small className="num">login: {u.usuario} · desde {desde(u.created_at)}</small></span>
                         </span>
                       </td>
-                      <td>
-                        <select className="inp pn-us-papel" value={u.papel} aria-label={`Papel de ${u.nome}`} disabled={souEu} title={souEu ? 'Você não muda o seu próprio papel' : PAPEL_DESC[u.papel]}
-                          onChange={(e) => {
-                            const novo = e.target.value as Papel;
-                            if (u.papel === 'admin' && novo !== 'admin' && !usuarios.some((x) => x.id !== u.id && x.papel === 'admin' && x.ativo)) { falha(new Error('É o último administrador ativo.')); return; }
-                            setPapel.mutate({ id: u.id, papel: novo }, { onSuccess: () => ok(`${u.nome} agora é ${PAPEL_ROTULO[novo]}.`), onError: falha });
-                          }}>
-                          {opcoesPapel(u.papel).map((p) => <option key={p} value={p}>{PAPEL_ROTULO[p]}</option>)}
-                        </select>
-                      </td>
-                      <td>
-                        <Ambientes papel={u.papel} modulos={u.modulos} rotulo={`Ambientes de ${u.nome}`}
-                          travado={souEu && !ambientesFixos(u.papel) ? 'Você não muda os seus próprios ambientes' : undefined}
-                          aoMudar={(l) => setAmbientes.mutate({ id: u.id, modulos: l }, { onSuccess: () => ok(`${u.nome} agora entra em: ${l.map((a) => ROTULO_AMBIENTE[a]).join(' e ')}.`), onError: falha })} />
-                      </td>
+                      <td><span className="pn-us-papel-tx">{PAPEL_ROTULO[u.papel]}</span></td>
+                      <td><span className="pn-us-amb-tx">{ambientesTexto(u.papel, u.modulos)}</span></td>
                       <td>
                         {u.ativo ? <BadgeStatus tom="ok">Ativo</BadgeStatus> : <BadgeStatus tom="neutro">Desativado</BadgeStatus>}
-                        {u.ativo && u.deve_trocar_senha && <span className="pn-us-1a">aguardando 1º acesso</span>}
+                        {u.ativo && u.deve_trocar_senha && <span className="pn-us-1a">Aguardando o primeiro acesso</span>}
                       </td>
                       <td className="pn-fin-acoes">
                         <span className="pn-us-acoes">
-                          <button type="button" className="pn-link" onClick={() => setJanela({ tipo: 'editar', u })}>Editar</button>
-                          <button type="button" className="pn-link" onClick={() => setJanela({ tipo: 'senha', u })}>Senha</button>
-                          <button type="button" className="pn-link" onClick={() => alternarAtivo(u)} disabled={!!bDes || setAtivo.isPending} title={bDes || (u.ativo ? 'Tira o acesso (reversível)' : 'Devolve o acesso')}>{u.ativo ? 'Desativar' : 'Reativar'}</button>
-                          <button type="button" className="pn-fin-lixo" onClick={() => setJanela({ tipo: 'excluir', u })} disabled={!!bExc} aria-label={`Excluir ${u.nome} do sistema`} title={bExc || 'Excluir do sistema (definitivo)'}><IcLixo /></button>
+                          <BotaoSec mini onClick={() => setJanela({ tipo: 'editar', u })}>Editar</BotaoSec>
+                          <MenuMais rotulo={`Mais ações para ${u.nome}`} itens={[
+                            { rotulo: 'Alterar senha', onClick: () => setJanela({ tipo: 'senha', u }) },
+                            { rotulo: u.ativo ? 'Desativar acesso' : 'Reativar acesso', onClick: () => alternarAtivo(u), desabilitado: !!bDes || setAtivo.isPending, dica: bDes || (u.ativo ? 'Tira o acesso; é possível reativar depois' : 'Devolve o acesso') },
+                            'sep',
+                            { rotulo: 'Excluir do sistema', perigo: true, onClick: () => setJanela({ tipo: 'excluir', u }), desabilitado: !!bExc, dica: bExc || 'Definitivo: pede confirmação' },
+                          ]} />
                         </span>
                       </td>
                     </tr>
@@ -247,11 +231,23 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
           })} />
       )}
       {janela?.tipo === 'editar' && (
-        <JanelaEditar u={janela.u} ocupado={editar.isPending} aoFechar={() => setJanela(null)}
-          aoSalvar={(a) => editar.mutate({ id: janela.u.id, ...a }, {
-            onSuccess: () => { setJanela(null); ok(a.usuario ? `Dados salvos — o login de ${a.nome ?? janela.u.nome} agora é "${loginValido(a.usuario)}".` : 'Dados salvos.'); },
-            onError: falha,
-          })} />
+        <JanelaEditar u={janela.u} souEu={janela.u.id === eu} ultimoAdmin={janela.u.papel === 'admin' && !usuarios.some((x) => x.id !== janela.u.id && x.papel === 'admin' && x.ativo)}
+          ocupado={editar.isPending || setPapel.isPending || setAmbientes.isPending} aoFechar={() => setJanela(null)}
+          aoSalvar={async (a) => {
+            const u = janela.u;
+            try {
+              if (a.nome !== undefined || a.usuario !== undefined) await editar.mutateAsync({ id: u.id, ...(a.nome !== undefined ? { nome: a.nome } : {}), ...(a.usuario !== undefined ? { usuario: a.usuario } : {}) });
+              if (a.papel) await setPapel.mutateAsync({ id: u.id, papel: a.papel });
+              if (a.modulos) await setAmbientes.mutateAsync({ id: u.id, modulos: a.modulos });
+              setJanela(null);
+              const nome = a.nome ?? u.nome;
+              ok([
+                a.usuario ? `o login de ${nome} agora é "${loginValido(a.usuario)}"` : '',
+                a.papel ? `${nome} agora é ${PAPEL_ROTULO[a.papel]}` : '',
+                a.modulos ? `entra em: ${a.modulos.map((x) => ROTULO_AMBIENTE[x]).join(' e ')}` : '',
+              ].filter(Boolean).join(' · ').replace(/^./, (c) => c.toUpperCase()) || 'Dados salvos.');
+            } catch (e) { falha(e); }
+          }} />
       )}
       {janela?.tipo === 'senha' && (
         <JanelaSenha u={janela.u} ocupado={resetar.isPending || definirSenha.isPending} aoFechar={() => setJanela(null)}
@@ -329,7 +325,7 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
         <div className="pn-us-campo">
           <span className="pn-us-rot">Ambientes</span>
           <Ambientes papel={papel} modulos={ambientes} aoMudar={setAmbientes} rotulo="Ambientes do novo usuário" />
-          <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Marque onde a pessoa vai trabalhar: Cobranças, Atendimento ou os dois. Dá pra mudar depois na lista.'}</span>
+          <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Marque onde a pessoa vai trabalhar: Cobranças, Atendimento ou os dois. É possível mudar depois, em Editar.'}</span>
         </div>
         <div className="pn-us-campo">
           <span className="pn-us-rot">Senha inicial</span>
@@ -349,23 +345,68 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
   );
 }
 
-function JanelaEditar({ u, ocupado, aoSalvar, aoFechar }: {
-  u: UsuarioRow; ocupado: boolean; aoFechar: () => void;
-  aoSalvar: (a: { nome?: string; usuario?: string }) => void;
+function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
+  u: UsuarioRow; souEu: boolean; ultimoAdmin: boolean; ocupado: boolean; aoFechar: () => void;
+  aoSalvar: (a: { nome?: string; usuario?: string; papel?: Papel; modulos?: Ambiente[] }) => void;
 }) {
   const [nome, setNome] = useState(u.nome);
   const [login, setLogin] = useState(u.usuario);
+  const [papel, setPapel] = useState<Papel>(u.papel);
+  const [ambientes, setAmbientes] = useState<Ambiente[]>(() => ambientesDoPerfil(u.papel, u.modulos));
+  // trocar o papel muda o acesso NA HORA: pede confirmação antes de salvar
+  const [confirmar, setConfirmar] = useState(false);
   const mudouNome = nome.trim() !== u.nome;
   const mudouLogin = loginValido(login) !== u.usuario;
-  const pode = !!nome.trim() && !!loginValido(login) && (mudouNome || mudouLogin);
+  const mudouPapel = papel !== u.papel;
+  const ambFinal = ambientesDoPerfil(papel, ambientes);
+  const ambAtual = ambientesDoPerfil(u.papel, u.modulos);
+  const mudouAmb = !ambientesFixos(papel) && (ambFinal.length !== ambAtual.length || ambFinal.some((a) => !ambAtual.includes(a)));
+  const bloqueioPapel = mudouPapel && ultimoAdmin && papel !== 'admin' ? 'É o último administrador ativo: o papel não pode mudar.' : '';
+  const pode = !!nome.trim() && !!loginValido(login) && (mudouNome || mudouLogin || mudouPapel || mudouAmb) && !bloqueioPapel;
+  const salvar = () => aoSalvar({
+    ...(mudouNome ? { nome: nome.trim() } : {}), ...(mudouLogin ? { usuario: loginValido(login) } : {}),
+    ...(mudouPapel ? { papel } : {}), ...(mudouAmb ? { modulos: ambFinal } : {}),
+  });
+  if (confirmar) {
+    return (
+      <ModalV2 aberto aoFechar={() => setConfirmar(false)} largura={460}
+        titulo={<div>Trocar o papel de {u.nome}?<div className="mod-sub">{PAPEL_ROTULO[u.papel]} → {PAPEL_ROTULO[papel]}</div></div>}
+        rodape={<><BotaoSec onClick={() => setConfirmar(false)} disabled={ocupado}>Voltar</BotaoSec><BotaoPrimario disabled={ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Confirmar a troca'}</BotaoPrimario></>}>
+        <div className="pn-us-form">
+          <p className="pn-us-dica" style={{ fontSize: 13, color: 'var(--txt-2)' }}>O acesso muda na hora. Como {PAPEL_ROTULO[papel].toLowerCase()}, {u.nome} passa a ter: {PAPEL_DESC[papel].charAt(0).toLowerCase() + PAPEL_DESC[papel].slice(1)}</p>
+        </div>
+      </ModalV2>
+    );
+  }
   return (
-    <ModalV2 aberto aoFechar={aoFechar} largura={480}
+    <ModalV2 aberto aoFechar={aoFechar} largura={600}
       titulo={<div>Editar usuário<div className="mod-sub">{u.nome} · {PAPEL_ROTULO[u.papel]}</div></div>}
-      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => aoSalvar({ ...(mudouNome ? { nome: nome.trim() } : {}), ...(mudouLogin ? { usuario: loginValido(login) } : {}) })}>{ocupado ? 'Salvando…' : 'Salvar'}</BotaoPrimario></>}>
+      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => (mudouPapel ? setConfirmar(true) : salvar())}>{ocupado ? 'Salvando…' : 'Salvar'}</BotaoPrimario></>}>
       <div className="pn-us-form">
-        <div className="pn-us-campo"><label htmlFor="ed-nome">Nome</label><input id="ed-nome" className="inp" value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-        {u.papel === 'comercial' && mudouNome && <p className="pn-us-alerta">Os clientes ficam ligados ao nome do comercial. Se mudar o nome, confira o campo Comercial dos clientes na Gestão para ele continuar vendo a carteira.</p>}
-        <div className="pn-us-campo"><label htmlFor="ed-login">Login</label><input id="ed-login" className="inp" value={login} onChange={(e) => setLogin(loginValido(e.target.value))} /><span className="pn-us-dica">{mudouLogin ? `A partir de agora a pessoa entra com "${loginValido(login)}". A senha não muda.` : 'Usado para entrar no sistema.'}</span></div>
+        <div className="pn-us-duas">
+          <div className="pn-us-campo"><label htmlFor="ed-nome">Nome</label><input id="ed-nome" className="inp" value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+          <div className="pn-us-campo"><label htmlFor="ed-login">Login</label><input id="ed-login" className="inp" value={login} onChange={(e) => setLogin(loginValido(e.target.value))} /><span className="pn-us-dica">{mudouLogin ? `A pessoa passa a entrar com "${loginValido(login)}". A senha não muda.` : 'Usado para entrar no sistema.'}</span></div>
+        </div>
+        {u.papel === 'comercial' && mudouNome && <p className="pn-us-alerta">Os clientes ficam ligados ao nome do comercial. Ao mudar o nome, confira o campo Comercial dos clientes na Gestão para que ele continue vendo a carteira.</p>}
+        <div className="pn-us-campo">
+          <span className="pn-us-rot">Papel</span>
+          {souEu ? <span className="pn-us-dica">Você não pode mudar o seu próprio papel ({PAPEL_ROTULO[u.papel]}).</span> : (
+            <div className="pn-us-opcoes" role="radiogroup" aria-label="Papel">
+              {opcoesPapel(u.papel).map((p) => (
+                <button key={p} type="button" role="radio" aria-checked={papel === p} className={papel === p ? 'on' : undefined} onClick={() => setPapel(p)}>
+                  <b>{PAPEL_ROTULO[p]}</b><span>{PAPEL_DESC[p]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {bloqueioPapel && <span className="pn-us-erro">{bloqueioPapel}</span>}
+        </div>
+        <div className="pn-us-campo">
+          <span className="pn-us-rot">Ambientes</span>
+          <Ambientes papel={papel} modulos={ambientes} aoMudar={setAmbientes} rotulo={`Ambientes de ${u.nome}`}
+            travado={souEu && !ambientesFixos(papel) ? 'Você não pode mudar os seus próprios ambientes' : undefined} />
+          <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Onde a pessoa trabalha: Cobranças, Atendimento ou os dois.'}</span>
+        </div>
       </div>
     </ModalV2>
   );
@@ -407,14 +448,14 @@ function JanelaExcluir({ u, bloqueio, ocupado, aoExcluir, aoFechar }: {
   const confere = conf.trim().toLowerCase() === u.usuario.toLowerCase();
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={500}
-      titulo={<div>Excluir {u.nome} do sistema<div className="mod-sub">Definitivo — não dá para desfazer</div></div>}
-      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!!bloqueio || !confere || ocupado} onClick={() => aoExcluir(conf)} style={{ background: 'var(--rubro)' }}>{ocupado ? 'Excluindo…' : 'Excluir definitivamente'}</BotaoPrimario></>}>
+      titulo={<div>Excluir {u.nome} do sistema<div className="mod-sub">Definitivo: não é possível desfazer</div></div>}
+      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><button type="button" className="p-btn btn-perigo" disabled={!!bloqueio || !confere || ocupado} onClick={() => aoExcluir(conf)}>{ocupado ? 'Excluindo…' : 'Excluir definitivamente'}</button></>}>
       <div className="pn-us-form">
         {bloqueio ? <p className="pn-us-alerta">{bloqueio}</p> : (<>
           <ul className="pn-us-conseq">
             <li><b>Some:</b> o login de <b>{u.usuario}</b>, as notificações e os recibos de leitura de avisos dessa pessoa.</li>
             <li><b>Fica:</b> clientes{u.papel === 'comercial' ? ` (continuam no nome "${u.nome}" na Gestão)` : ''}, pagamentos, conferências, avisos e o histórico em Registros.</li>
-            <li>Se a ideia é só tirar o acesso por um tempo, use <b>Desativar</b> — é reversível.</li>
+            <li>Para tirar o acesso só por um tempo, use <b>Desativar acesso</b>, que é reversível.</li>
           </ul>
           <div className="pn-us-campo">
             <label htmlFor="us-conf">Para confirmar, digite o login <b>{u.usuario}</b></label>
