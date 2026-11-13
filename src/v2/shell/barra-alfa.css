@@ -505,3 +505,10 @@ html[data-barra-alfa] .v2 .ba-menu-check { flex: none; color: var(--ba-ativo-ico
 html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] { background: rgba(var(--tint), .05); color: var(--ba-txt); font-weight: 400; }
 html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] .ba-menu-ico { border-color: color-mix(in srgb, var(--azul) 40%, transparent); background: var(--ba-ativo); color: var(--ba-ativo-ico); }
 html[data-barra-alfa] .v2 .ba-menu .ba-menu-item[aria-checked="true"] .ba-menu-nome { font-weight: 600; }
+
+/* ---- busca ⌘K: o trecho encontrado em destaque; no claro o véu escurece de verdade (o fundo a 52% era branco
+   e lavava a página) e a caixa ganha sombra de camada ---- */
+html[data-barra-alfa] .v2 .pal-hl { font-weight: 600; color: var(--ba-txt); }
+html[data-barra-alfa][data-tema="light"][data-repaginada][data-repaginada] .v2 .pal-veu.pal-veu { background: rgba(17, 19, 24, .32); }
+html[data-barra-alfa][data-tema="light"][data-repaginada][data-repaginada] .v2 .pal-caixa.pal-caixa { box-shadow: 0 24px 64px rgba(17, 19, 24, .22); border-color: rgba(16, 24, 40, .1); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-meta.pal-meta { margin-left: 12px; }

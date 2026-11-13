@@ -37,7 +37,7 @@ import { chavesCobranca } from '../data/cobranca/keys';
 import type { Dados } from '../data/cobranca/types';
 import { BotaoDesfazer } from './BotaoDesfazer';
 import { EstadoVazio } from '../components/Estado';
-import { BarraAlfa, TopoAlfa, IcFechar, IcSair, rotuloAtalho, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
+import { BarraAlfa, TopoAlfa, IcFechar, IcSair, ICONE_AMBIENTE, rotuloAtalho, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
 import { ModalV2 } from '../components/ModalV2';
 
 /* ALFA (Reviza de verdade e a demo): barra lateral e topo no desenho da referência "Dashboard
@@ -180,7 +180,7 @@ const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equi
 /* a linha de descrição de cada ambiente no menu de troca da barra */
 const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
   cobrancas: 'Carteira e pagamentos',
-  atendimento: 'Conversas e funil de vendas',
+  atendimento: 'Conversas e Kanban',
 };
 const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS };
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
@@ -295,23 +295,86 @@ const IcConta = () => icMenu(<><circle cx="12" cy="8.5" r="3.5" /><path d="M5.5 
 const IcTeclado = () => icMenu(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9" /></>);
 const IcTemaClaro = () => icMenu(<><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></>);
 const IcTemaEscuro = () => icMenu(<path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5z" />);
+const IcMais = () => icMenu(<path d="M12 5v14M5 12h14" />);
 
 /* ---------------- Paleta de busca global (⌘K) ----------------
-   A barra do topo abre um spotlight de verdade: SEÇÕES do módulo ativo
-   (mesmo filtro de papel do menu) e, na Reviza/demo, CLIENTES da Gestão
-   por nome, CPF ou telefone. Enter/clique navega; escolher um cliente
-   entrega a busca pronta pra Gestão via sessionStorage
-   ('alfa_paleta_busca'). Monta só enquanto aberta — a query dos clientes
-   não pesa o shell nas telas que não precisam dela. */
+   A barra do topo abre um spotlight de verdade. Na ALFA (crítica 12/11) ela cobre o sistema da pessoa:
+   as SEÇÕES dos ambientes que ela tem (agrupadas por ambiente, o atual primeiro — mesmo filtro de papel
+   da barra), os CLIENTES da Gestão por nome, CPF ou telefone (só para quem tem Cobranças) e as AÇÕES
+   (trocar de ambiente, tema, nova cobrança). Apelidos acham a seção pelo nome que a pessoa usa
+   ("whatsapp" → Conversas, "usuários" → Configurações); quem começa pelo termo vem antes de quem só o
+   contém; o trecho encontrado fica em destaque. Enter/clique abre; escolher um cliente entrega a busca
+   pronta para a Gestão via sessionStorage ('alfa_paleta_busca'). Monta só enquanto aberta — a query dos
+   clientes não pesa o shell nas telas que não precisam dela. */
 const semAcentoPal = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const soDigitos = (s: string) => s.replace(/\D/g, '');
 const d2 = (n: number) => String(n).padStart(2, '0');
 type SecaoPaleta = { slug: string; rotulo: string; grupo: string };
+type GrupoPaleta = { id: string; rotulo: string; secoes: SecaoPaleta[] };
+type AcaoPaleta = { id: string; rotulo: string; meta?: string; icone: ReactNode; apelidos?: string[]; executar: () => void };
 type ItemPaleta =
-  | { tipo: 'secao'; slug: string; rotulo: string; grupo: string }
-  | { tipo: 'cliente'; id: string; nome: string; comercial: string; dia: number };
+  | { tipo: 'secao'; grupoId: string; grupoRotulo: string; slug: string; rotulo: string; grupo: string; nota: number }
+  | { tipo: 'cliente'; id: string; nome: string; comercial: string; dia: number; nota: number }
+  | { tipo: 'acao'; acao: AcaoPaleta; nota: number };
+/* apelidos: o nome que a pessoa digita para chegar a uma seção (sem acento, minúsculo) */
+const APELIDOS: Record<string, string[]> = {
+  'cobrancas/painel': ['inicio', 'resumo', 'visao geral', 'indicadores'],
+  'cobrancas/atendentes': ['comerciais', 'equipe', 'vendedores'],
+  'cobrancas/planilha': ['planilha', 'clientes', 'carteira', 'gestao'],
+  'cobrancas/novos': ['novo cliente', 'debito', 'aprovacao', 'cadastro'],
+  'cobrancas/cancelados': ['cancelamento', 'reativar'],
+  'cobrancas/financeiro': ['pagamentos', 'comprovantes', 'confirmacao'],
+  'cobrancas/calendario': ['agenda', 'vencimentos', 'ciclos'],
+  'cobrancas/avisos': ['comunicados', 'recados'],
+  'cobrancas/regua': ['mensagens automaticas', 'automacao', 'lembretes'],
+  'cobrancas/conversas': ['whatsapp', 'mensagens', 'chat'],
+  'cobrancas/numeros': ['chips', 'telefones', 'whatsapp', 'conexao'],
+  'cobrancas/envios': ['disparos', 'fila', 'mensagens enviadas'],
+  'cobrancas/analise': ['inss', 'extrato', 'margem'],
+  'cobrancas/registros': ['auditoria', 'historico', 'log'],
+  'cobrancas/usuarios': ['equipe', 'acessos', 'permissoes', 'senhas'],
+  whatsapp: ['whatsapp', 'inbox', 'chat', 'mensagens', 'atendimento'],
+  presenciais: ['agenda', 'visitas', 'atendimento presencial'],
+  scripts: ['respostas prontas', 'modelos', 'textos'],
+  kanban: ['funil', 'quadro', 'vendas', 'pipeline'],
+  dashboard: ['indicadores', 'metricas', 'relatorios', 'campanhas'],
+  'ferramentas/unificador': ['pdf', 'juntar', 'documentos'],
+  'ferramentas/conversor': ['converter', 'arquivos', 'imagem'],
+  'ferramentas/coletor-inss': ['inss', 'extrato', 'coletor'],
+  configuracoes: ['usuarios', 'conta', 'preferencias', 'canais', 'notificacoes', 'ajustes', 'senha'],
+};
+/* nota de um texto para o termo (menor = melhor): 0 começa pelo termo · 1 uma palavra começa pelo termo ·
+   2 contém · 3 só pelo apelido · -1 não casa */
+function notaDoTexto(texto: string, t: string, apelidos?: string[]): number {
+  const n = semAcentoPal(texto);
+  if (n.startsWith(t)) return 0;
+  if (n.includes(' ' + t)) return 1;
+  if (n.includes(t)) return 2;
+  if (apelidos?.some((a) => a.startsWith(t) || a.includes(' ' + t) || (t.length >= 3 && a.includes(t)))) return 3;
+  return -1;
+}
+/* o trecho encontrado em destaque (o começo de palavra ganha do meio); o texto original segue intacto */
+function destacar(texto: string, termo: string): ReactNode {
+  const t = semAcentoPal(termo.trim());
+  if (!t) return texto;
+  const mapa: number[] = [];
+  let norm = '';
+  for (let i = 0; i < texto.length; i++) {
+    const c = semAcentoPal(texto[i]);
+    for (let k = 0; k < c.length; k++) mapa.push(i);
+    norm += c;
+  }
+  let at = norm.startsWith(t) ? 0 : norm.indexOf(' ' + t);
+  at = at > 0 ? at + 1 : at === 0 ? 0 : norm.indexOf(t);
+  if (at < 0) return texto;
+  const ini = mapa[at];
+  const fim = mapa[at + t.length - 1] + 1;
+  return <>{texto.slice(0, ini)}<b className="pal-hl">{texto.slice(ini, fim)}</b>{texto.slice(fim)}</>;
+}
 
-function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void; comClientes: boolean; alfa?: boolean }) {
+function PaletaBusca({ grupos, acoes, raiz, aoFechar, comClientes, alfa = false }: {
+  grupos: GrupoPaleta[]; acoes: AcaoPaleta[]; raiz: HTMLElement; aoFechar: () => void; comClientes: boolean; alfa?: boolean;
+}) {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [ativo, setAtivo] = useState(0);
@@ -326,8 +389,7 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   useEffect(() => { setAtivo(0); }, [q]);
 
   // clientes = a MESMA query da Gestão (chave compartilhada → cache aproveitado). Quem decide é o
-  // shell (`comClientes`): só no ambiente Cobranças e só para quem tem Cobranças — no Atendimento a
-  // paleta é a do Atenvo (só as seções) e quem é só do Atendimento nunca busca a carteira
+  // shell (`comClientes`): só para quem tem Cobranças — quem é só do Atendimento nunca busca a carteira
   const clientesQ = useQuery<Dados>({
     queryKey: chavesCobranca.dados,
     queryFn: () => getCobrancaRepo().carregar(),
@@ -337,31 +399,40 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   const termo = q.trim();
   const tNorm = semAcentoPal(termo);
   const tDig = soDigitos(termo);
-  const secoesVistas = termo ? secoes.filter((s) => semAcentoPal(s.rotulo).includes(tNorm)) : secoes;
+  // seções: cada ambiente na sua ordem (o atual primeiro); com termo, as que casam, melhor nota primeiro
+  const secoesVistas: ItemPaleta[] = grupos.flatMap((g) => {
+    const itens = g.secoes.map((sc, i) => ({ sc, i, nota: termo ? notaDoTexto(sc.rotulo, tNorm, APELIDOS[sc.slug]) : 0 }))
+      .filter((x) => x.nota >= 0)
+      .sort((a, b) => a.nota - b.nota || a.i - b.i);
+    return itens.map(({ sc, nota }) => ({ tipo: 'secao' as const, grupoId: g.id, grupoRotulo: g.rotulo, slug: sc.slug, rotulo: sc.rotulo, grupo: sc.grupo, nota }));
+  });
   const clientes = useMemo<ItemPaleta[]>(() => {
     if (!comClientes || !termo) return [];
-    const achados: ItemPaleta[] = [];
+    const achados: { it: ItemPaleta; nome: string }[] = [];
     for (const l of clientesQ.data?.linhas ?? []) {
-      const porNome = semAcentoPal(l.nome).includes(tNorm);
-      // CPF/telefone só por DÍGITOS (3+ pra não casar o mundo inteiro com "1")
-      const porDigitos = tDig.length >= 3 && (soDigitos(l.cpf).includes(tDig) || soDigitos(l.telefone).includes(tDig));
-      if (!porNome && !porDigitos) continue;
-      achados.push({ tipo: 'cliente', id: l.id, nome: l.nome, comercial: l.comercial, dia: l.dia });
-      if (achados.length >= 8) break;
+      let nota = notaDoTexto(l.nome, tNorm);
+      if (nota === 3) nota = -1;
+      // CPF/telefone só por DÍGITOS (3+ para não casar o mundo inteiro com "1")
+      if (nota < 0 && tDig.length >= 3 && (soDigitos(l.cpf).includes(tDig) || soDigitos(l.telefone).includes(tDig))) nota = 3;
+      if (nota < 0) continue;
+      achados.push({ it: { tipo: 'cliente', id: l.id, nome: l.nome, comercial: l.comercial, dia: l.dia, nota }, nome: l.nome });
     }
-    return achados;
+    return achados.sort((a, b) => a.it.nota - b.it.nota || a.nome.localeCompare(b.nome, 'pt-BR')).slice(0, 8).map((a) => a.it);
   }, [comClientes, termo, tNorm, tDig, clientesQ.data]);
+  const acoesVistas: ItemPaleta[] = acoes
+    .map((a, i) => ({ a, i, nota: termo ? notaDoTexto(a.rotulo, tNorm, a.apelidos) : 0 }))
+    .filter((x) => x.nota >= 0)
+    .sort((x, y) => x.nota - y.nota || x.i - y.i)
+    .map(({ a, nota }) => ({ tipo: 'acao' as const, acao: a, nota }));
 
-  const itens: ItemPaleta[] = [
-    ...secoesVistas.map((s) => ({ tipo: 'secao' as const, slug: s.slug, rotulo: s.rotulo, grupo: s.grupo })),
-    ...clientes,
-  ];
+  const itens: ItemPaleta[] = [...secoesVistas, ...clientes, ...acoesVistas];
   const at = itens.length ? Math.min(ativo, itens.length - 1) : 0;
   useEffect(() => { listaRef.current?.querySelector('.pal-item.on')?.scrollIntoView({ block: 'nearest' }); }, [at]);
 
   const abrir = (it: ItemPaleta) => {
     aoFechar();
     if (it.tipo === 'secao') { navigate('/' + it.slug); return; }
+    if (it.tipo === 'acao') { it.acao.executar(); return; }
     // handoff: a Gestão consome a chave no mount — ou pelo evento, se já estiver aberta
     try { sessionStorage.setItem('alfa_paleta_busca', it.nome); } catch { /* sem storage: só navega */ }
     navigate('/cobrancas/planilha');
@@ -381,6 +452,12 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
     if (e.key === 'ArrowUp') { e.preventDefault(); setAtivo(Math.max(at - 1, 0)); return; }
     if (e.key === 'Enter' && itens[at]) { e.preventDefault(); abrir(itens[at]); }
   };
+  // o cabeçalho de cada bloco: o nome do ambiente (seções), "Clientes" ou "Ações"
+  const chaveBloco = (it: ItemPaleta) => (it.tipo === 'secao' ? 's:' + it.grupoId : it.tipo);
+  const rotuloBloco = (it: ItemPaleta) => (it.tipo === 'secao' ? (grupos.length > 1 || alfa ? it.grupoRotulo : 'Seções') : it.tipo === 'cliente' ? 'Clientes' : 'Ações');
+  const marcador = comClientes
+    ? (acoes.length ? 'Buscar seção, cliente (nome, CPF, telefone) ou ação…' : 'Buscar cliente (nome, CPF, telefone) ou seção…')
+    : (acoes.length ? 'Buscar seção ou ação…' : 'Buscar seção…');
 
   return createPortal(
     <div className="pal-veu" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
@@ -390,8 +467,7 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
             <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
           </svg>
           <input ref={inputRef} className="pal-inp" type="text" value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder={comClientes ? 'Buscar cliente (nome, CPF, telefone) ou seção…' : 'Buscar seção…'}
-            aria-label="Buscar" autoComplete="off" spellCheck={false} />
+            placeholder={marcador} aria-label="Buscar" autoComplete="off" spellCheck={false} />
           {alfa ? (
             <>
               <kbd onClick={aoFechar} aria-hidden>ESC</kbd>
@@ -401,22 +477,28 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
         </div>
         <div className="pal-lista" ref={listaRef}>
           {itens.map((it, i) => {
-            const cabecalho = i === 0 || itens[i - 1].tipo !== it.tipo;
+            const cabecalho = i === 0 || chaveBloco(itens[i - 1]) !== chaveBloco(it);
+            const chave = it.tipo === 'secao' ? 's-' + it.slug : it.tipo === 'cliente' ? 'c-' + it.id : 'a-' + it.acao.id;
             return (
-              <Fragment key={it.tipo === 'secao' ? 's-' + it.slug : 'c-' + it.id}>
-                {cabecalho && <div className="pal-glabel">{it.tipo === 'secao' ? 'Seções' : 'Clientes'}</div>}
+              <Fragment key={chave}>
+                {cabecalho && <div className="pal-glabel">{rotuloBloco(it)}</div>}
                 <button type="button" className={i === at ? 'pal-item on' : 'pal-item'} tabIndex={alfa ? -1 : undefined}
                   onMouseEnter={() => setAtivo(i)} onClick={() => abrir(it)}>
-                  <span className="pal-ico" aria-hidden>{it.tipo === 'secao' ? iconeDoItem(it.slug) : COB_ICONES.clientes}</span>
+                  <span className="pal-ico" aria-hidden>{it.tipo === 'secao' ? iconeDoItem(it.slug) : it.tipo === 'cliente' ? COB_ICONES.clientes : it.acao.icone}</span>
                   {it.tipo === 'secao' ? (
                     <>
-                      <span className="pal-nome">{it.rotulo}</span>
+                      <span className="pal-nome">{destacar(it.rotulo, termo)}</span>
                       <span className="pal-meta">{it.grupo}</span>
+                    </>
+                  ) : it.tipo === 'cliente' ? (
+                    <>
+                      <span className="pal-nome">{destacar(it.nome, termo)}</span>
+                      <span className="pal-meta">{(it.comercial || '—') + ' · ' + (it.dia > 0 ? 'D' + d2(it.dia) : 'Sem ciclo')}</span>
                     </>
                   ) : (
                     <>
-                      <span className="pal-nome">{it.nome}</span>
-                      <span className="pal-meta">{(it.comercial || '—') + ' · ' + (it.dia > 0 ? 'D' + d2(it.dia) : 'Sem ciclo')}</span>
+                      <span className="pal-nome">{destacar(it.acao.rotulo, termo)}</span>
+                      {it.acao.meta && <span className="pal-meta">{it.acao.meta}</span>}
                     </>
                   )}
                 </button>
@@ -701,9 +783,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // a barra lateral desenha o ambiente para onde a pessoa VAI (sem piscar o menu do ambiente que ela não tem)
   const moduloDaBarra: ModuloId = semAcessoAoAmbiente ? (modulosDisponiveis[0]?.id ?? moduloAtivo) : moduloAtivo;
   const modulo = MODULOS.find((m) => m.id === moduloDaBarra) ?? MODULOS[0];
-  // busca de CLIENTES na paleta ⌘K: só no ambiente Cobranças e só para quem tem Cobranças
-  // (no Atendimento a busca é a do Atenvo: só as seções)
-  const buscaClientes = (isRevizaMode || isDemoMode) && temCob && moduloAtivo === 'cobrancas';
+  // busca de CLIENTES na paleta ⌘K: só para quem tem Cobranças — na ALFA, de qualquer ambiente (a paleta cobre
+  // o sistema da pessoa); quem é só do Atendimento nunca busca a carteira
+  const buscaClientes = (isRevizaMode || isDemoMode) && temCob && !acessoCarregando && modulosDisponiveis.some((m) => m.id === 'cobrancas');
 
   // BARRA DA ALFA: aberta (260px) ou recolhida (trilho) — preferência deste aparelho, e o padrão
   // segue a largura da tela; no celular vira gaveta (o botão do topo abre por cima)
@@ -779,9 +861,27 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     window.addEventListener('keydown', aoTecla);
     return () => window.removeEventListener('keydown', aoTecla);
   }, []);
-  // seções da paleta = o menu do módulo ativo, com o MESMO filtro de papel da sidebar
-  const secoesPaleta: SecaoPaleta[] = modulo.grupos.flatMap((g) =>
+  // seções da paleta = o menu de cada ambiente, com o MESMO filtro de papel da barra
+  const secoesDoModulo = (m: Modulo): SecaoPaleta[] => m.grupos.flatMap((g) =>
     filtrarItensNav(g.itens).map((i) => ({ slug: i.slug, rotulo: i.rotulo, grupo: g.rotulo })));
+  const secoesPaleta = secoesDoModulo(modulo);
+  // ALFA: os ambientes que a pessoa TEM (o atual primeiro); Atenvo: só o do módulo ativo, como sempre
+  const gruposPaleta: GrupoPaleta[] = (ALFA && !acessoCarregando ? [modulo, ...modulosDisponiveis.filter((m) => m.id !== modulo.id)] : [modulo])
+    .map((m) => ({ id: m.id, rotulo: m.rotulo, secoes: secoesDoModulo(m) }))
+    .filter((g) => g.secoes.length > 0);
+  // AÇÕES (ALFA): nova cobrança (quem a vê no Painel), trocar de ambiente (quem tem os dois) e o tema
+  const gestorOrg = currentOrg?.role === 'admin' || currentOrg?.role === 'gestor';
+  const acoesPaleta: AcaoPaleta[] = !ALFA || acessoCarregando ? [] : [
+    ...(gestorOrg && gruposPaleta.some((g) => g.secoes.some((sc) => sc.slug === 'cobrancas/novos'))
+      ? [{ id: 'nova-cobranca', rotulo: 'Nova cobrança', meta: 'Cobranças', icone: <IcMais />, apelidos: ['novo cliente', 'cadastrar cliente', 'adicionar cliente'], executar: () => navigate('/cobrancas/novos') }]
+      : []),
+    ...modulosDisponiveis.filter((m) => m.id !== modulo.id).map((m) => ({
+      id: 'amb-' + m.id, rotulo: `Trocar para ${m.rotulo}`, meta: 'Ambiente', icone: ICONE_AMBIENTE[m.id],
+      apelidos: ['trocar de ambiente', 'mudar de ambiente', 'ambiente'], executar: () => trocarModulo(m),
+    })),
+    { id: 'tema', rotulo: tema === 'dark' ? 'Usar o tema claro' : 'Usar o tema escuro', meta: 'Aparência',
+      icone: tema === 'dark' ? <IcTemaClaro /> : <IcTemaEscuro />, apelidos: ['tema', 'modo claro', 'modo escuro', 'aparencia', 'cores'], executar: alternarTema },
+  ];
   // alinha a lista da sidebar ao trocar de rota E quando a lista muda: os itens do papel chegam
   // depois da 1ª pintura (ex.: Financeiro entra quando o papel carrega) e empurram o item ativo pra
   // baixo — em 1280×720 Avisos/Registros/Usuários ficavam escondidos no pé da cápsula
@@ -1062,7 +1162,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
-        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} alfa={ALFA} />}
+        {paletaAberta && <PaletaBusca grupos={gruposPaleta} acoes={acoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} alfa={ALFA} />}
         <AvisoAtualizacao />
         {ALFA && (
           <ModalV2 aberto={atalhosAbertos} aoFechar={() => setAtalhosAbertos(false)} titulo="Atalhos do teclado" largura={420}>

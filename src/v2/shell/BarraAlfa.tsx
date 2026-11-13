@@ -55,7 +55,7 @@ function MarcaAlfa() {
 }
 
 /* ícone de cada ambiente no menu de troca (quadro de 28px): Cobranças = recibo; Atendimento = balão */
-const ICONE_AMBIENTE: Record<string, ReactNode> = {
+export const ICONE_AMBIENTE: Record<string, ReactNode> = {
   cobrancas: svg(<><path d="M5 3.5h14v17l-2.4-1.5-2.3 1.5-2.3-1.5-2.3 1.5-2.3-1.5L5 20.5z" /><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" /></>, 16),
   atendimento: svg(<path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.6A7.5 7.5 0 1 1 20 11.5z" />, 16),
 };
