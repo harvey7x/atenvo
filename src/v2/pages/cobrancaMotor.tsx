@@ -55,7 +55,7 @@ import type { Papel } from '../data/cobranca/types';
 import { isDemoMode, isRevizaMode } from '@/lib/supabase';
 // crítica 12/11 (cob_gestao): "+ Novo cliente" do Painel abre o formulário (?novo=1); ações raras no "Mais"
 import { useSearchParams } from 'react-router-dom';
-import { MenuMais } from './planilha/MenuMais';
+import { MenuMais as MenuMaisPlanilha } from './planilha/MenuMais'; // o "Mais" da Gestão (o da comunicação é outro)
 
 /** tradução de erro das mutations (RLS/RPC/rede) p/ o aviso da tela */
 const msgErro = (e: unknown) => {
@@ -4363,7 +4363,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
             <select className="inp pl-sel" value={fCom} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial"><option value="todos">Comercial: todos</option>{comerciais.map((c) => <option key={c} value={c}>{c}</option>)}</select>
             {gestor && ativos.length > 0 && <BotaoSec onClick={() => exportarXlsx(ativos, comps, 'clientes-novos')}><IcT d="M12 4v11m0 0 4-4m-4 4-4-4M4 20h16" />Exportar</BotaoSec>}
             {gestor && (
-              <MenuMais titulo="Mais ações" so itens={[
+              <MenuMaisPlanilha titulo="Mais ações" so itens={[
                 { rotulo: 'Importar novos', icone: IC_PATH.importar, aoClicar: () => setImportOpen(true) },
                 ...(normais.length > 0 ? [{
                   rotulo: 'Remover todos os novos', icone: 'M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5', perigo: true, separar: true,

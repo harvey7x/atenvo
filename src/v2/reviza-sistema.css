@@ -450,3 +450,8 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .nv-pend .fin-head h3 { color: var(--txt)
   html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg[data-cel-painel="ficha"] > :is(.wa-fila, .wa-conv) { display: none; }
   html[data-barra-alfa]:not(#rv-sis) .v2 .wa-pg .conv2 { min-height: 64px; }
 }
+
+/* ---- celular: as faixas de KPI em 2 colunas (4 colunas espremiam os números em 390px) ---- */
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+}
