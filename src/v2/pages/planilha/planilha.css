@@ -589,3 +589,4 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-rn { color: var(--plx-b
 html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-c { letter-spacing: .01em; }
 /* mês em aberto com só a data do vencimento escrita: texto discreto (a data repetida virava ruído) */
 .v2 .plx-c.plx-c-data { color: var(--txt-3); font-size: 11.5px; }
+.v2 .plx-lin-cab .plx-c { padding-left: 5px; padding-right: 5px; }

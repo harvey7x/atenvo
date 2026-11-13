@@ -1728,3 +1728,15 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.off > :f
 .v2 .calx-leg span { text-transform: none; letter-spacing: 0; font-size: 11px; }
 .v2 .calx-aside { max-height: calc(100vh - 180px); }
 .v2 .calx-ah-x { display: inline-grid; place-items: center; }
+/* Ciclos (Gerenciar): o código do ciclo é dado, não seleção — texto neutro (dourado só no que está ativo) */
+html[data-barra-alfa] .v2 .fin-ciclo-row .cm-ciclo-cod { color: var(--txt); }
+/* celular: KPIs de Novos/Cancelados em 2 colunas (4 colunas cortavam "R$ 23.94…"); filtros e ações quebram linha */
+@media (max-width: 760px) {
+  .v2 .fin-raiz > .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .fin-raiz > .kpis .kpi .val { white-space: nowrap; font-size: 22px; }
+  .v2 .fin-raiz .fin-head { flex-wrap: wrap; row-gap: 10px; }
+  .v2 .fin-raiz .fin-head .fin-filtros { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; margin-left: 0; }
+  .v2 .fin-raiz .fin-head .fin-filtros > .inp { flex: 1 1 150px; min-width: 0; width: auto; }
+  .v2 .calx-top { gap: 10px 14px; }
+  .v2 .calx-kpis { margin-left: 0; }
+}
