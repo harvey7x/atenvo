@@ -4585,20 +4585,24 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
   return (
     <div className="calx">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
-      {!gestor && <p className="cm-hint" style={{ margin: '0 0 10px' }}>Modo visualização — as datas dos ciclos são ajustadas pelo administrador (arrastar desabilitado).</p>}
+      {/* crítica 12/11: o mesmo seletor de mês do Painel; contadores no estilo do Painel; aviso em selos;
+          filtro de ciclos com estado legível ("Filtrado: 8 de 9 ciclos · Limpar") */}
       <div className="calx-top sobe" style={{ animationDelay: '.05s' }}>
         <div className="calx-nav">
-          <button type="button" className="calx-seta" onClick={() => irMes(-1)} aria-label="Mês anterior">‹</button>
-          <div className="calx-mes"><b>{CALX_MESES[cursor.m - 1]}</b><span className="num">{cursor.y}</span></div>
-          <button type="button" className="calx-seta" onClick={() => irMes(1)} aria-label="Próximo mês">›</button>
-          <button type="button" className="calx-hojebtn" onClick={irHoje}>Hoje</button>
+          <div className="pn-mes calx-mesgrp" role="group" aria-label="Mês do calendário">
+            <button type="button" className="pn-mes-seta" onClick={() => irMes(-1)} aria-label="Mês anterior"><IcT d="m15 18-6-6 6-6" s={14} mr={0} /></button>
+            <span className="calx-mes-rot num" aria-live="polite">{`${CALX_MESES[cursor.m - 1]} de ${cursor.y}`}</span>
+            <button type="button" className="pn-mes-seta" onClick={() => irMes(1)} aria-label="Próximo mês"><IcT d="m9 18 6-6-6-6" s={14} mr={0} /></button>
+          </div>
+          <button type="button" className="calx-hojebtn" onClick={irHoje} disabled={cursor.y === hoje.getFullYear() && cursor.m === hoje.getMonth() + 1}>Hoje</button>
+          {!gestor && <span className="st s-ne calx-ro" title="As datas dos ciclos são ajustadas pelo administrador (arrastar desabilitado)."><i aria-hidden />Somente leitura</span>}
         </div>
         <div className="calx-kpis">
-          <div className="calx-kpi"><span className="num">{visiveis.length}</span><em>ciclos</em></div>
-          <div className="calx-kpi"><span className="num">{totalPessoas}</span><em>pessoas</em></div>
-          <div className={`calx-kpi${deslocados.length ? ' alerta' : ''}`}><span className="num">{deslocados.length}</span><em>deslocados</em></div>
+          <span className="pn-barra-stat num"><b>{visiveis.length}</b> ciclo{visiveis.length === 1 ? '' : 's'}</span>
+          <span className="pn-barra-stat num"><b>{totalPessoas}</b> pessoa{totalPessoas === 1 ? '' : 's'}</span>
+          <span className={`pn-barra-stat num${deslocados.length ? ' calx-stat-alerta' : ''}`}><b>{deslocados.length}</b> reprogramado{deslocados.length === 1 ? '' : 's'}</span>
         </div>
-        <select className="inp calx-sit" value={fSit} onChange={(e) => setFSit(e.target.value as typeof fSit)}>
+        <select className="inp calx-sit" value={fSit} onChange={(e) => setFSit(e.target.value as typeof fSit)} aria-label="Filtrar clientes">
           <option value="todos">Todos os clientes</option>
           <option value="cancelado">Em cobrança</option>
           <option value="ativo">Débito ativo</option>
@@ -4607,22 +4611,35 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
 
       {deslocados.length > 0 && (
         <div className="calx-alerta sobe" style={{ animationDelay: '.08s' }} role="status">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a1.5 1.5 0 0 0 1.3 2.2h16.6a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z" /></svg>
-          <div><b>Ajuste automático de {CALX_MESES[cursor.m - 1]}:</b> {deslocados.map((x, i) => (
-            <span key={x.c.dia} className="calx-al-item"><b>{x.c.codigo}</b> recebe {diaBR(x.c.dia)}{x.cd.motivo ? ` (${x.cd.motivo})` : ''} → cobrança <b>{dataBRcurta(x.cd.iso)}</b> ({diaSemanaBR(x.cd.iso)}){i < deslocados.length - 1 ? '' : ''}</span>
-          ))}</div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a1.5 1.5 0 0 0 1.3 2.2h16.6a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z" /></svg>
+          <span className="calx-al-tit">Cobranças reprogramadas em {CALX_MESES[cursor.m - 1]}</span>
+          <span className="calx-al-selos">
+            {deslocados.map((x) => (
+              <span key={x.c.dia} className="calx-al-selo num" title={`${x.c.codigo} recebe dia ${diaBR(x.c.dia)}${x.cd.motivo ? ` (${x.cd.motivo})` : ''} — cobrança em ${dataBRcurta(x.cd.iso)} (${diaSemanaBR(x.cd.iso)})`}>
+                <b>{x.c.codigo}</b>{diaSemanaBR(`${comp}-${d2(Math.min(x.c.dia, ult))}`).slice(0, 3)} {d2(Math.min(x.c.dia, ult))}
+                <IcT d="M5 12h14m-5-5 5 5-5 5" s={12} mr={0} />{diaSemanaBR(x.cd.iso).slice(0, 3)} {dataBRcurta(x.cd.iso).slice(0, 5)}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
-      <div className="calx-chips sobe" style={{ animationDelay: '.1s' }}>
-        <button type="button" className={`calx-chip${ocultos.size === 0 ? ' on' : ''}`} onClick={() => setOcultos(new Set())}>Todos</button>
+      <div className="calx-chips sobe" style={{ animationDelay: '.1s' }} role="group" aria-label="Filtrar ciclos">
+        <button type="button" className={`calx-chip calx-todos${ocultos.size === 0 ? ' on' : ''}`} aria-pressed={ocultos.size === 0} onClick={() => setOcultos(new Set())}>Todos</button>
         {ciclos.map((c) => (
-          <button type="button" key={c.dia} className={`calx-chip${ocultos.has(c.dia) ? ' off' : ' on'}`}
+          <button type="button" key={c.dia} className={`calx-chip${ocultos.has(c.dia) ? ' off' : ''}`} aria-pressed={!ocultos.has(c.dia)}
+            title={ocultos.has(c.dia) ? `${c.codigo} oculto — clique para mostrar` : `Clique para ocultar ${c.codigo}`}
             onMouseEnter={() => setCicloFoco(c.dia)} onMouseLeave={() => setCicloFoco(null)} onFocus={() => setCicloFoco(c.dia)} onBlur={() => setCicloFoco(null)}
             onClick={() => alternarCiclo(c.dia)}>
             {c.codigo}<span className="calx-chip-n">{c.leads.length}</span>
           </button>
         ))}
+        {ocultos.size > 0 && (
+          <span className="calx-filtrado num">
+            Filtrado: {ciclos.length - ciclos.filter((c) => ocultos.has(c.dia)).length} de {ciclos.length} ciclos
+            <button type="button" className="mc-lnk" onClick={() => setOcultos(new Set())}>Limpar</button>
+          </span>
+        )}
       </div>
 
       <div className="calx-layout sobe" style={{ animationDelay: '.14s' }}>
@@ -4652,8 +4669,8 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
                       </span>
                     ))}
                     {ghosts.map((g) => (
-                      <span key={`g${g.dia}`} className={`calx-pill fantasma${cicloFoco === g.dia ? ' foco' : ''}`} title={`Recebe dia ${d2(g.dia)}, mas ${g.motivo}: cobrança anda para ${dataBRcurta(g.destino)}`}>
-                        D{d2(g.dia)}→{Number(g.destino.slice(8, 10))}
+                      <span key={`g${g.dia}`} className={`calx-pill fantasma${cicloFoco === g.dia ? ' foco' : ''}`} title={`D${d2(g.dia)} cobrado no dia ${dataBRcurta(g.destino)} (${g.motivo})`}>
+                        <span className="calx-rot" aria-hidden><IcT d={IC_PATH.girar} s={10} mr={0} /></span>D{d2(g.dia)}
                       </span>
                     ))}
                   </div>
@@ -4705,7 +4722,7 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
                   <div className="calx-ah-tit">{diaSemanaBR(diaSel).replace(/^./, (c) => c.toUpperCase())}, {Number(diaSel.slice(8, 10))} de {CALX_MESES[cursor.m - 1]}</div>
                   {nomeFerSel && <div className="calx-ah-fer"><IcT d={IC_PATH.bandeira} s={11} mr={0} /> {nomeFerSel}</div>}
                 </div>
-                <button type="button" className="calx-ah-x" onClick={() => setDiaSel(null)} aria-label="Fechar">×</button>
+                <button type="button" className="calx-ah-x" onClick={() => setDiaSel(null)} aria-label="Fechar"><IcT d="M18 6 6 18M6 6l12 12" s={15} mr={0} /></button>
               </div>
               {gruposDia.length === 0 ? (
                 <div className="calx-aside-vazio"><p>Nenhuma cobrança neste dia.</p></div>
@@ -4736,7 +4753,6 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
           )}
         </aside>
       </div>
-      {!gestor && <p className="cm-hint" style={{ marginTop: 10 }}>Visão somente leitura.</p>}
     </div>
   );
 }

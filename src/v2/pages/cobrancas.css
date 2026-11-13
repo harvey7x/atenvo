@@ -1686,3 +1686,45 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec:first-child { m
 html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec .gs-lab-nota { font-size: var(--fs-12, 12px); font-weight: 400; color: var(--txt-3); margin-left: 4px; }
 /* "Excluir cliente" à esquerda, vermelho sem fundo, separado das ações de salvar */
 .v2 .p-modal-rodape .ficha-excluir { margin-right: 8px; }
+/* ---- Calendário (crítica 12/11): o mês cabe na tela, seletor de mês igual ao do Painel ---- */
+.v2 .calx { display: flex; flex-direction: column; gap: 12px; }
+.v2 .calx > * { margin-top: 0; margin-bottom: 0; }
+.v2 .calx-mesgrp { flex: none; }
+.v2 .calx-mes-rot { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; min-width: 150px; justify-content: center;
+  border-radius: 8px; background: rgba(var(--tint), .06); color: var(--txt); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.v2 .calx-hojebtn:disabled { opacity: .45; cursor: default; }
+.v2 .calx-ro { margin-left: 4px; }
+.v2 .calx-kpis { gap: 0; }
+.v2 .calx-kpis .pn-barra-stat + .pn-barra-stat { margin-left: 11px; }
+.v2 .calx-stat-alerta b { color: var(--cor-alerta-txt, var(--ambar)); }
+/* aviso de reprogramação: título curto + selos "D01 dom 01 → ter 03/11" */
+.v2 .calx-alerta { align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 8px 12px; }
+.v2 .calx-alerta > svg { margin-top: 0; color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .calx-alerta { border-left-color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .calx-al-tit { font-size: 12.5px; font-weight: 600; color: var(--txt); margin-right: 4px; }
+.v2 .calx-al-selos { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.v2 .calx-al-selo { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-2); white-space: nowrap; cursor: default; }
+.v2 .calx-al-selo b { color: var(--txt); font-weight: 600; margin-right: 2px; }
+.v2 .calx-al-selo svg { color: var(--txt-3); }
+/* filtro de ciclos: "Todos" é a seleção (dourado); ciclo oculto fica riscado; o estado do filtro em texto */
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.calx-todos.on {
+  color: var(--txt); background: var(--cor-acento-suave); border: 1px solid var(--cor-acento-fio);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.off { opacity: 1; color: var(--txt-3); border-style: dashed; background: transparent; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.off > :first-child,
+.v2 .calx-chip.off { text-decoration: line-through; text-decoration-color: rgba(var(--tint), .4); }
+.v2 .calx-chip.off .calx-chip-n { text-decoration: none; }
+.v2 .calx-filtrado { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; font-size: 12px; color: var(--txt-2); }
+/* grade mais baixa: o mês inteiro cabe em 820px */
+.v2 .calx-cal { padding: 14px 16px 12px; }
+.v2 .calx-wk { margin-bottom: 4px; }
+.v2 .calx-wk span { padding-bottom: 4px; }
+.v2 .calx-grid { gap: 4px; }
+.v2 .calx-cell { min-height: 74px; padding: 6px 9px 7px; gap: 2px; }
+.v2 .calx-fer { font-size: 11px; letter-spacing: .02em; text-transform: none; font-weight: 600; min-width: 0; max-width: 100%; display: block; }
+.v2 .calx-fer::before { display: inline-block; vertical-align: middle; margin-right: 4px; }
+.v2 .calx-leg { margin-top: 10px; padding-top: 9px; gap: 16px; }
+.v2 .calx-leg span { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.v2 .calx-aside { max-height: calc(100vh - 180px); }
+.v2 .calx-ah-x { display: inline-grid; place-items: center; }
