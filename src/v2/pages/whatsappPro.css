@@ -509,3 +509,149 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .a
   html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx { background: var(--ip-painel); }
   html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx.recolhido { width: 0; }
 }
+
+/* ===== crítica 12/11 — atendimento (WhatsApp) =====
+   Só na ALFA. Prefixo  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg  (peso de um id + a página) — vence a
+   camada PRO, a repaginada e a régua do sistema em qualquer ordem de carga.
+   Regras: dourado SÓ na conversa selecionada, nas não lidas e no Enviar; um horário por linha; no máximo
+   dois selos por item (situação + um alerta escrito); nada abaixo de 11px; nada de caractere como ícone. */
+
+/* botões só do celular: fora do celular não existem */
+.v2 :is(.wa-cel-volta, .wa-cel-so) { display: none; }
+
+/* ---------- fila ---------- */
+/* a barra à esquerda marca SÓ a selecionada (a espera virou selo escrito) */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2::before { background: transparent; box-shadow: none; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2.ativa::before { background: var(--azul); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .av2 .sig { display: none; }
+/* nome com reticências de verdade (o texto solto num flex não cortava com "…") */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .n { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .nm-tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 :is(.n .fl, .ia-ic) { display: inline-flex; flex-shrink: 0; color: var(--txt-3); font-size: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 :is(.n .fl, .ia-ic) svg { width: 13px; height: 13px; }
+/* um horário só (hora da última mensagem), neutro; com não lidas sobe um degrau, sem dourado */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .h2 { font-size: 12px; font-weight: 400; color: var(--txt-3); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2:has(.nl) .h2 { color: var(--txt-2); font-weight: 600; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .nl { min-width: 20px; height: 20px; font-size: 11px; font-weight: 600; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cr { display: none; }
+/* selos do item: UMA família — 20px, raio 6, 11/600 em caixa alta, ponto de cor quando há */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .chips { gap: 5px; row-gap: 4px; margin-top: 6px; flex-wrap: wrap; min-width: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 :is(.cchip, .etqchip.sm) {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; max-width: 100%;
+  height: 20px; line-height: 18px; padding: 0 7px; border-radius: 6px; box-sizing: border-box;
+  font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--txt-2); background: var(--ip-chip, rgba(var(--tint), .05)); border: 1px solid var(--ip-chip-fio, rgba(var(--tint), .08));
+}
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.etapa { flex-shrink: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .etqchip.sm { text-transform: none; letter-spacing: 0; }
+/* a cor da etapa vem em --pt-cor (não em --c: a repaginada pinta com !important todo chip que traz --c) */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.conv2 .cchip.etapa, .wa-hchip.etapa) .pt { display: block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--pt-cor, var(--txt-3)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.conv2 .cchip.etapa, .wa-hchip.etapa).sit-ganho .pt { background: var(--cor-ok, var(--verde)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.conv2 .cchip.etapa, .wa-hchip.etapa):is(.sit-perdido, .sit-cancelado) .pt { background: var(--cor-erro, var(--rubro)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.conv2 .cchip.etapa, .wa-hchip.etapa).sit-lead .pt { background: var(--pt-cor, var(--cor-alerta, var(--ambar))); }
+/* o 2º selo: alerta escrito (laranja), erro (vermelho), espera pelo prazo, finalizado (verde) */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 :is(.cchip.alerta, .cchip.espera.t-ambar) { color: var(--cor-alerta-txt, var(--ambar)); background: var(--cor-alerta-suave); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 :is(.cchip.alerta.erro, .cchip.espera.t-vermelho, .cchip.espera.t-critico) { color: var(--cor-erro-txt, var(--rubro)); background: var(--cor-erro-suave); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.fim { color: var(--cor-ok-txt, var(--verde)); background: var(--cor-ok-suave); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.repasse { text-transform: none; letter-spacing: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip svg { width: 11px; height: 11px; flex-shrink: 0; margin: 0; }
+/* Radar: os degraus seguem (1º laranja, 2º contorno vermelho, último vermelho cheio); "Ligar" sai do dourado */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.conv2 .cchip.rdr-selo.ligar, .wa-hchip.ligar) { color: var(--txt); background: rgba(var(--tint), .06); border-color: rgba(var(--tint), .16); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.rdr-selo.e1 { color: var(--cor-alerta-txt, var(--ambar)); background: var(--cor-alerta-suave); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.rdr-selo.e2 { color: var(--cor-erro-txt, var(--rubro)); background: transparent; border-color: rgba(var(--rubro-rgb), .55); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.rdr-selo.e3 { color: #fff; background: var(--rubro); border-color: var(--rubro); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .cchip.rdr-selo.pedido { color: var(--cor-alerta-txt, var(--ambar)); background: var(--cor-alerta-suave); border-color: rgba(var(--ambar-rgb), .5); }
+/* cabeçalho de grupo e vazio: régua de 11/12 */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-grupo { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-grupo :is(.qt, .gnl) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-vazio { font-size: 13px; color: var(--txt-2); padding: 32px 16px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-fchip { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .fbadge { font-size: 11px; }
+
+/* ---------- cabeçalho da conversa: selos inteiros (quebram linha em vez de cortar "DOCUM…") ---------- */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .sb { font-size: 12px; flex-wrap: wrap; row-gap: 4px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .idw { min-width: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-hchip {
+  display: inline-flex; align-items: center; gap: 5px; max-width: none; overflow: visible; white-space: nowrap;
+  height: 20px; line-height: 18px; padding: 0 7px; border-radius: 6px; box-sizing: border-box;
+  font-size: 11px; font-weight: 600; letter-spacing: .03em;
+}
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-hchip.etapa { color: var(--txt-2); background: var(--ip-chip, rgba(var(--tint), .05)); border: 1px solid var(--ip-chip-fio, rgba(var(--tint), .08)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-hchip.of { color: var(--cor-ok-txt, var(--verde)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-hchip svg { width: 11px; height: 11px; flex-shrink: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-hchip .preso { display: inline-flex; color: var(--txt-2); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo :is(.etqchip, .janela) { height: 20px; font-size: 11px; }
+
+/* ---------- fio de mensagens: o balão enviado é neutro (o dourado fica no Enviar) ---------- */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-wa) .v2 .wa-pg .wa-msgs .bolha.env2 { background: #1D1F24; border-color: rgba(255, 255, 255, .09); }
+html[data-barra-alfa][data-tema="light"]:not(#rv-wa) .v2 .wa-pg .wa-msgs .bolha.env2 { background: #EEF0F3; border-color: rgba(17, 24, 39, .08); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-msgs :is(.bolha .hh, .dia, .bt-tag, .suf, .audio2 .dur, .audio2 .rate, .tick) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-msgs .audio2 .play { background: rgba(var(--tint), .12); color: var(--txt); box-shadow: none; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-msgs .audio2 .play:hover { background: rgba(var(--tint), .18); }
+
+/* ---------- compositor: anexos todos em ícone de 32px; "Scripts" é o único com rótulo; Enviar dourado com texto ---------- */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > .p-btn.btn-mini {
+  width: 32px; min-width: 32px; height: 32px; padding: 0; justify-content: center;
+  color: var(--txt-2); background: transparent; border: 1px solid transparent; box-shadow: none;
+}
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > .p-btn.btn-mini:hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .06); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > .p-btn.btn-mini > span { display: none; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > .p-btn.btn-mini svg { width: 16px; height: 16px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools .wa-scr-btn { height: 32px; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools .wa-scr-btn .ct { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools .wa-scr-btn:is(:hover:not(:disabled), .on) { color: var(--txt); background: rgba(var(--tint), .08); border-color: rgba(var(--tint), .18); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .wa-resp-sel .rs-rot { font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-3); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .oftag { font-size: 11px; height: 18px; line-height: 16px; letter-spacing: .02em; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .env-b { background: rgba(var(--tint), .07); color: var(--txt-3); border: 1px solid rgba(var(--tint), .08); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .env-b.pronto:not(:disabled) { background: var(--platina-a, var(--azul)); color: var(--platina-txt, #1A1407); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg:focus-within { border-color: rgba(var(--tint), .22); box-shadow: 0 0 0 3px rgba(var(--tint), .06); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-linha-resp { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-composer :is(.wa-aviso, .reply-box) { font-size: 12px; }
+
+/* ---------- ficha do contato: a etapa é um cartão neutro com o ponto na cor dela ---------- */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase { background: var(--ip-cartao, rgba(var(--tint), .03)); border: 1px solid var(--ip-fio-forte, rgba(var(--tint), .1)); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase .ic { width: 22px; height: 22px; background: color-mix(in srgb, var(--fase) 16%, transparent); color: var(--fase); box-shadow: none; font-size: 0; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase .ic svg { width: 13px; height: 13px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase .ctx-fase-pt { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--fase); }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase .tx b { color: var(--txt); font-size: 13px; font-weight: 600; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-fase .tx small { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.ctx-t, .wa-ctx .fjb-h) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.chk-cnt, .chk-sh, .wa-ctx .fjb-tag) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cx-l .cx-lk { color: var(--txt); text-decoration: underline; text-decoration-color: rgba(var(--tint), .28); text-underline-offset: 3px; }
+
+/* ---------- celular (≤760px): um painel por vez (data-cel-painel), voltar e dados com 40px ---------- */
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.wa-cel-volta, .wa-cel-so) {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 40px; height: 40px; min-width: 40px; padding: 0; border-radius: 10px;
+  }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg :is(.wa-cel-volta, .wa-cel-so) svg { width: 20px; height: 20px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-dados-desk { display: none; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo { flex-wrap: wrap; row-gap: 8px; padding: 8px 10px; gap: 8px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .idw { flex: 1 1 0; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir { flex: 1 1 100%; margin-left: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; justify-content: flex-start; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .ib2[title^="Modo de foco"] { display: none; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-topo { position: relative; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .ctx-topo .ctx-volta { position: absolute; top: 10px; left: 10px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctx, html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctx-inner { width: 100%; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo { align-items: flex-start; }
+  /* compositor no celular: texto · ferramentas (rolam) · "Responder por" + Enviar */
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ta ta" "tools tools" "resp env"; row-gap: 6px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > * { flex-shrink: 0; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .wa-resp-sel { margin-left: 2px; min-height: 40px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tools > .p-btn.btn-mini { width: 40px; min-width: 40px; height: 40px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .tool { width: 40px; height: 40px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .cmsg .env-b { width: 44px; height: 44px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .conv2 .wa-pin { opacity: .5; width: 32px; height: 32px; }
+}
+
+/* ---------- vidro do painel de Filtros e da paleta de Scripts: mais opaco (no claro a foto atrás manchava) ---------- */
+html[data-barra-alfa][data-tema="light"]:not(#rv-wa) .v2 .wa-pop.wa-filtro.vidro-pro.vidro-pro {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(250, 251, 252, .94));
+  -webkit-backdrop-filter: blur(22px) saturate(1.15); backdrop-filter: blur(22px) saturate(1.15);
+}
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-wa) .v2 .wa-pop.wa-filtro.vidro-pro.vidro-pro {
+  background: linear-gradient(160deg, rgba(34, 36, 42, .92), rgba(22, 24, 28, .9));
+  -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
+}
