@@ -464,3 +464,24 @@ html[data-barra-alfa] .v2 .ba-atalhos kbd {
   html[data-barra-alfa] .v2 .p-topbar :is(.ib, .avatar-btn, .ba-alternar, .bd-botao)::after { content: ""; position: absolute; inset: -6px; }
   html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn { margin-left: 0; }
 }
+
+/* ---- barra POR CIMA do conteúdo (trilho aberto pelo mouse, pelo Tab, pelo menu de ambiente ou pelo botão do
+   topo): superfície um degrau acima da página, fio à direita e um véu sobre o conteúdo — a barra deixa de
+   "colar" no conteúdo e passa a flutuar (na tela média, a dos notebooks da equipe, era o estado de sempre) ---- */
+html[data-barra-alfa] .v2 { --ba-sobre: #15161A; --ba-sobre-fio: rgba(255, 255, 255, .08); --ba-veu-cor: rgba(0, 0, 0, .45); }
+html[data-barra-alfa][data-tema="light"] .v2 { --ba-sobre: #FFFFFF; --ba-sobre-fio: rgba(16, 24, 40, .08); --ba-veu-cor: rgba(17, 19, 24, .18); }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]),
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra { background: var(--ba-sobre); border-right-color: var(--ba-sobre-fio); }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"]::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 64px; z-index: 29;
+  background: var(--ba-veu-cor); opacity: 0; pointer-events: none; transition: opacity .2s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre]::after,
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"]:has(> .ba-barra:is(:has(:focus-visible), [data-menu]))::after { opacity: 1; }
+@media (hover: hover) {
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover { background: var(--ba-sobre); border-right-color: var(--ba-sobre-fio); }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"]:has(> .ba-barra:hover)::after { opacity: 1; transition-delay: .05s; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-perf="lite"] .v2 .p-app[data-barra="trilho"]::after { transition: opacity .2s var(--ba-e) !important; }
+}

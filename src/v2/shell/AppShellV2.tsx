@@ -54,6 +54,8 @@ const lerPrefBarra = (): 'aberta' | 'trilho' | null => {
 const LARGURA_CELULAR = 760;
 const LARGURA_ENCAIXE = 1440;
 const zonaDaLargura = (w: number): 'gaveta' | 'media' | 'larga' => (w <= LARGURA_CELULAR ? 'gaveta' : w < LARGURA_ENCAIXE ? 'media' : 'larga');
+/* telas que precisam de toda a largura: a barra começa recolhida nelas em qualquer tela (crítica 12/11) */
+const TELAS_DE_TRABALHO = /^\/(whatsapp|kanban|cobrancas\/planilha)(\/|$)/;
 /* atalho de teclado não age com o foco num campo de texto (Ctrl+, apagava o rascunho do WhatsApp) */
 const ehEditavel = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
@@ -708,7 +710,12 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     window.addEventListener('resize', ver);
     return () => window.removeEventListener('resize', ver);
   }, []);
-  const zonaBarra = zonaDaLargura(largura);
+  // TELAS DE TRABALHO largas (WhatsApp, Kanban e Gestão de cobranças): mesmo na tela larga a barra começa
+  // recolhida (trilho), como na tela média — a tela precisa da largura; a preferência salva não muda e vale
+  // nas outras telas. O botão do topo abre a barra por cima do conteúdo.
+  const telaDeTrabalho = TELAS_DE_TRABALHO.test(location.pathname);
+  const zonaTela = zonaDaLargura(largura);
+  const zonaBarra = zonaTela === 'larga' && telaDeTrabalho ? 'media' : zonaTela;
   // por cima do conteúdo: a gaveta do celular ou o trilho aberto pelo botão (tela média). Fecha ao navegar.
   const [sobreposta, setSobreposta] = useState(false);
   useEffect(() => { setSobreposta(false); }, [location.pathname, zonaBarra]);
