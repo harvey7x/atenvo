@@ -303,3 +303,86 @@ html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-num { margin-top: 9px; font-
   html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra i { transition: width .4s cubic-bezier(.2, .7, .2, 1) !important; }
   html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra.indet i { animation: kb-carr-indet 1.25s ease-in-out infinite !important; }
 }
+
+/* ===== crítica 12/11 — atendimento (Kanban) =====
+   Só na ALFA (html[data-barra-alfa]); o :not(#rv-kb) dá o peso de um id e vence as camadas acima. */
+/* cabeçalho no mesmo lugar das outras telas (26px 30px, título em x=290/y=95) */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro { padding: 26px 30px 12px; }
+/* paleta do sistema: azul de seleção/arrasto vira o dourado da seleção; alerta, erro e ok nos semânticos */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro {
+  --kp-blue: var(--azul); --kp-blue-bg: var(--cor-acento-suave);
+  --kp-red: var(--cor-erro-txt, var(--rubro)); --kp-red-bg: var(--cor-erro-suave);
+  --kp-orange: var(--cor-alerta-txt, var(--ambar)); --kp-orange-bg: var(--cor-alerta-suave);
+  --kp-green: var(--cor-ok-txt, var(--verde)); --kp-green-bg: var(--cor-ok-suave);
+}
+/* "Responder · 2" é atenção (laranja), não informação azul */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-chip.msg { color: var(--cor-alerta-txt, var(--ambar)); background: var(--cor-alerta-suave); border-color: transparent; }
+
+/* barra de filtros: a busca no fim da 1ª linha (Ordenar · Foco · Equipe · Filtros · Exportar ····· Buscar) */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra > .kb-busca { order: 1; margin-left: auto; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-busca input { width: 280px; height: 32px; border-radius: 8px; font-size: 13px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-busca.so-cel { display: none; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra > .kb-fchip { gap: 6px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra > .kb-fchip > svg { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 1.6; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra > .kb-fchip.foco.on { color: var(--txt); background: var(--cor-acento-suave); border-color: var(--cor-acento-fio); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-fchip .c { font-size: 11px; }
+
+/* cartão: o selo de tempo NUNCA corta ("Parado 10d" virava "parado 1"); faltando espaço, o pé quebra a linha */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-pe { flex-wrap: wrap; row-gap: 6px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-chip { flex-shrink: 0; height: 22px; line-height: 20px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-chip.est { flex-shrink: 0; min-width: auto; overflow: visible; text-overflow: clip; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-chip svg { width: 12px; height: 12px; }
+/* etapa do funil: N segmentos (a etapa atual e as anteriores preenchidas; fechado = verde) */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-etapas {
+  display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 6px; flex-shrink: 0;
+  border-radius: 6px; background: var(--kp-chip); border: 1px solid var(--kp-line);
+}
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-etapas i { display: block; width: 6px; height: 6px; border-radius: 2px; background: rgba(var(--tint), .14); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-etapas i.on { background: var(--txt-2); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-etapas.ok { background: var(--cor-ok-suave); border-color: transparent; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-etapas.ok i.on { background: var(--cor-ok-txt, var(--verde)); }
+/* textos abaixo de 11px no cartão e na coluna */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc .sla-chip { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kc-lem { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .q { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-subcab { font-size: 12px; }
+
+/* quadro: colunas de 264px; a borda que ainda tem coluna esmaece e ganha seta de rolagem */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-quadro { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-quadro > .kb-scroll { flex: 1; min-height: 0; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-col:not(.recolhida) { flex: 0 0 264px; width: 264px; min-width: 264px; max-width: 264px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-quadro.f-dir > .kb-scroll { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-quadro.f-esq > .kb-scroll { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-quadro.f-esq.f-dir > .kb-scroll { -webkit-mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent); mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta {
+  position: absolute; top: 14px; z-index: 4; width: 32px; height: 32px; padding: 0; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--txt); background: var(--cor-sup-3); border: 1px solid var(--cor-borda-ctl); box-shadow: var(--sombra-1, 0 2px 8px rgba(0, 0, 0, .3));
+}
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta:hover { background: var(--cor-sup-2); }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta.dir { right: 4px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta.esq { left: 4px; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta svg { width: 16px; height: 16px; stroke-width: 1.6; }
+
+/* celular: a busca sobe para o cabeçalho (linha própria); os filtros viram UMA fileira que rola */
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro { padding: 16px 16px 10px; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-busca.so-cel { display: block; flex: 1 1 100%; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-busca.so-cel input { width: 100%; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-busca.so-desk { display: none; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra::before { display: none; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-barra > * { flex-shrink: 0; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-col:not(.recolhida) { flex-basis: min(300px, calc(100vw - 56px)); width: min(300px, calc(100vw - 56px)); min-width: 0; max-width: none; }
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-seta { display: none; }
+}
+/* cabeçalho da coluna: o "recolher" só aparece no hover (invisível, ainda ocupava 24px e cortava "LEAD NOVO") */
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .kb-col-toggle { display: none; }
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab:hover .kb-col-toggle,
+html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .kb-col-toggle:focus-visible { display: inline-flex; opacity: 1; }
+@media (pointer: coarse) {
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .kb-col-toggle { display: inline-flex; opacity: 1; }
+}
+@media (max-width: 760px) {
+  /* celular: o selo "entrada" sai do cabeçalho da coluna (fica no title do nome) para o nome caber inteiro */
+  html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .tag-entrada { display: none; }
+}

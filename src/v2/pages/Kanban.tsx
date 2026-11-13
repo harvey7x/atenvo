@@ -165,8 +165,10 @@ const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12
 // Kanban PRO (29/10): ícones dos chips do card
 const IcRelogio = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Ic>;
 const IcCal = () => <Ic><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></Ic>;
-const IcEtapas = () => <Ic><path d="M4 17h4v-4h4V9h4V5h4" /></Ic>;
 const IcAlerta = () => <Ic><path d="M12 4 2.8 19.5h18.4L12 4z" /><path d="M12 10v4M12 17h.01" /></Ic>;
+const IcAlvo = () => <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none" /></Ic>; // Foco
+const IcSetaLado = ({ esq }: { esq?: boolean }) => <Ic>{esq ? <path d="m14.5 6-6 6 6 6" /> : <path d="m9.5 6 6 6-6 6" />}</Ic>;
+const IcBaixar = () => <Ic><path d="M12 4v11" /><path d="m7.5 10.5 4.5 4.5 4.5-4.5" /><path d="M5 19.5h14" /></Ic>; // Exportar
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -695,6 +697,37 @@ export default function KanbanV2() {
     };
     autoRaf.current = requestAnimationFrame(passo);
   };
+  /* BORDAS DO QUADRO (crítica 12/11: "a 4ª coluna fica cortada na borda, sem indicação de rolagem"):
+     com mais colunas que a tela, a borda que ainda tem coluna esmaece e ganha uma seta de rolagem */
+  const [bordas, setBordas] = useState({ esq: false, dir: false });
+  const medirBordas = () => {
+    const el = boardRef.current;
+    if (!el) return;
+    const esq = el.scrollLeft > 4;
+    const dir = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setBordas((b) => (b.esq === esq && b.dir === dir ? b : { esq, dir }));
+  };
+  const medirBordasRef = useRef(medirBordas);
+  medirBordasRef.current = medirBordas;
+  // o quadro só existe depois do carregamento: observa quando o elemento aparece (ou troca), sem recriar a cada render
+  const bordasObs = useRef<{ el: HTMLElement | null; ro: ResizeObserver | null }>({ el: null, ro: null });
+  useEffect(() => {
+    const el = boardRef.current;
+    if (bordasObs.current.el === el) return;
+    bordasObs.current.ro?.disconnect();
+    bordasObs.current = { el, ro: null };
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => medirBordasRef.current());
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    bordasObs.current.ro = ro;
+    medirBordasRef.current();
+  });
+  useEffect(() => () => bordasObs.current.ro?.disconnect(), []);
+  const rolarQuadro = (lado: 1 | -1) => {
+    const el = boardRef.current;
+    if (el) el.scrollBy({ left: lado * Math.max(276, Math.round(el.clientWidth * 0.75)), behavior: 'smooth' });
+  };
 
   const mover = async (id: string, colId: string) => {
     const lead = leads.find((l) => l.id === id);
@@ -932,19 +965,20 @@ export default function KanbanV2() {
 
   return (
     <div className="kb-pg kb-pro">
+      {/* crítica 12/11: título sozinho, como na Cobrança (a explicação fica no title do título);
+          a busca desceu para a barra de filtros — no topo fica só a ação principal */}
       <div className="ph sobe">
         <div>
-          <h2>Kanban</h2>
-          <p>Funil comercial · cada card = 1 oportunidade em andamento{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
+          <h2 title="Funil comercial: cada cartão é uma oportunidade em andamento">Kanban</h2>
         </div>
         <div className="acoes">
-          <div className="kb-busca">
-            <IcBusca />
-            <input
-              className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome, telefone, e-mail, benefício, serviço, instituição, responsável ou etiqueta..."
-            />
-          </div>
+          {/* no celular a busca mora aqui, numa linha só dela (a barra de filtros vira uma fileira que rola) */}
+          {!vazioFunil && (
+            <div className="kb-busca so-cel">
+              <IcBusca />
+              <input className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads..." />
+            </div>
+          )}
           {podeConfig && <BotaoSec onClick={abrirNovaColuna}>Nova coluna</BotaoSec>}
           <BotaoPrimario onClick={() => abrirNovoLead()}>＋ Novo lead</BotaoPrimario>
         </div>
@@ -964,7 +998,7 @@ export default function KanbanV2() {
             </div>
             <button type="button" className={'kb-fchip foco' + (foco ? ' on' : '')} aria-pressed={foco}
               title="Mostra só os leads que exigem ação agora — sem esconder o board" onClick={() => setFoco((f) => !f)}>
-              ◆ Foco{foco ? ' ativo' : ''}
+              <IcAlvo />Foco{foco ? ' ativo' : ''}
             </button>
             {cargaPorResp.length > 1 && (
               <button type="button" className={'kb-fchip' + (equipe ? ' on' : '')} aria-pressed={equipe}
@@ -987,8 +1021,16 @@ export default function KanbanV2() {
               Filtros{nFiltrosAtivos > 0 && <span className="c num">{nFiltrosAtivos}</span>}
             </button>
             <button type="button" className="kb-fchip" title={`Baixar os ${leadsVisiveis.length} lead(s) do recorte atual em CSV (abre no Excel) — respeita busca e filtros`} onClick={exportarCsv}>
-              ⇩ Exportar
+              <IcBaixar />Exportar
             </button>
+            <div className="kb-busca so-desk">
+              <IcBusca />
+              <input
+                className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)}
+                title="Busca por nome, telefone, e-mail, benefício, serviço, instituição, responsável ou etiqueta"
+                placeholder="Buscar leads..."
+              />
+            </div>
           </div>
 
           {/* v3 F2 — Carga por responsável (opt-in): quem está sobrecarregado; clicar filtra o board */}
@@ -1033,8 +1075,12 @@ export default function KanbanV2() {
         </div>
       )}
 
+      <div className={'kb-quadro' + (bordas.esq ? ' f-esq' : '') + (bordas.dir ? ' f-dir' : '')}>
+      {bordas.esq && (
+        <button type="button" className="kb-seta esq" aria-label="Rolar o quadro para a esquerda" title="Colunas anteriores" onClick={() => rolarQuadro(-1)}><IcSetaLado esq /></button>
+      )}
       <div
-        className="kb-scroll" ref={boardRef}
+        className="kb-scroll" ref={boardRef} onScroll={medirBordas}
         onDragOver={(e) => { ptr.current = { x: e.clientX, y: e.clientY }; if (dragId.current) iniciarAutoScroll(); }}
       >
         <div className="kb-cols">
@@ -1107,7 +1153,7 @@ export default function KanbanV2() {
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
                   {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
                   <span className="kb-cab-ic" aria-hidden />
-                  <span className="n" title={col.nome}>{col.nome}</span>
+                  <span className="n" title={col.entrada ? col.nome + ' · coluna de entrada: recebe os novos leads dos canais' : col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
                   <span className="q num">{todosCol.length.toLocaleString('pt-BR')}</span>
                   <button type="button" className="kb-col-add" aria-label={'Adicionar lead em ' + col.nome} title="Adicionar lead" onClick={(e) => { e.stopPropagation(); abrirNovoLead(col.id); }}><IcMais /></button>
@@ -1164,6 +1210,10 @@ export default function KanbanV2() {
             </div>
           )}
         </div>
+      </div>
+      {bordas.dir && (
+        <button type="button" className="kb-seta dir" aria-label="Rolar o quadro para a direita" title="Próximas colunas" onClick={() => rolarQuadro(1)}><IcSetaLado /></button>
+      )}
       </div>
 
       {/* dropdown "⋮" (card ou coluna) em PORTAL — fora do overflow da coluna e do stacking do card;
@@ -1527,10 +1577,10 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   const foto = fotoIlustrativa(l.nome, l.contatoId ?? l.id);
   const estado = badge
     ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
-    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `parado ${dp}d`, msg: false }
+    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `Parado ${dp}d`, msg: false }
     : { cls: '', txt: haDe(l.atualizadoEm || l.criadoEm), msg: false };
   const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '') + (dataFull ? ` · no funil desde ${dataFull}` : '')
-    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização';
+    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` + (dataFull ? ` · no funil desde ${dataFull}` : '') : 'Última atualização';
 
   return (
     <div
@@ -1601,12 +1651,19 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
           {estado.txt}
         </span>
         {/* com ação no selo ("Retomar · 122d"), a data sai do pé para o selo caber inteiro (fica no title) */}
-        {dataCurta && !badge && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
-        {mostraProg && (
-          <span className={'kc-chip num' + (noGanho ? ' ok' : '')} title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
-            <IcEtapas />{progVal}/{nEtapas}
-          </span>
-        )}
+        {/* idem com "Parado Xd": a data vai para o title do selo e o pé cabe numa linha só */}
+        {dataCurta && !badge && !paradoAtivo && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
+        {/* etapa do funil (crítica 12/11: o "0/5" sem rótulo virou uma barrinha de N segmentos — a etapa
+            atual e as anteriores preenchidas; a frase completa fica no title e no leitor de tela) */}
+        {mostraProg && (() => {
+          const etapaN = noGanho ? nEtapas : Math.min(nEtapas, progVal + 1);
+          const rotulo = noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Etapa ${etapaN} de ${nEtapas} · ${colAtual?.nome ?? ''}`;
+          return (
+            <span className={'kc-etapas' + (noGanho ? ' ok' : '')} title={rotulo} role="img" aria-label={rotulo}>
+              {Array.from({ length: nEtapas }, (_, i) => <i key={i} className={i < etapaN ? 'on' : undefined} />)}
+            </span>
+          );
+        })()}
         <span className="kc-pessoas">
           <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
             style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '?'}</span>
@@ -2098,7 +2155,7 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
               {etapaCol && <span className="kd-etapa"><span className="pt" style={{ background: etapaCol.cor }} />{etapaCol.nome}</span>}
               {l.status === 'ganho' && <span className="kd-flag ganho">Ganho</span>}
               {l.status === 'perdido' && <span className="kd-flag perdido">Perdido</span>}
-              {paradoDet && <span className="kd-flag parado">parado {dpDet}d</span>}
+              {paradoDet && <span className="kd-flag parado">Parado {dpDet}d</span>}
             </div>
           </div>
         </div>
