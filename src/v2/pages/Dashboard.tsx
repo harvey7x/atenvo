@@ -1,28 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
+import { useDashAtendentesAba, useDashCampanhas } from '@/data/dashboardV5.abas';
 import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
-import { CardVidro, EstadoErro } from '../components';
+import { CardVidro, EstadoErro, Segmentado } from '../components';
 import { Cabecalho, rotuloPeriodoV5 } from './dashboardV5/Cabecalho';
 import { Kpis, KpisSkeleton } from './dashboardV5/Kpis';
 import { PorNumero, PorNumeroSkeleton } from './dashboardV5/PorNumero';
 import { Motivos, MotivosSkeleton } from './dashboardV5/Motivos';
-import { Atendentes, AtendentesSkeleton } from './dashboardV5/Atendentes';
 import { Mapa, MapaSkeleton } from './dashboardV5/Mapa';
 import { Robo, RoboSkeleton } from './dashboardV5/Robo';
 import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
+import { Campanhas, CampanhasSkeleton } from './dashboardV5/Campanhas';
+import { AtendentesAba, AtendentesAbaSkeleton } from './dashboardV5/AtendentesAba';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
-   Dashboard v5 (21/10) — o pedido FECHADO do dono, e nada além:
-   entradas de clientes (no total e em cada número conectado), não
-   elegíveis com o motivo, tempo para fechar, avaliação de cada
-   atendente e o mapa dia × hora das entradas — e, desde 30/10, o robô
-   (quanto ele conclui e entrega à equipe; a mesma régua do PDF diário).
-   Uma RPC por período (dashboard_v5). Demo é o contrato: em
-   `vite --mode demo` o mesmo hook devolve a fixture com os mesmos tipos.
-   A "Leitura do dia" (22/10) SAIU a pedido do dono (29/10).
+   Dashboard v5 em ABAS — o mesmo do Atenvo (12/11), trazido para a Reviza em
+   13/11 (dono: "copie o dashboard"): Visão geral (os seis itens, como sempre) ·
+   Campanhas (melhor do dia/semana/mês, ondas, retornos, parente) · Atendentes
+   (os dois relógios, campanha × atendente, carteira). A aba Iris do Atenvo NÃO
+   vem: a Reviza não tem a Iris. O período é GLOBAL, acima da linha de abas.
+   Uma RPC por aba + período; cada aba só busca quando aberta. Demo é o
+   contrato: em `vite --mode demo` os mesmos hooks devolvem as fixtures.
    ------------------------------------------------------------------ */
+
+const ABAS = [
+  { valor: 'geral', rotulo: 'Visão geral' },
+  { valor: 'campanhas', rotulo: 'Campanhas' },
+  { valor: 'atendentes', rotulo: 'Atendentes' },
+] as const;
+type AbaDash = typeof ABAS[number]['valor'];
+const ehAba = (v: string | null): v is AbaDash => ABAS.some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
 const MAX_DIF = DASH_V5_MAX_DIAS - 1;
@@ -57,6 +67,27 @@ function CarregandoDash() {
   );
 }
 
+/** Erro da aba quando não há nem dado velho; com dado velho, só o aviso em cima. */
+function ErroAba({ q }: { q: { isError: boolean; error: unknown; refetch: () => unknown; data: unknown } }) {
+  if (!q.isError) return null;
+  if (q.data) {
+    return (
+      <p className="d5-aviso" role="status">
+        {(q.error as Error)?.message || 'Não foi possível atualizar agora.'} Os números abaixo são da última leitura.
+      </p>
+    );
+  }
+  return (
+    <CardVidro className="d5-sec d5-erro">
+      <EstadoErro
+        titulo="Não foi possível carregar esta aba"
+        descricao={(q.error as Error)?.message || 'Verifique a conexão e tente de novo.'}
+        aoTentarDeNovo={() => void q.refetch()}
+      />
+    </CardVidro>
+  );
+}
+
 export default function DashboardV2() {
   const hoje = useHojeSP();
   const [preset, setPresetRaw] = useState<PresetDash>('hoje');
@@ -68,13 +99,28 @@ export default function DashboardV2() {
   const setIni = (v: string) => { setIniRaw(v); if (difDias(v, fim) > MAX_DIF) setFimRaw(addDias(v, MAX_DIF)); };
   const setFim = (v: string) => { setFimRaw(v); if (difDias(ini, v) > MAX_DIF) setIniRaw(addDias(v, -MAX_DIF)); };
 
+  // aba na URL (?aba=campanhas): sobrevive ao F5 e vira link compartilhável
+  const [params, setParams] = useSearchParams();
+  const aba: AbaDash = ehAba(params.get('aba')) ? (params.get('aba') as AbaDash) : 'geral';
+  const setAba = (v: AbaDash) => {
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      if (v === 'geral') n.delete('aba'); else n.set('aba', v);
+      return n;
+    }, { replace: true });
+  };
+
   // `hoje` entra nas dependências: depois da meia-noite "Hoje" passa a ser o dia novo
   const periodo = useMemo(() => periodoDash(preset, ini, fim, mesCaf), [preset, ini, fim, mesCaf, hoje]); // eslint-disable-line react-hooks/exhaustive-deps
   const q = useDashV5(periodo);
+  const qCamp = useDashCampanhas(periodo, aba === 'campanhas');
+  const qAt = useDashAtendentesAba(periodo, aba === 'atendentes');
   const d = q.data;
   const carregando = !d;
-  // trocou de período: os números do anterior ficam esmaecidos até a nova foto chegar
-  const trocando = q.isPlaceholderData && q.isFetching;
+
+  // esmaecer na troca de período: o da aba aberta
+  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : qAt;
+  const trocando = qAtivo.isPlaceholderData && qAtivo.isFetching;
 
   // o trecho do anterior que a busca comparou: sai do MESMO instante com que o hook cortou
   // a janela (buscaEm), então o rótulo nomeia o minuto que foi de fato para a RPC
@@ -85,6 +131,8 @@ export default function DashboardV2() {
   );
   const janelaMapa = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
 
+  const atualizar = () => { void qAtivo.refetch(); };
+
   return (
     <div className="d5-pg" aria-busy={trocando || undefined}>
       <Cabecalho
@@ -92,43 +140,68 @@ export default function DashboardV2() {
         rotulo={rotuloPeriodoV5(preset, periodo, hoje)}
         ini={ini} fim={fim} setIni={setIni} setFim={setFim} hoje={hoje}
         mesCaf={mesCaf} setMesCaf={setMesCaf}
-        geradoEm={d?.geradoEm ?? null} atualizando={q.isFetching}
-        aoAtualizar={() => { void q.refetch(); }}
+        geradoEm={(qAtivo.data as { geradoEm?: string } | undefined)?.geradoEm ?? d?.geradoEm ?? null}
+        atualizando={qAtivo.isFetching}
+        aoAtualizar={atualizar}
         demo={!DASH_V5_REAL}
       />
 
-      {q.isError && !d ? (
-        <CardVidro className="d5-sec d5-erro">
-          <EstadoErro
-            titulo="Não foi possível carregar o dashboard"
-            descricao={(q.error as Error)?.message || 'Verifique a conexão e tente de novo.'}
-            aoTentarDeNovo={() => void q.refetch()}
-          />
-        </CardVidro>
-      ) : (
+      <nav className="d5-abas" aria-label="Seções do dashboard">
+        <Segmentado<AbaDash>
+          opcoes={ABAS.map((a) => ({ valor: a.valor, rotulo: a.rotulo }))}
+          valor={aba} aoMudar={setAba} rotulo="Seção do dashboard" />
+      </nav>
+
+      {aba === 'geral' && (
+        q.isError && !d ? (
+          <CardVidro className="d5-sec d5-erro">
+            <EstadoErro
+              titulo="Não foi possível carregar o dashboard"
+              descricao={(q.error as Error)?.message || 'Verifique a conexão e tente de novo.'}
+              aoTentarDeNovo={() => void q.refetch()}
+            />
+          </CardVidro>
+        ) : (
+          <>
+            {q.isError && d && (
+              <p className="d5-aviso" role="status">
+                {(q.error as Error)?.message || 'Não foi possível atualizar agora.'} Os números abaixo são da última leitura.
+              </p>
+            )}
+
+            {carregando ? <KpisSkeleton /> : <Kpis k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} />}
+
+            <div className="d5-linha2">
+              {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}
+              {carregando ? <MotivosSkeleton /> : <Motivos ne={d.ne} />}
+            </div>
+
+            {carregando ? <AnuncioSkeleton /> : <Anuncio canais={d.canais} />}
+
+            {carregando ? <RoboSkeleton /> : d.robo && <Robo robo={d.robo} />}
+
+            {carregando ? <MapaSkeleton /> : <Mapa mapa={d.mapa} janela={janelaMapa} hoje={hoje} geradoEm={d.geradoEm} />}
+
+            {carregando && <CarregandoDash />}
+          </>
+        )
+      )}
+
+      {aba === 'campanhas' && (
         <>
-          {q.isError && d && (
-            <p className="d5-aviso" role="status">
-              {(q.error as Error)?.message || 'Não foi possível atualizar agora.'} Os números abaixo são da última leitura.
-            </p>
-          )}
+          <ErroAba q={qCamp} />
+          {qCamp.data
+            ? <Campanhas d={qCamp.data} periodo={periodo} hoje={hoje} />
+            : !qCamp.isError && <CampanhasSkeleton />}
+        </>
+      )}
 
-          {carregando ? <KpisSkeleton /> : <Kpis k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} />}
-
-          <div className="d5-linha2">
-            {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}
-            {carregando ? <MotivosSkeleton /> : <Motivos ne={d.ne} />}
-          </div>
-
-          {carregando ? <AnuncioSkeleton /> : <Anuncio canais={d.canais} />}
-
-          {carregando ? <RoboSkeleton /> : d.robo && <Robo robo={d.robo} />}
-
-          {carregando ? <AtendentesSkeleton /> : <Atendentes atendentes={d.atendentes} />}
-
-          {carregando ? <MapaSkeleton /> : <Mapa mapa={d.mapa} janela={janelaMapa} hoje={hoje} geradoEm={d.geradoEm} />}
-
-          {carregando && <CarregandoDash />}
+      {aba === 'atendentes' && (
+        <>
+          <ErroAba q={qAt} />
+          {qAt.data
+            ? <AtendentesAba d={qAt.data} periodo={periodo} hoje={hoje} />
+            : !qAt.isError && <AtendentesAbaSkeleton />}
         </>
       )}
     </div>
