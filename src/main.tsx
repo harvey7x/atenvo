@@ -16,6 +16,8 @@ import './v2/movimento.css'; // camada de movimento (dono 22/10) — Leve e Comp
 import './v2/repaginada.css'; // repaginada "mais profissional" (dono 27/10) — só age com [data-repaginada] na raiz
 import { aplicarRepaginada, lerRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro, lerInboxPro } from './v2/lib/inboxPro';
+import './v2/linear.css'; // camada "Linear" (prévia 13/11) — só age com [data-linear] na raiz
+import { aplicarLinear, lerLinear } from './v2/lib/linear';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -79,6 +81,10 @@ if (typeof document !== 'undefined') aplicarRepaginada(lerRepaginada());
 // Atendimento renovado (prévia 29/10): marca [data-inbox-pro] antes do primeiro paint.
 // Padrão ligado; o comparador do demo grava a escolha por dispositivo.
 if (typeof document !== 'undefined') aplicarInboxPro(lerInboxPro());
+
+// Camada "Linear" (prévia 13/11): marca [data-linear] antes do primeiro paint.
+// Padrão ligado; o comparador do demo grava a escolha por dispositivo.
+if (typeof document !== 'undefined') aplicarLinear(lerLinear());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

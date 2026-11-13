@@ -223,7 +223,7 @@ export default function ContatosV2() {
         </div>
       ),
     },
-    { chave: 'tel', titulo: 'Telefone', render: (c) => <span className="num" style={{ whiteSpace: 'nowrap' }}>{fmtTel(c.tel)}</span> },
+    { chave: 'tel', titulo: 'Telefone', classe: 'tel', render: (c) => <span className="num" style={{ whiteSpace: 'nowrap' }}>{fmtTel(c.tel)}</span> },
     {
       chave: 'tags', titulo: 'Etiquetas', render: (c) => c.tags.length === 0
         ? <span style={{ color: 'var(--txt-3)' }}>—</span>

@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { lerInboxPro, salvarInboxPro } from '../lib/inboxPro';
+import { lerLinear, salvarLinear } from '../lib/linear';
 
-/* Comparador "Antes / Depois" da prévia em curso (hoje: atendimento renovado, 29/10;
-   a repaginada de 27/10 já foi aprovada e segue ligada nos dois lados).
+/* Comparador "Antes / Depois" da prévia em curso (hoje: camada "Linear", 13/11;
+   repaginada e atendimento renovado já foram aprovados e seguem ligados nos dois lados).
    Só renderiza no modo demonstração — quem chama decide (AppShellV2).
    O × esconde até recarregar a aba, para ver a tela limpa. */
 export function ComparadorVisual() {
-  const [novo, setNovo] = useState(lerInboxPro);
+  const [novo, setNovo] = useState(lerLinear);
   const [visivel, setVisivel] = useState(true);
   if (!visivel) return null;
 
-  const trocar = (v: boolean) => { setNovo(v); salvarInboxPro(v); };
+  const trocar = (v: boolean) => { setNovo(v); salvarLinear(v); };
 
   return (
     <div className="rp-comparador" role="group" aria-label="Comparar visual">

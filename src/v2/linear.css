@@ -1,0 +1,153 @@
+/* =====================================================================
+   CAMADA "LINEAR" — prévia 13/11 (dono: "aplicar um pouco desse estilo",
+   guia DESIGN-estilo-linear.md). Só 4 coisas, de propósito:
+     1. fonte mono pequena nos IDENTIFICADORES (telefone, CPF, horário);
+     2. títulos em peso médio, letras um pouco mais juntas;
+     3. hover sem movimento — a borda clareia um tom, nada sobe/cresce;
+     4. um botão colorido por tela (os demais viram contorno neutro).
+   NÃO entra: verde-limão, troca da Instrument Sans, tirar cor de status,
+   tamanhos de site de vendas. Números grandes (KPI) ficam como estão.
+
+   Todo seletor começa com html:root[data-linear]×3 — vence repaginada,
+   inbox-pro (que não mexe em fonte), movimento e CSS das páginas em
+   qualquer ordem de import, SEM !important (o arrasto do Kanban usa
+   transform inline e precisa continuar vencendo).
+   Atributo ausente = visual atual idêntico.
+   ===================================================================== */
+
+html:root[data-linear] {
+  --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* ---- 1. MONO NOS IDENTIFICADORES ----------------------------------
+   Lista escolhida à mão: .num cobre 585 lugares (inclusive totais e
+   KPIs grandes), então NÃO vai por .num genérico.
+   font-size-adjust casa a altura das letras com a Instrument Sans — o
+   tamanho de cada lugar continua o dele. */
+html:root[data-linear][data-linear][data-linear] .v2 :is(
+  .conv2 .h2,              /* atendimento: horário na lista de conversas */
+  .conv2 .cr,              /* atendimento: tempo aguardando */
+  .wa-ctx .t2.num,         /* atendimento: telefone na ficha lateral */
+  .wa-ctopo .sb.num,       /* atendimento: telefone no topo da conversa (etiquetas voltam abaixo) */
+  .hh.num,                 /* atendimento: hora das mensagens, do repasse, da pausa */
+  .cx-l .num,              /* atendimento: última interação, ciclos 3/8 */
+  .ct-tel,                 /* atendimento: telefone no "nova conversa" */
+  .fi-lin-prod.num,        /* fila da Iris: telefone na linha */
+  .fi-fone,                /* fila da Iris: telefone na ficha */
+  .fi-chip-n, .fi-tile-n,  /* fila da Iris: "2x" das marcações */
+  .kc-nm .num,             /* kanban: telefone quando não tem nome */
+  .kc-chip.num:not(.est),  /* kanban: data de entrada e etapas 2/5 (o chip de estado, com palavra, fica) */
+  .kd-hist-when,           /* kanban: data/hora do histórico */
+  .mo-tab td.tel .num,     /* contatos: coluna Telefone */
+  .fx-kv .v.num,           /* contatos: CPF e demais códigos da ficha */
+  .d5-tel                  /* painel: número de cada canal */
+) {
+  font-family: var(--mono);
+  font-size-adjust: .5;
+  letter-spacing: 0;
+  word-spacing: -.3em;      /* o espaço da mono é largo: "há 4 min" não pode roubar letra do nome */
+  font-feature-settings: 'zero' 0;
+}
+/* no topo da conversa o telefone é texto solto ao lado das etiquetas:
+   as etiquetas voltam para a fonte da casa */
+html:root[data-linear][data-linear][data-linear] .v2 .wa-ctopo .sb.num > * {
+  font-family: var(--fonte);
+  font-size-adjust: none;
+}
+
+/* ---- 2. TÍTULOS EM PESO MÉDIO -------------------------------------- */
+html:root[data-linear][data-linear][data-linear] .v2 :is(.ph h2, .d5-cab h2, .d5-cab-tits h2) {
+  font-weight: 540;
+  letter-spacing: -.034em;
+}
+html:root[data-linear][data-linear][data-linear] .v2 :is(
+  .card-cab h3, .fi-lista-cab h2, .fi-eq-h2, .fi-modal-quem h2, .fi-como-t, .wa-ftopo h3
+) {
+  font-weight: 550;
+  letter-spacing: -.012em;
+}
+/* rótulos pequenos em caixa alta: 700 → 600 (nada de negrito pesado) */
+html:root[data-linear][data-linear][data-linear] .v2 :is(.wa-pop .ph2, .wa-filtro .fp-tit, .wa-filtro .fp-h-t) {
+  font-weight: 600;
+}
+
+/* ---- 3. HOVER SEM MOVIMENTO ----------------------------------------
+   Tudo que subia (translateY) ou crescia (scale) fica parado; quem tem
+   borda clareia um tom. Só classes v2 (as v1 ficam como estão). */
+html:root[data-linear][data-linear][data-linear] .v2 :is(
+  .btn-pri:hover:not(:disabled),
+  .fjb-btn.primary:hover:not(:disabled),
+  .atv-btn.primary:hover:not(:disabled),
+  .entrar:hover:not(:disabled),
+  .spot:hover,
+  .kc:hover,
+  .kb-carga-c:hover,
+  .kpi:hover,
+  .rl2-kpi:hover,
+  .d5-kpi:hover,
+  .d5-cel:hover,
+  .atd-cor:hover:not(:disabled),
+  .sv-seta:hover
+) {
+  transform: none;
+}
+/* Kanban PRO usa .kb-pro×4 — repete para vencer sem !important */
+html:root[data-linear][data-linear][data-linear] .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc:hover {
+  transform: none;
+}
+html:root[data-linear][data-linear][data-linear] .v2 :is(.kc, .kpi, .d5-kpi, .rl2-kpi):hover {
+  border-color: rgba(var(--tint), .16);
+}
+
+/* ---- 4. UM BOTÃO COLORIDO POR TELA ---------------------------------
+   Auditoria na demo (13/11, todas as telas do menu): quase todas já têm
+   um só. Exceções tratadas aqui, que passam a usar o mesmo neutro do
+   .btn-sec da repaginada:
+   (a) atendimento — "Editar" e "Criar ficha" da ficha lateral competiam
+       com o botão da conversa ("Pausar a Iris e responder" / Enviar);
+   (b) Radar — "Repassar para …" cheio em CADA cartão: fica colorido só
+       no primeiro da seção (os cartões vêm em grupos por atendente, por
+       isso as duas formas de "seguinte"), os demais viram neutros;
+   (c) ação destrutiva de linha (Integrações: Desconectar/Remover) —
+       texto neutro em repouso, o vermelho acende no hover. */
+html:root[data-linear][data-linear][data-linear]:not([data-tema="light"]) .v2 :is(
+  .wa-ctx .btn-pri, .wa-ctx .fjb-btn.primary, .gd-dec ~ .gd-dec .gd-dec-acoes .btn-pri, .gd-grupo ~ .gd-grupo .gd-dec-acoes .btn-pri
+) {
+  color: var(--txt);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel, none), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-linear][data-linear][data-linear]:not([data-tema="light"]) .v2 :is(
+  .wa-ctx .btn-pri, .wa-ctx .fjb-btn.primary, .gd-dec ~ .gd-dec .gd-dec-acoes .btn-pri, .gd-grupo ~ .gd-grupo .gd-dec-acoes .btn-pri
+):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08);
+  border-color: rgba(255, 255, 255, .17);
+}
+html:root[data-linear][data-linear][data-linear][data-tema="light"] .v2 :is(
+  .wa-ctx .btn-pri, .wa-ctx .fjb-btn.primary, .gd-dec ~ .gd-dec .gd-dec-acoes .btn-pri, .gd-grupo ~ .gd-grupo .gd-dec-acoes .btn-pri
+) {
+  color: var(--txt);
+  background: #FFFFFF;
+  border-color: rgba(17, 24, 39, .13);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+}
+html:root[data-linear][data-linear][data-linear][data-tema="light"] .v2 :is(
+  .wa-ctx .btn-pri, .wa-ctx .fjb-btn.primary, .gd-dec ~ .gd-dec .gd-dec-acoes .btn-pri, .gd-grupo ~ .gd-grupo .gd-dec-acoes .btn-pri
+):hover:not(:disabled) {
+  background: #F8F9FA;
+  border-color: rgba(17, 24, 39, .2);
+}
+
+/* (c) destrutiva de linha: neutra em repouso, vermelha no hover (2 temas) */
+html:root[data-linear][data-linear][data-linear] .v2 .p-btn.btn-perigo.btn-mini:not(:hover) {
+  color: var(--txt-2);
+  background: transparent;
+  border-color: rgba(var(--tint), .12);
+  box-shadow: none;
+}
+html:root[data-linear][data-linear][data-linear] .v2 .p-btn.btn-perigo.btn-mini:hover:not(:disabled) {
+  color: var(--rubro);
+  background: var(--rubro-bg);
+  border-color: rgba(var(--rubro-rgb), .4);
+}
