@@ -1,7 +1,6 @@
 /* Tela de início: arrastar/escolher os PDFs do Histórico de Créditos,
    lista dos escolhidos e "Analisar". Tudo no navegador. */
 import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import AlfaMotor from '../../data/analise/motor';
 import { BotaoPrimario, BotaoSec, CardVidro } from '../../components';
 import { NOME_PRODUTO, tamanhoKB } from './conteudo';
 import { CabecalhoTela, Giro, IconeCadeado, IconeDocumento, IconeEnviar, Rodape } from './comum';
@@ -168,7 +167,7 @@ export function TelaInicio({ carregando, progresso, aoAnalisar }: {
       </div>
 
       <Rodape>
-        {NOME_PRODUTO} v{AlfaMotor.VERSAO} · os PDFs são lidos e analisados no seu navegador, sem envio
+        {NOME_PRODUTO} · os PDFs são lidos e analisados no seu navegador, sem envio
         a servidores · aponta indícios, não prova fraude · não é aconselhamento jurídico.
       </Rodape>
     </>

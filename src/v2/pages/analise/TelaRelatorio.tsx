@@ -194,7 +194,7 @@ export function TelaRelatorio({
             <><br /><strong className="an-forte-alerta">Falhas de leitura:</strong> {estado.falhas.join('; ')}</>
           )}
         </p>
-        <p>{NOME_PRODUTO} v{AlfaMotor.VERSAO} · processamento 100% no navegador · gerado em {gerado}</p>
+        <p>{NOME_PRODUTO} · processamento 100% no navegador · gerado em {gerado}</p>
       </Rodape>
     </>
   );

@@ -470,3 +470,10 @@
   .v2 .an-benef, .v2 .an-drop, .v2 .an-pg, .v2 .an-pg-lupa { transition: none; }
   .v2 button.an-benef:hover { transform: none; }
 }
+
+/* ===== crítica 12/11 — cob_comunicacao =====
+   o fio dourado do topo começava depois do canto arredondado (enfeite): sai do cabeçalho neutro;
+   nos estados de alerta/atenção vira um fio de borda a borda, recortado pelo raio do cartão */
+html[data-barra-alfa] .v2 .an-cab::after { display: none; }
+html[data-barra-alfa] .v2 .an-cab.an-cab-alerta { box-shadow: inset 0 2px 0 rgba(var(--rubro-rgb), .9), var(--sombra-1); }
+html[data-barra-alfa] .v2 .an-cab.an-cab-atencao { box-shadow: inset 0 2px 0 rgba(var(--ambar-rgb), .9), var(--sombra-1); }

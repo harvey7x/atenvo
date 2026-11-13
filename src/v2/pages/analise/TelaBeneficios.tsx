@@ -85,7 +85,7 @@ export function TelaBeneficios({ estado, aoAbrir, aoUnificar, aoNovaAnalise }: {
       </Secao>
 
       <Rodape>
-        {NOME_PRODUTO} v{AlfaMotor.VERSAO} · processamento 100% no navegador · aponta indícios,
+        {NOME_PRODUTO} · processamento 100% no navegador · aponta indícios,
         não provas · não é aconselhamento jurídico.
       </Rodape>
     </>
