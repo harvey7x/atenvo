@@ -1711,3 +1711,39 @@ html[data-barra-alfa] .v2 .ev-prog-err { font-style: normal; color: var(--cor-er
 html[data-barra-alfa] .v2 .ev-tabela .fin-acoes { display: inline-flex; gap: 6px; justify-content: center; }
 /* no celular a tabela rola de lado (as larguras fixas pediriam 900px) */
 @media (max-width: 760px) { html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab { min-width: 900px; } }
+
+/* ---- REGISTROS: cartão padrão (sem a janela de terminal), KPIs em 3 colunas, filtros com rótulo ---- */
+html[data-barra-alfa] .v2 .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .kpis.kpis-3 { grid-template-columns: 1fr; } }
+html[data-barra-alfa] .v2 .reg-filtros { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+html[data-barra-alfa] .v2 .reg-fil-area { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+html[data-barra-alfa] .v2 .reg-fil-area .chips { margin: 0; }
+html[data-barra-alfa] .v2 :is(.reg-fil-rot, .reg-fil-sel > span) { font-size: 12px; font-weight: 500; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .reg-fil-dir { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+html[data-barra-alfa] .v2 .reg-fil-sel { display: inline-flex; align-items: center; gap: 8px; }
+html[data-barra-alfa] .v2 .reg-fil-sel select.inp { width: auto; min-width: 120px; padding-right: 28px; }
+html[data-barra-alfa] .v2 .reg-busca { width: 220px; }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .reg-fil-dir { margin-left: 0; width: 100%; } html[data-barra-alfa] .v2 .reg-busca { flex: 1 1 160px; width: auto; } }
+html[data-barra-alfa] .v2 .reg-card { padding: 0; overflow: hidden; }
+html[data-barra-alfa] .v2 .reg-card-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; margin: 0; border-bottom: 1px solid var(--linha); }
+html[data-barra-alfa] .v2 .reg-vivo { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .reg-vivo > i { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 0 3px rgba(var(--verde-rgb), .15); }
+html[data-barra-alfa] .v2 .reg-card .reg-lista { padding: 4px 8px 6px; }
+html[data-barra-alfa] .v2 .reg-card .reg-item { border-bottom: 1px solid rgba(var(--tint), .06); }
+html[data-barra-alfa] .v2 .reg-card .reg-item:last-child { border-bottom: 0; }
+html[data-barra-alfa] .v2 .reg-card .reg-cab { padding: 10px 10px; gap: 12px; min-height: 52px; }
+html[data-barra-alfa] .v2 .reg-card .reg-av { width: 28px; height: 28px; font-size: 11px; font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 { font-size: 13px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 b { color: var(--txt); font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 .rl-acao { color: var(--txt-2); }
+html[data-barra-alfa] .v2 .reg-card .t-bad .reg-l1 .rl-acao { color: var(--cor-erro-txt, var(--rubro)); font-weight: 500; }
+html[data-barra-alfa] .v2 .reg-card .reg-l2 { font-size: 12px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-card .reg-quando { font-size: 12px; color: var(--txt-3); white-space: nowrap; }
+html[data-barra-alfa] .v2 .reg-card .reg-chev { width: 16px; height: 16px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-card .reg-det { padding: 2px 10px 16px 50px; }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .reg-card .reg-det { padding-left: 10px; } }
+html[data-barra-alfa] .v2 .reg-card :is(.reg-k, .reg-tab-h) { font-size: 11px; font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-tec-badge { font-size: 11px; text-transform: none; letter-spacing: 0; }
+html[data-barra-alfa] .v2 .reg-card .reg-tab-para { color: var(--txt); }
+html[data-barra-alfa] .v2 .reg-msg { padding: 16px 10px; font-size: 13px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-mais { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 8px; font-size: 12px; color: var(--txt-3); }

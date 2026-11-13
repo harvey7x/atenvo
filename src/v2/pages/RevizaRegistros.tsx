@@ -2,7 +2,7 @@
    detalhe. Cada linha abre mostrando exatamente o que mudou (de → para).
    Filtros por período, tipo, pessoa e busca. */
 import { useMemo, useState } from 'react';
-import { BotaoSec, Chip, Chips, EstadoErro, EstadoVazio, Input, Kpi } from '../components';
+import { BotaoSec, CardVidro, Chip, Chips, EstadoErro, EstadoVazio, Input, Kpi } from '../components';
 import { useRegistros, type Mudanca, type PeriodoRegistros, type Registro } from '../data/cobranca/registros';
 
 const PAPEL_ROT: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro' };
@@ -64,60 +64,74 @@ export function RevizaRegistros() {
 
   return (
     <>
-      <div className="kpis sobe">
+      <div className="kpis kpis-3 sobe">
         {/* totais vêm de count no servidor — a lista abaixo é paginada */}
         <Kpi rotulo="Ações registradas" valor={q.total ?? 0} />
-        <Kpi rotulo="Hoje" valor={q.totalHoje ?? 0} tomValor="ok" />
+        <Kpi rotulo="Hoje" valor={q.totalHoje ?? 0} />
         <Kpi rotulo="Pessoas na lista" valor={pessoas.length} />
       </div>
 
-      <div className="cob-filtros sobe" style={{ animationDelay: '.06s', gap: 10, flexWrap: 'wrap' }}>
-        <Chips>
-          {PERIODOS.map(([k, r]) => <Chip key={k} ativo={periodo === k} onClick={() => setPeriodo(k)}>{r}</Chip>)}
-        </Chips>
-        <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--linha)' }} aria-hidden />
-        <Chips>
-          <Chip ativo={grupo === 'todos'} onClick={() => setGrupo('todos')}>Tudo</Chip>
-          {GRUPOS.map((g) => <Chip key={g} ativo={grupo === g} onClick={() => setGrupo(g)}>{g}</Chip>)}
-        </Chips>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
-          <select className="inp" value={pessoa} onChange={(e) => setPessoa(e.target.value)} style={{ width: 170 }}>
-            <option value="todas">Todas as pessoas</option>
-            {pessoas.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <Input placeholder="Buscar por nome, ação, cliente, campo…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar nos registros" />
+      {/* filtros: período e pessoa como seletores com rótulo; área como chips com o nome do grupo */}
+      <div className="reg-filtros sobe" style={{ animationDelay: '.06s' }}>
+        <div className="reg-fil-area" role="group" aria-label="Área">
+          <span className="reg-fil-rot">Área</span>
+          <Chips>
+            <Chip ativo={grupo === 'todos'} onClick={() => setGrupo('todos')}>Todas</Chip>
+            {GRUPOS.map((g) => <Chip key={g} ativo={grupo === g} onClick={() => setGrupo(g)}>{g}</Chip>)}
+          </Chips>
+        </div>
+        <div className="reg-fil-dir">
+          <label className="reg-fil-sel"><span>Período</span>
+            <select className="inp" value={periodo} onChange={(e) => setPeriodo(e.target.value as PeriodoRegistros)}>
+              {PERIODOS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}
+            </select>
+          </label>
+          <label className="reg-fil-sel"><span>Pessoa</span>
+            <select className="inp" value={pessoa} onChange={(e) => setPessoa(e.target.value)}>
+              <option value="todas">Todas</option>
+              {pessoas.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+          <Input className="reg-busca" placeholder="Buscar…" title="Busca por pessoa, ação, cliente ou campo alterado" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar nos registros" />
         </div>
       </div>
 
-      <div className="reg-console sobe" style={{ animationDelay: '.12s' }}>
-        <div className="reg-console-bar">
-          <span className="reg-dot r" aria-hidden /><span className="reg-dot y" aria-hidden /><span className="reg-dot g" aria-hidden />
-          <span className="reg-console-tt mono">auditoria — registros do sistema</span>
-          <span className="reg-live mono" aria-hidden>● ao vivo</span>
+      {/* cartão padrão (antes: "janela de terminal" com as bolinhas do macOS e fonte mono) */}
+      <CardVidro spot sobe className="reg-card" style={{ animationDelay: '.12s' }}>
+        <div className="card-cab reg-card-cab">
+          <h3>Registros do sistema</h3>
+          <span className="reg-vivo" title="A lista se atualiza sozinha"><i aria-hidden />Ao vivo</span>
         </div>
-        <div className="reg-console-body">
+        <div className="reg-lista">
           {q.isLoading ? (
-            <div className="reg-console-msg mono">carregando registros…</div>
+            <div className="reg-msg">Carregando registros…</div>
           ) : q.isError ? (
-            <EstadoErro titulo="Não deu para carregar os registros" descricao="Foi uma falha ao consultar — tente de novo." aoTentarDeNovo={() => void q.refetch()} />
+            <EstadoErro titulo="Não foi possível carregar os registros" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={() => void q.refetch()} />
           ) : lista.length === 0 ? (
-            <EstadoVazio titulo={q.total === 0 ? 'Nenhuma ação registrada ainda' : 'Nada com esse filtro'} descricao={q.total === 0 ? 'Assim que a equipe cadastrar, confirmar ou alterar algo, aparece aqui — quem fez, o quê, quando e o que mudou.' : 'Ajuste o período, a pessoa, o tipo ou a busca.'} />
+            <EstadoVazio icone={<IconeRegistros />} titulo={q.total === 0 ? 'Nenhuma ação registrada ainda' : 'Nada com esse filtro'} descricao={q.total === 0 ? 'Cada cadastro, confirmação ou alteração da equipe aparece aqui: quem fez, o quê, quando e o que mudou.' : 'Ajuste o período, a pessoa, a área ou a busca.'} />
           ) : (
             <>
               {lista.map((r) => <LinhaRegistro key={r.id} r={r} aberto={aberto.has(r.id)} aoAbrir={() => toggle(r.id)} />)}
               {q.haMais && (
-                <div className="ev-mais" style={{ padding: '10px 0 4px' }}>
-                  <BotaoSec mini onClick={q.carregarMais} disabled={q.carregandoMais}>{q.carregandoMais ? 'Carregando…' : 'Carregar mais'}</BotaoSec>
+                <div className="reg-mais">
+                  <span>{`Mostrando as ${regs.length} mais recentes do período`}</span>
+                  <BotaoSec mini onClick={q.carregarMais} disabled={q.carregandoMais}>{q.carregandoMais ? 'Carregando…' : 'Carregar anteriores'}</BotaoSec>
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
-      <p className="cm-hint" style={{ margin: '10px 2px 0' }}>Console de auditoria — tudo que cada pessoa faz (cadastros, edições, pagamentos, exclusões, régua…). Clique numa linha para abrir o detalhe técnico completo. Atualiza sozinho; visível só para o administrador.{q.haMais ? ` Carregadas as ${regs.length} mais recentes do período — "Carregar mais" busca as anteriores.` : ''}</p>
+      </CardVidro>
     </>
   );
 }
+
+/** estado vazio de Registros: lista com relógio (traço 1,5, o mesmo da barra lateral) */
+const IconeRegistros = () => (
+  <svg className="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M4 6.5h9M4 11.5h6M4 16.5h5" /><circle cx="16.5" cy="15" r="4" /><path d="M16.5 13.2V15l1.2.9" />
+  </svg>
+);
 
 function tomAcao(a: string): string {
   if (/exclu|recus|deslig|tirou|remov/.test(a)) return 'bad';
@@ -127,21 +141,27 @@ function tomAcao(a: string): string {
 }
 const tsConsole = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+const iniciaisDe = (n: string) => (String(n ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('') || '·').toUpperCase();
+const quandoCurto = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+
 function LinhaRegistro({ r, aberto, aoAbrir }: { r: Registro; aberto: boolean; aoAbrir: () => void }) {
   const muds: Mudanca[] = r.mudancas ?? [];
   const iso = new Date(r.quando).toISOString();
   const papelCurto = r.ator_papel ? (PAPEL_ROT[r.ator_papel] ?? r.ator_papel) : '';
   return (
     <div className={aberto ? 'reg-item aberto' : 'reg-item'}>
-      <button type="button" className={'reg-line mono t-' + tomAcao(r.acao)} onClick={aoAbrir} aria-expanded={aberto}>
-        <span className="rl-ts">{tsConsole(r.quando)}</span>
-        <span className="rl-tag">[{r.ator_nome}{papelCurto ? '·' + papelCurto : ''}]</span>
-        <span className="rl-msg"><span className="rl-acao">{r.acao}</span> {r.entidade}{r.rotulo ? <> <span className="rl-alvo">{r.rotulo}</span></> : null}{r.detalhe ? <span className="rl-det"> — {r.detalhe}</span> : null}</span>
-        <span className={aberto ? 'reg-chev on' : 'reg-chev'} aria-hidden>⌄</span>
+      <button type="button" className={'reg-cab t-' + tomAcao(r.acao)} onClick={aoAbrir} aria-expanded={aberto}>
+        <span className="reg-av" aria-hidden>{iniciaisDe(r.ator_nome)}</span>
+        <span className="reg-txt">
+          <span className="reg-l1"><b>{r.ator_nome}</b> <span className="rl-acao">{r.acao}</span> {r.entidade}{r.rotulo ? <> <b className="rl-alvo">{r.rotulo}</b></> : null}</span>
+          <span className="reg-l2">{[papelCurto, r.detalhe].filter(Boolean).join(' · ') || '—'}</span>
+        </span>
+        <span className="reg-quando num" title={tsConsole(r.quando)}>{quandoCurto(r.quando)}</span>
+        <svg className={aberto ? 'reg-chev on' : 'reg-chev'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {aberto && (
         <div className="reg-det">
-          {/* painel técnico de auditoria (estilo dev) */}
+          {/* detalhe técnico de auditoria: mono só nos identificadores */}
           <div className="reg-tec">
             <div className="reg-tec-cab"><span className="reg-tec-badge">{r.entidade}</span><span className="reg-tec-id mono">registro #{r.id}</span></div>
             <div className="reg-tec-grid">
@@ -158,14 +178,14 @@ function LinhaRegistro({ r, aberto, aoAbrir }: { r: Registro; aberto: boolean; a
               {muds.map((m, i) => (
                 <div className="reg-tab-r" key={i}>
                   <span className="reg-tab-c">{rotCampo(m.c)}</span>
-                  <span className="reg-tab-de mono">{valCampo(m.c, m.de)}</span>
-                  <span className="reg-tab-seta mono" aria-hidden>→</span>
-                  <span className="reg-tab-para mono">{valCampo(m.c, m.para)}</span>
+                  <span className="reg-tab-de num">{valCampo(m.c, m.de)}</span>
+                  <span className="reg-tab-seta" aria-hidden>→</span>
+                  <span className="reg-tab-para num">{valCampo(m.c, m.para)}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="reg-semdiff">{r.acao === 'editou' || r.acao === 'atualizou' ? 'Alterações campo a campo passaram a ser registradas nas próximas edições.' : 'Esta ação não altera campos de um cadastro (sem comparação antes/depois).'}</p>
+            <p className="reg-semdiff">{r.acao === 'editou' || r.acao === 'atualizou' ? 'As alterações campo a campo passaram a ser registradas nas edições seguintes.' : 'Esta ação não altera campos de um cadastro (sem comparação antes e depois).'}</p>
           )}
         </div>
       )}
