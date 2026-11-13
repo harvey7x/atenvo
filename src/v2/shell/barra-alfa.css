@@ -539,17 +539,18 @@ html[data-barra-alfa] .v2 .ba-ponto { top: -2px; right: -2px; width: 6px; height
 
 /* ---- trilho (recolhida): no lugar de cada título de grupo, um fio de 24px centrado — os vãos entre os blocos
    de ícones pareciam ícones faltando ---- */
-html[data-barra-alfa] .v2 .ba-grupo-rot { position: relative; }
-html[data-barra-alfa] .v2 .ba-grupo-rot::before {
-  content: ""; position: absolute; left: 8px; top: 50%; width: 24px; height: 1px; background: var(--ba-fio);
-  opacity: 0; transition: opacity .15s;
+/* (o fio fica no GRUPO, na altura do título: o título some por opacidade no trilho e levaria o fio junto) */
+html[data-barra-alfa] .v2 .ba-grupo[role="group"] { position: relative; }
+html[data-barra-alfa] .v2 .ba-grupo[role="group"]::before {
+  content: ""; position: absolute; left: 8px; top: 8px; width: 24px; height: 1px; background: rgba(255, 255, 255, .1);
+  opacity: 0; transition: opacity .15s; pointer-events: none;
 }
-html[data-barra-alfa][data-tema="light"] .v2 .ba-grupo-rot::before { background: rgba(0, 0, 0, .1); }
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra .ba-grupo-rot::before { opacity: 1; }
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) .ba-grupo-rot::before,
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra .ba-grupo-rot::before { opacity: 0; }
+html[data-barra-alfa][data-tema="light"] .v2 .ba-grupo[role="group"]::before { background: rgba(0, 0, 0, .1); }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra .ba-grupo[role="group"]::before { opacity: 1; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) .ba-grupo[role="group"]::before,
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra .ba-grupo[role="group"]::before { opacity: 0; }
 @media (hover: hover) {
-  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover .ba-grupo-rot::before { opacity: 0; }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover .ba-grupo[role="group"]::before { opacity: 0; }
 }
 
 /* ---- Buscar: desenhado como campo (32px, fio, raio 8) e o atalho sempre à vista, apagado — a busca se distingue
