@@ -1714,7 +1714,14 @@ html[data-barra-alfa] .v2 .ev-tabela .fin-acoes { display: inline-flex; gap: 6px
 
 /* ---- REGISTROS: cartão padrão (sem a janela de terminal), KPIs em 3 colunas, filtros com rótulo ---- */
 html[data-barra-alfa] .v2 .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 760px) { html[data-barra-alfa] .v2 .kpis.kpis-3 { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .kpis.kpis-3 { gap: 8px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .kpis.kpis-3 .kpi { min-height: 0; padding: 12px 12px 13px; }
+  /* a área vira uma faixa que desliza (sem quebrar "Régua e envios" em 3 linhas) */
+  html[data-barra-alfa] .v2 .reg-fil-area { flex-wrap: nowrap; width: 100%; }
+  html[data-barra-alfa] .v2 .reg-fil-area .chips { min-width: 0; flex: 1 1 auto; }
+  html[data-barra-alfa] .v2 .reg-fil-area .chip { flex-shrink: 0; white-space: nowrap; }
+}
 html[data-barra-alfa] .v2 .reg-filtros { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 html[data-barra-alfa] .v2 .reg-fil-area { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
 html[data-barra-alfa] .v2 .reg-fil-area .chips { margin: 0; }
@@ -1784,3 +1791,10 @@ html[data-barra-alfa] .v2 .rg-vars-dica .cc-var { margin: 0 2px; }
 html[data-barra-alfa] .v2 .cv2-av { position: relative; overflow: hidden; }
 html[data-barra-alfa] .v2 .cv2-script-bts { display: inline-flex; align-items: center; gap: 4px; }
 html[data-barra-alfa] .v2 .cv2-script-txt .cc-var { font-size: 11px; line-height: 16px; }
+
+/* ---- CELULAR (≤760px) ---- */
+@media (max-width: 760px) {
+  /* Envios: 4 KPIs em 2 colunas (em 4 o rótulo "Responderam hoje" saía do cartão) */
+  html[data-barra-alfa] .v2 .ev-raiz > .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  html[data-barra-alfa] .v2 .ev-fx { padding: 12px 14px; }
+}
