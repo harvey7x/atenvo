@@ -25,6 +25,9 @@ export interface Lead {
   udoc?: number;
   /** o cliente mandou a última mensagem e ninguém respondeu */
   esperandoEm?: number;
+  /** a nossa última mensagem (texto) e de onde saiu (bot · atenvo · telefone) — a lista mostra a última, de quem for */
+  nossaTexto?: string;
+  nossaOrigem?: string;
   disse: string;
   docPessoal?: boolean;
   comprovante?: boolean;
@@ -74,6 +77,9 @@ export interface LinhaFila {
   assinado_em: string | null;
   marcacoes: { id: string; tipo: string; texto: string | null; vezes: number; em: string }[] | null;
   ult_cliente_texto: string | null;
+  /** a NOSSA última mensagem (texto) e de onde saiu: bot (IA/robô) · atenvo (painel) · telefone (celular) — 13/11 */
+  ult_nossa_texto?: string | null;
+  ult_nossa_origem?: string | null;
 }
 
 export const ROTULO_LISTA: Record<number, string> = {
@@ -143,6 +149,28 @@ export function mensagemDoCliente(t: string | null | undefined): { texto: string
   const m = s.match(/^\[(\w+)\]$/);
   if (m) return { texto: MIDIA[m[1]] ?? 'Mandou um arquivo', midia: true };
   return { texto: s, midia: false };
+}
+
+/** a última mensagem da conversa, de quem for (dono 13/11: "sempre tem que atualizar pra última mensagem, e se for do
+    cliente, sempre tem que ter uma marcação"): quem falou por último, o texto e quando. A nossa vem com a assinatura do
+    atendente ("*Juliana – Atendimento CAF:*") — vira o nome na etiqueta e sai do texto. */
+export interface UltimaMensagem { de: 'cliente' | 'nos'; quem: string; texto: string; midia: boolean; em?: number }
+export function ultimaMensagem(l: Pick<Lead, 'ud' | 'nu' | 'disse' | 'nossaTexto' | 'nossaOrigem'>): UltimaMensagem | null {
+  const doCliente = l.ud != null && (l.nu == null || l.ud > l.nu);
+  if (doCliente || (l.nu == null && l.disse)) {
+    const m = mensagemDoCliente(l.disse);
+    return m ? { de: 'cliente', quem: 'Cliente', texto: m.texto, midia: m.midia, em: l.ud } : null;
+  }
+  if (l.nu == null) return null;
+  let texto = (l.nossaTexto ?? '').replace(/\r/g, '');
+  let quem = l.nossaOrigem === 'bot' ? 'IA' : l.nossaOrigem === 'telefone' ? 'Celular' : 'Atendente';
+  const ass = texto.match(/^\*([^*\n]{1,60}?)\s*[–-][^*\n]*:\*\s*/);
+  if (ass) { quem = ass[1].trim().split(/\s+/)[0] || quem; texto = texto.slice(ass[0].length); }
+  const m = mensagemDoCliente(texto);
+  if (!m) return { de: 'nos', quem, texto: 'Mensagem enviada', midia: true, em: l.nu };
+  const midia = m.midia ? m.texto.replace(/^Mandou /, 'Enviou ').replace(/^Enviou um áudio$/, 'Áudio').replace(/^Enviou uma imagem$/, 'Imagem')
+    .replace(/^Enviou um documento$/, 'Documento').replace(/^Enviou um vídeo$/, 'Vídeo') : null;
+  return { de: 'nos', quem, texto: midia ?? m.texto, midia: m.midia, em: l.nu };
 }
 
 /** minutos desde um instante */
@@ -229,6 +257,7 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
     fone: foneBonito(r.telefone), atendente: equipeDoUid(r.dono_id) ?? r.dono_id ?? '', lista,
     campanha: r.campanha ?? '—', funil: r.coluna ?? '', ud: ms(r.ult_cliente_em),
     esperandoEm: r.aguardando ? ms(r.ult_cliente_em) : undefined, disse: r.ult_cliente_texto ?? '',
+    nossaTexto: r.ult_nossa_texto ?? undefined, nossaOrigem: r.ult_nossa_origem ?? undefined,
     docsManualId, assinadoEm: ms(r.assinado_em), entrouEm: ms(r.entrou_em), ...vinda, nota: '', planilha: '', situacao, curta, ordem, marcas,
   };
 }
@@ -291,6 +320,8 @@ export function leadsFicticios(): Lead[] {
       atendente: c.atendente, lista: c.cat === 'quente' ? 1 : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
       campanha: c.canal, funil: c.cat === 'quente' ? 'Documentos' : 'Lead Qualificado', ud: c.cat === 'sem_resposta' ? t - 3_600_000 : t,
       esperandoEm: ordem % 5 === 0 ? t : undefined, disse: c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: [],
+      /* a nossa última mensagem (a lista mostra a última, de quem for): nos sem resposta falamos por último */
+      ...(c.cat === 'sem_resposta' ? { nossaTexto: 'Oi! Conseguiu separar os documentos? Estou aqui para te ajudar.', nossaOrigem: 'bot' } : {}),
       /* "Entrou hoje": metade dos quentes chegou hoje; o resto, dias atrás */
       entrouEm: c.cat === 'quente' && ordem % 2 === 0 ? Math.max(hoje0.getTime() + 60_000, t - 90 * 60_000) : t - (2 + (ordem % 5)) * 86_400_000,
     };

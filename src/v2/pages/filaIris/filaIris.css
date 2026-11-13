@@ -893,3 +893,13 @@
 .v2 .fi-conversa-wa .bolha { max-width: 84%; }
 .v2 .fi-conversa-wa :is(.resp-btn, .ident-btns, .msg-falha-acts) { display: none; }
 .v2 .fi-conversa-wa .m-img { max-width: 100%; cursor: zoom-in; }
+
+/* ---------------------------------------------------------------- a última mensagem, de quem for (dono 13/11): quem falou
+   numa etiqueta antes do texto — o CLIENTE em vermelho (é ele que está aguardando resposta), nós em cinza */
+.v2 .fi-msg-l1 { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; max-width: 100%; }
+.v2 .fi-msg-quem {
+  flex: none; display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 5px;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+  background: rgba(var(--tint), .07); color: var(--txt-2); border: 1px solid rgba(var(--tint), .12);
+}
+.v2 .fi-msg-quem[data-de="cliente"] { background: rgba(var(--rubro-rgb), .14); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .38); }

@@ -16,7 +16,7 @@ import {
   type Atendente, type Categoria, type GrupoMarca, type Marca, type TipoMarca,
 } from './dados';
 import {
-  PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, type Lead,
+  PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, ultimaMensagem, type Lead,
 } from './lead';
 import { textoPeriodo, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo } from './fonte';
 import {
@@ -193,7 +193,7 @@ function Colunas({ ultima }: { ultima?: string }) {
     <div className="fi-colunas" aria-hidden>
       <span className="fi-col-cli">Cliente</span>
       <span>Situação</span>
-      <span>Última mensagem do cliente</span>
+      <span>Última mensagem</span>
       <span>Marcações</span>
       {ultima ? <span>{ultima}</span> : null}
       <span />
@@ -263,7 +263,7 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
   /** sem a coluna Campanha · Kanban (a Minha fila; a campanha fica na janela) */
   semCanal?: boolean;
 }) {
-  const msg = mensagemDoCliente(l.disse);
+  const ult = ultimaMensagem(l);
   const dono = atendente(l.atendente);
   const quandoEscreveu = l.ud ? `${haQuanto(minDesde(l.ud) ?? 0)} · ${dataHora(l.ud)}` : '';
   const nomeCurto = doisNomes(l.nome);
@@ -296,12 +296,16 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
           : <Detalhe l={l} />}
       </span>
       <span className="fi-col-msg">
-        {msg
-          ? <span className="fi-l1 fi-elip" data-midia={msg.midia ? '' : undefined} title={msg.texto}>{msg.midia ? msg.texto : `“${msg.texto}”`}</span>
-          : <span className="fi-l1 fi-vazio">Nenhuma mensagem do cliente</span>}
+        {ult
+          ? <span className="fi-l1 fi-msg-l1">
+              <span className="fi-msg-quem" data-de={ult.de} title={ult.de === 'cliente' ? 'A última mensagem é do cliente' : `A última mensagem é nossa (${ult.quem})`}>{ult.quem}</span>
+              <span className="fi-elip" data-midia={ult.midia ? '' : undefined} title={ult.texto}>{ult.midia ? ult.texto : `“${ult.texto}”`}</span>
+            </span>
+          : <span className="fi-l1 fi-vazio">Nenhuma mensagem</span>}
         {l.esperandoEm
           ? <span className="fi-l2" data-alerta><i className="fi-pt" aria-hidden />aguardando {sua ? 'sua ' : ''}resposta · {haQuanto(minDesde(l.esperandoEm) ?? 0)}</span>
-          : quandoEscreveu ? <span className="fi-l2">{quandoEscreveu}</span> : null}
+          : ult?.em ? <span className="fi-l2">{haQuanto(minDesde(ult.em) ?? 0)} · {dataHora(ult.em)}</span>
+            : quandoEscreveu ? <span className="fi-l2">{quandoEscreveu}</span> : null}
       </span>
       <span className="fi-col-marc"><ChipsMarca marcas={l.marcas} /></span>
       {semCanal ? null : <span className="fi-col-canal">
@@ -1015,6 +1019,8 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
     const id = aberto;
     setAberto(null);
     if (!id) return;
+    /* quem fecha a ficha acabou de mexer no cliente (talvez respondeu): a fila relê agora */
+    void fonte.recarregar?.();
     requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(`.fi-lin[data-id="${id}"]`);
       el?.scrollIntoView({ block: 'nearest' });

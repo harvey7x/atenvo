@@ -75,14 +75,19 @@ export function useFonteReal(): FonteFila {
   useEffect(() => {
     void carregar();
     void carregarNumeros();
-    /* a fila muda sozinha (24 h, documentos, fechados): relê a cada 2 minutos */
-    const t = window.setInterval(() => { void carregar(); }, 120_000);
+    /* a fila muda sozinha (mensagens, 24 h, documentos, fechados): relê a cada minuto (dono 13/11: "sempre tem que
+       atualizar pra última mensagem") e ao voltar para a aba */
+    const t = window.setInterval(() => { void carregar(); }, 60_000);
+    let lidaEm = Date.now();
+    const voltou = () => { if (document.visibilityState === 'visible' && Date.now() - lidaEm > 15_000) { lidaEm = Date.now(); void carregar(); } };
+    document.addEventListener('visibilitychange', voltou);
     /* um repasse pelo recado do administrador trocou o dono de um cliente: relê na hora */
     const releia = () => { void carregar(); };
     window.addEventListener(EVENTO_FILA_RECARREGAR, releia);
     return () => {
       window.clearInterval(t);
       window.removeEventListener(EVENTO_FILA_RECARREGAR, releia);
+      document.removeEventListener('visibilitychange', voltou);
       if (retentar.current != null) { window.clearTimeout(retentar.current); retentar.current = null; }
     };
   }, [carregar, carregarNumeros]);
@@ -95,7 +100,7 @@ export function useFonteReal(): FonteFila {
   }, [org, carregar]);
 
   return useMemo<FonteFila>(() => ({
-    modo: 'real', rotulo: 'atualiza sozinha a cada 2 minutos', carregando, erro, leads,
+    modo: 'real', rotulo: 'atualiza sozinha a cada minuto', carregando, erro, leads,
     marcar: (id, tipo, texto) => { void rpc('fila_iris_marcar', { p_contato: id, p_tipo: tipo, p_texto: texto ?? null }); },
     tirarMarca: (_id, mid) => { void rpc('fila_iris_tirar', { p_marcacao: mid }); },
     corrigirDocs: (id, estado) => {
