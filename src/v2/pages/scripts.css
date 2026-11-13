@@ -169,3 +169,5 @@ html[data-barra-alfa]:not(#rv-scr) .v2 .scr-det-lixo {
 html[data-barra-alfa]:not(#rv-scr) .v2 .scr-det-lixo:hover { color: var(--cor-erro-txt, var(--rubro)); background: var(--cor-erro-suave); }
 /* estrela do favorito: o laranja é de alerta — favorito ligado usa a tinta dourada da seleção */
 html[data-barra-alfa]:not(#rv-scr) .v2 .scr-fav.on, html[data-barra-alfa]:not(#rv-scr) .v2 .scr-fav.on:hover { color: var(--cor-acento-txt, var(--azul)); }
+/* filtros de categoria: o rótulo nunca quebra dentro do chip ("Boas-/vindas" no celular) */
+html[data-barra-alfa]:not(#rv-scr) .v2 .ars-cats .chip { white-space: nowrap; flex-shrink: 0; }
