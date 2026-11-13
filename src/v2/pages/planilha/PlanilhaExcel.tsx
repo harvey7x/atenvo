@@ -576,7 +576,10 @@ function renderCel(l: PlLinha, c: ColV, dest: string, senha: SenhaPar | undefine
       title={trava ? 'Sem permissão para ver a senha' : ev ? ev.dica : txt || undefined}>
       {ev?.k === 'sem'
         ? <span className="plx-sem-txt">A informar</span>
-        : <>{ev?.rel && <span className="plx-rel" aria-hidden="true"><Ic d={P.relogio} s={10} /></span>}{txt}</>}
+        : cab && txt
+          // crítica 12/11: o título da coluna quebra em até 2 linhas em vez de cortar ("DATA FECH…")
+          ? <span className="plx-cab-txt">{txt}</span>
+          : <>{ev?.rel && <span className="plx-rel" aria-hidden="true"><Ic d={P.relogio} s={10} /></span>}{txt}</>}
     </div>
   );
 }

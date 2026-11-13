@@ -1018,7 +1018,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
 
       {/* faixa de filtros: busca e comercial à esquerda, ciclos no resto da linha */}
       <div className="gp-barra gp-linha-chips">
-        <input ref={buscaRef} className="inp gp-busca" type="search" placeholder="Buscar na planilha (nome, NB, CPF…)" value={busca}
+        <input ref={buscaRef} className="inp gp-busca" type="search" placeholder="Buscar nome, NB ou CPF…" value={busca}
           onChange={(e) => setBusca(e.target.value)} aria-label="Buscar na planilha" />
         <select className="inp gp-sel" value={comAtivo} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial">
           <option value="">Comercial: todos</option>

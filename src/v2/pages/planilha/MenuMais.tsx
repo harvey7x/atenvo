@@ -18,6 +18,7 @@ export interface ItemMenuMais {
 }
 
 const PONTOS = 'M5 12h.01M12 12h.01M19 12h.01';
+const SETA = 'm6 9 6 6 6-6';
 
 function Ic({ d, s = 16 }: { d: string; s?: number }) {
   return (
@@ -76,7 +77,7 @@ export function MenuMais({ itens, rotulo = 'Mais', mini, so, titulo, className, 
         className={`p-btn btn-sec mm-gatilho${mini ? ' btn-mini' : ''}${so ? ' mm-so' : ''}${aberto ? ' on' : ''}`}
         aria-haspopup="menu" aria-expanded={aberto} title={titulo ?? rotulo} aria-label={so ? (titulo ?? rotulo) : undefined}
         onClick={() => setAberto((v) => !v)}>
-        {so ? <Ic d={PONTOS} s={mini ? 16 : 18} /> : <>{rotulo}<Ic d={PONTOS} s={16} /></>}
+        {so ? <Ic d={PONTOS} s={mini ? 16 : 18} /> : <>{rotulo}<Ic d={SETA} s={14} /></>}
       </button>
       {aberto && (
         <div className="mm-pop" role="menu" aria-label={titulo ?? rotulo} onKeyDown={teclar}>

@@ -572,3 +572,17 @@ html[data-barra-alfa]:not(#rv-sis) .v2 .plx-sem-txt {
   display: block; height: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 11px; line-height: inherit; letter-spacing: 0; text-align: center;
 }
+/* filete da linha de cabeçalho do bloco: dourado da marca (o âmbar virou cor de alerta) */
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6), inset 2px 0 0 var(--plx-sep); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { font-weight: 600; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); }
+/* título de coluna (linha de cabeçalho do bloco): até 2 linhas de 11px em vez do corte com reticências */
+.v2 .plx-lin-cab .plx-c { display: flex; align-items: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-c { justify-content: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-r { justify-content: flex-end; }
+.v2 .plx-cab-txt {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: normal; overflow-wrap: anywhere; line-height: 12px; font-size: 11px; max-width: 100%;
+}

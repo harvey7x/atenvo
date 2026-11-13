@@ -1651,10 +1651,10 @@
 
 /* ===== crítica 12/11 — cob_gestao ===== */
 /* Novos: ação da linha quieta (contorno só no hover da linha) e "remover" como ícone discreto */
-html[data-barra-alfa] .v2 .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover):not(:focus-visible) {
-  color: var(--txt-2); background: transparent; border-color: rgba(var(--tint), .1); box-shadow: none;
+html[data-barra-alfa]:not(#rv-sis) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover):not(:focus-visible) {
+  color: var(--txt-2); background: transparent; border-color: rgba(var(--tint), .09); box-shadow: none;
 }
-html[data-barra-alfa] .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover) { color: var(--txt); border-color: rgba(var(--tint), .18); }
+html[data-barra-alfa]:not(#rv-sis) .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-parado.nv-parado:not(:hover) { color: var(--txt); border-color: rgba(var(--tint), .18); }
 .v2 .nv-rm {
   display: inline-grid; place-items: center; flex: none;
   width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px;

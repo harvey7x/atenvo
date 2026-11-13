@@ -358,3 +358,7 @@ html[data-barra-alfa] .v2 .gp-ph .p-btn.gp-cheia-bt { width: var(--btn-h-g, 36px
 .v2 .mm-sep { height: 1px; margin: 5px 4px; background: var(--linha); }
 /* o popover de colunas abre do mesmo lugar do "Mais" */
 .v2 .mm.gp-cols-wrap > .gp-cols-pop { top: calc(100% + 6px); right: 0; }
+/* a grade desce até perto da borda: a folga de baixo da página fica em 14px nesta tela */
+.v2 .pagina:not(.cheia):has(.gp-raiz:not(.gp-cheia)),
+html:root[data-repaginada][data-repaginada] .v2 .pagina:not(.cheia):has(.gp-raiz:not(.gp-cheia)) { padding-bottom: 14px; }
+.v2 .mm-gatilho:not(.mm-so) > svg { margin-left: 2px; color: var(--txt-2); }
