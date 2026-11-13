@@ -798,7 +798,7 @@ export function ConversasReviza() {
               <h3 className="zp-titulo">{noFora ? 'Fora da base' : 'Conversas'}</h3>
               {!noFora && (() => {
                 if (canaisQ.isLoading) return <p className="zp-numeros">Verificando o número…</p>;
-                if (canaisQ.isError && !canaisQ.data) return <p className="zp-numeros">Não deu pra ver os números agora</p>;
+                if (canaisQ.isError && !canaisQ.data) return <p className="zp-numeros">Não foi possível ver os números agora</p>;
                 const on = canais.filter((k) => k.estado === 'conectado');
                 const ponto = on.length === 0 ? 'zp-ponto zp-ponto-off' : on.length < canais.length ? 'zp-ponto zp-ponto-meio' : 'zp-ponto';
                 const um = canais.length === 1 ? canais[0] : null;
@@ -834,7 +834,7 @@ export function ConversasReviza() {
             )}
             <div className="zp-lista-rol">
               {/* dentro da pasta, a explicação no topo (como o aviso das Arquivadas no iPhone) */}
-              {noFora && <p className="zp-arq-nota">Números que não estão na Gestão. Cadastre o telefone do cliente e a conversa passa pra lista principal.</p>}
+              {noFora && <p className="zp-arq-nota">Números que não estão na Gestão. Cadastre o telefone do cliente e a conversa passa para a lista principal.</p>}
               {/* pasta "Fora da base" no topo da lista, no lugar das Arquivadas do WhatsApp: o número em verde,
                   sem selo (desenho do Painel da Equipe) — as não lidas da pasta quando há, senão o total */}
               {!noFora && !semGestao && dadosProntos && outras > 0 && !busca.trim() && filtroLista === 'tudo' && (
@@ -851,7 +851,7 @@ export function ConversasReviza() {
                 </div>
               ) : q.isError && !q.data ? (
                 <div className="zp-vazio">
-                  <b>Não deu pra carregar agora</b>
+                  <b>Não foi possível carregar agora</b>
                   <span>As conversas não carregaram. Confira a internet e tente de novo.</span>
                   <button type="button" className="zp-acao-txt" onClick={() => { void q.refetch(); }}>Tentar de novo</button>
                 </div>
@@ -1683,7 +1683,7 @@ function ChatReviza({ conversa, titulo, estado, aoVoltar, inserirTexto, aoConsum
               <div className="zp-esq-msgs" role="status" aria-label="Carregando mensagens"><i className="in" /><i className="out" /><i className="in curta" /><i className="out longa" /></div>
             ) : q.isError && !q.data ? (
               <div className="zp-evento zp-falha">
-                <span><b>Não deu pra carregar as mensagens agora.</b><button type="button" className="zp-acao-txt" onClick={() => { void q.refetch(); }}>Tentar de novo</button></span>
+                <span><b>Não foi possível carregar as mensagens agora.</b><button type="button" className="zp-acao-txt" onClick={() => { void q.refetch(); }}>Tentar de novo</button></span>
               </div>
             ) : msgs.length === 0 ? (
               <div className="zp-evento"><span>{filtro ? 'Nada encontrado' : 'Sem mensagens ainda'}</span></div>
@@ -1723,7 +1723,7 @@ function ChatReviza({ conversa, titulo, estado, aoVoltar, inserirTexto, aoConsum
                       <span className="zp-b-acoes">
                         <button type="button" tabIndex={foco} title="Responder" aria-label="Responder" onClick={() => { setRespondendo(m); inputRef.current?.focus(); }}><IcResponder /></button>
                         {saida && (
-                          <button type="button" tabIndex={foco} title="Apagar pra todos" aria-label="Apagar pra todos" onClick={() => { if (window.confirm('Apagar esta mensagem pra todos?')) apagarMsg.mutate({ mensagem_id: m.id, conversa_id: conversa.id }, { onError: (er) => setErro((er as Error).message) }); }}>
+                          <button type="button" tabIndex={foco} title="Apagar para todos" aria-label="Apagar para todos" onClick={() => { if (window.confirm('Apagar esta mensagem para todos?')) apagarMsg.mutate({ mensagem_id: m.id, conversa_id: conversa.id }, { onError: (er) => setErro((er as Error).message) }); }}>
                             <IcLixo />
                           </button>
                         )}
@@ -1835,8 +1835,8 @@ function ChatReviza({ conversa, titulo, estado, aoVoltar, inserirTexto, aoConsum
                 onChange={(e) => setProgTexto(e.target.value)} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                 {VARS_MSG.map((v) => (
-                  <button type="button" key={v} className="cm-cli-filtro-btn" title={`${DICA_VAR[v]} — clique pra inserir`}
-                    onClick={() => setProgTexto((tx) => (tx.trim() ? `${tx.replace(/\s+$/, '')} ${v}` : v))}>{v}</button>
+                  <button type="button" key={v} className="cm-cli-filtro-btn cc-var-btn" title={`${DICA_VAR[v]}. Clique para inserir ${v}`}
+                    onClick={() => setProgTexto((tx) => (tx.trim() ? `${tx.replace(/\s+$/, '')} ${v}` : v))}><span className="cc-var">{v.slice(1, -1)}</span></button>
                 ))}
               </div>
             </div>
@@ -1853,7 +1853,7 @@ function ChatReviza({ conversa, titulo, estado, aoVoltar, inserirTexto, aoConsum
             <div className="campo"><label>Dia</label><Input type="date" value={progData} onChange={(e) => setProgData(e.target.value)} /></div>
             <div className="campo"><label>Horário</label><Input type="time" value={progHora} onChange={(e) => setProgHora(e.target.value)} /></div>
             {progErro && <div className="gs-aviso erro gs-col2" role="alert" style={{ margin: 0 }}><span>{progErro}</span></div>}
-            <p className="cm-hint gs-col2" style={{ margin: 0 }}>A mensagem programada aparece na aba Envios — dá pra cancelar lá até a hora do disparo. Variável sem dado no cadastro = não sai errada, vira erro explicado na fila.</p>
+            <p className="cm-hint gs-col2" style={{ margin: 0 }}>A mensagem programada aparece em Envios, onde é possível cancelá-la até a hora do disparo. Se faltar no cadastro o dado de uma variável, a mensagem não sai errada: vira um erro explicado na fila.</p>
           </div>
         </ModalV2>
       )}

@@ -102,7 +102,7 @@ export function CabecalhoReguaComercial({ nome, minha, empresaLigada, inicioEmpr
       {pausada && (
         <div className="rt-aviso atencao" role="status">
           <b>{minha ? 'Sua régua está pausada.' : `A régua de ${nome} está pausada.`}</b>
-          <span>Nenhuma mensagem automática sai {pros} até {minha ? 'você retomar' : 'retomar'}. O resto da equipe continua normal.</span>
+          <span>Nenhuma mensagem automática sai {pros} até {minha ? 'você retomar' : 'a régua ser retomada'}. O resto da equipe continua normalmente.</span>
         </div>
       )}
       {!pausada && !empresaLigada && (
