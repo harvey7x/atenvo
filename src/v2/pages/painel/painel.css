@@ -703,3 +703,12 @@
 /* "Voltou a pagar": tom próprio (azul-petróleo), distinto do verde de "Em dia" e ≥3:1 nos dois temas */
 html[data-barra-alfa]:not([data-tema="light"]):not(#rv-sis) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #4FB8C4; }
 html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #2B8A99; }
+
+/* Atendentes: "Recebido (total)" é dado, não seleção — barra em cinza (o dourado fica para o ativo) */
+.v2 .pn-eq-rec .pn-trilho i.acento { background: rgba(var(--tint), .3); }
+/* Comissões: uma linha de subtítulo; a explicação mora na dica do ícone */
+.v2 .pn-com-sub { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .pn-info { display: inline-grid; place-items: center; color: var(--txt-3); cursor: help; border-radius: 50%; }
+.v2 .pn-info:hover, .v2 .pn-info:focus-visible { color: var(--txt); outline: none; }
+/* KPI de pessoa (Melhor adimplência, Maior atraso): o nome do comercial em destaque no rodapé */
+.v2 .pn-kpi-pe b:not(.num) { color: var(--txt); font-weight: 600; }

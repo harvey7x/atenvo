@@ -175,22 +175,32 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
         </div>
       </div>
 
-      {/* indicadores */}
-      <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
-        <Indicador rotulo="Carteira em cobrança" valor={<>{tot.emCobranca.toLocaleString('pt-BR')}<span className="pn-cent"> clientes</span></>}
-          pe={<>ticket médio <b className="num">{brl(tot.emCobranca ? tot.recorrencia / tot.emCobranca : 0)}</b></>}
-          visual={<Proporcao partes={tot.brk.map((b) => ({ v: b.n, tom: TOM_COMP[b.comp], titulo: `${ROTULO_COMP[b.comp]}: ${b.n}` }))} />} />
-        <Indicador rotulo="Recorrência mensal" valor={<Dinheiro v={tot.recorrencia} />}
-          pe={<>comissões previstas <b className="num">{brl(comPrevista)}</b>/mês</>}
-          visual={<div className="pn-trilho" title={`Comissões: ${pct1(tot.recorrencia ? (comPrevista / tot.recorrencia) * 100 : 0)}% da recorrência`}><i className="neutro" style={{ width: `${tot.recorrencia ? Math.min(100, (comPrevista / tot.recorrencia) * 100) : 0}%` }} /></div>} />
-        <Indicador rotulo="Em atraso" valor={<>{tot.atrasoN.toLocaleString('pt-BR')}<span className="pn-cent"> clientes</span></>} tom={tot.atrasoN > 0 ? 'er' : undefined}
-          pe={<><b className="num">{brl(tot.atrasoValor)}</b>/mês · {pct1(tot.emCobranca ? (tot.atrasoN / tot.emCobranca) * 100 : 0)}% da carteira</>}
-          visual={<div className="pn-trilho"><i className="er" style={{ width: `${tot.emCobranca ? (tot.atrasoN / tot.emCobranca) * 100 : 0}%` }} /></div>} />
-        <Indicador rotulo="Adimplência da equipe" valor={tot.emCobranca ? <>{tot.adimplencia}<span className="pn-cent">%</span></> : '—'}
-          tom={!tot.emCobranca ? undefined : tot.adimplencia >= 80 ? 'ok' : tot.adimplencia >= 60 ? 'at' : 'er'}
-          pe={<><b className="num">{tot.emDia.toLocaleString('pt-BR')}</b> de {tot.emCobranca.toLocaleString('pt-BR')} clientes em dia</>}
-          visual={<div className="pn-trilho"><i className={tot.adimplencia >= 80 ? 'ok' : tot.adimplencia >= 60 ? 'at' : 'er'} style={{ width: `${tot.adimplencia}%` }} /></div>} />
-      </div>
+      {/* indicadores — crítica 12/11: os totais da carteira já estão no Painel (e no rodapé da
+          tabela); aqui a pergunta é "quem está bem e quem precisa de ajuda" */}
+      {(() => {
+        const comCarteira = membros.filter((m) => m.emCobranca > 0 && m.adimplencia != null);
+        const melhor = [...comCarteira].sort((a, b) => (b.adimplencia ?? 0) - (a.adimplencia ?? 0) || b.emCobranca - a.emCobranca)[0];
+        const pior = [...membros].filter((m) => m.atrasoValor > 0).sort((a, b) => b.atrasoValor - a.atrasoValor)[0];
+        const semWa = membros.reduce((s, m) => s + m.semWa, 0);
+        const maisSemWa = [...membros].filter((m) => m.semWa > 0).sort((a, b) => b.semWa - a.semWa)[0];
+        const tomDe = (v: number) => (v >= 80 ? 'ok' : v >= 60 ? 'at' : 'er') as 'ok' | 'at' | 'er';
+        return (
+          <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
+            <Indicador rotulo="Comissões previstas" valor={<Dinheiro v={comPrevista} />}
+              pe={<>por mês · {pct1(tot.recorrencia ? (comPrevista / tot.recorrencia) * 100 : 0)}% da recorrência de <b className="num">{brl(tot.recorrencia)}</b></>}
+              visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${tot.recorrencia ? Math.min(100, (comPrevista / tot.recorrencia) * 100) : 0}%` }} /></div>} />
+            <Indicador rotulo="Melhor adimplência" valor={melhor ? <>{melhor.adimplencia}<span className="pn-cent">%</span></> : '—'} tom={melhor ? tomDe(melhor.adimplencia ?? 0) : undefined}
+              pe={melhor ? <><b>{melhor.nome}</b> · {melhor.brk.em_dia + melhor.brk.voltou} de {melhor.emCobranca} em dia · equipe {tot.adimplencia}%</> : 'nenhuma carteira em cobrança'}
+              visual={melhor ? <div className="pn-trilho"><i className={tomDe(melhor.adimplencia ?? 0)} style={{ width: `${melhor.adimplencia}%` }} /></div> : undefined} />
+            <Indicador rotulo="Maior atraso" valor={pior ? <Dinheiro v={pior.atrasoValor} /> : '—'} tom={pior ? 'er' : undefined}
+              pe={pior ? <><b>{pior.nome}</b> · {pior.atrasoN} cliente{pior.atrasoN === 1 ? '' : 's'} em atraso, por mês</> : 'ninguém com cliente em atraso'}
+              visual={pior ? <div className="pn-trilho"><i className="er" style={{ width: `${tot.atrasoValor ? Math.min(100, (pior.atrasoValor / tot.atrasoValor) * 100) : 0}%` }} /></div> : undefined} />
+            <Indicador rotulo="Clientes sem WhatsApp" valor={semWa.toLocaleString('pt-BR')} tom={semWa > 0 ? 'at' : undefined}
+              pe={maisSemWa ? <>mais na carteira de <b>{maisSemWa.nome}</b> ({maisSemWa.semWa})</> : 'todos com número cadastrado'}
+              visual={<div className="pn-trilho"><i className={semWa > 0 ? 'at' : 'ok'} style={{ width: `${tot.emCobranca ? Math.min(100, (semWa / tot.emCobranca) * 100) : 0}%` }} /></div>} />
+          </div>
+        );
+      })()}
 
       {/* desempenho da equipe */}
       <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.08s' }}>
@@ -267,10 +277,13 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
         <div className="pn-card-cab">
           <div>
             <h3>Comissões</h3>
-            <p>
-              A mensalidade (o que o cliente paga) é metade da parcela e se divide entre escritório e comercial pela % dele (padrão {PCT_PADRAO}% = metade pra cada).
-              Na planilha entra o líquido do escritório; o realizado do comercial sai dele — com {PCT_PADRAO}%, o mesmo valor.
-              {podeEditarPct ? ' Edite a % e salve — vale na hora para previsões e fechamentos.' : ' A % é definida pelo administrador.'}
+            {/* crítica 12/11: a explicação saiu do corpo da página e virou a dica do ícone */}
+            <p className="pn-com-sub">
+              Divisão da mensalidade entre escritório e comercial · padrão {PCT_PADRAO}%
+              <span className="pn-info" tabIndex={0} role="img" aria-label="Como funciona"
+                title={`A mensalidade (o que o cliente paga) é metade da parcela e se divide entre escritório e comercial pela % dele (padrão ${PCT_PADRAO}% = metade para cada). Na planilha entra o líquido do escritório; o realizado do comercial sai dele — com ${PCT_PADRAO}%, o mesmo valor.${podeEditarPct ? ' Edite a % e salve — vale na hora para previsões e fechamentos.' : ' A % é definida pelo administrador.'}`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg>
+              </span>
             </p>
           </div>
           <span className="pn-card-lado num">previsto <b>{brl(comPrevista)}</b>/mês</span>
