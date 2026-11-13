@@ -688,3 +688,7 @@ html[data-barra-alfa]:not([data-tema="light"]):not(#rv-wa) .v2 .spl.vidro-pro.vi
   background: linear-gradient(160deg, rgba(34, 36, 42, .92), rgba(22, 24, 28, .9));
   -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
 }
+/* mínimo de 11px na paleta (pílulas, cabeçalhos de grupo, linhas de apoio, contadores, dicas de teclado) */
+html[data-barra-alfa]:not(#rv-wa) .v2 .spl :is(.spl-kbd, .spl-gcab, .spl-gcab-n, .spl-sub-onde, .spl-et-n, .spl-mid-tile b, .spl-pill, .spl-it-sub, .spl-it-n, .spl-pv-linha, .spl-tag, .spl-pv-desc, .spl-dicas) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .spl :is(.spl-usar, .spl-ger) { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .spl .spl-var { font-size: inherit; }

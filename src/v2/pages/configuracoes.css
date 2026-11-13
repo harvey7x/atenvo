@@ -228,3 +228,12 @@ html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-canal-notif {
 html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-desc-c { font-size: 12px; }
 html[data-barra-alfa]:not(#rv-cfg) .v2 .cfg-nav .it { font-size: 13px; }
 html[data-barra-alfa]:not(#rv-cfg) .v2 .cfa-nota { font-size: 12px; }
+
+/* ===== crítica 12/11 — atendimento (Integrações, aberta por Configurações › Canais e integrações) =====
+   mínimo de 11px e selos na régua do sistema */
+html[data-barra-alfa]:not(#rv-cfg) .v2 .intg-transp { font-size: 11px; letter-spacing: .03em; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .intg-chip { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .int-card :is(.sb, .int-s, .obs) { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .diag-sec .obs { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .intg-tec .mono { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-cfg) .v2 .intg-tec .intg-check .it b { font-size: 11px; }

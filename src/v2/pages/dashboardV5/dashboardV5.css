@@ -584,3 +584,5 @@ html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-ja { color: var(--txt); }
 /* o único destaque dourado da tela: o período escolhido no mapa (a linha "Hoje"/semana em foco) */
 html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje { outline-color: var(--cor-acento-fio); }
 html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje .d5-calor-rot::before { background: var(--azul); }
+/* mínimo de 11px também nas legendas miúdas (% de "Quem marcou", "em 7 dias" do pé do mapa) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg :is(.d5-quem-leg small, .d5-calor-pe small, .d5-barra-v small) { font-size: 11px; }

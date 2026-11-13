@@ -655,3 +655,8 @@ html[data-barra-alfa]:not([data-tema="light"]):not(#rv-wa) .v2 .wa-pop.wa-filtro
   background: linear-gradient(160deg, rgba(34, 36, 42, .92), rgba(22, 24, 28, .9));
   -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
 }
+/* painel de Filtros: mínimo de 11px (títulos de seção, opções, contadores, rodapé) */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro :is(.fp-h-t, .fp-sub, .fp-it, .fp-it .tt, .fp-limpar, .fp-h .num, .fp-it .num) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro .fp-ok { font-size: 12px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro .fp-ok .num { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro :is(.fp-nada, .fp-it .oftag, .fp-it .ck) { font-size: 11px; }

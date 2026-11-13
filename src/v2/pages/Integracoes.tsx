@@ -17,6 +17,8 @@ import {
 } from '../components';
 import { formatarTelefone } from '../lib/telefone';
 import './integracoes.css';
+// Integrações é a extensão de Configurações › Canais e integrações: a régua da ALFA desta tela mora lá
+import './configuracoes.css';
 
 /* telefone no formato único, mascarado: "(51) •••••-0001" (fora do padrão brasileiro, a máscara de sempre) */
 const numeroMascarado = (n: string | null | undefined) => {

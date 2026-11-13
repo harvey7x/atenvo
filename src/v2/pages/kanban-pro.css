@@ -386,3 +386,6 @@ html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .kb-col-toggle:focus-visib
   /* celular: o selo "entrada" sai do cabeçalho da coluna (fica no title do nome) para o nome caber inteiro */
   html[data-barra-alfa]:not(#rv-kb) .v2 .kb-pro .kb-cab .tag-entrada { display: none; }
 }
+/* gaveta do lead: selos e títulos de seção com 11px */
+html[data-barra-alfa]:not(#rv-kb) .v2 .drawer-v2 .kd-flag { font-size: 11px; letter-spacing: .02em; }
+html[data-barra-alfa]:not(#rv-kb) .v2 :is(.drawer-v2, .p-modal) .kb-sec-h { font-size: 11px; }
