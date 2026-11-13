@@ -10,11 +10,14 @@
    Os itens, a ordem, os ícones e as regras de quem vê o quê são os de antes (o shell
    decide e manda pronto); muda a pele e o desenho do topo e do pé.
 
-   Três jeitos, escolhidos pelo shell (AppShellV2):
-   - 'aberta'  — 260px encaixada, o conteúdo começa depois dela (padrão em tela larga);
-   - 'trilho'  — 64px só com os ícones; o mouse (ou o Tab) abre por cima do conteúdo,
-                 como a barra de antes ("a barra do lado tem que minimizar", 11/09);
-   - 'gaveta'  — no celular ela some; o botão do topo abre por cima, com um véu atrás.
+   Três jeitos, escolhidos pelo shell (AppShellV2) pela largura da tela:
+   - 'aberta'  — 260px encaixada, o conteúdo começa depois dela (tela larga, ≥1440px, se a
+                 pessoa não recolheu — a escolha fica salva neste aparelho);
+   - 'trilho'  — 64px só com os ícones (tela larga recolhida, ou tela média 761–1439px, onde
+                 encaixar espremeria as telas): o mouse ou o Tab abrem por cima do conteúdo, como
+                 a barra de antes ("a barra do lado tem que minimizar", 11/09); na tela média o
+                 botão do topo também abre por cima;
+   - 'gaveta'  — no celular (≤760px) ela some; o botão do topo abre por cima, com um véu atrás.
    ===================================================================== */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -140,11 +143,15 @@ function ItemLink({ item, aoEscolher }: { item: ItemBarra; aoEscolher?: () => vo
   );
 }
 
+export type AcaoTopoBarra = { rotulo: string; tipo: 'fixar' | 'recolher' | 'fechar'; aoClicar: () => void };
+
 export type BarraAlfaProps = {
   modo: ModoBarra;
-  /** gaveta (celular): aberta por cima do conteúdo */
-  gavetaAberta: boolean;
-  aoFecharGaveta: () => void;
+  /** aberta POR CIMA do conteúdo: a gaveta do celular, ou o trilho aberto pelo botão do topo (tela média) */
+  sobreposta: boolean;
+  aoFecharSobreposta: () => void;
+  /** o botão do canto da barra quando ela está por cima do conteúdo (fixar aberta / recolher / fechar) */
+  acaoTopo?: AcaoTopoBarra | null;
   org: string;
   ambientes: AmbienteBarra[];
   ambienteAtual: AmbienteBarra | null;
@@ -160,24 +167,42 @@ export type BarraAlfaProps = {
   versao?: string | null;
 };
 
+const idGrupo = (rotulo: string) => 'ba-g-' + rotulo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const IcFixar = () => svg(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="m14 9 3 3-3 3" /></>, 16);
+const IcRecolher = () => svg(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="m16 15-3-3 3-3" /></>, 16);
+
 export function BarraAlfa(p: BarraAlfaProps) {
   const raiz = useRef<HTMLElement>(null);
   const nav = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
   const [rolagem, setRolagem] = useState<'' | 'abaixo' | 'acima' | 'ambos'>('');
-  const gavetaFechada = p.modo === 'gaveta' && !p.gavetaAberta;
+  const gavetaFechada = p.modo === 'gaveta' && !p.sobreposta;
 
   // gaveta fechada: fora da ordem do Tab e do leitor de tela
   useLayoutEffect(() => { raiz.current?.toggleAttribute('inert', gavetaFechada); }, [gavetaFechada]);
 
-  // gaveta aberta: Esc fecha
+  // por cima do conteúdo (gaveta ou trilho aberto pelo botão): o foco entra na barra e, ao fechar, volta ao
+  // botão do topo; o Esc fecha (o Esc do menu de ambiente e o da busca vêm antes)
+  const menuRef = useRef(menuAberto); menuRef.current = menuAberto;
+  const buscaRef = useRef(p.buscaAberta); buscaRef.current = p.buscaAberta;
+  const fecharRef = useRef(p.aoFecharSobreposta); fecharRef.current = p.aoFecharSobreposta;
   useEffect(() => {
-    if (p.modo !== 'gaveta' || !p.gavetaAberta) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented && !p.buscaAberta) p.aoFecharGaveta(); };
+    if (!p.sobreposta) return;
+    const r = raiz.current;
+    const alvo = r?.querySelector<HTMLElement>('.ba-item.on') ?? r?.querySelector<HTMLElement>('.ba-ws-gat:not(.estatico), .ba-item');
+    alvo?.focus({ preventScroll: true });
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || menuRef.current || buscaRef.current) return;
+      e.preventDefault(); fecharRef.current();
+    };
     document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [p.modo, p.gavetaAberta, p.buscaAberta, p.aoFecharGaveta]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      document.removeEventListener('keydown', esc);
+      // o foco estava na barra: volta para o botão que abre/fecha (senão se perde no body)
+      if (r && r.contains(document.activeElement)) document.querySelector<HTMLElement>('.ba-alternar')?.focus({ preventScroll: true });
+    };
+  }, [p.sobreposta]);
 
   // a lista rola sem barra (como na referência): um esmaecido na borda avisa que tem mais
   const medir = useCallback(() => {
@@ -192,7 +217,9 @@ export function BarraAlfa(p: BarraAlfaProps) {
     n.addEventListener('scroll', medir, { passive: true });
     return () => { ro.disconnect(); n.removeEventListener('scroll', medir); };
   }, [medir]);
-  // troca de rota: o item ativo fica à vista dentro da lista (sem rolar a página)
+  // troca de rota (ou o menu muda de verdade): o item ativo fica à vista dentro da lista, sem rolar a página.
+  // A chave é a LISTA de itens, não o array (que é novo a cada render do shell — a lista pulava sozinha)
+  const chaveItens = p.grupos.map((g) => g.itens.map((i) => i.slug).join(',')).join('|');
   useEffect(() => {
     const n = nav.current; if (!n) return;
     const ativo = n.querySelector<HTMLElement>('.ba-item.on'); if (!ativo) { medir(); return; }
@@ -200,16 +227,24 @@ export function BarraAlfa(p: BarraAlfaProps) {
     if (topo < n.scrollTop) n.scrollTop = Math.max(0, topo - 28);
     else if (fim > n.scrollTop + n.clientHeight) n.scrollTop = fim - n.clientHeight + 12;
     medir();
-  }, [pathname, p.grupos, medir]);
+  }, [pathname, chaveItens, medir]);
 
-  const escolher = p.modo === 'gaveta' ? p.aoFecharGaveta : undefined;
+  const escolher = p.sobreposta ? p.aoFecharSobreposta : undefined;
+  const a = p.acaoTopo;
   return (
     <>
       <aside ref={raiz} id="ba-barra" className="ba-barra" aria-label="Barra lateral"
         data-menu={menuAberto || undefined}>
         <div className="ba-in">
-          <TrocaAmbiente org={p.org} atual={p.ambienteAtual} ambientes={p.ambientes} carregando={p.carregando}
-            aoTrocar={(id) => { escolher?.(); p.aoTrocarAmbiente(id); }} aoMudarAberto={setMenuAberto} />
+          <div className="ba-cab">
+            <TrocaAmbiente org={p.org} atual={p.ambienteAtual} ambientes={p.ambientes} carregando={p.carregando}
+              aoTrocar={(id) => { escolher?.(); p.aoTrocarAmbiente(id); }} aoMudarAberto={setMenuAberto} />
+            {a && (
+              <button type="button" className="ba-cab-bt" onClick={a.aoClicar} aria-label={a.rotulo} title={a.rotulo}>
+                {a.tipo === 'fixar' ? <IcFixar /> : a.tipo === 'recolher' ? <IcRecolher /> : <IcFechar tam={16} />}
+              </button>
+            )}
+          </div>
 
           <nav ref={nav} className="ba-grupos" aria-label="Navegação principal" data-rolagem={rolagem || undefined}>
             {!p.carregando && (
@@ -222,8 +257,8 @@ export function BarraAlfa(p: BarraAlfaProps) {
               </div>
             )}
             {!p.carregando && p.grupos.map((g) => (
-              <div className="ba-grupo" key={g.rotulo} role="group" aria-labelledby={`ba-g-${g.rotulo}`}>
-                <span className="ba-grupo-rot" id={`ba-g-${g.rotulo}`}>{g.rotulo}</span>
+              <div className="ba-grupo" key={g.rotulo} role="group" aria-labelledby={idGrupo(g.rotulo)}>
+                <span className="ba-grupo-rot" id={idGrupo(g.rotulo)}>{g.rotulo}</span>
                 {g.itens.map((i) => <ItemLink key={i.slug} item={i} aoEscolher={escolher} />)}
               </div>
             ))}
@@ -242,21 +277,21 @@ export function BarraAlfa(p: BarraAlfaProps) {
           </div>
         </div>
       </aside>
-      {p.modo === 'gaveta' && p.gavetaAberta && <div className="ba-veu" onClick={p.aoFecharGaveta} aria-hidden />}
+      {p.sobreposta && <div className={p.modo === 'gaveta' ? 'ba-veu' : 'ba-veu leve'} onClick={p.aoFecharSobreposta} aria-hidden />}
     </>
   );
 }
 
 /* ---------- o lado esquerdo da barra do topo: recolher + "ambiente / página" ---------- */
-export function TopoAlfa({ modo, gavetaAberta, aoAlternar, ambiente, pagina }: {
-  modo: ModoBarra; gavetaAberta: boolean; aoAlternar: () => void; ambiente: string; pagina: string;
+export function TopoAlfa({ modo, sobreposta, aoAlternar, ambiente, pagina }: {
+  modo: ModoBarra; sobreposta: boolean; aoAlternar: () => void; ambiente: string; pagina: string;
 }) {
-  const aberta = modo === 'aberta' || (modo === 'gaveta' && gavetaAberta);
+  const aberta = modo === 'aberta' || sobreposta;
+  const rotulo = modo === 'gaveta' ? (sobreposta ? 'Fechar o menu' : 'Abrir o menu') : aberta ? 'Recolher a barra lateral' : 'Abrir a barra lateral';
   return (
     <div className="ba-topo">
       <button type="button" className="ba-alternar" onClick={aoAlternar} aria-controls="ba-barra" aria-expanded={aberta}
-        aria-label={modo === 'gaveta' ? (gavetaAberta ? 'Fechar o menu' : 'Abrir o menu') : aberta ? 'Recolher a barra lateral' : 'Abrir a barra lateral'}
-        title={modo === 'gaveta' ? 'Menu' : aberta ? 'Recolher a barra lateral' : 'Abrir a barra lateral'}>
+        aria-label={rotulo} title={rotulo}>
         <IcPainel aberto={aberta} />
       </button>
       <nav className="ba-trilha" aria-label="Você está em">

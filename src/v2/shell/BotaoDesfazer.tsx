@@ -26,7 +26,8 @@ function ToastDesfazer({ tom, txt }: { tom: 'ok' | 'erro' | 'info'; txt: string 
     <div
       role="status"
       style={{
-        position: 'fixed', left: '50%', bottom: 22, transform: 'translateX(-50%)',
+        // centrado no CONTEÚDO: --ba-w é a largura da barra lateral da ALFA (fora dela, 0 = centro da janela)
+        position: 'fixed', left: 'calc(50% + var(--ba-w, 0px) / 2)', bottom: 22, transform: 'translateX(-50%)',
         zIndex: 9999, maxWidth: 460, padding: '11px 16px', borderRadius: 11,
         fontSize: 13, fontWeight: 500, color: 'var(--txt)', boxShadow: '0 10px 34px rgba(0,0,0,.28)',
         border: '1px solid ' + (tom === 'erro' ? 'rgba(var(--rubro-rgb),.5)' : tom === 'ok' ? 'rgba(var(--verde-rgb),.5)' : 'var(--linha)'),
@@ -58,14 +59,14 @@ export function BotaoDesfazer() {
   if (!estado) {
     return (
       <>
-        <button
+        <button className="bd-botao"
           type="button"
           style={{ ...baseBtn, opacity: 0.45, padding: '0 10px' }}
           title="Desfazer — a última ação feita no sistema aparece aqui pra reverter num clique."
           onClick={() => flash('info', 'Nada pra desfazer por enquanto. Quando você mover um ciclo, marcar um pagamento ou editar um cliente, a ação aparece aqui pra reverter num clique (por até 5 minutos).')}
         >
           <IconeDesfazer />
-          <span>Desfazer</span>
+          <span className="bd-rotulo">Desfazer</span>
         </button>
         {toast && <ToastDesfazer tom={toast.tom} txt={toast.txt} />}
       </>
@@ -113,7 +114,7 @@ export function BotaoDesfazer() {
 
   return (
     <>
-      <button
+      <button className="bd-botao"
         type="button"
         style={estilo}
         disabled={ocupado}
@@ -125,9 +126,9 @@ export function BotaoDesfazer() {
           : rodar())}
       >
         <IconeDesfazer />
-        <span>{label}</span>
+        <span className="bd-rotulo">{label}</span>
         {!bloqueada && !confirmando && !ocupado && (
-          <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.6, fontWeight: 500 }}>· {rotulo}</span>
+          <span className="bd-acao" style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.6, fontWeight: 500 }}>· {rotulo}</span>
         )}
       </button>
       {toast && <ToastDesfazer tom={toast.tom} txt={toast.txt} />}

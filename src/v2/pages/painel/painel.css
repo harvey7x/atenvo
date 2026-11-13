@@ -571,10 +571,15 @@
 .v2 .pn-us-alerta { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: var(--txt); background: rgba(var(--ambar-rgb), .1); border: 1px solid rgba(var(--ambar-rgb), .35); }
 .v2 .pn-us-conseq { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
 .v2 .pn-us-conseq b { color: var(--txt); }
-@media (max-width: 1180px) { .v2 .pn-us-papeis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* Usuários em janela até 1280px (notebook, meia tela): a coluna Ambientes (11/11) não empurra
+/* Pela LARGURA DO CARTÃO (container), não da janela: a barra lateral da ALFA (12/11) pode estar aberta
+   (260px) ou recolhida, e o mesmo cartão aparece em Cobranças › Usuários e em Configurações › Usuários */
+.v2 .pn-card:has(> .pn-us-papeis) { container: us-papeis / inline-size; }
+@container us-papeis (max-width: 1000px) { .v2 .pn-us-papeis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container us-papeis (max-width: 560px) { .v2 .pn-us-papeis { grid-template-columns: minmax(0, 1fr); } }
+/* Usuários com o cartão estreito (barra aberta, notebook, meia tela): a coluna Ambientes (11/11) não empurra
    Desativar e a lixeira para fora do cartão nem empilha os chips — células e controles mais justos */
-@media (max-width: 1280px) {
+.v2 .pn-mapa-rolo:has(> .pn-us-tab) { container: us-tab / inline-size; }
+@container us-tab (max-width: 1110px) {
   html:root[data-repaginada][data-repaginada] .v2 .pn-us-tab :is(td, th), .v2 .pn-us-tab.pn-us-tab :is(td, th) { padding-left: 9px; padding-right: 9px; }
   .v2 .pn-us-tab .pn-us-papel { width: 128px; }
   .v2 .pn-us-tab .pn-us-amb { flex-wrap: nowrap; gap: 4px; }
@@ -582,7 +587,7 @@
   .v2 .pn-us-tab .pn-us-acoes { gap: 4px; }
   .v2 .pn-us-tab .pn-us-acoes .pn-link { padding: 4px 8px; }
 }
-@media (max-width: 1100px) { .v2 .pn-us-tab .pn-eq-nm small { white-space: normal; } }
+@container us-tab (max-width: 920px) { .v2 .pn-us-tab .pn-eq-nm small { white-space: normal; } }
 @media (max-width: 620px) {
   .v2 .pn-us-papeis, .v2 .pn-us-duas, .v2 .pn-us-opcoes { grid-template-columns: minmax(0, 1fr); }
   .v2 .pn-us-filtros .inp { width: 100%; }
