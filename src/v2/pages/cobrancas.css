@@ -1798,3 +1798,7 @@ html[data-barra-alfa] .v2 .cv2-script-txt .cc-var { font-size: 11px; line-height
   html[data-barra-alfa] .v2 .ev-raiz > .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   html[data-barra-alfa] .v2 .ev-fx { padding: 12px 14px; }
 }
+/* editor de mensagem (Régua e Novo envio): o tipo da parte é rótulo neutro (laranja = atenção);
+   16px entre os grupos de campos — "Nome da mensagem" não encosta no campo de cima */
+html[data-barra-alfa]:not(#rv-sis) .v2 .cm-blk-tag { color: var(--txt-2); background: var(--cor-neutro-suave, rgba(var(--tint), .07)); border-color: rgba(var(--tint), .1); }
+html[data-barra-alfa] .v2 .p-modal :is(.gs-form + .form-grid, .rg-vars-dica + .form-grid) { margin-top: 16px; }
