@@ -36,6 +36,7 @@ import { getCobrancaRepo } from '../data/cobranca/cobrancaRepo';
 import { chavesCobranca } from '../data/cobranca/keys';
 import type { Dados } from '../data/cobranca/types';
 import { BotaoDesfazer } from './BotaoDesfazer';
+import { EstadoVazio } from '../components/Estado';
 import { BarraAlfa, TopoAlfa, IcFechar, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
 
 /* ALFA (Reviza de verdade e a demo): barra lateral e topo no desenho da referência "Dashboard
@@ -391,8 +392,27 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   );
 }
 
-/** Shell autenticado v2: barra lateral (ALFA: BarraAlfa — aberta/trilho/gaveta; Atenvo: cápsula em overlay 64→242 no hover), topbar e palco. */
-export default function AppShellV2() {
+/* Página não encontrada DENTRO da moldura (ALFA, pessoa logada — crítica 12/11): a barra e o topo
+   continuam, o palco diz o que houve e leva de volta ao início do ambiente da pessoa */
+const IcBussola = () => (
+  <svg className="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="12" cy="12" r="8.5" /><path d="m15.2 8.8-1.9 4.5-4.5 1.9 1.9-4.5z" />
+  </svg>
+);
+function PaginaNaoEncontrada({ home, rotuloHome }: { home: string; rotuloHome: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="ba-404">
+      <EstadoVazio icone={<IcBussola />} titulo="Página não encontrada"
+        descricao="O endereço acessado não existe ou foi movido."
+        acao={{ rotulo: rotuloHome, onClick: () => navigate(home) }} />
+    </div>
+  );
+}
+
+/** Shell autenticado v2: barra lateral (ALFA: BarraAlfa — aberta/trilho/gaveta; Atenvo: cápsula em overlay 64→242 no hover), topbar e palco.
+ *  `naoEncontrada`: a rota não existe — a NaoEncontrada monta o shell assim para quem está logado (ALFA). */
+export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: boolean } = {}) {
   const { user, signOut } = useAuth();
   const { currentOrg } = useOrg();
   const location = useLocation();
@@ -600,7 +620,11 @@ export default function AppShellV2() {
 
   // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
   // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
-  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
+  // página não encontrada: o ambiente é o de início da pessoa (o primeiro que ela tem), não o da rota
+  const ambientesPerfil = papelSessao?.papel != null ? papelSessao.ambientes : undefined;
+  const moduloAtivo: ModuloId = naoEncontrada
+    ? (isRevizaMode ? (MODULOS.find((m) => !ambientesPerfil || ambientesPerfil.includes(m.id))?.id ?? 'cobrancas') : isDemoMode ? 'cobrancas' : MODULOS[0].id)
+    : location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
   // DEMO da ALFA: Atendimento removido — só Cobranças.
   // AMBIENTES (dono 11/11): na Reviza o seletor mostra só os ambientes do perfil (admin = os dois; atendente =
   // só Atendimento; demais = o que o administrador marcou). Enquanto o perfil carrega, só o ambiente atual
@@ -830,7 +854,7 @@ export default function AppShellV2() {
             {ALFA ? (
               <TopoAlfa modo={modoBarra} sobreposta={sobreposta} aoAlternar={alternarBarra}
                 ambiente={acessoCarregando || semAcessoAoAmbiente ? '' : modulo.rotulo}
-                pagina={acessoCarregando || semAcessoAoAmbiente ? '' : tituloDaRota(location.pathname)} />
+                pagina={acessoCarregando || semAcessoAoAmbiente ? '' : naoEncontrada ? 'Página não encontrada' : tituloDaRota(location.pathname)} />
             ) : (
             /* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */
             <button type="button" className="busca" title="Buscar (⌘K)" aria-haspopup="dialog" aria-expanded={paletaAberta}
@@ -924,8 +948,9 @@ export default function AppShellV2() {
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
-              {isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
-                : acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
+              {acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
+                : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar às Conversas'} />
+                : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
                 : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
                 : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />
                 : <Outlet />}

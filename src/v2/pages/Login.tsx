@@ -7,6 +7,7 @@ import '../base.css';
 import '../components/componentes.css';
 import './login.css';
 import { LogoAtenvo } from '../components/LogoAtenvo';
+import { MolduraAcesso } from './MolduraAcesso';
 import { isRevizaMode } from '@/lib/supabase';
 
 import { DESTINO_PADRAO_V2 as DESTINO_PADRAO } from '../destino';
@@ -110,9 +111,7 @@ export default function LoginV2() {
   }
 
   return (
-    <div className="v2 tela-login">
-      <div className="luz2" />
-      <div className="grao" />
+    <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
         <div className="caps">Bem-vindo à ALFA GROUP</div>
@@ -137,7 +136,7 @@ export default function LoginV2() {
               type={isRevizaMode ? 'text' : 'email'}
               inputMode={isRevizaMode ? 'text' : 'email'}
               autoComplete="username"
-              placeholder={isRevizaMode ? 'seu usuário' : 'voce@empresa.com.br'}
+              placeholder={isRevizaMode ? 'Seu usuário' : 'voce@empresa.com.br'}
               value={email}
               aria-invalid={eEmail ? true : undefined}
               aria-describedby={eEmail ? 'lg-email-erro' : undefined}
@@ -160,7 +159,7 @@ export default function LoginV2() {
                 name="password"
                 type={verSenha ? 'text' : 'password'}
                 autoComplete="current-password"
-                placeholder="••••••••"
+                placeholder="Sua senha"
                 value={senha}
                 aria-invalid={eSenha ? true : undefined}
                 aria-describedby={eSenha ? 'lg-senha-erro' : undefined}
@@ -200,6 +199,6 @@ export default function LoginV2() {
           )}
         </div>
       </div>
-    </div>
+    </MolduraAcesso>
   );
 }

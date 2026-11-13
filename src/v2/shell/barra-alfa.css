@@ -392,3 +392,9 @@ html[data-barra-alfa][data-perf="lite"][data-repaginada][data-repaginada] .v2 .p
     transition-duration: .01ms !important; animation-duration: .01ms !important;
   }
 }
+
+/* =====================================================================
+   CRÍTICA 12/11 — MOLDURA (shell)
+   ===================================================================== */
+/* página não encontrada dentro da moldura: o estado vazio no meio do palco */
+html[data-barra-alfa] .v2 .ba-404 { min-height: 100%; display: grid; place-items: center; padding: 24px 0 72px; }
