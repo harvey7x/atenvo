@@ -417,7 +417,7 @@ export function ConversasReviza() {
       atendente: nomeGente(sel ? canalNomeDe(sel.canal_id) : '') || nomeGente(cliSel?.atendente),
       dia: cliSel ? Number(cliSel.ciclo.replace(/\D/g, '')) || null : null,
     });
-    if (r.faltando.length) { setAvisoLado(`Este cliente está sem ${r.faltando.join(' e ')} — complete o cadastro na Gestão antes de usar o script.`); return null; }
+    if (r.faltando.length) { setAvisoLado(`Este cliente está sem ${r.faltando.join(' e ')}. Complete o cadastro na Gestão antes de usar o script.`); return null; }
     return r.texto;
   };
   // scripts = os do chat (alvo 'script', NÃO disparam sozinhos) + os textos ativos da sequência padrão
@@ -435,7 +435,7 @@ export function ConversasReviza() {
   const enviarScript = async (m: ReguaMsgWA) => {
     const conv = sel; if (!conv || enviandoScript) return;
     const bs = blocosEnviaveis(m);
-    if (!bs.length) { setAvisoLado('Este script não tem conteúdo enviável — abra a Régua completa e confira os blocos.'); return; }
+    if (!bs.length) { setAvisoLado('Este script não tem conteúdo para enviar. Abra a Régua completa e confira as partes.'); return; }
     const prontos: { bloco: Bloco; texto: string }[] = [];
     for (const b of bs) {
       const cru = (b.corpo ?? '').trim();
@@ -455,7 +455,7 @@ export function ConversasReviza() {
           { onSuccess: () => res(), onError: (e) => rej(e) },
         ));
       }
-      setAvisoLado(`"${m.nome}" enviado pra ${nomeDe(conv)} — ${prontos.length} ${prontos.length === 1 ? 'parte' : 'partes na ordem'}.`);
+      setAvisoLado(`"${m.nome}" enviado para ${nomeDe(conv)}: ${prontos.length} ${prontos.length === 1 ? 'parte' : 'partes, na ordem'}.`);
     } catch (e) { setAvisoLado((e as Error).message); }
     finally { setEnviandoScript(null); }
   };
@@ -523,7 +523,7 @@ export function ConversasReviza() {
         {sel && cliSel ? (
           <CardVidro spot className="cv2-cli fx-span2">
             <div className="cv2-cli-cab">
-              <span className={`cv2-av t-${estadoDe(sel).tom}`} aria-hidden>{iniciaisNome(cliSel.nome)}</span>
+              <span className={`cv2-av t-${estadoDe(sel).tom}`} aria-hidden>{iniciaisNome(cliSel.nome)}<FotoCliente nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
               <div className="cv2-cli-quem">
                 <b>{cliSel.nome}</b>
                 <span className="num">{fmtTel(sel.telefone)}{nomeGente(cliSel.atendente) ? ` · ${nomeGente(cliSel.atendente)}` : ''}</span>
@@ -586,18 +586,18 @@ export function ConversasReviza() {
             {linhaSel?.obs && <p className="cv2-obs">“{linhaSel.obs}”</p>}
           </CardVidro>
         ) : sel && !dadosProntos ? (
-          <CardVidro spot className="cv2-card fx-span2"><p className="cv2-vazio">{dadosErro ? 'Não deu pra carregar o cadastro da Gestão agora — recarregue a página.' : 'Carregando o cadastro do cliente…'}</p></CardVidro>
+          <CardVidro spot className="cv2-card fx-span2"><p className="cv2-vazio">{dadosErro ? 'Não foi possível carregar o cadastro da Gestão agora. Recarregue a página.' : 'Carregando o cadastro do cliente…'}</p></CardVidro>
         ) : sel ? (
           <CardVidro spot className="cv2-cli fx-span2">
             <div className="cv2-cli-cab">
-              <span className="cv2-av t-neutro" aria-hidden>{iniciaisNome(nomeDe(sel))}</span>
+              <span className="cv2-av t-neutro" aria-hidden>{iniciaisNome(nomeDe(sel))}<FotoCliente nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
               <div className="cv2-cli-quem">
                 <b>{nomeDe(sel)}</b>
                 {nomeDe(sel) !== fmtTel(sel.telefone) && <span className="num">{fmtTel(sel.telefone)}</span>}
                 <div className="cv2-chips"><span className="ev-chip">Fora da base</span></div>
               </div>
             </div>
-            <p className="cv2-nota">Este número não está cadastrado na Gestão, então não há ficha, valores nem régua pra ele. Se for um cliente, cadastre o telefone na Gestão e a conversa passa a mostrar tudo aqui.</p>
+            <p className="cv2-nota">Este número não está cadastrado na Gestão, então não há ficha, valores nem régua para ele. Se for um cliente, cadastre o telefone na Gestão e a conversa passa a mostrar tudo aqui.</p>
           </CardVidro>
         ) : (
           <>
@@ -607,7 +607,7 @@ export function ConversasReviza() {
                 <div className="cv2-lista">
                   {esperando.map((c) => (
                     <button type="button" key={c.id} className="cv2-item" onClick={() => setSelId(c.id)}>
-                      <span className={`cv2-av p t-${estadoDe(c).tom}`} aria-hidden>{iniciaisNome(nomeDe(c))}</span>
+                      <span className={`cv2-av p t-${estadoDe(c).tom}`} aria-hidden>{iniciaisNome(nomeDe(c))}<FotoCliente nome={nomeAgenda(nomeDe(c), c.telefone)} id={c.lead_id ?? c.id} tam={32} /></span>
                       <span className="cv2-item-mid"><b>{nomeDe(c)}</b><i>{textoPreviaWa(c.ultima_previa).texto || '—'}</i></span>
                       <span className="cv2-item-fim"><span className="num">{quandoLista(c.ultima_em)}</span><span className="cv2-badge num">{c.nao_lidas}</span></span>
                     </button>
@@ -617,11 +617,11 @@ export function ConversasReviza() {
             </CardVidro>
             <CardVidro spot className="cv2-card">
               <div className="cv2-card-cab"><b>Responderam a cobrança</b><span className="ev-sub">últimos 7 dias</span></div>
-              {respQ.isLoading ? <p className="cv2-vazio">Carregando…</p> : respQ.isError && !respQ.data ? <p className="cv2-vazio">Não deu pra carregar agora ({respQ.error?.message}).</p> : responderam.length === 0 ? <p className="cv2-vazio">Ninguém respondeu uma mensagem da régua ou de um envio nos últimos 7 dias.</p> : (
+              {respQ.isLoading ? <p className="cv2-vazio">Carregando…</p> : respQ.isError && !respQ.data ? <p className="cv2-vazio">Não foi possível carregar agora ({respQ.error?.message}).</p> : responderam.length === 0 ? <p className="cv2-vazio">Ninguém respondeu uma mensagem da régua ou de um envio nos últimos 7 dias.</p> : (
                 <div className="cv2-lista">
                   {responderam.map((a) => { const rp = textoPreviaWa(a.resposta_previa); return (
                     <button type="button" key={a.id} className="cv2-item" onClick={() => setSelId(a.conversa_id!)}>
-                      <span className="cv2-av p" aria-hidden>{iniciaisNome(a.nome ?? '')}</span>
+                      <span className="cv2-av p" aria-hidden>{iniciaisNome(a.nome ?? '')}<FotoCliente nome={nomeAgenda(a.nome ?? '', a.telefone)} id={a.lead_id ?? a.conversa_id ?? a.id} tam={32} /></span>
                       <span className="cv2-item-mid"><b>{a.nome ?? fmtTel(a.telefone)}</b><i>{rp.texto ? (rp.midia ? rp.texto : `“${rp.texto}”`) : `respondeu “${a.passo_nome ?? a.wa_envios?.nome ?? 'envio'}”`}</i></span>
                       <span className="cv2-item-fim"><span className="num">{a.respondeu_em ? new Date(a.respondeu_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span></span>
                     </button>
@@ -637,7 +637,7 @@ export function ConversasReviza() {
             <CardVidro spot className="cv2-card">
               <div className="cv2-card-cab"><b>Envios deste cliente</b><button type="button" className="ev-link" onClick={() => navigate('/cobrancas/envios?aba=feitos')}>Ver em Envios <IcT d="m9 18 6-6-6-6" s={12} mr={0} /></button></div>
               {alvosCliQ.isLoading ? <p className="cv2-vazio">Carregando…</p> : filaCli.length === 0 ? (
-                <p className="cv2-vazio">Nenhuma mensagem da régua ou de envio em massa pra este cliente ainda. Use o relógio no aparelho pra programar uma.</p>
+                <p className="cv2-vazio">Nenhuma mensagem da régua ou de envio em massa para este cliente ainda. Use o relógio no aparelho para programar uma.</p>
               ) : (
                 <div className="cv2-tl">
                   {filaCli.map((f) => { const st = statusFila(f); return (
@@ -658,8 +658,8 @@ export function ConversasReviza() {
               {!dadosProntos ? <p className="cv2-vazio">{dadosErro ? 'Cadastro indisponível agora.' : 'Carregando…'}</p>
                 : !linhaSel ? <p className="cv2-vazio">Contato fora da base não recebe a régua.</p>
                 : proxQ.isLoading ? <p className="cv2-vazio">Calculando…</p>
-                : proxQ.isError ? <p className="cv2-vazio">Não deu pra calcular agora ({proxQ.error?.message}).</p>
-                : proximas.length === 0 ? <p className="cv2-vazio">Nenhum passo da régua cai nos próximos 20 dias pra este cliente.</p> : (
+                : proxQ.isError ? <p className="cv2-vazio">Não foi possível calcular agora ({proxQ.error?.message}).</p>
+                : proximas.length === 0 ? <p className="cv2-vazio">Nenhum passo da régua cai nos próximos 20 dias para este cliente.</p> : (
                 <div className="cv2-tl">
                   {proximas.map((p) => { const st = ROT_PROX[p.status] ?? { t: p.status, tom: 'neutro' as const }; return (
                     <div key={`${p.passo_id}-${p.data}`} className="cv2-tl-i" title={p.motivo ?? ''}>
@@ -679,15 +679,14 @@ export function ConversasReviza() {
 
         <CardVidro spot className="cv2-card fx-span2">
           <div className="cv2-card-cab">
-            <div className="cv2-card-tt"><b>Scripts</b><span className="ev-sub">Inserir coloca o texto no chat pra você revisar · Enviar manda na hora, na ordem das partes</span></div>
+            <div className="cv2-card-tt"><b>Scripts</b></div>
             <span className="cv2-card-acoes">
               {gestor && <BotaoSec mini onClick={() => setNsMsg({ id: rid('s'), nome: '', quando: 0, blocos: [{ tipo: 'texto', corpo: '' }] })}><IcT d={IC_PATH.mais} s={12} />Novo script</BotaoSec>}
               <button type="button" className="ev-link" onClick={() => navigate('/cobrancas/regua')}>Régua completa <IcT d="m9 18 6-6-6-6" s={12} mr={0} /></button>
             </span>
           </div>
-          {!sel && scripts.length > 0 && <div className="ev-aviso info"><span className="ev-aviso-ic"><IcT d="M12 16v-4M12 8h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" s={14} mr={0} /></span><span className="ev-aviso-t">Abra uma conversa no aparelho ao lado pra usar os scripts — as variáveis ({'{nome}'}, {'{valor}'}…) são preenchidas com os dados do cliente.</span></div>}
           {scripts.length === 0 ? (
-            <p className="cv2-vazio">Nenhum script ainda{gestor ? ' — crie o primeiro em “Novo script” (texto, áudio, foto, vídeo e documento, com intervalo entre as partes)' : ''}.</p>
+            <p className="cv2-vazio">Nenhum script ainda{gestor ? '. Crie o primeiro em “Novo script” (texto, áudio, foto, vídeo e documento, com intervalo entre as partes)' : ''}.</p>
           ) : (
             <div className="cv2-scripts">
               {scripts.map((m) => {
@@ -698,18 +697,21 @@ export function ConversasReviza() {
                   <div key={m.id} className="cv2-script">
                     <div className="cv2-script-cab">
                       <b title={m.nome}>{m.nome}</b>
-                      <span className={m.alvo === 'padrao' ? 'ev-chip regua' : 'ev-chip'}>{m.alvo === 'padrao' ? `Régua · ${quandoCurto(m.quando)}` : 'Script'}</span>
+                      <span className="ev-chip">{m.alvo === 'padrao' ? `Régua · ${quandoCurto(m.quando)}` : 'Script'}</span>
                     </div>
-                    <p className="cv2-script-txt">{previewMsg(m as { blocos: Bloco[] }) || '—'}</p>
+                    <p className="cv2-script-txt"><TextoComVariaveis texto={previewMsg(m as { blocos: Bloco[] }) || '—'} /></p>
                     <div className="cv2-script-pe">
                       <span className="cv2-script-tps">{tiposUnicos((m.blocos ?? []) as Bloco[]).map((tp) => <em key={tp}><IconeBloco tipo={tp} s={10} /> {ROTULO_BLOCO[tp]}</em>)}{partes.length > 1 && <em className="num">{partes.length} partes</em>}</span>
                       <span className="cv2-script-bts">
+                        {/* ação padrão: coloca o texto no chat para revisar; enviar na hora fica no menu (1 clique a menos de risco) */}
                         <button type="button" className="cv2-bt" disabled={!sel || !t}
-                          title={!sel ? 'Abra uma conversa primeiro' : !t ? 'Este script não tem texto pra inserir' : 'Coloca o texto no chat pra você revisar antes de enviar'}
-                          onClick={() => { const tx = aplicarVarsFront(t); if (tx != null && sel) setScriptPendente({ conv: sel.id, texto: tx }); }}>Inserir</button>
-                        <button type="button" className="cv2-bt pri" disabled={!mandavel || !!enviandoScript}
-                          title={!sel ? 'Abra uma conversa primeiro' : partes.length > 1 ? `Envia as ${partes.length} partes na ordem, com o intervalo configurado` : 'Envia agora nesta conversa'}
-                          onClick={() => { void enviarScript(m); }}>{enviandoScript === m.id ? 'Enviando…' : 'Enviar'}</button>
+                          title={!sel ? 'Abra uma conversa' : !t ? 'Este script não tem texto para inserir' : 'Coloca o texto no chat para você revisar antes de enviar'}
+                          onClick={() => { const tx = aplicarVarsFront(t); if (tx != null && sel) setScriptPendente({ conv: sel.id, texto: tx }); }}>{enviandoScript === m.id ? 'Enviando…' : 'Usar no chat'}</button>
+                        <MenuMais rotulo={`Mais ações para o script ${m.nome}`} itens={[{
+                          rotulo: partes.length > 1 ? `Enviar agora (${partes.length} partes)` : 'Enviar agora', desabilitado: !mandavel || !!enviandoScript,
+                          dica: !sel ? 'Abra uma conversa' : partes.length > 1 ? `Envia as ${partes.length} partes na ordem, com o intervalo configurado` : 'Envia agora nesta conversa, sem revisar',
+                          onClick: () => { void enviarScript(m); },
+                        }]} />
                       </span>
                     </div>
                   </div>
@@ -721,7 +723,7 @@ export function ConversasReviza() {
 
       {nsMsg && (
         <ModalV2 aberto aoFechar={() => setNsMsg(null)} largura={560}
-          titulo={<div>Novo script<div className="mod-sub">Texto, áudio, foto, vídeo e documento — na ordem, com delay e variáveis · só sai quando alguém clicar em Enviar</div></div>}
+          titulo={<div>Novo script<div className="mod-sub">Texto, áudio, foto, vídeo e documento, na ordem, com intervalo e variáveis. Só sai quando alguém enviar.</div></div>}
           rodape={<><BotaoSec onClick={() => setNsMsg(null)}>Cancelar</BotaoSec>
             <BotaoPrimario disabled={salvarScript.isPending} onClick={() => {
               if (!nsMsg.nome.trim()) { setAvisoLado('Dê um nome ao script.'); return; }
@@ -963,7 +965,7 @@ function AparelhoZap({ conversa, children }: { conversa: boolean; children: Reac
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 15000); return () => clearInterval(t); }, []);
   return (
-    <div className="zp-tel" ref={telRef} style={{ zoom }}>
+    <div className={conversa ? 'zp-tel zp-tel-conv' : 'zp-tel'} ref={telRef} style={{ zoom }}>
       <span className="zp-bt zp-bt-acao" aria-hidden />
       <span className="zp-bt zp-bt-vol1" aria-hidden />
       <span className="zp-bt zp-bt-vol2" aria-hidden />

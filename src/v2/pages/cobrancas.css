@@ -1778,3 +1778,9 @@ html[data-barra-alfa] .v2 .rg-acoes { gap: 4px; }
 html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn { padding: 2px; border-radius: 6px; background: transparent; border: 1px solid transparent; }
 html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn:hover { border-color: rgba(var(--tint), .16); background: rgba(var(--tint), .04); }
 html[data-barra-alfa] .v2 .rg-vars-dica .cc-var { margin: 0 2px; }
+
+/* ---- CONVERSAS ---- */
+/* a mesma foto ilustrativa do aparelho nas listas e na ficha (antes: foto no aparelho, iniciais fora) */
+html[data-barra-alfa] .v2 .cv2-av { position: relative; overflow: hidden; }
+html[data-barra-alfa] .v2 .cv2-script-bts { display: inline-flex; align-items: center; gap: 4px; }
+html[data-barra-alfa] .v2 .cv2-script-txt .cc-var { font-size: 11px; line-height: 16px; }
