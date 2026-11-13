@@ -398,3 +398,69 @@ html[data-barra-alfa][data-perf="lite"][data-repaginada][data-repaginada] .v2 .p
    ===================================================================== */
 /* página não encontrada dentro da moldura: o estado vazio no meio do palco */
 html[data-barra-alfa] .v2 .ba-404 { min-height: 100%; display: grid; place-items: center; padding: 24px 0 72px; }
+
+/* ---- topo: o avatar é NEUTRO (o dourado fica para o item ativo e o botão principal da tela) e o ponto
+   do sino tem a cor do texto nos dois temas — a mesma dos pontos de não lida dentro do painel ---- */
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn,
+html[data-barra-alfa] .v2 .usuario-menu .avatar.um-av {
+  color: #EDEEF0; background: #1E2024; border: 1px solid rgba(255, 255, 255, .07); box-shadow: none;
+}
+html[data-barra-alfa][data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2 .p-topbar .avatar.avatar-btn,
+html[data-barra-alfa][data-tema="light"] .v2 .usuario-menu .avatar.um-av {
+  color: #1F2125; background: #E9EAED; border-color: rgba(16, 24, 40, .06);
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn:hover { border-color: rgba(var(--tint), .24); box-shadow: none; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .ib .pt { background: var(--txt); border-color: var(--ba-fundo); box-shadow: none; }
+
+/* ---- menu da conta (avatar): quem é, a conta, o tema, os atalhos e o Sair ---- */
+html[data-barra-alfa] .v2 .usuario-menu.um-conta { min-width: 248px; max-width: calc(100vw - 24px); padding: 6px; }
+html[data-barra-alfa] .v2 .um-conta .um-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 12px; margin-bottom: 6px; }
+html[data-barra-alfa] .v2 .um-conta .um-av { width: 32px; height: 32px; flex: none; font-size: 12px; font-weight: 600; }
+html[data-barra-alfa] .v2 .um-conta .um-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-barra-alfa] .v2 .um-conta .um-nome { font-size: 13px; font-weight: 600; line-height: 18px; }
+html[data-barra-alfa] .v2 .um-conta .um-cargo { margin: 0; font-size: 12px; line-height: 16px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .um-conta .um-item {
+  display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 6px 8px; border-radius: 6px;
+  font-size: 13px; line-height: 20px; color: var(--txt-2);
+}
+html[data-barra-alfa] .v2 .um-conta .um-item svg { flex: none; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .um-conta .um-item:hover { background: rgba(var(--tint), .06); color: var(--txt); }
+html[data-barra-alfa] .v2 .um-conta .um-item:hover svg { color: var(--txt-2); }
+html[data-barra-alfa] .v2 .um-sep { height: 1px; margin: 6px 4px; background: var(--linha); }
+html[data-barra-alfa] .v2 :is(.um-item, .np-item, .np-todas):focus { outline: none; }
+html[data-barra-alfa] .v2 :is(.um-item, .np-item):focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
+html[data-barra-alfa] .v2 .np-todas:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 2px; border-radius: 4px; }
+html[data-barra-alfa] .v2 .usuario-menu:focus { outline: none; }
+
+/* ---- sino: "Marcar todas como lidas" em texto neutro; no celular o painel ocupa a largura (12px de cada
+   lado) e cada linha tem 48px de altura mínima ---- */
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .notif-panel .np-todas.np-todas { color: var(--txt-2); font-weight: 600; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .notif-panel .np-todas.np-todas:hover { color: var(--txt); text-decoration: underline; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .usuario-menu.notif-panel.cel { width: auto; max-height: 70vh; }
+html[data-barra-alfa] .v2 .notif-panel.cel .np-item { min-height: 48px; }
+@media (pointer: coarse) {
+  html[data-barra-alfa] .v2 .um-conta .um-item, html[data-barra-alfa] .v2 .notif-panel .np-item { min-height: 44px; }
+}
+
+/* ---- atalhos do teclado (janela aberta pelo menu da conta) ---- */
+html[data-barra-alfa] .v2 .ba-atalhos { display: flex; flex-direction: column; margin: 0; }
+html[data-barra-alfa] .v2 .ba-atalhos > div {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0;
+  border-bottom: 1px solid var(--linha);
+}
+html[data-barra-alfa] .v2 .ba-atalhos > div:last-child { border-bottom: 0; }
+html[data-barra-alfa] .v2 .ba-atalhos dt { font-size: 13px; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .ba-atalhos dd { display: flex; gap: 4px; margin: 0; }
+html[data-barra-alfa] .v2 .ba-atalhos kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px;
+  border: 1px solid var(--ba-kbd-fio); border-radius: 4px; background: var(--ba-kbd-bg); color: var(--txt-2);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; font-weight: 500;
+}
+
+/* ---- topo no toque: o desenho segue em 32px, a área de toque chega a 44px (::after) com 12px entre os botões ---- */
+@media (max-width: 760px) and (pointer: coarse) {
+  html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .top-dir { gap: 12px; }
+  html[data-barra-alfa] .v2 .p-topbar :is(.ib, .avatar-btn, .ba-alternar, .bd-botao) { position: relative; }
+  html[data-barra-alfa] .v2 .p-topbar :is(.ib, .avatar-btn, .ba-alternar, .bd-botao)::after { content: ""; position: absolute; inset: -6px; }
+  html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn { margin-left: 0; }
+}

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -37,7 +37,8 @@ import { chavesCobranca } from '../data/cobranca/keys';
 import type { Dados } from '../data/cobranca/types';
 import { BotaoDesfazer } from './BotaoDesfazer';
 import { EstadoVazio } from '../components/Estado';
-import { BarraAlfa, TopoAlfa, IcFechar, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
+import { BarraAlfa, TopoAlfa, IcFechar, IcSair, rotuloAtalho, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
+import { ModalV2 } from '../components/ModalV2';
 
 /* ALFA (Reviza de verdade e a demo): barra lateral e topo no desenho da referência "Dashboard
    Sidebar" (dono 12/11) — BarraAlfa.tsx. O Atenvo (fora daqui) segue com a cápsula flutuante. */
@@ -253,6 +254,41 @@ const NOTIF_DEMO: DadosNotificacao = {
   fonte: 'WhatsApp · Canal 1390',
 };
 
+/* MENUS DO TOPO (sino e conta): o mesmo comportamento do seletor de ambiente da barra — ao abrir, o foco
+   vai ao primeiro item; setas, Home e End navegam; Esc e Tab fecham e devolvem o foco ao botão que abriu.
+   O Esc escuta na captura: fecha o menu antes de qualquer outro ouvinte (a barra sobreposta, por exemplo). */
+function useMenuTeclado(aberto: boolean, fechar: () => void, gatilho: RefObject<HTMLElement>, menu: RefObject<HTMLElement>) {
+  const fecharRef = useRef(fechar); fecharRef.current = fechar;
+  useEffect(() => {
+    if (!aberto) return;
+    const m = menu.current;
+    const itens = () => Array.from(m?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])') ?? []);
+    const primeiro = m?.querySelector<HTMLElement>('[role^="menuitem"]:not([disabled]):not(.np-todas)') ?? itens()[0] ?? m;
+    primeiro?.focus({ preventScroll: true });
+    const devolver = () => { fecharRef.current(); gatilho.current?.focus({ preventScroll: true }); };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { if (e.isComposing) return; e.preventDefault(); e.stopPropagation(); devolver(); return; }
+      if (!m || !m.contains(document.activeElement)) return;
+      if (e.key === 'Tab') { e.preventDefault(); devolver(); return; }
+      const lista = itens(); if (!lista.length) return;
+      const at = lista.indexOf(document.activeElement as HTMLElement);
+      const prox = e.key === 'ArrowDown' ? (at + 1) % lista.length
+        : e.key === 'ArrowUp' ? (at - 1 + lista.length) % lista.length
+        : e.key === 'Home' ? 0 : e.key === 'End' ? lista.length - 1 : -1;
+      if (prox >= 0) { e.preventDefault(); lista[prox]?.focus(); }
+    };
+    document.addEventListener('keydown', tecla, true);
+    return () => document.removeEventListener('keydown', tecla, true);
+  }, [aberto, gatilho, menu]);
+}
+const icMenu = (corpo: ReactNode) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false">{corpo}</svg>
+);
+const IcConta = () => icMenu(<><circle cx="12" cy="8.5" r="3.5" /><path d="M5.5 19.5c.8-3.3 3.3-5 6.5-5s5.7 1.7 6.5 5" /></>);
+const IcTeclado = () => icMenu(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9" /></>);
+const IcTemaClaro = () => icMenu(<><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></>);
+const IcTemaEscuro = () => icMenu(<path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5z" />);
+
 /* ---------------- Paleta de busca global (⌘K) ----------------
    A barra do topo abre um spotlight de verdade: SEÇÕES do módulo ativo
    (mesmo filtro de papel do menu) e, na Reviza/demo, CLIENTES da Gestão
@@ -438,6 +474,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const [badgePop, setBadgePop] = useState(0);
   const [menuUsuario, setMenuUsuario] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 60, right: 20 });
+  const menuUsuarioRef = useRef<HTMLDivElement>(null);
+  const painelNotifRef = useRef<HTMLDivElement>(null);
+  const [atalhosAbertos, setAtalhosAbertos] = useState(false);
 
   // Tema dual: escolha explícita do usuário, persistida por usuário; padrão dark.
   const escopoTema = user?.id ?? undefined;
@@ -502,7 +541,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // sino: central de notificações PERSISTIDA (tabela notificacoes, F2 do remarketing).
   // O clique abre o painel; o pulso/contador de inbound segue sendo zerado aqui.
   const [painelNotif, setPainelNotif] = useState(false);
-  const [notifPos, setNotifPos] = useState<{ top: number; right: number }>({ top: 60, right: 60 });
+  // no celular (≤760px) o painel ocupa a largura da tela com 12px de cada lado (ancorado no sino, saía pela borda esquerda)
+  const [notifPos, setNotifPos] = useState<{ top: number; right: number; left?: number }>({ top: 60, right: 60 });
   const sinoRef = useRef<HTMLButtonElement>(null);
   const papelQ = usePapel();
   const papelSessao = papelQ.data;
@@ -539,7 +579,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const naoLidasReais = notifsBase.filter((n) => !n.lidaEm).length;
   const abrirNotificacoes = useCallback(() => {
     const r = sinoRef.current?.getBoundingClientRect();
-    if (r) setNotifPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
+    if (r) setNotifPos(window.innerWidth <= LARGURA_CELULAR
+      ? { top: Math.round(r.bottom + 8), right: 12, left: 12 }
+      : { top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
     setSinoOn(false); setBadgePop(0); setPainelNotif((v) => !v);
   }, []);
   useEffect(() => { setPainelNotif(false); }, [location.pathname]);
@@ -547,6 +589,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const sair = useCallback(async () => { setMenuUsuario(false); await signOut(); navigate('/login', { replace: true }); }, [signOut, navigate]);
   // fecha o menu ao trocar de rota
   useEffect(() => { setMenuUsuario(false); }, [location.pathname]);
+  const fecharMenuUsuario = useCallback(() => setMenuUsuario(false), []);
+  const fecharPainelNotif = useCallback(() => setPainelNotif(false), []);
+  useMenuTeclado(menuUsuario, fecharMenuUsuario, avatarRef, menuUsuarioRef);
+  useMenuTeclado(painelNotif, fecharPainelNotif, sinoRef, painelNotifRef);
 
   // Fiação realtime (dívida da 1b, quitada na sessão do WhatsApp): o feed
   // postgres_changes já usado pelo app alimenta o toast — só mensagem de
@@ -605,6 +651,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // cargo exibido: na Reviza usa o papel REAL do banco (o role da org é só admin/gestor/atendente)
   const ROTULO_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
   const cargo = isRevizaMode && papelSessao?.papel ? (ROTULO_REVIZA[papelSessao.papel] ?? papelSessao.papel) : papel;
+  // o login como a pessoa digita na entrada (na Reviza: o usuário, sem o @reviza.local interno)
+  const loginConta = (user?.email ?? '').replace(/@reviza\.local$/i, '');
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
   const [menuOrg, setMenuOrg] = useState(false);
@@ -638,6 +686,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // ambiente da rota que a pessoa NÃO tem → vai pro primeiro que ela tem (ex.: atendente que caiu em /cobrancas)
   const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && !ambientesSessao.includes(moduloAtivo);
   const homeDaPessoa = modulosDisponiveis[0]?.home ?? '/cobrancas/painel';
+  // a conta e as preferências moram nas Configurações do Atendimento: o menu da conta só as oferece a quem o tem
+  const temContaAtendimento = modulosDisponiveis.some((m) => m.id === 'atendimento');
   // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
   // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
   const acessoCarregando = isRevizaMode && papelQ.isPending;
@@ -707,7 +757,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const fecharPaleta = useCallback(() => setPaletaAberta(false), []);
   useEffect(() => {
     const aoTecla = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletaAberta((v) => !v); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); setMenuUsuario(false); setPainelNotif(false); setPaletaAberta((v) => !v); return;
+      }
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ',' && atalhoConfigRef.current && !e.repeat && !ehEditavel(e.target)) {
         e.preventDefault(); navigate('/configuracoes');
       }
@@ -884,11 +936,12 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
               {painelNotif && createPortal(
                 <>
                   <div className="um-backdrop" onClick={() => setPainelNotif(false)} aria-hidden />
-                  <div className="usuario-menu notif-panel" role="menu" aria-label="Notificações" style={{ top: notifPos.top, right: notifPos.right }}>
+                  <div ref={painelNotifRef} tabIndex={-1} className={notifPos.left != null ? 'usuario-menu notif-panel cel' : 'usuario-menu notif-panel'} role="menu" aria-label="Notificações"
+                    style={{ top: notifPos.top, right: notifPos.right, left: notifPos.left }}>
                     <div className="np-head">
                       <b>Notificações</b>
                       {naoLidasReais > 0 && (
-                        <button type="button" className="np-todas" onClick={() => marcarNotif.mutate({ todas: true })}>Marcar todas como lidas</button>
+                        <button type="button" role="menuitem" className="np-todas" onClick={() => marcarNotif.mutate({ todas: true })}>Marcar todas como lidas</button>
                       )}
                     </div>
                     {notifsLista.length === 0 ? (
@@ -918,7 +971,34 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
               {menuUsuario && createPortal(
                 <>
                   <div className="um-backdrop" onClick={() => setMenuUsuario(false)} aria-hidden />
-                  <div className="usuario-menu" role="menu" aria-label="Menu do usuário" style={{ top: menuPos.top, right: menuPos.right }}>
+                  {ALFA ? (
+                    /* ALFA: o menu da conta de verdade — quem é, a conta (onde existe), o tema, os atalhos e o Sair */
+                    <div ref={menuUsuarioRef} tabIndex={-1} className="usuario-menu um-conta" role="menu" aria-label="Menu da conta" style={{ top: menuPos.top, right: menuPos.right }}>
+                      <div className="um-head">
+                        <span className="avatar um-av" aria-hidden>{iniciaisDe(nome)}</span>
+                        <span className="um-id">
+                          <span className="um-nome">{nome}</span>
+                          <span className="um-cargo">{loginConta ? `${loginConta} · ${cargo}` : cargo}</span>
+                        </span>
+                      </div>
+                      {temContaAtendimento && (
+                        <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes?tab=conta'); }}>
+                          <IcConta /><span>Minha conta</span>
+                        </button>
+                      )}
+                      <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); alternarTema(); }}>
+                        {tema === 'dark' ? <IcTemaClaro /> : <IcTemaEscuro />}<span>{tema === 'dark' ? 'Usar o tema claro' : 'Usar o tema escuro'}</span>
+                      </button>
+                      <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); setAtalhosAbertos(true); }}>
+                        <IcTeclado /><span>Atalhos do teclado</span>
+                      </button>
+                      <div className="um-sep" role="separator" />
+                      <button type="button" role="menuitem" className="um-item" onClick={sair}>
+                        <IcSair /><span>Sair</span>
+                      </button>
+                    </div>
+                  ) : (
+                  <div ref={menuUsuarioRef} tabIndex={-1} className="usuario-menu" role="menu" aria-label="Menu do usuário" style={{ top: menuPos.top, right: menuPos.right }}>
                     <div className="um-head">
                       <div className="um-nome">{nome}</div>
                       <div className="um-cargo">{cargo}</div>
@@ -926,6 +1006,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                     {!isRevizaMode && <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes'); }}>Configurações</button>}
                     <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
                   </div>
+                  )}
                 </>,
                 raizMenu,
               )}
@@ -971,6 +1052,17 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
         {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} alfa={ALFA} />}
         <AvisoAtualizacao />
+        {ALFA && (
+          <ModalV2 aberto={atalhosAbertos} aoFechar={() => setAtalhosAbertos(false)} titulo="Atalhos do teclado" largura={420}>
+            <dl className="ba-atalhos">
+              <div><dt>Buscar seções, clientes e ações</dt><dd><kbd>{rotuloAtalho('K')}</kbd></dd></div>
+              {temContaAtendimento && <div><dt>Abrir as Configurações</dt><dd><kbd>{rotuloAtalho(',')}</kbd></dd></div>}
+              <div><dt>Navegar nos menus e na busca</dt><dd><kbd>↑</kbd><kbd>↓</kbd></dd></div>
+              <div><dt>Abrir o item escolhido</dt><dd><kbd>Enter</kbd></dd></div>
+              <div><dt>Fechar menus, busca e janelas</dt><dd><kbd>Esc</kbd></dd></div>
+            </dl>
+          </ModalV2>
+        )}
       </div>
 
     </div>
