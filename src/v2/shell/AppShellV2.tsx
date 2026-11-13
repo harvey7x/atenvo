@@ -425,7 +425,16 @@ function PaletaBusca({ grupos, acoes, raiz, aoFechar, comClientes, alfa = false 
     .sort((x, y) => x.nota - y.nota || x.i - y.i)
     .map(({ a, nota }) => ({ tipo: 'acao' as const, acao: a, nota }));
 
-  const itens: ItemPaleta[] = [...secoesVistas, ...clientes, ...acoesVistas];
+  // blocos (cada ambiente, Clientes, Ações) na ordem de sempre; com termo, o bloco com o melhor acerto sobe
+  // (quem digita "mar" quer o Marcelo antes de uma seção achada só pelo apelido)
+  const blocos: ItemPaleta[][] = [];
+  for (const it of [...secoesVistas, ...clientes, ...acoesVistas]) {
+    const ult = blocos[blocos.length - 1];
+    const chave = (x: ItemPaleta) => (x.tipo === 'secao' ? 's:' + x.grupoId : x.tipo);
+    if (ult && chave(ult[0]) === chave(it)) ult.push(it); else blocos.push([it]);
+  }
+  const melhor = (b: ItemPaleta[]) => Math.min(...b.map((x) => x.nota));
+  const itens: ItemPaleta[] = (termo ? blocos.map((b, i) => ({ b, i })).sort((x, y) => melhor(x.b) - melhor(y.b) || x.i - y.i).map((x) => x.b) : blocos).flat();
   const at = itens.length ? Math.min(ativo, itens.length - 1) : 0;
   useEffect(() => { listaRef.current?.querySelector('.pal-item.on')?.scrollIntoView({ block: 'nearest' }); }, [at]);
 

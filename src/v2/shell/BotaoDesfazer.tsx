@@ -2,7 +2,7 @@
    e a reverte num clique. Quando a última ação não tem como ser desfeita
    (WhatsApp enviado, reset de senha…), aparece esmaecido e explica o porquê.
    A lógica do slot fica em src/v2/data/desfazer.ts. */
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDesfazerEstado, executarDesfazer } from '../data/desfazer';
 
@@ -14,12 +14,8 @@ function IconeDesfazer() {
   );
 }
 
-const baseBtn: CSSProperties = {
-  // 32px e raio 6: o mesmo dos botões da barra do topo da ALFA (barra-alfa.css); o fio segue o da barra
-  display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px',
-  borderRadius: 6, border: '1px solid var(--ba-fio, var(--linha))', background: 'transparent',
-  color: 'var(--txt)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
-};
+/* o desenho do botão mora no barra-alfa.css (.bd-botao e os estados: vazio, bloq, confirma, novo) — ele só
+   existe na ALFA (o shell só o monta na Reviza e na demo) */
 
 function ToastDesfazer({ tom, txt }: { tom: 'ok' | 'erro' | 'info'; txt: string }) {
   return (
@@ -54,19 +50,29 @@ export function BotaoDesfazer() {
     window.setTimeout(() => setToast((t) => (t && t.txt === txt ? null : t)), 4500);
   };
 
-  // SEMPRE visível (dono 17/09: "cadê o botão?"): sem ação pra desfazer, fica o
-  // ícone esmaecido do lado do botão de tema; clicar explica pra que serve.
+  // ação NOVA no slot: o botão fica em evidência por 8 segundos (sem outro aviso por cima do da tela)
+  const quandoAtual = estado?.quando ?? null;
+  const montadoEm = useRef(Date.now());
+  const [recente, setRecente] = useState(false);
+  useEffect(() => {
+    if (quandoAtual == null || quandoAtual < montadoEm.current) { setRecente(false); return; }
+    setRecente(true);
+    const t = window.setTimeout(() => setRecente(false), 8000);
+    return () => window.clearTimeout(t);
+  }, [quandoAtual]);
+
+  // SEMPRE visível (dono 17/09: "cadê o botão?"): sem ação para desfazer, fica só o ícone, sem borda, ao lado
+  // do botão de tema (um botão apagado permanente parecia quebrado — crítica 12/11); clicar explica para que serve.
   if (!estado) {
     return (
       <>
-        <button className="bd-botao"
+        <button className="bd-botao vazio"
           type="button"
-          style={{ ...baseBtn, opacity: 0.45, padding: '0 10px' }}
-          title="Desfazer — a última ação feita no sistema aparece aqui pra reverter num clique."
-          onClick={() => flash('info', 'Nada pra desfazer por enquanto. Quando você mover um ciclo, marcar um pagamento ou editar um cliente, a ação aparece aqui pra reverter num clique (por até 5 minutos).')}
+          aria-label="Desfazer a última ação"
+          title="Desfazer a última ação"
+          onClick={() => flash('info', 'Nada para desfazer por enquanto. Ao mover um ciclo, marcar um pagamento ou editar um cliente, a ação aparece aqui e pode ser desfeita por até 5 minutos.')}
         >
           <IconeDesfazer />
-          <span className="bd-rotulo">Desfazer</span>
         </button>
         {toast && <ToastDesfazer tom={toast.tom} txt={toast.txt} />}
       </>
@@ -75,7 +81,7 @@ export function BotaoDesfazer() {
 
   const bloqueada = estado.tipo === 'bloqueada';
   const rotulo = estado.rotulo;
-  // "Confirmar?" só vale pra ESTA ação (por identidade, não por flag solta)
+  // "Confirmar?" só vale para ESTA ação (por identidade, não por flag solta)
   const confirmando = estado.tipo === 'ok' && confirmandoQuando === estado.quando;
 
   const rodar = async () => {
@@ -96,17 +102,13 @@ export function BotaoDesfazer() {
       if (fez) flash('ok', `Desfeito: ${rotulo}.`);
     } catch (e) {
       await qc.invalidateQueries().catch(() => { /* idem */ });
-      flash('erro', `Não deu pra desfazer: ${(e as Error).message}`);
+      flash('erro', `Não foi possível desfazer: ${(e as Error).message}`);
     } finally {
       setOcupado(false);
     }
   };
 
-  const estilo: CSSProperties = bloqueada
-    ? { ...baseBtn, opacity: 0.55, cursor: 'help' }
-    : confirmando
-      ? { ...baseBtn, borderColor: 'rgba(var(--ambar-rgb,201,162,39),.6)', background: 'rgba(var(--ambar-rgb,201,162,39),.12)', color: 'var(--ambar)' }
-      : { ...baseBtn };
+  const classe = 'bd-botao' + (bloqueada ? ' bloq' : confirmando ? ' confirma' : '') + (recente && !bloqueada ? ' novo' : '');
 
   const label = bloqueada
     ? 'Desfazer'
@@ -114,21 +116,20 @@ export function BotaoDesfazer() {
 
   return (
     <>
-      <button className="bd-botao"
+      <button className={classe}
         type="button"
-        style={estilo}
         disabled={ocupado}
         title={bloqueada
-          ? `Última ação: ${rotulo}. Não dá pra desfazer — ${estado.motivo}`
+          ? `Última ação: ${rotulo}. Não é possível desfazer — ${estado.motivo}`
           : `Desfazer: ${rotulo}`}
         onClick={() => (bloqueada && estado.tipo === 'bloqueada'
-          ? flash('info', `"${rotulo}" não dá pra desfazer: ${estado.motivo}`)
+          ? flash('info', `"${rotulo}" não pode ser desfeita: ${estado.motivo}`)
           : rodar())}
       >
         <IconeDesfazer />
         <span className="bd-rotulo">{label}</span>
         {!bloqueada && !confirmando && !ocupado && (
-          <span className="bd-acao" style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.6, fontWeight: 500 }}>· {rotulo}</span>
+          <span className="bd-acao">· {rotulo}</span>
         )}
       </button>
       {toast && <ToastDesfazer tom={toast.tom} txt={toast.txt} />}
