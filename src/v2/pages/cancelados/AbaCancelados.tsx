@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import {
   BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, Kpi, ModalV2, TabelaPadrao, type Coluna,
+  EstadoVazio,
 } from '../../components';
 import { useCancelarLeads, useDadosCobranca, useStatusCancelamento, useVoltarDosCancelados } from '../../data/cobranca/hooks';
 import { ROTULO_CANCELAMENTO, STATUS_CANCELAMENTO, TOM_CANCELAMENTO } from '../../data/cobranca/cancelados';
@@ -168,7 +169,7 @@ export function AbaCancelados({ gestor, papel }: { gestor: boolean; papel?: Pape
       onSuccess: ({ n }) => {
         setSel(new Set());
         setAviso(n
-          ? `${nClientes(n)} agora ${n === 1 ? 'está' : 'estão'} como “${ROTULO_CANCELAMENTO[status]}”. Dá pra desfazer no Desfazer.`
+          ? `${nClientes(n)} agora ${n === 1 ? 'está' : 'estão'} como “${ROTULO_CANCELAMENTO[status]}”. É possível reverter no Desfazer.`
           : `Nada mudou — ${ids.length === 1 ? 'o cliente já estava' : 'os clientes já estavam'} como “${ROTULO_CANCELAMENTO[status]}”${podeMover ? '' : ' (ou não são seus)'}.`);
       },
       onError: (e) => setAviso(msgErro(e)),
@@ -180,7 +181,7 @@ export function AbaCancelados({ gestor, papel }: { gestor: boolean; papel?: Pape
       onSuccess: ({ n }) => {
         setSel(new Set());
         setAviso(n
-          ? `${nClientes(n)} ${n === 1 ? 'voltou' : 'voltaram'} pra Gestão, no mesmo lugar da planilha, e ${n === 1 ? 'volta' : 'voltam'} pra régua. Dá pra desfazer no Desfazer.`
+          ? `${nClientes(n)} ${n === 1 ? 'voltou' : 'voltaram'} para a Gestão, no mesmo lugar da planilha, e ${n === 1 ? 'volta' : 'voltam'} para a régua. É possível reverter no Desfazer.`
           : 'Nada mudou — esses clientes já não estavam nos Cancelados.');
       },
       onError: (e) => setAviso(msgErro(e)),
@@ -221,34 +222,43 @@ export function AbaCancelados({ gestor, papel }: { gestor: boolean; papel?: Pape
     ...(podeMover ? [{
       chave: 'ac', titulo: '', dir: true,
       render: (l: GLinha) => <button type="button" className="cm-num-lnk" disabled={ocupado} onClick={() => voltar([l.id])}
-        title="O cliente volta pra linha dele na Gestão e pra régua">Voltar pra Gestão</button>,
+        title="O cliente volta para a linha dele na Gestão e para a régua">Voltar para a Gestão</button>,
     }] : []),
   ];
 
   const acoes = [
     ...(podeStatus ? STATUS_CANCELAMENTO.map((s) => ({ rotulo: ROTULO_CANCELAMENTO[s], onClick: (ids: string[]) => mudarStatus(ids, s) })) : []),
-    ...(podeMover ? [{ rotulo: 'Voltar pra Gestão', onClick: (ids: string[]) => voltar(ids) }] : []),
+    ...(podeMover ? [{ rotulo: 'Voltar para a Gestão', onClick: (ids: string[]) => voltar(ids) }] : []),
   ];
   const mensal = cancelados.reduce((s, l) => s + l.valor / 2, 0);
 
   return (
     <div className="fin-raiz mc-raiz">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
+      {/* crítica 12/11: sem nenhum cancelado, um estado vazio desenhado (sem KPIs e filtros zerados) */}
+      {!isLoading && !isError && cancelados.length === 0 ? (
+        <CardVidro spot className="fin-panel mc-vazio sobe">
+          <EstadoVazio
+            icone={<svg className="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="9" cy="8" r="3.5" /><path d="M3 19v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 3.2 1.2" /><path d="m16 15 5 5m0-5-5 5" /></svg>}
+            titulo={podeMover ? 'Nenhum cliente cancelado' : 'Nenhum cliente seu nos Cancelados'}
+            descricao={podeMover
+              ? 'Clientes que saem da cobrança ficam aqui, fora da Gestão e da régua, com o histórico preservado.'
+              : 'Quando um cliente seu sair da cobrança, ele aparece aqui.'}
+            acao={podeMover && dados ? { rotulo: 'Mover clientes…', onClick: () => setMover(true) } : undefined} />
+        </CardVidro>
+      ) : (
+      <>
       <div className="kpis sobe">
-        <Kpi rotulo="Cancelados" valor={cancelados.length} formato="mil" />
-        <Kpi rotulo="Em reativação" valor={conta.em_reativacao} formato="mil" tomValor={conta.em_reativacao > 0 ? 'ok' : undefined} />
-        <Kpi rotulo="Desconto reativado" valor={conta.reativado} formato="mil" tomValor={conta.reativado > 0 ? 'ok' : undefined}
-          nota={conta.reativado > 0 && podeMover ? 'volte pra Gestão quando conferir' : undefined} />
-        <Kpi rotulo="Mensalidades fora" valor={Math.trunc(mensal)} formato="mil" prefixo="R$ " />
+        <Kpi rotulo="Cancelados" valor={cancelados.length} formato="mil" nota="fora da cobrança e da régua" />
+        <Kpi rotulo="Em reativação" valor={conta.em_reativacao} formato="mil" nota={conta.em_reativacao > 0 ? 'aguardando o desconto voltar' : 'nenhum em andamento'} />
+        <Kpi rotulo="Desconto reativado" valor={conta.reativado} formato="mil"
+          nota={conta.reativado > 0 && podeMover ? 'volte para a Gestão após conferir' : conta.reativado > 0 ? 'aguardando a volta para a Gestão' : 'nenhum reativado'} />
+        <Kpi rotulo="Mensalidades fora" valor={Math.trunc(mensal)} formato="mil" prefixo="R$ " sufixo={`,${String(Math.round((mensal % 1) * 100)).padStart(2, '0')}`}
+          nota="por mês, que deixaram de entrar" />
       </div>
-      <p className="cm-hint sobe" style={{ animationDelay: '.06s' }}>
-        Clientes que <b>saíram da cobrança</b>. Não aparecem na Gestão nem nos Novos e <b>não recebem a régua</b>; os pagamentos antigos continuam no histórico e nas comissões.
-        Na reativação, marque <b>Em processo de reativação</b> e, quando o desconto voltar, <b>Desconto reativado</b>.
-        {podeMover ? <> Pra cobrar de novo, use <b>Voltar pra Gestão</b>: o cliente volta pra linha dele na planilha.</> : null}
-      </p>
       <CardVidro spot className="fin-panel sobe" style={{ animationDelay: '.1s' }}>
         <div className="fin-head">
-          <h3>Cancelados</h3>
+          <h3 title={`Clientes que saíram da cobrança: não aparecem na Gestão nem nos Novos e não recebem a régua; os pagamentos antigos continuam no histórico e nas comissões. Na reativação, marque Em processo de reativação e, quando o desconto voltar, Desconto reativado.${podeMover ? ' Para cobrar de novo, use Voltar para a Gestão: o cliente volta para a linha dele na planilha.' : ''}`}>Cancelados</h3>
           <span className="pl-count num">{visiveis.length}</span>
           <div className="fin-filtros">
             {podeMover && <BotaoPrimario onClick={() => setMover(true)} disabled={!dados}>Mover clientes…</BotaoPrimario>}
@@ -275,7 +285,7 @@ export function AbaCancelados({ gestor, papel }: { gestor: boolean; papel?: Pape
           )}
         </div>
         {isError ? (
-          <div className="fin-vazio">Não deu pra carregar os cancelados. <button type="button" className="mc-lnk" onClick={() => { void refetch(); }}>Tentar de novo</button></div>
+          <div className="fin-vazio">Não foi possível carregar os cancelados. <button type="button" className="mc-lnk" onClick={() => { void refetch(); }}>Tentar de novo</button></div>
         ) : isLoading ? (
           <div className="fin-vazio">Carregando…</div>
         ) : visiveis.length === 0 ? (
@@ -292,6 +302,8 @@ export function AbaCancelados({ gestor, papel }: { gestor: boolean; papel?: Pape
             rodape={{ texto: `${nClientes(visiveis.length)} · ${fmtBRL(visiveis.reduce((s, l) => s + l.valor / 2, 0))} em mensalidades` }} />
         )}
       </CardVidro>
+      </>
+      )}
       {mover && dados && (
         <MoverCancelados candidatos={dados.linhas} iniciais={[]} aoFechar={() => setMover(false)}
           aoMovido={(m) => { setMover(false); setAviso(m); }} />
