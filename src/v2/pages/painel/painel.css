@@ -712,3 +712,45 @@ html[data-barra-alfa][data-tema="light"]:not(#rv-sis) .v2 :is(.pn-prop i.ok2, .p
 .v2 .pn-info:hover, .v2 .pn-info:focus-visible { color: var(--txt); outline: none; }
 /* KPI de pessoa (Melhor adimplência, Maior atraso): o nome do comercial em destaque no rodapé */
 .v2 .pn-kpi-pe b:not(.num) { color: var(--txt); font-weight: 600; }
+
+/* ===== crítica 12/11 — cob_comunicacao ===== */
+/* USUÁRIOS: a linha passa de 7 controles para 2 (Editar + "⋯"); papel e ambientes viram informação */
+html[data-barra-alfa] .v2 .pn-us-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+html[data-barra-alfa] .v2 .pn-us-cab .pn-us-filtros { gap: 12px; }
+html[data-barra-alfa] .v2 .pn-us-busca { width: 240px; flex: none; }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .pn-us-busca { width: 100%; } }
+html[data-barra-alfa] .v2 .pn-us-1a-tot { font-size: 12px; color: var(--txt-3); white-space: nowrap; }
+html[data-barra-alfa] .v2 .pn-us-tab tbody td { height: 56px; }
+html[data-barra-alfa] .v2 .pn-us-papel-tx { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--txt); background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .08); white-space: nowrap; }
+html[data-barra-alfa] .v2 .pn-us-amb-tx { font-size: 12px; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .pn-us-1a { font-size: 11px; color: var(--cor-alerta-txt, var(--ambar)); }
+html[data-barra-alfa] .v2 .pn-us-acoes { gap: 4px; justify-content: center; }
+html[data-barra-alfa] .v2 .pn-us-tab .pn-eq-nm small { white-space: nowrap; }
+/* cartões de papel no modal: a seleção em ouro suave (o mesmo do chip ligado) */
+html[data-barra-alfa] .v2 .pn-us-opcoes button.on { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); box-shadow: none; }
+/* NÚMEROS: selos lado a lado no cabeçalho do cartão; rodapé numa linha (sem quebrar data/hora no meio) */
+html[data-barra-alfa] .v2 .pn-num-selos { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+html[data-barra-alfa] .v2 .pn-num-quem .num, html[data-barra-alfa] .v2 .pn-num-cart .num { white-space: nowrap; }
+html[data-barra-alfa] .v2 .pn-num-pe { gap: 10px; }
+html[data-barra-alfa] .v2 .pn-num-meta { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .pn-num-pe > .p-btn { flex-shrink: 0; }
+html[data-barra-alfa] .v2 .pn-num-alerta .p-btn { align-self: flex-start; margin-top: 4px; }
+/* avatar de pessoa: neutro (o laranja agora é "atenção") */
+html[data-barra-alfa] .v2 .rt-av { color: var(--txt); background: rgba(var(--tint), .08); }
+/* USUÁRIOS no celular: cada pessoa vira um cartão (nome e ações em cima; papel, situação e ambientes embaixo) — sem rolagem lateral.
+   :not(#rv-sis) vence a altura fixa de célula da repaginada (tbody td 48px) */
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab { display: block; min-width: 0; width: 100%; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab thead { display: none; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody { display: block; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody tr { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; column-gap: 8px; row-gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--linha); }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody tr:last-child { border-bottom: 0; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td { display: block; height: auto; min-height: 0; padding: 0; border: 0; text-align: left; min-width: 0; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td:nth-child(1) { grid-column: 1 / 4; grid-row: 1; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td:nth-child(2) { grid-column: 1; grid-row: 2; padding-left: 38px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td:nth-child(4) { grid-column: 2; grid-row: 2; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td:nth-child(3) { grid-column: 1 / 4; grid-row: 3; padding-left: 38px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab tbody td:nth-child(5) { grid-column: 4; grid-row: 1 / 4; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab .pn-us-1a { display: none; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab .pn-eq-nm small { white-space: normal; }
+}

@@ -1740,3 +1740,157 @@ html[data-barra-alfa] .v2 .fin-ciclo-row .cm-ciclo-cod { color: var(--txt); }
   .v2 .calx-top { gap: 10px 14px; }
   .v2 .calx-kpis { margin-left: 0; }
 }
+
+/* ===== crítica 12/11 — cob_comunicacao ===== */
+/* ---- ENVIOS ---- */
+/* faixa de status (régua · WhatsApp · envio automático): uma linha de ~80px no lugar dos 3 cartões altos */
+html[data-barra-alfa] .v2 .ev-faixa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; border-radius: var(--r-cartao, 12px); overflow: hidden; }
+html[data-barra-alfa] .v2 .ev-fx { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px; min-width: 0; }
+html[data-barra-alfa] .v2 .ev-fx + .ev-fx { border-left: 1px solid var(--linha); }
+html[data-barra-alfa] .v2 .ev-fx .ev-st-ic { width: 32px; height: 32px; border-radius: 8px; }
+html[data-barra-alfa] .v2 .ev-fx-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-barra-alfa] .v2 .ev-fx-rot { font-size: 12px; font-weight: 500; color: var(--txt-2); line-height: 16px; }
+html[data-barra-alfa] .v2 .ev-fx-val { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-fx-val b { font-size: 14px; font-weight: 600; color: var(--txt); letter-spacing: -.005em; }
+html[data-barra-alfa] .v2 .ev-fx-val b.ok { color: var(--cor-ok-txt, var(--verde)); }
+html[data-barra-alfa] .v2 .ev-fx-val b.atencao { color: var(--cor-alerta-txt, var(--ambar)); }
+html[data-barra-alfa] .v2 .ev-fx-val b.erro { color: var(--cor-erro-txt, var(--rubro)); }
+html[data-barra-alfa] .v2 .ev-fx-val > span { font-size: 12px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-fx-meta { font-size: 12px; color: var(--txt-3); line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-fx-prob { display: flex; align-items: center; gap: 12px; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .ev-fx-num { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-fx-num > i { width: 6px; height: 6px; border-radius: 50%; background: var(--rubro); flex-shrink: 0; }
+html[data-barra-alfa] .v2 .ev-fx-num > i.atencao { background: var(--ambar); }
+html[data-barra-alfa] .v2 .ev-fx-num .ev-link { padding: 0; font-size: 12px; }
+@media (max-width: 1080px) {
+  html[data-barra-alfa] .v2 .ev-faixa { grid-template-columns: 1fr; }
+  html[data-barra-alfa] .v2 .ev-fx + .ev-fx { border-left: 0; border-top: 1px solid var(--linha); }
+}
+/* "3d / Dia D / +3d" é rótulo, não alerta: neutro (laranja = atenção) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .ev-q { color: var(--txt-2); background: var(--cor-neutro-suave, rgba(var(--tint), .07)); padding: 2px 7px; }
+/* "hoje" nos próximos disparos: o destaque de dado em ouro suave (não laranja) */
+html[data-barra-alfa] .v2 .ev-data.hoje { background: var(--cor-acento-suave); border-color: var(--cor-acento-fio); }
+html[data-barra-alfa] .v2 .ev-data.hoje i { color: var(--cor-acento-txt, var(--azul)); }
+/* previsões (futuro) na cor do texto — verde só para o que já aconteceu */
+html[data-barra-alfa] .v2 .ev-dia-n.ok b { color: var(--txt); }
+
+/* tabela "Envios feitos": cabe em 1.150px (barra aberta, 1470) — larguras fixas, 1 linha por célula */
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab { table-layout: fixed; width: 100%; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td) { box-sizing: border-box; padding-left: 10px; padding-right: 10px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td):first-child { padding-left: 16px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab :is(th, td):last-child { padding-right: 14px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab tbody td { height: 54px; padding-top: 7px; padding-bottom: 7px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli { align-items: center; }
+html[data-barra-alfa] .v2 .ev-tab-feitos td.ini .ev-cli { align-items: flex-start; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > :is(b, span) { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > b { font-size: 13px; font-weight: 600; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-cli > span { font-size: 12px; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-previa { display: block; max-width: 100%; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-chip { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-tab-feitos .ev-det { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-saiu { display: block; font-size: 13px; font-weight: 500; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ev-hora > b { font-size: 13px; }
+html[data-barra-alfa] .v2 .ev-hora1 { white-space: nowrap; }
+html[data-barra-alfa] .v2 .ev-st-cel .st { max-width: 100%; }
+html[data-barra-alfa] .v2 .ev-resp { white-space: nowrap; }
+/* ação da linha: só o ícone (28×28), dentro da tabela — "Abrir a conversa" na dica e no leitor de tela */
+html[data-barra-alfa]:not(#rv-sis) .v2 .ev-tabela .ev-btn-conv.so-ic { width: 28px; min-width: 28px; padding: 0; justify-content: center; gap: 0; }
+@media (pointer: coarse) { html[data-barra-alfa]:not(#rv-sis) .v2 .ev-tabela .ev-btn-conv.so-ic { width: 40px; min-width: 40px; } }
+/* telefone, data e hora nunca quebram no meio */
+html[data-barra-alfa] .v2 :is(.ev-tabela, .ev-dw-quem, .ev-prev-i, .ev-tl-i) .num { white-space: nowrap; }
+/* campanhas: os erros à parte, em vermelho */
+html[data-barra-alfa] .v2 .ev-prog-err { font-style: normal; color: var(--cor-erro-txt, var(--rubro)); }
+html[data-barra-alfa] .v2 .ev-tabela .fin-acoes { display: inline-flex; gap: 6px; justify-content: center; }
+/* no celular a tabela rola de lado (as larguras fixas pediriam 900px) */
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .ev-tab-feitos .mo-tab { min-width: 900px; } }
+
+/* ---- REGISTROS: cartão padrão (sem a janela de terminal), KPIs em 3 colunas, filtros com rótulo ---- */
+html[data-barra-alfa] .v2 .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .kpis.kpis-3 { gap: 8px; }
+  html[data-barra-alfa]:not(#rv-sis) .v2 .kpis.kpis-3 .kpi { min-height: 0; padding: 12px 12px 13px; }
+  /* a área vira uma faixa que desliza (sem quebrar "Régua e envios" em 3 linhas) */
+  html[data-barra-alfa] .v2 .reg-fil-area { flex-wrap: nowrap; width: 100%; }
+  html[data-barra-alfa] .v2 .reg-fil-area .chips { min-width: 0; flex: 1 1 auto; }
+  html[data-barra-alfa] .v2 .reg-fil-area .chip { flex-shrink: 0; white-space: nowrap; }
+}
+html[data-barra-alfa] .v2 .reg-filtros { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+html[data-barra-alfa] .v2 .reg-fil-area { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+html[data-barra-alfa] .v2 .reg-fil-area .chips { margin: 0; }
+html[data-barra-alfa] .v2 :is(.reg-fil-rot, .reg-fil-sel > span) { font-size: 12px; font-weight: 500; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .reg-fil-dir { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+html[data-barra-alfa] .v2 .reg-fil-sel { display: inline-flex; align-items: center; gap: 8px; }
+html[data-barra-alfa] .v2 .reg-fil-sel select.inp { width: auto; min-width: 120px; padding-right: 28px; }
+html[data-barra-alfa] .v2 .reg-busca { width: 220px; }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .reg-fil-dir { margin-left: 0; width: 100%; } html[data-barra-alfa] .v2 .reg-busca { flex: 1 1 160px; width: auto; } }
+html[data-barra-alfa] .v2 .reg-card { padding: 0; overflow: hidden; }
+html[data-barra-alfa] .v2 .reg-card-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; margin: 0; border-bottom: 1px solid var(--linha); }
+html[data-barra-alfa] .v2 .reg-vivo { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--txt-2); }
+html[data-barra-alfa] .v2 .reg-vivo > i { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 0 3px rgba(var(--verde-rgb), .15); }
+html[data-barra-alfa] .v2 .reg-card .reg-lista { padding: 4px 8px 6px; }
+html[data-barra-alfa] .v2 .reg-card .reg-item { border-bottom: 1px solid rgba(var(--tint), .06); }
+html[data-barra-alfa] .v2 .reg-card .reg-item:last-child { border-bottom: 0; }
+html[data-barra-alfa] .v2 .reg-card .reg-cab { padding: 10px 10px; gap: 12px; min-height: 52px; }
+html[data-barra-alfa] .v2 .reg-card .reg-av { width: 28px; height: 28px; font-size: 11px; font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 { font-size: 13px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 b { color: var(--txt); font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-l1 .rl-acao { color: var(--txt-2); }
+html[data-barra-alfa] .v2 .reg-card .t-bad .reg-l1 .rl-acao { color: var(--cor-erro-txt, var(--rubro)); font-weight: 500; }
+html[data-barra-alfa] .v2 .reg-card .reg-l2 { font-size: 12px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-card .reg-quando { font-size: 12px; color: var(--txt-3); white-space: nowrap; }
+html[data-barra-alfa] .v2 .reg-card .reg-chev { width: 16px; height: 16px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-card .reg-det { padding: 2px 10px 16px 50px; }
+@media (max-width: 760px) { html[data-barra-alfa] .v2 .reg-card .reg-det { padding-left: 10px; } }
+html[data-barra-alfa] .v2 .reg-card :is(.reg-k, .reg-tab-h) { font-size: 11px; font-weight: 600; }
+html[data-barra-alfa] .v2 .reg-card .reg-tec-badge { font-size: 11px; text-transform: none; letter-spacing: 0; }
+html[data-barra-alfa] .v2 .reg-card .reg-tab-para { color: var(--txt); }
+html[data-barra-alfa] .v2 .reg-msg { padding: 16px 10px; font-size: 13px; color: var(--txt-3); }
+html[data-barra-alfa] .v2 .reg-mais { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 8px; font-size: 12px; color: var(--txt-3); }
+
+/* ---- RÉGUA DE MENSAGENS ---- */
+/* uma linha de controles: segmentado compacto · "Régua de" · ação principal à direita */
+html[data-barra-alfa] .v2 .rg-controles { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg { display: inline-flex; width: auto; margin: 0; flex: none; }
+html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg .cm-seg-btn { flex: none; }
+html[data-barra-alfa] .v2 .rg-controles-esp { flex: 1 1 auto; }
+html[data-barra-alfa] .v2 .rg-de-sel { display: inline-flex; align-items: center; gap: 8px; }
+html[data-barra-alfa] .v2 .rg-de-sel > span { font-size: 12px; font-weight: 500; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .rg-de-sel select.inp { width: auto; min-width: 190px; padding-right: 28px; }
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .rg-controles .cm-seg.rg-seg { width: 100%; overflow-x: auto; }
+  html[data-barra-alfa] .v2 .rg-controles-esp { display: none; }
+}
+/* interruptor "Ligada" no cabeçalho da régua automática */
+html[data-barra-alfa] .v2 .rg-liga { display: inline-flex; align-items: center; gap: 10px; padding-left: 12px; margin-left: 2px; border-left: 1px solid var(--linha); font-size: 13px; font-weight: 600; color: var(--txt-2); white-space: nowrap; }
+html[data-barra-alfa] .v2 .rg-liga.on { color: var(--cor-ok-txt, var(--verde)); }
+/* blocos de hoje/amanhã/alcance: o rótulo do KPI do sistema (12/500, sem caixa alta) */
+html[data-barra-alfa]:not(#rv-sis) .v2 .rg-tile .ev-rot { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
+/* os cartões dos passos viram uma LINHA DO TEMPO (fio ligando os dias) — no lugar da faixa que os repetia */
+html[data-barra-alfa] .v2 .rg-cards { position: relative; gap: 10px; }
+html[data-barra-alfa] .v2 .rg-cards::before { content: ''; position: absolute; left: 52px; top: 22px; bottom: 22px; width: 1px; background: linear-gradient(180deg, transparent, var(--linha) 12%, var(--linha) 88%, transparent); pointer-events: none; }
+html[data-barra-alfa] .v2 .rg-cards > .rg-card { position: relative; background: var(--vidro-a, rgba(var(--tint), .02)); }
+html[data-barra-alfa] .v2 .rg-quando b { font-size: 16px; font-weight: 600; }
+html[data-barra-alfa] .v2 .rg-quando i { font-size: 11px; }
+html[data-barra-alfa] .v2 .rg-prev { color: var(--txt-2); font-size: 13px; line-height: 1.55; border-left-color: rgba(var(--tint), .14); }
+html[data-barra-alfa] .v2 .rg-acoes { gap: 4px; }
+/* chips de variável no editor: o mesmo desenho da ficha da lista */
+html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn { padding: 2px; border-radius: 6px; background: transparent; border: 1px solid transparent; }
+html[data-barra-alfa] .v2 .cm-ed-chips .cc-var-btn:hover { border-color: rgba(var(--tint), .16); background: rgba(var(--tint), .04); }
+html[data-barra-alfa] .v2 .rg-vars-dica .cc-var { margin: 0 2px; }
+
+/* ---- CONVERSAS ---- */
+/* a mesma foto ilustrativa do aparelho nas listas e na ficha (antes: foto no aparelho, iniciais fora) */
+html[data-barra-alfa] .v2 .cv2-av { position: relative; overflow: hidden; }
+html[data-barra-alfa] .v2 .cv2-script-bts { display: inline-flex; align-items: center; gap: 4px; }
+html[data-barra-alfa] .v2 .cv2-script-txt .cc-var { font-size: 11px; line-height: 16px; }
+
+/* ---- CELULAR (≤760px) ---- */
+@media (max-width: 760px) {
+  /* Envios: 4 KPIs em 2 colunas (em 4 o rótulo "Responderam hoje" saía do cartão) */
+  html[data-barra-alfa] .v2 .ev-raiz > .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  html[data-barra-alfa] .v2 .ev-fx { padding: 12px 14px; }
+}
+/* editor de mensagem (Régua e Novo envio): o tipo da parte é rótulo neutro (laranja = atenção);
+   16px entre os grupos de campos — "Nome da mensagem" não encosta no campo de cima */
+html[data-barra-alfa]:not(#rv-sis) .v2 .cm-blk-tag { color: var(--txt-2); background: var(--cor-neutro-suave, rgba(var(--tint), .07)); border-color: rgba(var(--tint), .1); }
+html[data-barra-alfa] .v2 .p-modal :is(.gs-form + .form-grid, .rg-vars-dica + .form-grid) { margin-top: 16px; }

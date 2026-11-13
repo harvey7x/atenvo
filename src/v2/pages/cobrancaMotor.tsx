@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { MenuMais } from './comunicacao/MenuMais';
+import { TextoComVariaveis } from './comunicacao/Variaveis';
 import * as XLSX from 'xlsx';
 import {
   AudioRecorderV2, BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips,
@@ -650,7 +652,7 @@ export function EditorMsg({ msg, setMsg, comQuando, semNome, setAviso, aoSubirMi
   /** persiste o anexo; LANÇA em falha — o gravador de áudio precisa do erro pra
       manter o blob e oferecer "tentar novamente" (a gravação não pode se perder) */
   const anexar = async (k: number, f: Blob, nome: string) => {
-    if (f.size > 16 * 1024 * 1024) { setAviso('Arquivo acima de 16MB — o WhatsApp não aceita.'); throw new Error('Arquivo acima de 16MB'); }
+    if (f.size > 16 * 1024 * 1024) { setAviso('Arquivo acima de 16 MB: o WhatsApp não aceita.'); throw new Error('Arquivo acima de 16MB'); }
     if (!aoSubirMidia) { setBloco(k, { nome, url: URL.createObjectURL(f) }); return; }   // demo: só sessão
     setSubindo(k);
     const blocoAlvo = ultimo.current.blocos[k];   // se os blocos mudarem de lugar durante o upload, acha o mesmo
@@ -658,8 +660,8 @@ export function EditorMsg({ msg, setMsg, comQuando, semNome, setAviso, aoSubirMi
       const path = await aoSubirMidia(f, nome);
       const kAgora = ultimo.current.blocos.indexOf(blocoAlvo);
       setBloco(kAgora >= 0 ? kAgora : k, { nome, url: URL.createObjectURL(f), path });
-      setAviso('Arquivo salvo na mensagem — vai junto em todo envio.');
-    } catch (e) { setAviso(`Não deu pra salvar o arquivo: ${(e as Error).message}`); throw e; }
+      setAviso('Arquivo salvo na mensagem; vai junto em todo envio.');
+    } catch (e) { setAviso(`Não foi possível salvar o arquivo: ${(e as Error).message}`); throw e; }
     finally { setSubindo(null); }
   };
   return (
@@ -675,7 +677,7 @@ export function EditorMsg({ msg, setMsg, comQuando, semNome, setAviso, aoSubirMi
           </div>
         </div>
       )}
-      <div className="campo"><label>Conteúdo (na ordem do envio) — texto, foto, vídeo ou áudio</label></div>
+      <div className="campo"><label>Conteúdo (na ordem do envio): texto, foto, vídeo ou áudio</label></div>
       {msg.blocos.map((b, k) => (
         <div className="cm-ed-item" key={k}>
           <div className="cm-ed-topo">
@@ -698,8 +700,8 @@ export function EditorMsg({ msg, setMsg, comQuando, semNome, setAviso, aoSubirMi
               <textarea className="inp" rows={3} value={b.corpo ?? ''} placeholder="Olá {nome}, sua mensalidade de {meia parcela} vence {vencimento}…" onChange={(e) => setBloco(k, { corpo: e.target.value })} />
               <div className="cm-ed-chips">
                 {VARS_MSG.map((v) => (
-                  <button type="button" key={v} className="cm-cli-filtro-btn" title={`${DICA_VAR[v]} — clique pra inserir`}
-                    onClick={() => setBloco(k, { corpo: (b.corpo ?? '').trim() ? `${(b.corpo ?? '').replace(/\s+$/, '')} ${v}` : v })}>{v}</button>
+                  <button type="button" key={v} className="cm-cli-filtro-btn cc-var-btn" title={`${DICA_VAR[v]}. Clique para inserir ${v}`}
+                    onClick={() => setBloco(k, { corpo: (b.corpo ?? '').trim() ? `${(b.corpo ?? '').replace(/\s+$/, '')} ${v}` : v })}><span className="cc-var">{v.slice(1, -1)}</span></button>
                 ))}
               </div>
             </>
@@ -737,7 +739,7 @@ export function EditorMsg({ msg, setMsg, comQuando, semNome, setAviso, aoSubirMi
         <BotaoSec mini onClick={() => add('audio')}>＋ Áudio</BotaoSec>
         <BotaoSec mini onClick={() => add('documento')}>＋ Documento</BotaoSec>
       </div>
-      <p className="cm-vars">As partes saem na ordem, com o intervalo configurado entre elas. Variável sem dado no cadastro = a mensagem daquele cliente NÃO sai (vira erro explicado na fila).</p>
+      <p className="cm-vars">As partes saem na ordem, com o intervalo configurado entre elas. Se faltar no cadastro o dado de uma variável, a mensagem daquele cliente não sai (vira um erro explicado na fila).</p>
     </div>
   );
 }
@@ -838,7 +840,7 @@ export function CartoesReguaComercial({ passos, nome, versaoDe, podeEditar, aoEd
               <div className="rg-corpo">
                 <div className="rg-topo"><span className="rg-nm">{m.nome}</span><span className="rg-pub rg-pub-excluida">Excluída</span></div>
                 <div className="rg-prev">{minha ? 'Seus clientes não recebem esta mensagem.' : `Os clientes de ${nome} não recebem esta mensagem.`}{alterado ? ' O que foi personalizado fica guardado.' : ''}</div>
-                {(grupoNoDia?.(m) ?? []).map((g) => <div className="rg-donos" key={g}>Atenção: no mesmo dia ainda sai o grupo “{g}” pra quem está nele.</div>)}
+                {(grupoNoDia?.(m) ?? []).map((g) => <div className="rg-donos" key={g}>Atenção: no mesmo dia ainda sai o grupo “{g}” para quem está nele.</div>)}
               </div>
               {podeEditar && <div className="rg-acoes"><BotaoSec mini onClick={() => aoVoltar(m)}>Voltar a usar</BotaoSec></div>}
             </div>
@@ -849,17 +851,19 @@ export function CartoesReguaComercial({ passos, nome, versaoDe, podeEditar, aoEd
               <div className="rg-corpo">
                 <div className="rg-topo"><span className="rg-nm">{m.nome}</span>{selos}</div>
                 <div className="rg-tipos">{tiposUnicos(exib.blocos).map((t) => <span className="rg-tipo" key={t}><IconeBloco tipo={t} /> {ROTULO_BLOCO[t]}</span>)}</div>
-                <div className="rg-prev">{previewMsg(exib)}</div>
+                <div className="rg-prev"><TextoComVariaveis texto={previewMsg(exib)} /></div>
                 {diaProprio && <div className="rg-donos">Na padrão sai {quandoExtenso(m.quando)}; {minha ? 'na sua' : `na de ${nome}`}, {quandoExtenso(q)}.</div>}
                 {(grupoNoDia?.(m) ?? []).map((g) => <div className="rg-donos" key={g}>{diaProprio
-                  ? <>Pra quem está no grupo “{g}”, vai a mensagem do grupo ({quandoExtenso(m.quando)}) no lugar desta.</>
-                  : <>No mesmo dia sai o grupo “{g}”: pra quem está nele, vai a mensagem do grupo no lugar desta.</>}</div>)}
+                  ? <>Para quem está no grupo “{g}”, vai a mensagem do grupo ({quandoExtenso(m.quando)}) no lugar desta.</>
+                  : <>No mesmo dia sai o grupo “{g}”: para quem está nele, vai a mensagem do grupo no lugar desta.</>}</div>)}
               </div>
               {podeEditar && (
                 <div className="rg-acoes">
                   <BotaoSec mini onClick={() => aoEditar(m, JSON.parse(JSON.stringify(exib.blocos)) as Bloco[], !v, q)}>{alterado ? 'Editar' : 'Personalizar'}</BotaoSec>
-                  {alterado && <button type="button" className="cm-num-lnk" onClick={() => aoUsarPadrao(m)}>Usar a padrão</button>}
-                  <button type="button" className="cm-num-lnk perigo" onClick={() => aoExcluir(m)}>Excluir</button>
+                  <MenuMais rotulo={`Mais ações para ${m.nome}`} itens={[
+                    ...(alterado ? [{ rotulo: 'Usar a mensagem padrão', onClick: () => aoUsarPadrao(m) }, 'sep' as const] : []),
+                    { rotulo: minha ? 'Excluir da minha régua' : `Excluir da régua de ${nome}`, perigo: true, onClick: () => aoExcluir(m) },
+                  ]} />
                 </div>
               )}
             </div>
@@ -907,7 +911,7 @@ export function DiaDaVersao({ q0, valor, aoMudar }: { q0: number; valor: number;
           onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 2); setTxt(t); const k = Number(t); if (k >= 1 && k <= 30) aoMudar(lado * k); }}
           onBlur={fechar} />
         <span>{n === 1 ? 'dia' : 'dias'} {lado < 0 ? 'antes' : 'depois'} do vencimento <small>(1 a 30)</small></span>
-        {valor !== q0 && <button type="button" className="cm-num-lnk" onClick={() => aoMudar(q0)}>voltar pro dia da padrão ({Math.abs(q0)})</button>}
+        {valor !== q0 && <button type="button" className="cm-num-lnk" onClick={() => aoMudar(q0)}>voltar para o dia da padrão ({Math.abs(q0)})</button>}
       </div>
     </div>
   );

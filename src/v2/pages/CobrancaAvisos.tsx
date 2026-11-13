@@ -24,6 +24,7 @@ import { useUsuarios } from '../data/cobranca/usuarios';
 import { ambientesDoPerfil } from '../data/modulos';
 import type { Papel } from '../data/cobranca/types';
 import { ATENDENTES_DEMO } from './cobrancaAnalytics';
+import { AcoesNoTopo } from './comunicacao/MenuMais';
 import './painel/painel.css';
 
 const fmtQuando = (iso: string) => {
@@ -222,7 +223,7 @@ function NovoAvisoModal({ destinosOpcoes, maxMb, aoEnviar, aoFechar }: {
   async function enviar() {
     if (busy) return;
     if (!corpo.trim() && anexos.length === 0) { setErro('Escreva a mensagem ou anexe pelo menos um arquivo.'); return; }
-    if (escolhidos.length === 0) { setErro('Escolha pra quem vai o aviso.'); return; }
+    if (escolhidos.length === 0) { setErro('Escolha para quem vai o aviso.'); return; }
     setBusy(true); setErro('');
     try { await aoEnviar({ corpo: corpo.trim(), paraTodos: todos, destinos: escolhidos, anexos }); aoFechar(); }
     catch (e) { setErro(msgErro((e as Error).message)); }
@@ -232,7 +233,7 @@ function NovoAvisoModal({ destinosOpcoes, maxMb, aoEnviar, aoFechar }: {
   return (
     <ModalV2
       aberto aoFechar={() => { if (!busy) aoFechar(); }} fecharNoVeu={!busy} largura={600}
-      titulo={<div>Novo aviso<div className="mod-sub">Mensagem, áudios, imagens e documentos — o time vê na tela de Avisos na hora.</div></div>}
+      titulo={<div>Novo aviso<div className="mod-sub">Mensagem, áudios, imagens e documentos. A equipe vê na tela de Avisos na hora.</div></div>}
       rodape={<>
         <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
         <BotaoPrimario disabled={busy} onClick={enviar}>{busy ? 'Enviando…' : `Enviar aviso${escolhidos.length ? ` · ${escolhidos.length}` : ''}`}</BotaoPrimario>
@@ -283,7 +284,7 @@ function NovoAvisoModal({ destinosOpcoes, maxMb, aoEnviar, aoFechar }: {
             <span className="av-hint">Todos do time ({destinosOpcoes.length})</span>
           </div>
           {destinosOpcoes.length === 0 ? (
-            <p className="cm-hint" style={{ margin: '6px 0 0' }}>Nenhum usuário ativo pra receber — cadastre o time na aba Usuários.</p>
+            <p className="cm-hint" style={{ margin: '6px 0 0' }}>Nenhum usuário ativo para receber. Cadastre a equipe em Usuários.</p>
           ) : (
             <div className="av-destinos-sel">
               {destinosOpcoes.map((d) => {
@@ -361,6 +362,13 @@ function blobPraDataUrl(b: Blob): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error('falha ao ler o arquivo')); r.readAsDataURL(b); });
 }
 
+/** estado vazio de Avisos: megafone (traço 1,5, o mesmo da barra lateral) */
+const IconeMegafone = () => (
+  <svg className="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z" /><path d="M16 9.5a3.5 3.5 0 0 1 0 5" /><path d="M18.5 7a7 7 0 0 1 0 10" />
+  </svg>
+);
+
 export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel }) {
   const real = isRevizaMode;
   // demo roda como gestor: o seletor de visão demonstra o lado do comercial
@@ -413,7 +421,7 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
         anexos, destinos: a.destinos.map((d) => ({ userId: d.userId, nome: d.nome, lidoEm: null })),
       }, ...l]);
     }
-    setAviso(a.destinos.length === 1 ? `Aviso enviado pra ${a.destinos[0].nome}.` : `Aviso enviado pra ${a.destinos.length} pessoas.`);
+    setAviso(a.destinos.length === 1 ? `Aviso enviado para ${a.destinos[0].nome}.` : `Aviso enviado para ${a.destinos.length} pessoas.`);
   }
 
   function marcarLido(id: string) {
@@ -450,7 +458,14 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
 
   return (
     <div className="pn">
-      {/* barra: contexto à esquerda, visão e ação à direita */}
+      {/* a ação da tela no cabeçalho da página (um só "Novo aviso": o do estado vazio saiu) */}
+      {adm && !comercialVe && (
+        <AcoesNoTopo>
+          <BotaoPrimario onClick={() => setNovo(true)}>＋ Novo aviso</BotaoPrimario>
+        </AcoesNoTopo>
+      )}
+      {/* barra de contexto: só quando há o que contar (sem avisos, o estado vazio já diz tudo) */}
+      {(nAvisos > 0 || !real) && (
       <div className="pn-barra sobe">
         <div className="pn-barra-esq">
           <span className="pn-barra-rot">Mural da equipe</span>
@@ -471,9 +486,9 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
               )}
             </>
           )}
-          {adm && !comercialVe && <BotaoPrimario onClick={() => setNovo(true)}>＋ Novo aviso</BotaoPrimario>}
         </div>
       </div>
+      )}
 
       {aviso && (
         <div className="aviso-inline" role="status">{aviso}<button type="button" onClick={() => setAviso('')} aria-label="Fechar aviso">×</button></div>
@@ -486,7 +501,7 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
       ) : comercialVe ? (
         /* -------- visão do COMERCIAL: o que recebeu, não-lido em destaque -------- */
         listaCom.length === 0
-          ? <CardVidro sobe><EstadoVazio titulo="Nenhum aviso por enquanto" descricao="Quando o administrativo enviar um aviso, ele aparece aqui na hora." /></CardVidro>
+          ? <CardVidro sobe><EstadoVazio icone={<IconeMegafone />} titulo="Nenhum aviso por enquanto" descricao="Quando o administrativo enviar um aviso, ele aparece aqui na hora." /></CardVidro>
           : (
             <div className="pn-mural sobe">
               {porDia(listaCom).map((g) => (
@@ -505,8 +520,7 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
         listaAdm.length === 0
           ? (
             <CardVidro sobe>
-              <EstadoVazio titulo="Nenhum aviso enviado" descricao="Publique um aviso com mensagem, áudios, imagens ou documentos pro time comercial."
-                acao={adm ? { rotulo: '＋ Enviar o primeiro aviso', onClick: () => setNovo(true) } : undefined} />
+              <EstadoVazio icone={<IconeMegafone />} titulo="Nenhum aviso enviado" descricao="Publique um aviso com mensagem, áudios, imagens ou documentos para a equipe." />
             </CardVidro>
           ) : (
             <div className="pn-mural sobe">

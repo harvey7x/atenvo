@@ -6,7 +6,7 @@
    Tudo vem do banco real (wa_envio_alvos + triggers de entrega/resposta) e
    da PRÉVIA do motor (a mesma conta do disparo — nada é enviado pra calcular).
    ===================================================================== */
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2, EstadoVazio, Input, Kpi, ModalV2, TabelaPadrao, type Coluna, type TomStatus } from '../components';
 import { EditorMsg, IcT, IC_PATH, quandoCurto, rid, type Bloco, type MsgDef } from './cobrancaMotor';
@@ -15,6 +15,7 @@ import { useDadosCobranca } from '../data/cobranca/hooks';
 import { usePapel } from '../data/cobranca/sessao';
 import { clientesReais, linhasComCancelados } from './revizaAnalytics';
 import type { Dados, GLinha } from '../data/cobranca/types';
+import { AcoesNoTopo } from './comunicacao/MenuMais';
 import {
   useAlvosWA, useCanaisWA, useCancelarEnvioWA, useCriarEnvioWA, useEnviosWA, useOptoutWA, usePreviaReguaWA, useReguaWA,
   useProcessarEnviosWA, useProgressoReguaWA, useReenviarWA, useReguaConfigWA, useResumoEnviosWA, useRodadasWA,
@@ -44,6 +45,8 @@ function tempoAtras(iso: string | null): string {
   return `há ${Math.round(s / 86400)} d`;
 }
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+/** plural de verdade (nada de "enviada(s)"): plural(3, 'enviada', 'enviadas') → "3 enviadas" */
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 const nomeCanal = (c: CanalWA) => c.nome.charAt(0).toUpperCase() + c.nome.slice(1);
 /** chave canônica do telefone = DDD + 8 últimos dígitos (a mesma do banco/motor: wa_tel_chave) */
 const chaveTel = (t: string): string | null => {
@@ -62,12 +65,12 @@ function statusAlvo(a: AlvoWA, canal: CanalWA | undefined, cx: CtxStatus): { t: 
       const ag = a.wa_envios?.agendado_para;
       if (a.wa_envios?.estado === 'rascunho' && ag && new Date(ag).getTime() > Date.now()) return { t: `Agendada · ${dataHora(ag)}`, tom: 'neutro', det: null };
       if (a.tentar_apos) return { t: 'Tentando de novo', tom: 'atencao', det: a.erro };
-      if (canal && canal.estado !== 'conectado') return { t: 'Aguardando o número', tom: 'atencao', det: `o número de ${nomeCanal(canal)} está desconectado — sai quando reconectar${a.wa_envios?.origem === 'regua' ? ' (até o fim do dia)' : ''}` };
-      if (a.wa_envios?.origem === 'regua' && !cx.reguaLigada) return { t: 'Parada', tom: 'atencao', det: 'régua desligada — se não religar hoje, expira à meia-noite' };
-      if (a.wa_envios?.origem === 'regua' && foraDaJanela(cx)) return { t: 'Parada', tom: 'atencao', det: `fora do horário da régua (${cx.ini}h–${cx.fim}h) — o que não saiu hoje expira à meia-noite` };
+      if (canal && canal.estado !== 'conectado') return { t: 'Aguardando o número', tom: 'atencao', det: `O número de ${nomeCanal(canal)} está desconectado; sai quando reconectar${a.wa_envios?.origem === 'regua' ? ' (até o fim do dia)' : ''}` };
+      if (a.wa_envios?.origem === 'regua' && !cx.reguaLigada) return { t: 'Parada', tom: 'atencao', det: 'Régua desligada; se não for religada hoje, expira à meia-noite' };
+      if (a.wa_envios?.origem === 'regua' && foraDaJanela(cx)) return { t: 'Parada', tom: 'atencao', det: `Fora do horário da régua (${cx.ini}h–${cx.fim}h); o que não saiu hoje expira à meia-noite` };
       // mig 82: comercial com início próprio (ex.: Eduardo às 7h) — o cliente espera na fila até lá
       const iniCom = a.wa_envios?.origem === 'regua' ? cx.porComercial?.[chaveComercial(a.canal_nome)] : undefined;
-      if (iniCom != null && iniCom > cx.ini && horaBrasilia() < iniCom && !(a.parte_atual ?? 0)) return { t: 'Na fila', tom: 'neutro', det: `começa às ${String(iniCom).padStart(2, '0')}:00 (horário de ${a.canal_nome})` };
+      if (iniCom != null && iniCom > cx.ini && horaBrasilia() < iniCom && !(a.parte_atual ?? 0)) return { t: 'Na fila', tom: 'neutro', det: `Começa às ${String(iniCom).padStart(2, '0')}:00 (horário de ${a.canal_nome})` };
       return { t: 'Na fila', tom: 'neutro', det: null };
     }
     case 'enviando': return { t: 'Enviando…', tom: 'atencao', det: null };
@@ -78,8 +81,9 @@ function statusAlvo(a: AlvoWA, canal: CanalWA | undefined, cx: CtxStatus): { t: 
     default: return { t: a.status, tom: 'neutro', det: null };
   }
 }
+// futuro/previsto = cinza (neutro); verde fica só para o que já aconteceu (enviada, entregue, lida)
 const ROT_PREVIA: Record<ItemPreviaWA['status'], { t: string; tom: TomStatus }> = {
-  vai_receber: { t: 'Vai receber', tom: 'ok' }, gerado: { t: 'Já na fila / enviado', tom: 'ok' },
+  vai_receber: { t: 'Vai receber', tom: 'neutro' }, gerado: { t: 'Na fila ou enviado', tom: 'neutro' },
   aguardando: { t: 'Aguardando', tom: 'atencao' }, pulado: { t: 'Não recebe', tom: 'neutro' },
 };
 
@@ -97,6 +101,12 @@ const IC = {
   info: 'M12 16v-4M12 8h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
 } as const;
 const Ico = ({ d, s = 16 }: { d: string; s?: number }) => <IcT d={d} s={s} mr={0} />;
+/** estado vazio de "Não recebem": seta de saída (traço 1,5, o mesmo da barra lateral) */
+const IconeSaida = () => (
+  <svg className="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M14 4.5h3.5A1.5 1.5 0 0 1 19 6v12a1.5 1.5 0 0 1-1.5 1.5H14" /><path d="M10 16l4-4-4-4" /><path d="M14 12H4.5" />
+  </svg>
+);
 const iniciais = (n: string | null | undefined) => (String(n ?? '').trim().split(/\s+/).slice(0, 2).map((p) => p[0] ?? '').join('') || '·').toUpperCase();
 
 type Aba = 'feitos' | 'proximos' | 'campanhas' | 'optout';
@@ -105,7 +115,16 @@ export function EnviosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: 
   const [params, setParams] = useSearchParams();
   const abaParam = params.get('aba');
   const aba: Aba = abaParam === 'proximos' || abaParam === 'campanhas' || abaParam === 'optout' ? abaParam : 'feitos';
-  const setAba = (a: Aba) => { const p = new URLSearchParams(params); p.set('aba', a); setParams(p, { replace: true }); };
+  const abasRef = useRef<HTMLDivElement>(null);
+  const rolarParaAbas = () => window.setTimeout(() => abasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  const setAba = (a: Aba, rolar = false) => { const p = new URLSearchParams(params); p.set('aba', a); setParams(p, { replace: true }); if (rolar) rolarParaAbas(); };
+  // vindo de outra tela já numa aba (Régua › "Ver quem recebe" → Próximos disparos): a lista fica
+  // abaixo dos cartões de situação — a página desce até as abas, senão o clique parece não ter feito nada
+  useEffect(() => {
+    if (abaParam !== 'proximos' && abaParam !== 'campanhas' && abaParam !== 'optout') return;
+    const t = window.setTimeout(() => abasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 450);
+    return () => window.clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hoje = isoLocal(new Date());
   const [ini, fim] = useMemo(() => [inicioDia(0), inicioDia(-1)], [hoje]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -144,34 +163,32 @@ export function EnviosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: 
 
   return (
     <div className="ev-raiz">
-      <div className="ev-topo sobe">
-        <p>Tudo que sai pelo WhatsApp — régua automática e envios manuais — com o número usado, o horário, o texto exato, a entrega, a leitura e a resposta de cada cliente.</p>
-        <div className="ev-topo-acoes">
-          {gestor && <BotaoSec mini onClick={() => processar.mutate(undefined, { onSuccess: (x) => aoAvisar(`Fila processada — ${Number((x as Record<string, unknown>).enviadas ?? 0)} enviada(s), ${Number((x as Record<string, unknown>).falhas ?? 0)} com erro.`), onError: (e) => aoAvisar((e as Error).message) })} disabled={processar.isPending}>
-            <Ico d={IC_PATH.girar} s={13} /> {processar.isPending ? 'Processando…' : 'Processar fila agora'}</BotaoSec>}
-          <BotaoPrimario onClick={() => setNovo(true)}><IcT d={IC_PATH.mais} s={14} />Novo envio</BotaoPrimario>
-        </div>
-      </div>
+      {/* ações no cabeçalho da página, à direita do título (sem parágrafo explicativo embaixo) */}
+      <AcoesNoTopo>
+        {gestor && <BotaoSec title="Processa agora as mensagens que estão na fila, sem esperar a próxima rodada automática" onClick={() => processar.mutate(undefined, { onSuccess: (x) => { const env = Number((x as Record<string, unknown>).enviadas ?? 0); const fal = Number((x as Record<string, unknown>).falhas ?? 0); aoAvisar(`Fila processada: ${env ? plural(env, 'enviada', 'enviadas') : 'nenhuma enviada'}${fal ? `, ${plural(fal, 'com erro', 'com erro')}` : ''}.`); }, onError: (e) => aoAvisar((e as Error).message) })} disabled={processar.isPending}>
+          <Ico d={IC_PATH.girar} s={16} />{processar.isPending ? 'Processando…' : 'Processar fila agora'}</BotaoSec>}
+        <BotaoPrimario onClick={() => setNovo(true)}><Ico d={IC_PATH.mais} s={16} />Novo envio</BotaoPrimario>
+      </AcoesNoTopo>
 
       <StatusGeral cfg={cfgQ.data ?? null} canais={canais} ultima={rodadasQ.data?.[0] ?? null} gestor={gestor} aoAvisar={aoAvisar}
         aoConfigurar={() => navigate('/cobrancas/regua')} aoNumeros={() => navigate('/cobrancas/numeros')} />
 
       <ChecklistLigar cfg={cfgQ.data ?? null} canais={canais} passos={passosAtivos.length} cobertura={previaHojeQ.data?.cobertura ?? null}
         carregando={cfgQ.isLoading || canaisQ.isLoading || reguaQ.isLoading || previaHojeQ.isLoading} erroCob={previaHojeQ.isError && !previaHojeQ.data}
-        aoIr={(rota) => navigate(rota)} aoVerQuem={() => setAba('proximos')} />
+        aoIr={(rota) => navigate(rota)} aoVerQuem={() => setAba('proximos', true)} />
 
       <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
-        <Kpi rotulo="Enviadas hoje" valor={r?.enviadas ?? 0} tomValor="ok" nota={r ? `${r.entregues} entregues · ${r.lidas} lidas` : '—'} />
-        <Kpi rotulo="Responderam hoje" valor={r?.responderam ?? 0} nota={r && r.enviadas ? `${pct(r.responderam, r.enviadas)}% de quem recebeu` : 'ninguém ainda'} />
-        <Kpi rotulo="Na fila agora" valor={r?.na_fila ?? 0} nota={`${(r?.na_fila ?? 0) > 0 ? (!cx.reguaLigada || foraDaJanela(cx) ? `régua parada (desligada ou fora das ${cx.ini}h–${cx.fim}h) — só envios manuais saem` : 'saindo com intervalo anti-bloqueio') : 'fila vazia'}${r?.agendados ? ` · ${r.agendados} agendada(s)` : ''}`} />
-        <Kpi rotulo="Com erro hoje" valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={`${r?.pulados ?? 0} não enviadas (pagou, saiu…)`} />
+        <Kpi rotulo="Enviadas hoje" valor={r?.enviadas ?? 0} nota={r ? `${r.entregues} entregues · ${r.lidas} lidas` : '—'} />
+        <Kpi rotulo="Responderam hoje" valor={r?.responderam ?? 0} nota={r && r.enviadas ? `${pct(r.responderam, r.enviadas)}% de quem recebeu` : 'Nenhuma resposta ainda'} />
+        <Kpi rotulo="Na fila agora" valor={r?.na_fila ?? 0} nota={`${(r?.na_fila ?? 0) > 0 ? (!cx.reguaLigada || foraDaJanela(cx) ? `Régua parada (desligada ou fora das ${cx.ini}h–${cx.fim}h); só os envios manuais saem` : 'Saindo com intervalo de segurança') : 'Fila vazia'}${r?.agendados ? ` · ${plural(r.agendados, 'agendada', 'agendadas')}` : ''}`} />
+        <Kpi rotulo="Com erro hoje" valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={(r?.pulados ?? 0) > 0 ? `${plural(r?.pulados ?? 0, 'não enviada', 'não enviadas')} por regra` : 'Nenhuma deixada de fora'} />
       </div>
 
       <ReguaDeHoje prog={progQ.data ?? []} itens={previaHojeQ.data?.itens ?? []} passos={passosAtivos.map((p) => ({ nome: p.nome, quando: p.quando }))}
         carregando={previaHojeQ.isLoading || progQ.isLoading || cfgQ.isLoading} erro={previaHojeQ.isError && !previaHojeQ.data ? (previaHojeQ.error?.message ?? 'falhou') : null} ligada={cx.reguaLigada} ini={cx.ini} fim={cx.fim}
-        dMedio={cfgQ.data ? (cfgQ.data.delay_min + cfgQ.data.delay_max) / 2 : 32} aoVerProximos={() => setAba('proximos')} />
+        dMedio={cfgQ.data ? (cfgQ.data.delay_min + cfgQ.data.delay_max) / 2 : 32} aoVerProximos={() => setAba('proximos', true)} />
 
-      <div className="ev-abas sobe" role="tablist" aria-label="Envios" style={{ animationDelay: '.1s' }}>
+      <div className="ev-abas sobe" ref={abasRef} role="tablist" aria-label="Envios" style={{ animationDelay: '.1s' }}>
         {abas.map(([k, t, n]) => (
           <button key={k} type="button" role="tab" aria-selected={aba === k} className={aba === k ? 'ev-aba on' : 'ev-aba'} onClick={() => setAba(k)}>
             {t}{n ? <span className="ev-aba-n num">{n}</span> : null}
@@ -190,7 +207,10 @@ export function EnviosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: 
   );
 }
 
-/* ---------- visão geral: régua, WhatsApp e motor (3 blocos) ---------- */
+/* ---------- visão geral: régua, WhatsApp e envio automático — UMA faixa de status (~80px) ----------
+   Crítica 12/11: os três cartões seguiam a altura do do meio (os 8 números, cada um com "verificar") e
+   gastavam ~220px para dizer "está tudo funcionando, menos 1 número". Agora: uma linha por bloco, o
+   problema nomeado ("Paty desconectada") com o "Verificar" SÓ nele; a lista completa mora em Números. */
 function StatusGeral({ cfg, canais, ultima, gestor, aoAvisar, aoConfigurar, aoNumeros }: {
   cfg: ReguaConfigWA | null; canais: CanalWA[]; ultima: RodadaWA | null;
   gestor: boolean; aoAvisar: (t: string) => void; aoConfigurar: () => void; aoNumeros: () => void;
@@ -200,50 +220,56 @@ function StatusGeral({ cfg, canais, ultima, gestor, aoAvisar, aoConfigurar, aoNu
   const bat = motorQ.data?.ultima_rodada ? Date.now() - new Date(motorQ.data.ultima_rodada).getTime() : null;
   const motorParado = bat != null && bat > 3 * 60_000;
   const motorErro = motorQ.data?.ultima_ok === false;
-  const dias = cfg?.dias_envio === 'uteis' ? 'só dias úteis' : cfg?.dias_envio === 'uteis_sabado' ? 'dias úteis + sábado' : 'todos os dias';
+  const dias = cfg?.dias_envio === 'uteis' ? 'dias úteis' : cfg?.dias_envio === 'uteis_sabado' ? 'dias úteis e sábado' : 'todos os dias';
   const conectados = canais.filter((c) => c.estado === 'conectado');
+  const problemas = canais.filter((c) => c.estado !== 'conectado');
   const tomNum: TomStatus = !canais.length ? 'neutro' : conectados.length === canais.length ? 'ok' : conectados.length ? 'atencao' : 'erro';
+  const tomMotor: TomStatus = motorParado || motorErro ? 'erro' : motorQ.data?.ultima_rodada ? 'ok' : 'neutro';
+  const verificarCanal = (c: CanalWA) => verificar.mutate(c.id, {
+    onSuccess: (x) => aoAvisar(`${nomeCanal(c)}: ${x.estado === 'conectado' ? 'conectado' : String(x.estado)}${x.webhook_reaplicado ? ' · recebimento reconfigurado' : ''}${x.detalhe ? ` · ${String(x.detalhe)}` : x.webhook_ok ? ' · tudo certo' : ''}.`),
+    onError: (e) => aoAvisar((e as Error).message),
+  });
+  const ultimaAtiv = ultima ? (ultima.erro ? 'a última rodada falhou' : ultima.enviadas || ultima.falhas ? `${plural(ultima.enviadas, 'enviada', 'enviadas')}${ultima.falhas ? `, ${plural(ultima.falhas, 'erro', 'erros')}` : ''} na última rodada` : '') : '';
   return (
-    <div className="ev-status sobe" style={{ animationDelay: '.02s' }}>
-      <CardVidro spot className="ev-st-card">
+    <CardVidro spot sobe className="ev-faixa" style={{ animationDelay: '.02s' }}>
+      <div className="ev-fx">
         <span className={`ev-st-ic ${cfg?.ativa ? 'ok' : 'neutro'}`}><Ico d={IC_PATH.relogio} /></span>
-        <div className="ev-st-corpo">
-          <span className="ev-rot">Régua automática</span>
-          <b className={cfg?.ativa ? 'ev-st-val ok' : 'ev-st-val'}>{cfg ? (cfg.ativa ? 'Ligada' : 'Desligada') : '…'}</b>
-          {cfg && <span className="ev-sub">Fila às {d2(cfg.hora_envio)}:00 · {dias} · {cfg.teto_diario > 0 ? `até ${cfg.teto_diario}/número por dia` : 'sem limite diário'}</span>}
+        <div className="ev-fx-corpo">
+          <span className="ev-fx-rot">Régua automática</span>
+          <span className="ev-fx-val"><b className={cfg?.ativa ? 'ok' : ''}>{cfg ? (cfg.ativa ? 'Ligada' : 'Desligada') : '…'}</b>{cfg && <span className="num">{d2(cfg.hora_envio)}:00 · {dias}</span>}</span>
+          {cfg && <span className="ev-fx-meta">{cfg.teto_diario > 0 ? `Até ${cfg.teto_diario} mensagens por número ao dia` : 'Sem limite diário por número'}</span>}
         </div>
-        <button type="button" className="ev-st-acao" onClick={aoConfigurar}>Configurar</button>
-      </CardVidro>
-      <CardVidro spot className="ev-st-card">
+        <BotaoSec mini onClick={aoConfigurar}>Configurar</BotaoSec>
+      </div>
+      <div className="ev-fx">
         <span className={`ev-st-ic ${tomNum}`}><Ico d={IC.zap} /></span>
-        <div className="ev-st-corpo">
-          <span className="ev-rot">WhatsApp</span>
-          <b className={`ev-st-val ${tomNum}`}>{canais.length ? `${conectados.length} de ${canais.length} conectado${canais.length === 1 ? '' : 's'}` : 'Nenhum número'}</b>
-          <div className="ev-st-nums">
-            {canais.map((c) => (
-              <span key={c.id} className="ev-st-num" title={`conexão conferida ${tempoAtras(c.verificado_em)} · último sinal do WhatsApp ${tempoAtras(c.ultimo_evento_em)}`}>
-                <i className={c.estado === 'conectado' ? 'ok' : c.estado === 'conectando' ? 'atencao' : 'erro'} />{nomeCanal(c)} <span className="num">{c.numero ? fmtTel(c.numero) : ''}</span>
-                {gestor && <button type="button" className="cm-num-lnk" disabled={verificar.isPending}
-                  onClick={() => verificar.mutate(c.id, {
-                    onSuccess: (x) => aoAvisar(`${nomeCanal(c)}: ${x.estado === 'conectado' ? 'conectado' : String(x.estado)}${x.webhook_reaplicado ? ' · recebimento reconfigurado' : ''}${x.detalhe ? ` · ${String(x.detalhe)}` : x.webhook_ok ? ' · tudo certo' : ''}.`),
-                    onError: (e) => aoAvisar((e as Error).message),
-                  })}>{verificar.isPending && verificar.variables === c.id ? 'verificando…' : 'verificar'}</button>}
-              </span>
-            ))}
-          </div>
+        <div className="ev-fx-corpo">
+          <span className="ev-fx-rot">WhatsApp</span>
+          <span className="ev-fx-val"><b className={tomNum === 'ok' ? 'ok' : tomNum}>{canais.length ? `${conectados.length} de ${plural(canais.length, 'número conectado', 'números conectados')}` : 'Nenhum número'}</b></span>
+          {problemas.length > 0 ? (
+            <span className="ev-fx-meta ev-fx-prob">
+              {problemas.slice(0, 2).map((c) => (
+                <span key={c.id} className="ev-fx-num" title={`Conexão conferida ${tempoAtras(c.verificado_em)} · último sinal do WhatsApp ${tempoAtras(c.ultimo_evento_em)}`}>
+                  <i className={c.estado === 'conectando' ? 'atencao' : 'erro'} aria-hidden />
+                  {nomeCanal(c)} · {c.estado === 'conectando' ? 'conectando' : 'desconectado'}
+                  {gestor && <button type="button" className="ev-link" disabled={verificar.isPending} onClick={() => verificarCanal(c)}>{verificar.isPending && verificar.variables === c.id ? 'Verificando…' : 'Verificar'}</button>}
+                </span>
+              ))}
+              {problemas.length > 2 && <span>e mais {problemas.length - 2}</span>}
+            </span>
+          ) : canais.length > 0 && <span className="ev-fx-meta">Todos recebendo e enviando normalmente</span>}
         </div>
-        <button type="button" className="ev-st-acao" onClick={aoNumeros}>Números</button>
-      </CardVidro>
-      <CardVidro spot className="ev-st-card">
-        <span className={`ev-st-ic ${motorParado || motorErro ? 'erro' : motorQ.data?.ultima_rodada ? 'ok' : 'neutro'}`}><Ico d={IC.pulso} /></span>
-        <div className="ev-st-corpo">
-          <span className="ev-rot">Motor de envio</span>
-          <b className={`ev-st-val ${motorParado || motorErro ? 'erro' : 'ok'}`}>{motorParado ? 'Parado' : motorErro ? 'Com erro' : motorQ.data?.ultima_rodada ? 'Funcionando' : '…'}</b>
-          <span className="ev-sub">{motorQ.data?.ultimo_erro ? motorQ.data.ultimo_erro : `roda a cada minuto · última rodada ${tempoAtras(motorQ.data?.ultima_rodada ?? null)}`}</span>
-          {ultima && <span className="ev-sub">última atividade {tempoAtras(ultima.inicio)}: {ultima.erro ? 'erro' : `${ultima.enviadas} enviada(s)${ultima.falhas ? `, ${ultima.falhas} erro(s)` : ''}`}</span>}
+        <BotaoSec mini onClick={aoNumeros}>Números</BotaoSec>
+      </div>
+      <div className="ev-fx">
+        <span className={`ev-st-ic ${tomMotor}`}><Ico d={IC.pulso} /></span>
+        <div className="ev-fx-corpo">
+          <span className="ev-fx-rot">Envio automático</span>
+          <span className="ev-fx-val"><b className={tomMotor === 'ok' ? 'ok' : tomMotor}>{motorParado ? 'Parado' : motorErro ? 'Com erro' : motorQ.data?.ultima_rodada ? 'Em dia' : '…'}</b>{motorQ.data?.ultima_rodada && <span className="num">última execução {hora(motorQ.data.ultima_rodada)}</span>}</span>
+          <span className="ev-fx-meta" title={motorQ.data?.ultimo_erro ?? undefined}>{motorQ.data?.ultimo_erro ? motorQ.data.ultimo_erro : ultimaAtiv ? `Roda a cada minuto · ${ultimaAtiv}` : 'Roda a cada minuto'}</span>
         </div>
-      </CardVidro>
-    </div>
+      </div>
+    </CardVidro>
   );
 }
 
@@ -262,11 +288,11 @@ function ChecklistLigar({ cfg, canais, passos, cobertura, carregando, erroCob, a
   const cob = (cobertura ?? []).reduce((s, c) => ({ total: s.total + c.clientes, tel: s.tel + c.com_telefone, alc: s.alc + (c.numero?.conectado ? c.com_telefone : 0) }), { total: 0, tel: 0, alc: 0 });
   type Item = { ok: boolean; titulo: string; desc: string; acao?: { rot: string; fn: () => void } };
   const itens: Item[] = [
-    { ok: conectados.length > 0, titulo: 'WhatsApp conectado', desc: conectados.length ? `${conectados.map(nomeCanal).join(', ')} conectado${conectados.length === 1 ? '' : 's'}.` : 'Nenhum número conectado — conecte o número de cada comercial.', acao: conectados.length ? undefined : { rot: 'Conectar', fn: () => aoIr('/cobrancas/numeros') } },
-    { ok: conectados.length > 0 && semDono.length === 0, titulo: 'Cada número com seu atendente', desc: semDono.length ? `${semDono.map(nomeCanal).join(', ')} sem atendente dono: a régua não manda por ${semDono.length === 1 ? 'este número' : 'estes números'} e o comercial não vê as conversas.` : 'Cada número manda pelos clientes do próprio comercial.', acao: semDono.length ? { rot: 'Definir dono', fn: () => aoIr('/cobrancas/numeros') } : undefined },
-    { ok: conectados.length > 0 && semSinal.length === 0, titulo: 'Recebendo mensagens', desc: semSinal.length ? `Nenhuma mensagem chegou em ${semSinal.map(nomeCanal).join(', ')} nos últimos dias. Mande um “oi” de outro celular e veja se aparece em Conversas — é por aí que chegam respostas, entregas e pedidos de SAIR.` : 'Respostas, entregas e leituras chegando normalmente.', acao: semSinal.length ? { rot: 'Abrir Conversas', fn: () => aoIr('/cobrancas/conversas') } : undefined },
-    { ok: passos > 0, titulo: 'Mensagens da régua', desc: passos ? `${passos} passo${passos === 1 ? '' : 's'} ativo${passos === 1 ? '' : 's'} na sequência padrão.` : 'Nenhum passo ativo — crie as mensagens na Régua.', acao: { rot: 'Ver régua', fn: () => aoIr('/cobrancas/regua') } },
-    { ok: erroCob || cob.alc > 0, titulo: 'Clientes alcançáveis', desc: erroCob ? 'Não deu pra calcular agora — veja “Régua de hoje” abaixo.' : cobertura ? `${cob.alc} de ${cob.total} clientes em cobrança podem receber hoje.${cob.total - cob.tel > 0 ? ` ${cob.total - cob.tel} estão sem telefone na Gestão.` : ''}${cob.tel - cob.alc > 0 ? ` ${cob.tel - cob.alc} têm telefone mas esperam o número do comercial (conectado e com dono).` : ''}` : 'Calculando…', acao: { rot: 'Ver quem recebe', fn: aoVerQuem } },
+    { ok: conectados.length > 0, titulo: 'WhatsApp conectado', desc: conectados.length ? `${conectados.map(nomeCanal).join(', ')} conectado${conectados.length === 1 ? '' : 's'}.` : 'Nenhum número conectado. Conecte o número de cada comercial.', acao: conectados.length ? undefined : { rot: 'Conectar', fn: () => aoIr('/cobrancas/numeros') } },
+    { ok: conectados.length > 0 && semDono.length === 0, titulo: 'Cada número com o seu comercial', desc: semDono.length ? `${semDono.map(nomeCanal).join(', ')} sem comercial dono: a régua não envia por ${semDono.length === 1 ? 'este número' : 'estes números'} e o comercial não vê as conversas.` : 'Cada número manda pelos clientes do próprio comercial.', acao: semDono.length ? { rot: 'Definir dono', fn: () => aoIr('/cobrancas/numeros') } : undefined },
+    { ok: conectados.length > 0 && semSinal.length === 0, titulo: 'Recebendo mensagens', desc: semSinal.length ? `Nenhuma mensagem chegou em ${semSinal.map(nomeCanal).join(', ')} nos últimos dias. Envie um “oi” de outro celular e confira se aparece em Conversas: é por ali que chegam respostas, entregas e pedidos de saída.` : 'Respostas, entregas e leituras chegando normalmente.', acao: semSinal.length ? { rot: 'Abrir Conversas', fn: () => aoIr('/cobrancas/conversas') } : undefined },
+    { ok: passos > 0, titulo: 'Mensagens da régua', desc: passos ? `${passos} passo${passos === 1 ? '' : 's'} ativo${passos === 1 ? '' : 's'} na sequência padrão.` : 'Nenhum passo ativo. Crie as mensagens na Régua.', acao: { rot: 'Ver régua', fn: () => aoIr('/cobrancas/regua') } },
+    { ok: erroCob || cob.alc > 0, titulo: 'Clientes alcançáveis', desc: erroCob ? 'Não foi possível calcular agora. Veja “Régua de hoje” abaixo.' : cobertura ? `${cob.alc} de ${cob.total} clientes em cobrança podem receber hoje.${cob.total - cob.tel > 0 ? ` ${cob.total - cob.tel} estão sem telefone na Gestão.` : ''}${cob.tel - cob.alc > 0 ? ` ${cob.tel - cob.alc} têm telefone mas esperam o número do comercial (conectado e com dono).` : ''}` : 'Calculando…', acao: { rot: 'Ver quem recebe', fn: aoVerQuem } },
   ];
   const prontos = itens.filter((i) => i.ok).length;
   if (carregando) return null;   // sem piscar um alerta falso enquanto carrega
@@ -276,7 +302,7 @@ function ChecklistLigar({ cfg, canais, passos, cobertura, carregando, erroCob, a
       <button type="button" className="ev-check-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
         <div>
           <b>{cfg?.ativa ? 'Pontos de atenção da régua' : 'Pronto para ligar a régua?'}</b>
-          <span className="ev-sub">{prontos === itens.length ? 'Tudo certo — a régua pode ser ligada na tela da Régua.' : cfg?.ativa ? `${prontos} de ${itens.length} itens prontos · a régua está ligada; os marcados podem impedir envios` : `${prontos} de ${itens.length} itens prontos · resolva os marcados antes de ligar`}</span>
+          <span className="ev-sub">{prontos === itens.length ? 'Tudo certo: a régua pode ser ligada na tela da Régua.' : cfg?.ativa ? `${prontos} de ${itens.length} itens prontos · a régua está ligada; os itens marcados podem impedir envios` : `${prontos} de ${itens.length} itens prontos · resolva os itens marcados antes de ligar`}</span>
         </div>
         <div className="ev-check-prog" aria-hidden><i style={{ width: `${pct(prontos, itens.length)}%` }} /></div>
         <span className={aberto ? 'ev-chev on' : 'ev-chev'}><Ico d={IC.seta} s={14} /></span>
@@ -337,12 +363,12 @@ function ReguaDeHoje({ prog, itens, passos, carregando, erro, ligada, ini = 8, f
   const nNums = Math.max(1, new Set(itens.filter((i) => i.status === 'gerado' && i.numero).map((i) => i.numero!.id)).size);
   const terminaEm = ligada && tot.f > 0 && h >= ini && h < fim ? new Date(Date.now() + Math.ceil(tot.f / nNums) * (dMedio + 6) * 1000) : null;
   const agFalta = itens.filter((i) => i.status === 'aguardando' && (i.motivo ?? '').startsWith('falta dado')).length;
-  const resumo = erro ? `Não deu pra calcular agora (${erro}).`
+  const resumo = erro ? `Não foi possível calcular agora (${erro}).`
     : carregando ? 'Calculando…'
-    : !ligada ? 'A régua está desligada — nada sai sozinho. Abaixo, o que sairia hoje se ela estivesse ligada.'
+    : !ligada ? 'A régua está desligada: nada sai sozinho. Abaixo, o que sairia hoje se ela estivesse ligada.'
     : !devidos ? 'Nenhuma mensagem da régua vence hoje.'
     : [`${tot.p} de ${devidos} processadas`, terminaEm ? `a fila termina por volta de ${hora(terminaEm.toISOString())}` : '', tot.prev ? `${tot.prev} ainda entram na fila` : '',
-      tot.ag ? [tot.ag - agFalta ? `${tot.ag - agFalta} aguardando número/limite/horário — não saem hoje se nada mudar` : '', agFalta ? `${agFalta} esperando dado na Gestão (saem ao corrigir)` : ''].filter(Boolean).join(' · ') : tot.g && tot.p === tot.g && !tot.prev ? 'concluída' : '',
+      tot.ag ? [tot.ag - agFalta ? `${tot.ag - agFalta} aguardando número, limite ou horário (não saem hoje se nada mudar)` : '', agFalta ? `${agFalta} aguardando dado na Gestão (saem ao corrigir)` : ''].filter(Boolean).join(' · ') : tot.g && tot.p === tot.g && !tot.prev ? 'concluída' : '',
       h >= fim && (tot.f || tot.prev) ? `depois das ${fim}h nada sai; o que sobrou expira à meia-noite` : ''].filter(Boolean).join(' · ');
   return (
     <CardVidro spot sobe className="ev-regua" style={{ animationDelay: '.08s' }}>
@@ -355,7 +381,7 @@ function ReguaDeHoje({ prog, itens, passos, carregando, erro, ligada, ini = 8, f
         <button type="button" className="ev-link" onClick={aoVerProximos}>Próximos dias <Ico d="m9 18 6-6-6-6" s={12} /></button>
       </div>
       {carregando ? <div className="cm-hint">Calculando…</div> : linhas.length === 0 ? (
-        <div className="cm-hint" style={{ margin: 0 }}>Nenhum passo da régua ativo — crie as mensagens na tela da Régua.</div>
+        <div className="cm-hint" style={{ margin: 0 }}>Nenhum passo da régua ativo. Crie as mensagens na tela da Régua.</div>
       ) : (
         <div className="ev-passos">
           {linhas.map((l) => {
@@ -409,23 +435,31 @@ function ReguaDeHoje({ prog, itens, passos, carregando, erro, ligada, ini = 8, f
 /* ---------- aba 1: envios feitos (histórico + fila) ---------- */
 function colunasAlvo(canais: CanalWA[], linhaPorId: Map<string, GLinha>, aoConversa: (id: string) => void, cx: CtxStatus): Coluna<AlvoWA>[] {
   const canalDe = (id: string | null) => canais.find((c) => c.id === id);
+  // larguras fixas (table-layout: fixed): a tabela cabe em 1.150px com a barra aberta e a coluna
+  // de ação aparece inteira; a mensagem fica com o que sobrar, em UMA linha com reticências
   return [
-    { chave: 'cli', titulo: 'Cliente', render: (a) => {
+    { chave: 'cli', titulo: 'Cliente', largura: '26%', render: (a) => {
       const l = a.lead_id ? linhaPorId.get(a.lead_id) : undefined;
       const nome = l?.nome ?? a.nome ?? fmtTel(a.telefone);
-      return <div className="ev-pessoa"><span className="ev-av">{iniciais(nome)}</span><div className="ev-cli"><b>{nome}</b><span className="num">{fmtTel(a.telefone)}{l ? ` · ${l.comercial || '—'}${l.dia ? ` · D${d2(l.dia)}` : ''}` : ''}</span></div></div>;
+      const meta = `${fmtTel(a.telefone)}${l ? ` · ${l.comercial || '—'}${l.dia ? ` · D${d2(l.dia)}` : ''}` : ''}`;
+      return <div className="ev-pessoa"><span className="ev-av">{iniciais(nome)}</span><div className="ev-cli"><b title={nome}>{nome}</b><span className="num" title={meta}>{meta}</span></div></div>;
     } },
-    { chave: 'msg', titulo: 'Mensagem', render: (a) => (
-      <div className="ev-cli">
-        <span className={a.wa_envios?.origem === 'regua' ? 'ev-chip regua' : 'ev-chip'}>{a.wa_envios?.origem === 'regua' ? `Régua · ${a.passo_nome ?? a.wa_envios?.nome?.replace(/^Régua:\s*/, '') ?? ''}` : `Manual · ${a.wa_envios?.nome ?? ''}`}</span>
-        <span className="ev-previa">{(a.mensagem ?? '').replace(/\s+/g, ' ').slice(0, 90) || (a.status === 'pendente' ? 'monta na hora do envio' : '—')}</span>
-      </div>
-    ) },
-    { chave: 'num', titulo: 'Saiu por', render: (a) => { const c = canalDe(a.canal_id ?? a.wa_envios?.canal_id ?? null); return <div className="ev-cli"><b>{a.canal_nome ?? (c ? nomeCanal(c) : '—')}</b><span className="num">{a.canal_numero ? fmtTel(a.canal_numero) : c?.numero ? fmtTel(c.numero) : ''}</span></div>; } },
-    { chave: 'hora', titulo: 'Horário', classe: 'num', render: (a) => a.enviado_em ? <div className="ev-cli"><b className="num">{hora(a.enviado_em)}</b><span className="num">{dataBR(isoLocal(new Date(a.enviado_em)))}</span></div> : <span className="ev-sub">{a.status === 'pendente' || a.status === 'enviando' ? `na fila desde ${hora(a.created_at)}` : dataHora(a.created_at)}</span> },
-    { chave: 'st', titulo: 'Status', render: (a) => { const s = statusAlvo(a, canalDe(a.canal_id ?? a.wa_envios?.canal_id ?? null), cx); return <div className="ev-cli"><span className="ev-st">{a.status === 'enviado' && <Checks status={a.entrega ?? 'enviada'} />}<BadgeStatus tom={s.tom}>{s.t}</BadgeStatus></span>{s.det && <span className="ev-det" title={s.det}>{s.det}</span>}</div>; } },
-    { chave: 'resp', titulo: 'Respondeu', render: (a) => { const rp = textoPreviaWa(a.resposta_previa); return a.respondeu_em ? <div className="ev-cli"><span className="ev-resp">Respondeu · {hora(a.respondeu_em)}</span>{rp.texto && <span className="ev-det" title={rp.texto}>{rp.midia ? rp.texto : `“${rp.texto}”`}</span>}</div> : <span className="ev-sub">—</span>; } },
-    { chave: 'conv', titulo: '', render: (a) => a.conversa_id ? <button type="button" className="ev-btn-conv" title="Abrir a conversa com este cliente" onClick={(e) => { e.stopPropagation(); aoConversa(a.conversa_id!); }}><Ico d={IC.zap} s={13} /> Conversa</button> : null },
+    { chave: 'msg', titulo: 'Mensagem', render: (a) => {
+      const txt = (a.mensagem ?? '').replace(/\s+/g, ' ').trim();
+      return (
+        <div className="ev-cli">
+          <span className="ev-chip">{a.wa_envios?.origem === 'regua' ? `Régua · ${a.passo_nome ?? a.wa_envios?.nome?.replace(/^Régua:\s*/, '') ?? ''}` : `Manual · ${a.wa_envios?.nome ?? ''}`}</span>
+          <span className="ev-previa" title={txt || undefined}>{txt || (a.status === 'pendente' ? 'Montada na hora do envio' : '—')}</span>
+        </div>
+      );
+    } },
+    // "Saiu por": só o nome do comercial (o número fica na dica) — telefone empilhado em 3 linhas era o que quebrava a linha
+    { chave: 'num', titulo: 'Saiu por', largura: '108px', render: (a) => { const c = canalDe(a.canal_id ?? a.wa_envios?.canal_id ?? null); const tel = a.canal_numero ? fmtTel(a.canal_numero) : c?.numero ? fmtTel(c.numero) : ''; return <span className="ev-saiu" title={tel ? `Número ${tel}` : undefined}>{a.canal_nome ?? (c ? nomeCanal(c) : '—')}</span>; } },
+    { chave: 'hora', titulo: 'Horário', largura: '92px', classe: 'num', render: (a) => a.enviado_em ? <div className="ev-cli ev-hora"><b className="num">{hora(a.enviado_em)}</b><span className="num">{dataBR(isoLocal(new Date(a.enviado_em)))}</span></div> : <span className="ev-sub ev-hora1">{a.status === 'pendente' || a.status === 'enviando' ? `Na fila desde ${hora(a.created_at)}` : dataHora(a.created_at)}</span> },
+    // status: um selo só (o duplo check azul repetia o "Lida" e saía da paleta)
+    { chave: 'st', titulo: 'Status', largura: '132px', render: (a) => { const s = statusAlvo(a, canalDe(a.canal_id ?? a.wa_envios?.canal_id ?? null), cx); return <div className="ev-cli ev-st-cel"><BadgeStatus tom={s.tom}>{s.t}</BadgeStatus>{s.det && <span className="ev-det" title={s.det}>{s.det}</span>}</div>; } },
+    { chave: 'resp', titulo: 'Respondeu', largura: '19%', render: (a) => { const rp = textoPreviaWa(a.resposta_previa); return a.respondeu_em ? <div className="ev-cli"><span className="ev-resp num">Respondeu às {hora(a.respondeu_em)}</span>{rp.texto && <span className="ev-det" title={rp.texto}>{rp.midia ? rp.texto : `“${rp.texto}”`}</span>}</div> : <span className="ev-sub">—</span>; } },
+    { chave: 'conv', titulo: <span className="cc-vh">Conversa</span>, largura: '56px', render: (a) => a.conversa_id ? <button type="button" className="ev-btn-conv so-ic" title="Abrir a conversa com este cliente" aria-label="Abrir a conversa com este cliente" onClick={(e) => { e.stopPropagation(); aoConversa(a.conversa_id!); }}><Ico d={IC.zap} s={14} /></button> : null },
   ];
 }
 function ListaEnvios({ canais, linhaPorId, gestor, aoAvisar, aoAbrir, aoConversa, envioId, cx }: {
@@ -462,18 +496,18 @@ function ListaEnvios({ canais, linhaPorId, gestor, aoAvisar, aoAbrir, aoConversa
       {gestor && status === 'erros' && comErro.length > 0 && (
         <div className="ev-aviso">
           <span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span>
-          <span className="ev-aviso-t">{comErro.length} com erro nesta lista. Número sem WhatsApp ou cadastro incompleto precisam ser corrigidos na Gestão antes; mensagens da régua só podem ser reenviadas no mesmo dia.</span>
-          <BotaoSec mini disabled={reenviar.isPending} onClick={() => reenviar.mutate(comErro.map((a) => a.id), { onSuccess: (n) => aoAvisar(n ? `${n} mensagem(ns) de volta na fila.` : 'Nenhuma pôde voltar pra fila (régua de outro dia não é reenviada).'), onError: (e) => aoAvisar((e as Error).message) })}>
+          <span className="ev-aviso-t">{comErro.length} com erro nesta lista. Número sem WhatsApp ou cadastro incompleto precisam ser corrigidos antes na Gestão; mensagens da régua só podem ser reenviadas no mesmo dia.</span>
+          <BotaoSec mini disabled={reenviar.isPending} onClick={() => reenviar.mutate(comErro.map((a) => a.id), { onSuccess: (n) => aoAvisar(n ? `${plural(n, 'mensagem voltou', 'mensagens voltaram')} para a fila.` : 'Nenhuma pôde voltar para a fila (régua de outro dia não é reenviada).'), onError: (e) => aoAvisar((e as Error).message) })}>
             {reenviar.isPending ? 'Reenviando…' : 'Reenviar os com erro'}
           </BotaoSec>
         </div>
       )}
-      <CardVidro spot sobe className="ev-tabela">
+      <CardVidro spot sobe className="ev-tabela ev-tab-feitos">
         {q.isLoading ? <div className="cm-hint" style={{ padding: 16 }}>Carregando…</div>
-          : q.isError ? <EstadoVazio titulo="Não deu pra carregar os envios" descricao={q.error?.message ?? 'Tente de novo.'} />
-          : linhas.length === 0 ? <EstadoVazio titulo={status === 'todos' ? 'Nenhum envio no período' : 'Nada com esse filtro'} descricao={status === 'todos' ? 'Quando a régua ou um envio manual mandar mensagem, cada cliente aparece aqui com número, horário, texto, entrega e resposta.' : 'Troque o filtro ou o período.'} />
+          : q.isError ? <EstadoVazio titulo="Não foi possível carregar os envios" descricao={q.error?.message ?? 'Tente de novo.'} />
+          : linhas.length === 0 ? <EstadoVazio titulo={status === 'todos' ? 'Nenhum envio no período' : 'Nada com esse filtro'} descricao={status === 'todos' ? 'Cada mensagem da régua ou de um envio manual aparece aqui, com número, horário, texto, entrega e resposta.' : 'Troque o filtro ou o período.'} />
           : <TabelaPadrao colunas={cols} linhas={linhas} chave={(a) => a.id} aoClicarLinha={aoAbrir}
-              rodape={{ texto: `${linhas.length}${q.hasNextPage ? '+' : ''} envio${linhas.length === 1 ? '' : 's'} · clique numa linha pra ver tudo` }} />}
+              rodape={{ texto: `${linhas.length}${q.hasNextPage ? '+' : ''} envio${linhas.length === 1 ? '' : 's'} · clique em uma linha para ver os detalhes` }} />}
       </CardVidro>
       {q.hasNextPage && <div className="ev-mais"><BotaoSec mini onClick={() => { void q.fetchNextPage(); }} disabled={q.isFetchingNextPage}>{q.isFetchingNextPage ? 'Carregando…' : 'Carregar mais'}</BotaoSec></div>}
     </>
@@ -523,8 +557,8 @@ function DetalheAlvo({ alvo, canais, linha, gestor, aoAvisar, aoFechar, aoConver
       </div>
       <div className="ev-dw-corpo">
         <div className="ev-dw-st">
-          <span className="ev-st">{a.status === 'enviado' && <Checks status={a.entrega ?? 'enviada'} />}<BadgeStatus tom={s.tom}>{s.t}</BadgeStatus></span>
-          <span className={a.wa_envios?.origem === 'regua' ? 'ev-chip regua' : 'ev-chip'}>{a.wa_envios?.origem === 'regua' ? `Régua · ${a.passo_nome ?? ''}` : `Manual · ${a.wa_envios?.nome ?? ''}`}</span>
+          <BadgeStatus tom={s.tom}>{s.t}</BadgeStatus>
+          <span className="ev-chip">{a.wa_envios?.origem === 'regua' ? `Régua · ${a.passo_nome ?? ''}` : `Manual · ${a.wa_envios?.nome ?? ''}`}</span>
           {s.det && <p className="ev-dw-det">{s.det}</p>}
         </div>
 
@@ -558,13 +592,13 @@ function DetalheAlvo({ alvo, canais, linha, gestor, aoAvisar, aoFechar, aoConver
         {a.lead_id && (
           <>
             <div className="ev-sec">Régua deste cliente em {compBR(base.slice(0, 7))}</div>
-            {previaQ.isLoading ? <div className="cm-hint">Calculando…</div> : previaQ.isError ? <div className="cm-hint">Não deu pra calcular a régua agora ({previaQ.error?.message}).</div> : passos.length === 0 ? <div className="cm-hint" style={{ margin: 0 }}>Nenhum passo da régua cai neste período para este cliente.</div> : (
+            {previaQ.isLoading ? <div className="cm-hint">Calculando…</div> : previaQ.isError ? <div className="cm-hint">Não foi possível calcular a régua agora ({previaQ.error?.message}).</div> : passos.length === 0 ? <div className="cm-hint" style={{ margin: 0 }}>Nenhum passo da régua cai neste período para este cliente.</div> : (
               <div className="ev-tl">
                 {passos.map((p) => {
                   const feito = doLead.find((x) => x.regua_msg_id === p.passo_id && x.comp === p.comp);
                   const passou = p.data < hojeIso;
                   const st = feito ? statusAlvo(feito, canal, cx)
-                    : passou && (p.status === 'vai_receber' || p.status === 'aguardando') ? { t: 'Não saiu', tom: 'neutro' as TomStatus, det: p.motivo ?? 'a régua não mandou neste dia (desligada ou antes do rastreio)' }
+                    : passou && (p.status === 'vai_receber' || p.status === 'aguardando') ? { t: 'Não saiu', tom: 'neutro' as TomStatus, det: p.motivo ?? 'A régua não enviou neste dia (desligada ou antes do rastreio)' }
                     : { ...ROT_PREVIA[p.status], det: p.motivo };
                   return (
                     <div className={`ev-tl-i ${feito ? 'feito' : ''}`} key={`${p.passo_id}-${p.data}`}>
@@ -583,11 +617,11 @@ function DetalheAlvo({ alvo, canais, linha, gestor, aoAvisar, aoFechar, aoConver
         )}
       </div>
       <div className="ev-dw-pe">
-        {gestor && a.status === 'erro' && <BotaoSec disabled={reenviar.isPending} onClick={() => reenviar.mutate([a.id], { onSuccess: (n) => aoAvisar(n ? 'Mensagem de volta na fila.' : 'Não dá pra reenviar: mensagem da régua de outro dia (o texto fala de "hoje").'), onError: (e) => aoAvisar((e as Error).message) })}>{reenviar.isPending ? 'Reenviando…' : 'Reenviar'}</BotaoSec>}
-        {gestor && <BotaoSec disabled={tirar.isPending} title="O cliente para de receber a régua e os envios em massa (como se tivesse mandado SAIR). Dá pra desfazer."
-          onClick={() => tirar.mutate({ telefone: a.telefone, lead_id: a.lead_id }, { onSuccess: (x) => aoAvisar(x.jaEstava ? 'Este cliente já estava fora da régua (pediu SAIR ou já foi tirado).' : 'Cliente tirado da régua — aparece em "Não recebem". Dá pra desfazer no Desfazer.'), onError: (e) => aoAvisar((e as Error).message) })}>{tirar.isPending ? 'Tirando…' : 'Tirar da régua'}</BotaoSec>}
+        {gestor && a.status === 'erro' && <BotaoSec disabled={reenviar.isPending} onClick={() => reenviar.mutate([a.id], { onSuccess: (n) => aoAvisar(n ? 'Mensagem de volta na fila.' : 'Não é possível reenviar: mensagem da régua de outro dia (o texto fala de "hoje").'), onError: (e) => aoAvisar((e as Error).message) })}>{reenviar.isPending ? 'Reenviando…' : 'Reenviar'}</BotaoSec>}
+        {gestor && <BotaoSec disabled={tirar.isPending} title="O cliente para de receber a régua e os envios em massa, como se tivesse pedido para sair. É possível desfazer."
+          onClick={() => tirar.mutate({ telefone: a.telefone, lead_id: a.lead_id }, { onSuccess: (x) => aoAvisar(x.jaEstava ? 'Este cliente já estava fora da régua (pediu para sair ou já tinha sido tirado).' : 'Cliente tirado da régua. Ele aparece em "Não recebem" e é possível desfazer pelo botão Desfazer.'), onError: (e) => aoAvisar((e as Error).message) })}>{tirar.isPending ? 'Tirando…' : 'Tirar da régua'}</BotaoSec>}
         <span style={{ flex: 1 }} />
-        {a.conversa_id && <BotaoPrimario onClick={() => aoConversa(a.conversa_id!)}><Ico d={IC.zap} s={13} /> Abrir conversa</BotaoPrimario>}
+        {a.conversa_id && <BotaoPrimario onClick={() => aoConversa(a.conversa_id!)}><Ico d={IC.zap} s={16} />Abrir conversa</BotaoPrimario>}
       </div>
     </DrawerV2>
   );
@@ -614,7 +648,7 @@ function ProximosDisparos({ hoje, ligada }: { hoje: string; ligada: boolean }) {
   const Linha = ({ i }: { i: ItemPreviaWA }) => (
     <div className="ev-prev-i">
       <div className="ev-pessoa"><span className="ev-av">{iniciais(i.nome)}</span><div className="ev-cli"><b>{i.nome}</b><span className="num">{i.comercial || 'sem comercial'}{i.dia ? ` · D${d2(i.dia)}` : ''}{i.venc ? ` · vence ${dataBR(i.venc)}` : ''}</span></div></div>
-      <div className="ev-cli"><span className="ev-chip regua">{i.quando != null && i.alvo !== 'cliente' ? `${quandoCurto(i.quando)} · ` : ''}{i.passo_nome}</span><span className="num">{i.numero ? `${i.numero.nome}${i.numero.numero ? ` · ${fmtTel(i.numero.numero)}` : ''}${i.numero.reserva ? ' (reserva)' : ''}` : 'sem número'}</span></div>
+      <div className="ev-cli"><span className="ev-chip">{i.quando != null && i.alvo !== 'cliente' ? `${quandoCurto(i.quando)} · ` : ''}{i.passo_nome}</span><span className="num">{i.numero ? `${i.numero.nome}${i.numero.numero ? ` · ${fmtTel(i.numero.numero)}` : ''}${i.numero.reserva ? ' (reserva)' : ''}` : 'sem número'}</span></div>
       <div className="ev-cli ev-prev-st">
         <BadgeStatus tom={i.falta && i.status !== 'pulado' ? 'erro' : ROT_PREVIA[i.status].tom}>{i.falta && i.status !== 'pulado' ? 'Falta dado na Gestão' : ehVai(i) ? (i.status === 'gerado' ? ROT_PREVIA.gerado.t : rotVai.replace('Vão receber', 'Vai receber').replace('Sairiam', 'Sairia')) : ROT_PREVIA[i.status].t}</BadgeStatus>
         {(i.motivo || i.falta) && <span className="ev-det" title={i.motivo ?? i.falta ?? ''}>{i.motivo ?? i.falta}</span>}
@@ -642,9 +676,9 @@ function ProximosDisparos({ hoje, ligada }: { hoje: string; ligada: boolean }) {
         <span className="ev-aviso-t">{ligada
           ? 'Calculado pelo próprio motor com os dados de agora (pagamentos, números, telefones, pedidos de saída). Se um cliente pagar antes, ele sai da lista sozinho.'
           : 'A régua está desligada: esta lista mostra o que sairia em cada dia se ela estivesse ligada. Nada é enviado.'}
-          {(janela === '7' || janela === '14') ? ' Abra um dia pra ver os clientes; o texto exato aparece nas visões Hoje e Amanhã.' : ''}</span>
+          {(janela === '7' || janela === '14') ? ' Abra um dia para ver os clientes; o texto exato aparece nas visões Hoje e Amanhã.' : ''}</span>
       </div>
-      {q.isLoading ? <div className="cm-hint">Calculando a régua…</div> : q.isError ? <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Não deu pra calcular" descricao={q.error?.message ?? ''} /></CardVidro> : porDia.length === 0 ? (
+      {q.isLoading ? <div className="cm-hint">Calculando a régua…</div> : q.isError ? <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Não foi possível calcular" descricao={q.error?.message ?? ''} /></CardVidro> : porDia.length === 0 ? (
         <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhuma mensagem nesse período" descricao="Nenhum cliente em cobrança tem passo da régua nesses dias (ou o filtro escondeu)." /></CardVidro>
       ) : porDia.map(([dia, xs]) => {
         const vai = xs.filter(ehVai);
@@ -712,21 +746,29 @@ function Campanhas({ canais, linhaPorId, gestor, aoAvisar, aoAbrir, aoConversa, 
     return { t: 'Na fila', tom: 'neutro' };
   };
   const cols: Coluna<EnvioWA>[] = [
-    { chave: 'nm', titulo: 'Envio', render: (e) => <div className="ev-cli"><b>{e.origem === 'regua' ? (e.passo_nome ?? e.nome.replace(/^Régua:\s*/, '')) : e.nome}</b><span className={e.origem === 'regua' ? 'ev-chip regua' : 'ev-chip'}>{e.origem === 'regua' ? `Régua${e.passo_quando != null ? ` · ${quandoCurto(e.passo_quando)}` : ''}` : 'Manual'}</span></div> },
-    { chave: 'canal', titulo: 'Saiu por', render: (e) => { const c = canalDe(e.canal_id); return c ? <div className="ev-cli"><b>{nomeCanal(c)}</b><span className="num">{c.numero ? fmtTel(c.numero) : ''}</span></div> : '—'; } },
+    { chave: 'nm', titulo: 'Envio', render: (e) => <div className="ev-cli"><b>{e.origem === 'regua' ? (e.passo_nome ?? e.nome.replace(/^Régua:\s*/, '')) : e.nome}</b><span className="ev-chip">{e.origem === 'regua' ? `Régua${e.passo_quando != null ? ` · ${quandoCurto(e.passo_quando)}` : ''}` : 'Manual'}</span></div> },
+    { chave: 'canal', titulo: 'Saiu por', render: (e) => { const c = canalDe(e.canal_id); return c ? <span className="ev-saiu" title={c.numero ? `Número ${fmtTel(c.numero)}` : undefined}>{nomeCanal(c)}</span> : '—'; } },
     { chave: 'quando', titulo: 'Criado', classe: 'num', render: (e) => dataHora(e.created_at) },
-    { chave: 'prog', titulo: 'Progresso', render: (e) => (
-      <div className="ev-prog" title={`${e.enviados} enviadas · ${e.erros} com erro · ${e.pulados ?? 0} não enviadas (pagou, SAIR, expirou, cancelado…)`}>
-        <div className="ev-barra"><i className="ok" style={{ width: `${pct(e.enviados, e.total)}%` }} /><i className="erro" style={{ width: `${pct(e.erros, e.total)}%` }} /><i className="neutro" style={{ width: `${pct(e.pulados ?? 0, e.total)}%` }} /></div>
-        <span className="num"><b>{pct(e.enviados + e.erros + (e.pulados ?? 0), e.total)}%</b> · {e.enviados}/{e.total} enviadas</span>
-      </div>
-    ) },
+    // o % sai da MESMA fração que aparece ao lado (enviadas ÷ total), limitado a 100 — antes somava
+    // erros e não enviadas e mostrava "104% · 74/75"; os erros viram segmento vermelho e texto à parte
+    { chave: 'prog', titulo: 'Progresso', render: (e) => {
+      const tot = Math.max(e.total, 1);
+      const pOk = Math.min(100, pct(e.enviados, tot));
+      const pErr = Math.min(100 - pOk, pct(e.erros, tot));
+      const pPul = Math.min(100 - pOk - pErr, pct(e.pulados ?? 0, tot));
+      return (
+        <div className="ev-prog" title={`${plural(e.enviados, 'enviada', 'enviadas')} · ${plural(e.erros, 'com erro', 'com erro')} · ${plural(e.pulados ?? 0, 'não enviada', 'não enviadas')} (pagou, saiu da régua, expirou ou cancelado)`}>
+          <div className="ev-barra"><i className="ok" style={{ width: `${pOk}%` }} /><i className="erro" style={{ width: `${pErr}%` }} /><i className="neutro" style={{ width: `${pPul}%` }} /></div>
+          <span className="num"><b>{pOk}%</b> · {Math.min(e.enviados, e.total)} de {e.total} enviadas{e.erros > 0 && <em className="ev-prog-err"> · {plural(e.erros, 'erro', 'erros')}</em>}</span>
+        </div>
+      );
+    } },
     { chave: 'st', titulo: 'Status', render: (e) => { const r = rot(e); return <BadgeStatus tom={r.tom}>{r.t}</BadgeStatus>; } },
     { chave: 'ac', titulo: '', render: (e) => (
       <div className="fin-acoes">
-        <button type="button" className="cm-num-lnk" onClick={(ev) => { ev.stopPropagation(); setVer(e); }}>Clientes</button>
-        {(gestor || (e.origem === 'manual' && !!meuId && e.criado_por === meuId)) && (e.estado === 'rascunho' || e.estado === 'enviando') && <button type="button" className="cm-num-lnk perigo" disabled={cancelar.isPending}
-          onClick={(ev) => { ev.stopPropagation(); setConfCancelar(e); }}>Cancelar</button>}
+        <BotaoSec mini onClick={(ev) => { ev.stopPropagation(); setVer(e); }}>Ver clientes</BotaoSec>
+        {(gestor || (e.origem === 'manual' && !!meuId && e.criado_por === meuId)) && (e.estado === 'rascunho' || e.estado === 'enviando') && <button type="button" className="p-btn btn-perigo btn-mini" disabled={cancelar.isPending}
+          onClick={(ev) => { ev.stopPropagation(); setConfCancelar(e); }}>Cancelar envio</button>}
       </div>
     ) },
   ];
@@ -742,15 +784,15 @@ function Campanhas({ canais, linhaPorId, gestor, aoAvisar, aoAbrir, aoConversa, 
       </div>
       <CardVidro spot sobe className="ev-tabela">
         {q.isLoading ? <div className="cm-hint" style={{ padding: 16 }}>Carregando…</div>
-          : q.isError && !q.data ? <EstadoVazio titulo="Não deu pra carregar as campanhas" descricao={q.error?.message ?? 'Tente de novo.'} />
+          : q.isError && !q.data ? <EstadoVazio titulo="Não foi possível carregar as campanhas" descricao={q.error?.message ?? 'Tente de novo.'} />
           : envios.length === 0
           ? <EstadoVazio titulo="Nenhum envio aqui" descricao="A régua cria um envio por passo e por número a cada dia; os envios manuais aparecem aqui também." />
           : <TabelaPadrao colunas={cols} linhas={envios} chave={(e) => e.id} aoClicarLinha={setVer} rodape={{ texto: `${envios.length} envio${envios.length === 1 ? '' : 's'} (os mais recentes)` }} />}
       </CardVidro>
       {ver && (
         <ModalV2 aberto aoFechar={() => setVer(null)} largura={1080}
-          titulo={<div>{ver.origem === 'regua' ? `Régua · ${ver.passo_nome ?? ver.nome}` : ver.nome}<div className="mod-sub">{ver.total} cliente(s) · {ver.enviados} enviada(s) · {ver.erros} erro(s) · criado {dataHora(ver.created_at)}</div></div>}
-          rodape={<BotaoPrimario onClick={() => setVer(null)}>Fechar</BotaoPrimario>}>
+          titulo={<div>{ver.origem === 'regua' ? `Régua · ${ver.passo_nome ?? ver.nome}` : ver.nome}<div className="mod-sub">{plural(ver.total, 'cliente', 'clientes')} · {plural(ver.enviados, 'enviada', 'enviadas')} · {plural(ver.erros, 'erro', 'erros')} · criado em {dataHora(ver.created_at)}</div></div>}
+          rodape={<BotaoSec onClick={() => setVer(null)}>Fechar</BotaoSec>}>
           <ListaEnvios canais={canais} linhaPorId={linhaPorId} gestor={gestor} aoAvisar={aoAvisar} aoAbrir={(a) => { setVer(null); aoAbrir(a); }} aoConversa={aoConversa} envioId={ver.id} cx={cx} />
         </ModalV2>
       )}
@@ -758,11 +800,11 @@ function Campanhas({ canais, linhaPorId, gestor, aoAvisar, aoAbrir, aoConversa, 
         <ModalV2 aberto aoFechar={() => setConfCancelar(null)} largura={440}
           titulo={<div>Cancelar este envio?<div className="mod-sub">{confCancelar.origem === 'regua' ? `Régua · ${confCancelar.passo_nome ?? confCancelar.nome}` : confCancelar.nome}</div></div>}
           rodape={<><BotaoSec onClick={() => setConfCancelar(null)}>Voltar</BotaoSec>
-            <BotaoPrimario style={{ background: 'var(--rubro)' }} disabled={cancelar.isPending} onClick={() => cancelar.mutate(confCancelar.id, {
-              onSuccess: (n) => { setConfCancelar(null); aoAvisar(`Envio cancelado — ${n} cliente(s) que ainda não tinham recebido ficaram como "cancelado".`); },
+            <button type="button" className="p-btn btn-perigo" disabled={cancelar.isPending} onClick={() => cancelar.mutate(confCancelar.id, {
+              onSuccess: (n) => { setConfCancelar(null); aoAvisar(`Envio cancelado: ${plural(n, 'cliente que ainda não tinha recebido ficou', 'clientes que ainda não tinham recebido ficaram')} como "cancelado".`); },
               onError: (err) => { setConfCancelar(null); aoAvisar((err as Error).message); },
-            })}>{cancelar.isPending ? 'Cancelando…' : 'Cancelar envio'}</BotaoPrimario></>}>
-          <p className="cm-hint" style={{ margin: 0 }}>Quem ainda não recebeu ({Math.max(0, confCancelar.total - confCancelar.enviados - confCancelar.erros - (confCancelar.pulados ?? 0))}) não recebe mais — fica marcado como “cancelado” em Envios. O que já saiu continua saído. {confCancelar.origem === 'regua' ? 'Esses clientes não recebem este passo de novo neste mês.' : ''}</p>
+            })}>{cancelar.isPending ? 'Cancelando…' : 'Cancelar envio'}</button></>}>
+          <p className="cm-hint" style={{ margin: 0 }}>Quem ainda não recebeu ({Math.max(0, confCancelar.total - confCancelar.enviados - confCancelar.erros - (confCancelar.pulados ?? 0))}) não recebe mais e fica marcado como “cancelado” em Envios. O que já saiu continua saído. {confCancelar.origem === 'regua' ? 'Esses clientes não recebem este passo de novo neste mês.' : ''}</p>
         </ModalV2>
       )}
     </>
@@ -781,18 +823,18 @@ function NaoRecebem({ itens, carregando, erro, dados, gestor, aoAvisar }: { iten
     { chave: 'cli', titulo: 'Cliente', render: (o) => { const l = linhasComCancelados(dados).find((x) => x.id === o.lead_id) ?? porChave.get(o.chave); return <div className="ev-cli"><b>{l?.nome ?? 'Contato fora da base'}</b><span className="num">{fmtTel(o.telefone ?? o.chave)}</span></div>; } },
     { chave: 'como', titulo: 'Como', render: (o) => o.origem === 'cliente' ? <span>Cliente pediu {o.texto ? <>(“{o.texto}”)</> : null}</span> : 'Tirado da régua à mão' },
     { chave: 'quando', titulo: 'Desde', classe: 'num', render: (o) => dataHora(o.criado_em) },
-    { chave: 'ac', titulo: '', render: (o) => gestor ? <button type="button" className="cm-num-lnk" disabled={voltar.isPending} onClick={() => voltar.mutate(o, { onSuccess: () => aoAvisar('Cliente voltou a receber a régua. Dá pra desfazer no Desfazer.'), onError: (e) => aoAvisar((e as Error).message) })}>Voltar a receber</button> : null },
+    { chave: 'ac', titulo: <span className="cc-vh">Ações</span>, render: (o) => gestor ? <BotaoSec mini disabled={voltar.isPending} onClick={() => voltar.mutate(o, { onSuccess: () => aoAvisar('O cliente voltou a receber a régua. É possível desfazer pelo botão Desfazer.'), onError: (e) => aoAvisar((e as Error).message) })}>Voltar a receber</BotaoSec> : null },
   ];
   return (
     <>
       <div className="ev-aviso info">
         <span className="ev-aviso-ic"><Ico d={IC.info} s={14} /></span>
-        <span className="ev-aviso-t">Quem responde <b>SAIR</b> ou <b>PARAR</b> no WhatsApp sai da régua e dos envios em massa na hora. A conversa normal pelo chat continua funcionando.</span>
+        <span className="ev-aviso-t">Quem responde “sair” ou “parar” no WhatsApp sai da régua e dos envios em massa na hora. A conversa pelo chat continua normalmente.</span>
       </div>
       <CardVidro spot sobe className="ev-tabela">
         {carregando ? <div className="cm-hint" style={{ padding: 16 }}>Carregando…</div>
-          : erro ? <EstadoVazio titulo="Não deu pra carregar a lista" descricao={erro} />
-          : itens.length === 0 ? <EstadoVazio titulo="Ninguém pediu pra sair" descricao="Quando um cliente responder SAIR ou PARAR, ele aparece aqui e para de receber." />
+          : erro ? <EstadoVazio titulo="Não foi possível carregar a lista" descricao={erro} />
+          : itens.length === 0 ? <EstadoVazio icone={<IconeSaida />} titulo="Nenhum cliente fora da régua" descricao="Quem responder “sair” ou “parar” aparece aqui e deixa de receber." />
           : <TabelaPadrao colunas={cols} linhas={itens} chave={(o) => o.chave} rodape={{ texto: `${itens.length} contato${itens.length === 1 ? '' : 's'} fora da régua` }} />}
       </CardVidro>
     </>
@@ -827,7 +869,7 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
   const addAlvo = (a: { telefone: string; nome?: string | null; lead_id?: string | null }) => {
     const tel = soDigitos(a.telefone);
     const ch = chaveTel(tel);
-    if (!ch) { aoAvisar('Número incompleto — use DDD + número.'); return; }
+    if (!ch) { aoAvisar('Número incompleto: informe o DDD e o número.'); return; }
     // dedupe pela chave canônica: com/sem 55 ou com/sem o 9º dígito é o MESMO telefone (senão o cliente recebe 2×)
     const jaTem = alvos.find((x) => chaveTel(x.telefone) === ch);
     if (jaTem) { aoAvisar(jaTem.telefone === tel ? 'Esse número já está na lista.' : 'Esse número já está na lista (formato diferente).'); return; }
@@ -852,7 +894,7 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
   }, [alvos, clientes, canais, canalSel, enviaveis]);
 
   const criarEnvio = async () => {
-    if (!canalSel) { aoAvisar('Escolha o número. Sem número conectado? Conecte na aba Números.'); return; }
+    if (!canalSel) { aoAvisar('Escolha o número. Sem número conectado? Conecte em Números.'); return; }
     if (!enviaveis.length) { aoAvisar('Escreva a mensagem ou anexe um arquivo (e espere ele salvar).'); return; }
     if (msg.blocos.some((b) => b.tipo !== 'texto' && !b.path)) { aoAvisar('Tem arquivo ainda não salvo na mensagem — espere salvar ou remova a parte vazia.'); return; }
     if (!alvos.length) { aoAvisar('Adicione pelo menos um destinatário.'); return; }
@@ -872,13 +914,13 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
         blocos: msg.blocos, agendado_para: agendado, alvos, delay_min: dMin, delay_max: Math.max(dMin, Number(delayMax) || 45), presenca,
       }, { onSuccess: () => res(), onError: (e) => rej(e) }));
       aoFechar();
-      aoAvisar(agendado ? `Envio agendado pra ${dataHora(agendado)} pelo número de ${canal ? nomeCanal(canal) : '—'}.` : `Envio criado — saindo agora pelo número de ${canal ? nomeCanal(canal) : '—'}. Acompanhe em "Envios feitos".`);
+      aoAvisar(agendado ? `Envio agendado para ${dataHora(agendado)} pelo número de ${canal ? nomeCanal(canal) : '—'}.` : `Envio criado e saindo agora pelo número de ${canal ? nomeCanal(canal) : '—'}. Acompanhe em "Envios feitos".`);
     } catch (e) { aoAvisar((e as Error).message); } finally { setCriando(false); }
   };
 
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={660}
-      titulo={<div>Novo envio<div className="mod-sub">Texto, áudio, foto, vídeo e documento na ordem · admin envia por qualquer número, comercial só pelo dele</div></div>}
+      titulo={<div>Novo envio<div className="mod-sub">Texto, áudio, foto, vídeo e documento, na ordem. O administrador envia por qualquer número; o comercial, só pelo dele.</div></div>}
       rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario onClick={() => { void criarEnvio(); }} disabled={criando || criar.isPending}>{criando || criar.isPending ? 'Criando…' : modo === 'agendar' ? 'Agendar envio' : `Enviar agora${alvos.length ? ` (${alvos.length})` : ''}`}</BotaoPrimario></>}>
       <div className="gs-form" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="campo gs-col2"><label>Sai pelo número</label>
@@ -914,7 +956,7 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
         {previa && (
           <div className="campo gs-col2"><label>Prévia — como chega para {previa.quem}</label>
             {previa.faltando.length > 0
-              ? <div className="ev-aviso" style={{ margin: 0 }}><span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span><span className="ev-aviso-t">Este destinatário está sem <b>{previa.faltando.join(' e ')}</b> no cadastro — a mensagem dele não sai errada: vira erro explicado em Envios. Complete na Gestão antes.</span></div>
+              ? <div className="ev-aviso" style={{ margin: 0 }}><span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span><span className="ev-aviso-t">Este destinatário está sem <b>{previa.faltando.join(' e ')}</b> no cadastro. A mensagem dele não sai errada: vira um erro explicado em Envios. Complete o cadastro na Gestão antes.</span></div>
               : <div className="ev-bolha">{previa.partes.map((p) => (p.b.tipo === 'texto' ? p.texto : `[${p.b.tipo === 'audio' ? 'Áudio' : p.b.tipo === 'imagem' ? 'Imagem' : p.b.tipo === 'video' ? 'Vídeo' : 'Documento'}${p.b.nome ? `: ${p.b.nome}` : ''}]${p.texto ? ` ${p.texto}` : ''}`)).join('\n\n') || '—'}</div>}
           </div>
         )}
@@ -930,7 +972,7 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
         </>)}
         {(foraHorario || acimaTeto) && (
           <div className="campo gs-col2" style={{ gap: 6 }}>
-            {foraHorario && <div className="ev-aviso" style={{ margin: 0 }}><span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span><span className="ev-aviso-t">Fora do horário comercial — envio em massa de madrugada pode bloquear o número.</span></div>}
+            {foraHorario && <div className="ev-aviso" style={{ margin: 0 }}><span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span><span className="ev-aviso-t">Fora do horário comercial: envio em massa de madrugada pode bloquear o número.</span></div>}
             {acimaTeto && <div className="ev-aviso" style={{ margin: 0 }}><span className="ev-aviso-ic"><Ico d={IC.alerta} s={14} /></span><span className="ev-aviso-t">São {alvos.length} destinatários — acima do teto diário da régua ({teto}). Considere dividir em dias.</span></div>}
           </div>
         )}
@@ -947,7 +989,7 @@ function NovoEnvio({ canais, dados, aoAvisar, aoFechar }: { canais: CanalWA[]; d
             Mostrar “digitando…” antes de cada parte
           </label>
         </div>
-        <p className="cm-hint gs-col2" style={{ margin: 0 }}>O número é validado no WhatsApp antes de cada envio (número sem WhatsApp vira erro explicado, sem tentativa às cegas). Quem pediu SAIR não recebe. Cada mensagem aparece em Envios e na conversa do cliente.</p>
+        <p className="cm-hint gs-col2" style={{ margin: 0 }}>O número é validado no WhatsApp antes de cada envio (número sem WhatsApp vira um erro explicado). Quem pediu para sair não recebe. Cada mensagem aparece em Envios e na conversa do cliente.</p>
       </div>
     </ModalV2>
   );
