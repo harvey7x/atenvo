@@ -2,7 +2,7 @@
    Dono 27/09: "melhore essa parte, deixe mais profissional, organizado e atraente".
    A demo e a instância real usam ESTE markup (demo é o contrato); só muda a fonte.
 
-   Organização (de cima pra baixo, do resumo ao detalhe):
+   Organização (de cima para baixo, do resumo ao detalhe):
      1. Topo: o MÊS DE REFERÊNCIA — um seletor só comanda a página inteira.
      2. Quatro indicadores com o mesmo desenho (rótulo · valor · contexto · visual).
      3. Saúde da carteira (composição) ao lado do Recebido por mês (tendência).
@@ -100,14 +100,22 @@ export function Indicador({ rotulo, valor, tom, pe, visual, extra }: {
   );
 }
 
-/** linha do tempo compacta (área + linha + ponto no mês de referência) */
-function Tendencia({ valores, sel }: { valores: number[]; sel: number }) {
+/** linha do tempo compacta (área + linha + ponto no mês de referência).
+    `ultimoAberto` (crítica 12/11): o último mês ainda não fechou — fora da seleção ele sai da
+    linha (não "despenca" para zero); selecionado, entra como trecho tracejado (parcial). */
+function Tendencia({ valores: todos, sel, ultimoAberto }: { valores: number[]; sel: number; ultimoAberto?: boolean }) {
+  const cortar = !!ultimoAberto && todos.length > 2 && sel < todos.length - 1;
+  const valores = cortar ? todos.slice(0, -1) : todos;
   if (valores.length < 2) return null;
   const max = Math.max(...valores, 1);
   const W = 120, H = 30;
   const pts = valores.map((v, i) => [(i / (valores.length - 1)) * W, H - 2 - (v / max) * (H - 6)] as const);
-  const linha = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const area = `${linha} L${W},${H} L0,${H} Z`;
+  const tracejar = !!ultimoAberto && !cortar;   // o mês aberto é o selecionado: trecho final tracejado
+  const firmes = tracejar ? pts.slice(0, -1) : pts;
+  const caminho = (xs: readonly (readonly [number, number])[]) => xs.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const linha = caminho(firmes);
+  const fimX = firmes[firmes.length - 1][0];
+  const area = `${linha} L${fimX.toFixed(1)},${H} L0,${H} Z`;
   const p = pts[Math.max(0, Math.min(sel, pts.length - 1))];
   // o ponto é HTML por cima: dentro do SVG esticado (preserveAspectRatio none) viraria elipse
   return (
@@ -115,6 +123,7 @@ function Tendencia({ valores, sel }: { valores: number[]; sel: number }) {
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         <path className="pn-tend-area" d={area} />
         <path className="pn-tend-linha" d={linha} vectorEffect="non-scaling-stroke" />
+        {tracejar && <path className="pn-tend-linha pn-tend-parcial" d={caminho(pts.slice(-2))} vectorEffect="non-scaling-stroke" />}
       </svg>
       <i className="pn-tend-ponto" style={{ left: `${(p[0] / W) * 100}%`, top: `${(p[1] / H) * 100}%` }} />
     </div>
@@ -133,16 +142,23 @@ export function Proporcao({ partes }: { partes: { v: number; tom: string; titulo
 export interface NovosResumo { n: number; mensal: number }
 
 /** Markup do Painel — demo e instância real usam O MESMO; só muda a fonte dos números. */
-export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, individual }: {
+export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, individual, aposKpis, antesAtend, limiteAtend, aoVerEquipe }: {
   r: ResumoCarteira; ciclosM: CicloSerie[]; atendM: AtendSerie[];
   /** datas manuais de cobrança do Calendário (vencimento do ciclo no mês) */
   ciclosDatas?: Dados['ciclosDatas'];
   /** clientes nos Novos (débito ainda ativo) — contexto do topo */
   novos?: NovosResumo;
   /** painel INDIVIDUAL do comercial (dono 27/09: "pro comercial, individual de seus
-      clientes; pro financeiro e administrador, geral"): nome dele na barra e sem a
+      clientes; para o financeiro e administrador, geral"): nome dele na barra e sem a
       tabela de atendentes. Os números já chegam filtrados (RLS + filtro no RevizaPainel). */
   individual?: string;
+  /** crítica 12/11: faixa logo abaixo dos indicadores (a Previsão de faturamento subiu para cá) */
+  aposKpis?: ReactNode;
+  /** bloco antes do "Desempenho por atendente" (Clientes que precisam de atenção) */
+  antesAtend?: ReactNode;
+  /** "Desempenho por atendente" mostra só os N primeiros; o resto fica na tela Atendentes */
+  limiteAtend?: number;
+  aoVerEquipe?: () => void;
 }) {
   const hoje = hojeLocal();
 
@@ -277,7 +293,7 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
           pe={compAnt
             ? <><Delta d={deltaMes} chip /> <span>vs {mesAno(compAnt)}{parcial ? ' nos ciclos já vencidos' : ''}</span></>
             : <span>primeiro mês com registro</span>}
-          visual={temSerie ? <Tendencia valores={serie.map((m) => m.valor)} sel={sel} /> : undefined} />
+          visual={temSerie ? <Tendencia valores={serie.map((m) => m.valor)} sel={sel} ultimoAberto={correnteAberto && serie[serie.length - 1]?.comp === hoje.comp} /> : undefined} />
         <Indicador rotulo="Em atraso" valor={<Dinheiro v={r.emAtrasoValor} />} tom={r.emAtrasoValor > 0 ? 'er' : undefined}
           pe={<><b className="num">{atrasoN.toLocaleString('pt-BR')}</b> cliente{atrasoN === 1 ? '' : 's'} · {pct1(pctCart(atrasoN))}% da carteira</>}
           visual={<div className="pn-trilho"><i className="er" style={{ width: `${pctCart(atrasoN)}%` }} /></div>} />
@@ -285,6 +301,8 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
           pe={carteira ? <><b className="num">{emDiaN.toLocaleString('pt-BR')}</b> de {carteira.toLocaleString('pt-BR')} clientes em dia</> : 'nenhum cliente em cobrança'}
           visual={<div className="pn-trilho"><i className={adimTom ?? 'neutro'} style={{ width: `${carteira ? Math.min(100, r.adimplencia) : 0}%` }} /></div>} />
       </div>
+
+      {aposKpis}
 
       {/* 3. saúde × tendência */}
       <div className="pn-duas sobe" style={{ animationDelay: '.08s' }}>
@@ -442,13 +460,24 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
             </div>
           </CardVidro>
 
-          {/* 5b. desempenho por atendente (só no painel geral) */}
+        </>
+      )}
+
+      {antesAtend}
+
+      {temSerie && (
+        <>
+          {/* 5b. desempenho por atendente (só no painel geral) — crítica 12/11: os primeiros
+              (por recebido no mês); a equipe completa é a tela Atendentes */}
           {!individual && <CardVidro spot className="pn-card pn-sec sobe" style={{ animationDelay: '.2s' }}>
             <div className="pn-card-cab">
               <div>
                 <h3>Desempenho por atendente</h3>
-                <p>Recebido da carteira de cada comercial em {mesAno(compSel)}{compAnt ? `, comparado com ${mesAno(compAnt)}` : ''}{parcial ? ` · ${mesAno(compSel)} ainda tem ciclo por vencer: a variação muda até o último vencer` : ''}</p>
+                <p>Recebido da carteira de cada comercial em {mesAno(compSel)}{compAnt ? `, comparado com ${mesAno(compAnt)}` : ''}{parcial ? ` · ainda há ciclo por vencer em ${mesAno(compSel)}` : ''}</p>
               </div>
+              {aoVerEquipe && limiteAtend != null && atendOrd.length > limiteAtend && (
+                <button type="button" className="pn-link pn-ver" onClick={aoVerEquipe}>Ver equipe completa<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m9 18 6-6-6-6" /></svg></button>
+              )}
             </div>
             <div className="pn-mapa-rolo">
               <table className="pn-atend">
@@ -464,7 +493,7 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
                   </tr>
                 </thead>
                 <tbody>
-                  {atendOrd.map((a) => {
+                  {(limiteAtend != null ? atendOrd.slice(0, limiteAtend) : atendOrd).map((a) => {
                     const vSel = kSel >= 0 ? a.serie[kSel]?.valor ?? 0 : 0;
                     const vAnt = kAnt >= 0 ? a.serie[kAnt]?.valor ?? 0 : 0;
                     const hist = meses.map((m) => a.serie[m.k]?.valor ?? 0);

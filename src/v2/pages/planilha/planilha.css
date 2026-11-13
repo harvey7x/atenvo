@@ -529,3 +529,64 @@ body.plx-cursor-col, body.plx-cursor-col * { cursor: col-resize !important; }
 .v2 .plx-barra-extra { display: inline-flex; align-items: center; margin-right: 10px; min-width: 0; }
 .v2 .plx-barra-extra .plx-legenda { flex-wrap: nowrap; }
 @media (max-width: 1180px) { .v2 .plx-barra-extra { display: none; } }
+
+/* =====================================================================
+   crítica 12/11 — formatação + fórmula numa linha só (a grade ganha uma
+   faixa); legenda das cores no rodapé; "A informar" legível (11px).
+   ===================================================================== */
+.v2 .plx-barra { flex-wrap: nowrap; padding: 4px 6px; gap: 2px; }
+.v2 .plx-barra > .plx-fbar {
+  flex: 1 1 auto; min-width: 180px; height: 28px; margin: 0 4px 0 2px;
+  border: 1px solid var(--linha); border-radius: 7px; overflow: hidden;
+  background: var(--plx-fundo);
+}
+.v2 .plx-barra > .plx-fbar .plx-nome { width: 64px; }
+.v2 .plx-barra > .plx-fbar .plx-fx { padding-top: 5px; }
+@media (max-width: 900px) {
+  .v2 .plx-barra { flex-wrap: wrap; row-gap: 4px; }
+  .v2 .plx-barra > .plx-fbar { order: 9; flex-basis: 100%; margin: 0; }
+}
+/* rodapé: legenda das cores ao lado da contagem (bolinha + texto, não parece botão) */
+.v2 .plx-rod-extra { display: inline-flex; align-items: center; flex: none; min-width: 0; }
+.v2 .plx-rod-extra .plx-legenda { flex-wrap: nowrap; gap: 12px; }
+.v2 .plx-rod-extra .plx-leg-am,
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-rod-extra .plx-leg-am {
+  height: auto; min-height: 0; padding: 0; gap: 0; border-radius: 0;
+  background: none !important; box-shadow: none !important;
+  font: 500 11px/1 var(--fonte); color: var(--txt-2) !important;
+}
+.v2 .plx-rod-extra .plx-leg-am::before {
+  content: ''; flex: none; width: 8px; height: 8px; margin-right: 6px; border-radius: 3px;
+  background: var(--plx-dot, rgba(var(--tint), .3));
+}
+.v2 .plx-rod-extra .plx-leg-am .plx-rel { display: none; }
+.v2 .plx-rod-extra .plx-st-ok { --plx-dot: var(--plx-ok-fg); }
+.v2 .plx-rod-extra .plx-st-pend { --plx-dot: var(--plx-pend-fg); }
+.v2 .plx-rod-extra .plx-st-ruim { --plx-dot: var(--plx-ruim-fg); }
+.v2 .plx-rod-extra .plx-st-sem { --plx-dot: transparent; }
+.v2 .plx-rod-extra .plx-st-sem::before { box-shadow: inset 0 0 0 1px var(--plx-sem-bd); }
+@media (max-width: 1180px) { .v2 .plx-rod-extra { display: none; } }
+/* "A informar" numa linha só, 11px, contorno cinza (o texto completo vai na dica) */
+.v2 .plx-sem-txt,
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-sem-txt {
+  display: block; height: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 11px; line-height: inherit; letter-spacing: 0; text-align: center;
+}
+/* filete da linha de cabeçalho do bloco: dourado da marca (o âmbar virou cor de alerta) */
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6), inset 2px 0 0 var(--plx-sep); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { font-weight: 600; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); }
+/* título de coluna (linha de cabeçalho do bloco): até 2 linhas de 11px em vez do corte com reticências */
+.v2 .plx-lin-cab .plx-c { display: flex; align-items: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-c { justify-content: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-r { justify-content: flex-end; }
+.v2 .plx-cab-txt {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: normal; overflow-wrap: anywhere; line-height: 12px; font-size: 11px; max-width: 100%;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-c { letter-spacing: .01em; }
+/* mês em aberto com só a data do vencimento escrita: texto discreto (a data repetida virava ruído) */
+.v2 .plx-c.plx-c-data { color: var(--txt-3); font-size: 11.5px; }
+.v2 .plx-lin-cab .plx-c { padding-left: 5px; padding-right: 5px; }

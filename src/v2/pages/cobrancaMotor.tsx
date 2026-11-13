@@ -51,6 +51,9 @@ import {
 } from '../data/cobranca/novoCliente';
 import type { Papel } from '../data/cobranca/types';
 import { isDemoMode, isRevizaMode } from '@/lib/supabase';
+// crítica 12/11 (cob_gestao): "+ Novo cliente" do Painel abre o formulário (?novo=1); ações raras no "Mais"
+import { useSearchParams } from 'react-router-dom';
+import { MenuMais } from './planilha/MenuMais';
 
 /** tradução de erro das mutations (RLS/RPC/rede) p/ o aviso da tela */
 const msgErro = (e: unknown) => {
@@ -1784,7 +1787,7 @@ function AbaAtendentesReal() {
           { chave: 'at', titulo: 'Atendente', render: (x) => x.atendente },
           { chave: 'cl', titulo: 'Clientes', dir: true, classe: 'num', render: (x) => String(x.clientes) },
           { chave: 'soma', titulo: 'Recorrência/mês', dir: true, classe: 'num', render: (x) => fmtBRL(x.soma) },
-          { chave: 'sn', titulo: 'Sem número', dir: true, classe: 'num', render: (x) => x.semNumero > 0 ? <span style={{ color: 'var(--ambar)' }}>⚠ {x.semNumero}</span> : '0' },
+          { chave: 'sn', titulo: 'Sem número', dir: true, classe: 'num', render: (x) => x.semNumero > 0 ? <span style={{ color: 'var(--ambar)' }}>{x.semNumero}</span> : '0' },
         ] as Coluna<{ atendente: string; clientes: number; soma: number; semNumero: number }>[]}
         linhas={linhas} chave={(x) => x.atendente}
       />
@@ -1826,7 +1829,7 @@ function AbaAtendentesDemo() {
       <EquipeVista linhas={dados} comissoes={comissoes} podeEditarPct salvando={salvarPct.isPending} aoAvisar={setAvisoCom}
         aoSalvarPct={(comercial, pct, desde) => salvarPct.mutate({ comercial, pct, desde }, {
           onSuccess: (r) => setAvisoCom(`Comissão de ${comercial}: ${pct}% da mensalidade ${desde === '2000-01' ? 'em todos os meses' : `a partir de ${rotuloMesCurto(desde)}`}${r.n ? ` — ${r.n} pagamento${r.n === 1 ? '' : 's'} refeito${r.n === 1 ? '' : 's'} na planilha` : ''}.`),
-          onError: (e) => setAvisoCom(`Não deu pra salvar a comissão: ${(e as Error).message}`),
+          onError: (e) => setAvisoCom(`Não foi possível salvar a comissão: ${(e as Error).message}`),
         })} />
     </>
   );
@@ -2347,7 +2350,7 @@ const reaisTxt = (n: number | undefined | null): string => (n == null || n === 0
 export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrade, podeAprovar = true, novo, datasPelaPlanilha, parteDoMes, aoSalvar, aoExcluir, aoVoltarNovos, aoFechar }: {
   inicial: GLinha; comps: string[]; ciclos: number[]; comerciais: string[]; gestor: boolean; podeGrade?: boolean; novo?: boolean;
   /** visão do COMERCIAL (dono 27/10): mês pago mostra a parte dele (comp, líquido da célula) → valor.
-      Com a prop a grade da ficha fica só leitura (o líquido do escritório não aparece pra ele) */
+      Com a prop a grade da ficha fica só leitura (o líquido do escritório não aparece para ele) */
   parteDoMes?: (comp: string, liquido: number) => number | null;
   /** aprova "débito parado" (financeiro/cadastro/admin). Sem isso, a Situação de um
       cliente com débito ativo fica travada: entrar em cobrança só pela aprovação (dono 24/09). */
@@ -2415,7 +2418,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={640}
       titulo={<div className="cm-dr-titulo"><span className="cm-num-av" aria-hidden>{(d.nome || '??').slice(0, 2).toUpperCase()}</span><div><div className="cm-dr-nm">{novo ? 'Novo lead' : (d.nome || 'Lead')}</div><div className="mod-sub">{novo ? 'Preencha os dados da planilha' : `${d.comercial || '—'} · vence dia ${diaBR(d.dia)}`}</div></div></div>}
-      rodape={gestor ? <>{aoExcluir && !novo && <BotaoSec onClick={aoExcluir}>Excluir</BotaoSec>}{aoVoltarNovos && !novo && d.situacao === 'cancelado' && <BotaoSec onClick={aoVoltarNovos} title="O débito volta a ATIVO e o cliente reaparece nos Novos.">Voltar pros Novos</BotaoSec>}<span style={{ flex: 1 }} /><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario onClick={() => aoSalvar(paraSalvar(), Array.from(tocadosRef.current))}>{btn}</BotaoPrimario></> : <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>}>
+      rodape={gestor ? <>{aoExcluir && !novo && <button type="button" className="cic-esv ficha-excluir" onClick={aoExcluir} title="Exclui o cliente (vai para a Lixeira; reversível no Desfazer)">Excluir cliente</button>}{aoVoltarNovos && !novo && d.situacao === 'cancelado' && <BotaoSec onClick={aoVoltarNovos} title="O débito volta a ATIVO e o cliente reaparece nos Novos.">Voltar para Novos</BotaoSec>}<span style={{ flex: 1 }} /><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario onClick={() => aoSalvar(paraSalvar(), Array.from(tocadosRef.current))}>{btn}</BotaoPrimario></> : <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>}>
       <div className="cm-dr-sec">Cadastro</div>
       <div className="gs-form">
         <div className="campo gs-col2"><label>Cliente</label><Input value={d.nome} disabled={ro} onChange={(e) => set('nome', e.target.value)} /></div>
@@ -2471,7 +2474,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
       {!novo && !ro && sugestaoDia > 0 && sugestaoDia !== d.dia && (
         <p className="cm-hint" style={{ margin: '6px 0 0' }}>
           O último pagamento cai no dia <b>{d2(sugestaoDia)}</b>, mas o ciclo deste cliente é <b>D{d2(d.dia)}</b>.{' '}
-          <BotaoSec mini onClick={() => { set('dia', Math.min(31, Math.max(1, sugestaoDia))); setNovoCiclo(!ciclos.includes(sugestaoDia)); }}>Mudar pra D{d2(sugestaoDia)}</BotaoSec>
+          <BotaoSec mini onClick={() => { set('dia', Math.min(31, Math.max(1, sugestaoDia))); setNovoCiclo(!ciclos.includes(sugestaoDia)); }}>Mudar para D{d2(sugestaoDia)}</BotaoSec>
         </p>
       )}
       {dicaINSS && (
@@ -2499,7 +2502,7 @@ export function FichaLead({ inicial, comps, ciclos, comerciais, gestor, podeGrad
           const travaSit = !!inicial.paradoPendente || !podeAprovar;
           const dica = inicial.paradoPendente ? 'Aguardando aprovação — aprove ou recuse na lista "Aguardando aprovação" dos Novos.'
             : !travaSit ? undefined
-            : inicial.situacao === 'ativo' ? 'Pra ir pra cobrança, use "Marcar débito parado" nos Novos — o financeiro/cadastro/administrador aprova.'
+            : inicial.situacao === 'ativo' ? 'Para ir para a cobrança, use "Marcar débito parado" nos Novos — o financeiro, o cadastro ou o administrador aprova.'
             : 'Tirar da cobrança é com o financeiro, o cadastro ou o administrador.';
           return (
             <div className="campo"><label>Situação</label>
@@ -2631,7 +2634,7 @@ export function NovoCliente({ linhas, comps, comerciais, meuComercial, ocupado, 
 
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={760} fecharNoVeu={false}
-      titulo={<div className="cm-dr-titulo"><span className="cm-num-av" aria-hidden>{(c.nome.trim() || 'NC').slice(0, 2).toUpperCase()}</span><div><div className="cm-dr-nm">Novo cliente</div><div className="mod-sub">Entra nos Novos e aparece na Gestão com estes dados</div></div></div>}
+      titulo={<div className="cm-dr-titulo"><span className="cm-num-av nv-ic-novo" aria-hidden><IcT d="M15 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 3 17.5V19M9 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19 8v6M16 11h6" s={16} mr={0} /></span><div><div className="cm-dr-nm">Novo cliente</div><div className="mod-sub">Entra nos Novos e aparece na Gestão com estes dados</div></div></div>}
       rodape={<>
         <span className={faltam.length ? 'nc-status pend' : 'nc-status ok'} aria-live="polite">
           {faltam.length
@@ -2812,7 +2815,7 @@ export function AbaFinanceiro({ gestor, papel, admin = false }: { demo: boolean;
     if (!cp.path) { setVerComp({ nome: cp.nome, url: cp.url }); return; }
     void getCobrancaRepo().assinarComprovante(cp)
       .then((url) => { if (url) setVerComp({ nome: cp.nome, url }); else setErro('Comprovante indisponível — o arquivo não foi encontrado.'); })
-      .catch((err) => setErro(`Não deu pra abrir o comprovante: ${msgErro(err)}`));
+      .catch((err) => setErro(`Não foi possível abrir o comprovante: ${msgErro(err)}`));
   };
 
   // decididas NESTA tela saem da fila na hora (o refetch vem depois — sem isso um
@@ -3154,7 +3157,7 @@ export function LancarPagamento({ linhas, comps, rotMes, aoLancar, aoFechar, mes
         : 'Registra que o cliente pagou — o financeiro confirma se caiu na conta.'}</div></div>}
       rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec>{soEscolher
         ? <BotaoPrimario disabled={!sel || !comp} onClick={() => sel && comp && aoEscolher?.(sel.id, comp)}>Continuar</BotaoPrimario>
-        : <BotaoPrimario disabled={!sel || liquido <= 0 || !comp} onClick={() => sel && aoLancar?.(sel.id, comp, liquido, comprovante ?? undefined)}>Enviar p/ o financeiro confirmar</BotaoPrimario>}</>}>
+        : <BotaoPrimario disabled={!sel || liquido <= 0 || !comp} onClick={() => sel && aoLancar?.(sel.id, comp, liquido, comprovante ?? undefined)}>Enviar para o financeiro confirmar</BotaoPrimario>}</>}>
       {!sel ? (
         <>
           <div className="campo"><label>Cliente</label><Input value={busca} placeholder="Buscar cliente pelo nome…" onChange={(e) => setBusca(e.target.value)} /></div>
@@ -3169,12 +3172,12 @@ export function LancarPagamento({ linhas, comps, rotMes, aoLancar, aoFechar, mes
             {!soEscolher && <div className="campo"><label>Valor que o cliente pagou (R$)</label><Input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} /></div>}
           </div>
           {!soEscolher && nVal > 0 && !pctOk && (
-            <p className="cm-hint" style={{ margin: '6px 0 0' }}>{(pctsQ.isError && !pctsCom) || (histQ.isError && !histCom) ? 'Não deu pra carregar a % da comissão — recarregue a página antes de enviar.' : 'Carregando a % da comissão…'}</p>
+            <p className="cm-hint" style={{ margin: '6px 0 0' }}>{(pctsQ.isError && !pctsCom) || (histQ.isError && !histCom) ? 'Não foi possível carregar a % da comissão — recarregue a página antes de enviar.' : 'Carregando a % da comissão…'}</p>
           )}
           {!soEscolher && nVal > 0 && pctOk && (
             <p className="cm-hint" style={{ margin: '6px 0 0' }}>
               Escritório <b className="num">{fmtBRL(liquido)}</b>
-              {pctSel != null ? <> · {comSel} ({fmtPct(pctSel)}%) <b className="num">{fmtBRL(parteDoComercial(liquido, pctSel))}</b></> : ' · cliente sem comercial: o valor todo fica pro escritório'}
+              {pctSel != null ? <> · {comSel} ({fmtPct(pctSel)}%) <b className="num">{fmtBRL(parteDoComercial(liquido, pctSel))}</b></> : ' · cliente sem comercial: o valor todo fica para o escritório'}
             </p>
           )}
           {permitidos && (soEscolher
@@ -3183,13 +3186,13 @@ export function LancarPagamento({ linhas, comps, rotMes, aoLancar, aoFechar, mes
               : <p className="gs-erro">Nenhum mês deste cliente para informar — os meses dele na planilha já estão pagos ou aguardando o financeiro (ou ele não tem coluna de mês, ex.: Novos).</p>)
             : (opcoes.length
               ? opcoes.length < comps.length && <p className="cm-hint" style={{ margin: '6px 0 0' }}>Só os meses que têm coluna no bloco deste cliente na planilha.</p>
-              : <p className="gs-erro">Este cliente não tem coluna de mês na planilha (ex.: Novos, sem ciclo) — não dá pra lançar pagamento por aqui.</p>))}
+              : <p className="gs-erro">Este cliente não tem coluna de mês na planilha (ex.: Novos, sem ciclo) — não é possível lançar pagamento por aqui.</p>))}
           {!soEscolher && <>
           <div className="cm-dr-sec">Comprovante (PDF do recibo)</div>
           <input ref={pdfRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) anexar(f); }} />
           {comprovante
             ? <div className="fin-comp-anexo"><span><IcT d={IC_PATH.documento} s={13} />{comprovante.nome}</span><button type="button" className="gs-aviso-x" onClick={() => setComprovante(null)}>remover</button></div>
-            : <div className="gs-drop" onClick={() => pdfRef.current?.click()} role="button" tabIndex={0}>Anexar o comprovante em PDF (o financeiro vê pra confirmar)</div>}
+            : <div className="gs-drop" onClick={() => pdfRef.current?.click()} role="button" tabIndex={0}>Anexar o comprovante em PDF (o financeiro vê para confirmar)</div>}
           {erroPdf && <p className="gs-erro">{erroPdf}</p>}
           {comp && <p className="cm-hint" style={{ marginTop: 12 }}>Ao enviar, fica <b>aguardando o financeiro</b>. Ele confere o comprovante, olha a conta e confirma — aí o valor entra como pago no mês de {rotMes(comp)}.</p>}
           </>}
@@ -3245,7 +3248,7 @@ function ImportarCiclo({ situacao, diaFixo, ocupado, erroExterno, aoImportar, ao
       <input ref={ref} type="file" accept=".xlsx,.xls" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) escolher(f); }} />
       <label className="gs-check"><input type="checkbox" checked={incluirSenha} onChange={(e) => setIncluirSenha(e.target.checked)} /> Trazer também as senhas (INSS e Reclame Aqui) — entram cifradas, nunca aparecem em texto</label>
       <div className="gs-drop" onClick={() => ref.current?.click()} role="button" tabIndex={0}>
-        {carregando ? 'Lendo…' : previa ? `✓ ${previa.linhas.length} leads lidos · ${previa.comps.length} meses${previa.ignoradas ? ` · ${previa.ignoradas} linhas vazias ignoradas` : ''}` : 'Clique para escolher o arquivo .xlsx da planilha'}
+        {carregando ? 'Lendo…' : previa ? `${previa.linhas.length} leads lidos · ${previa.comps.length} meses${previa.ignoradas ? ` · ${previa.ignoradas} linhas vazias ignoradas` : ''}` : 'Clique para escolher o arquivo .xlsx da planilha'}
       </div>
       {previa && <div className="gs-previa">{previa.linhas.slice(0, 5).map((l) => <div key={l.id}><b>{l.nome}</b><span>{l.comercial || '—'} · {l.banco || '—'} · {fmtBRL(l.valor)}</span></div>)}{previa.linhas.length > 5 && <div className="gs-previa-mais">+ {previa.linhas.length - 5} outros…</div>}</div>}
       {(erro || erroExterno) && <p className="gs-erro">{erro || erroExterno}</p>}
@@ -3262,7 +3265,7 @@ function linhaVazia(comps: string[]): GLinha {
 /* Editor do ciclo: escolher o DIA do mês em que essa turma inteira é cobrada.
    Ao Confirmar, TODOS os clientes do ciclo passam a vencer nesse dia — muda a
    Gestão e os disparos juntos (moverTurma). Dono 15-16/09: "quando trocar a data
-   do dia 1 pra outro dia, tem que atualizar tudo referente àquele ciclo, as
+   do dia 1 para outro dia, tem que atualizar tudo referente àquele ciclo, as
    pessoas dentro dele, tudo." Clicar num dia só SELECIONA; o botão Confirmar aplica. */
 function EditorDiaCiclo({ ciclo, turmas, novosPorDia, datasManuaisDe, aoMover, salvando, aoFechar }: {
   ciclo: CicloTurma; turmas: CicloTurma[];
@@ -3310,13 +3313,13 @@ function EditorDiaCiclo({ ciclo, turmas, novosPorDia, datasManuaisDe, aoMover, s
       <p className="cm-hint" style={{ margin: '10px 2px 0' }}>
         {escolhido != null
           ? <>{rotuloMove} passam a vencer no <b>dia {d2(escolhido)}</b> ({dataBRcurta(selIso!)}) — a Gestão e os disparos vão junto.</>
-          : <>Clique num dia do calendário e depois em <b>Confirmar</b>. Pode rolar pro mês seguinte (ex.: dia 31 → dia 1).</>}
+          : <>Clique num dia do calendário e depois em <b>Confirmar</b>. Pode rolar para o mês seguinte (ex.: dia 31 → dia 1).</>}
       </p>
-      {alvo && <p className="cm-hint" style={{ margin: '6px 2px 0', color: 'var(--ambar)' }}>⚠ O dia {d2(escolhido!)} já é o ciclo {alvo.codigo} ({alvo.leads.length} cliente{alvo.leads.length === 1 ? '' : 's'}). Ao confirmar, os dois viram um só ciclo <b>D{d2(escolhido!)}</b> com {alvo.leads.length + totalMove} clientes.</p>}
-      {mudou && !alvo && novosDest > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>ℹ {novosDest} novo{novosDest === 1 ? '' : 's'} (débito ativo) já vence{novosDest === 1 ? '' : 'm'} no dia {d2(escolhido!)} — passam a dividir o dia com a turma.</p>}
-      {mudou && datasOrigem.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0', color: 'var(--ambar)' }}>⚠ O dia {d2(ciclo.dia)} tem data manual no calendário ({datasOrigem.join(', ')}) — ao mover, essas datas voltam ao automático (o Desfazer repõe).</p>}
-      {mudou && !destinoOcupado && datasDestino.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0', color: 'var(--ambar)' }}>⚠ O dia {d2(escolhido!)} tinha data manual antiga ({datasDestino.join(', ')}) de uma turma que já saiu — será limpa; a turma chega no automático.</p>}
-      {mudou && destinoOcupado && datasDestino.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>ℹ O dia {d2(escolhido!)} tem data manual no calendário ({datasDestino.join(', ')}) — ela passa a valer também pra quem chega.</p>}
+      {alvo && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>O dia {d2(escolhido!)} já é o ciclo {alvo.codigo} ({alvo.leads.length} cliente{alvo.leads.length === 1 ? '' : 's'}). Ao confirmar, os dois viram um só ciclo <b>D{d2(escolhido!)}</b> com {alvo.leads.length + totalMove} clientes.</p>}
+      {mudou && !alvo && novosDest > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>{novosDest} novo{novosDest === 1 ? '' : 's'} (débito ativo) já vence{novosDest === 1 ? '' : 'm'} no dia {d2(escolhido!)} — passam a dividir o dia com a turma.</p>}
+      {mudou && datasOrigem.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>O dia {d2(ciclo.dia)} tem data manual no calendário ({datasOrigem.join(', ')}) — ao mover, essas datas voltam ao automático (o Desfazer repõe).</p>}
+      {mudou && !destinoOcupado && datasDestino.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>O dia {d2(escolhido!)} tinha data manual antiga ({datasDestino.join(', ')}) de uma turma que já saiu — será limpa; a turma chega no automático.</p>}
+      {mudou && destinoOcupado && datasDestino.length > 0 && <p className="cm-hint" style={{ margin: '6px 2px 0' }}>O dia {d2(escolhido!)} tem data manual no calendário ({datasDestino.join(', ')}) — ela passa a valer também para quem chega.</p>}
     </ModalV2>
   );
 }
@@ -3367,8 +3370,8 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
     <ModalV2 aberto aoFechar={aoFechar} largura={580}
       titulo={<div>Ciclos (turmas de vencimento)<div className="mod-sub">Clique num ciclo para mudar o dia da cobrança — move todos os clientes dele de uma vez.</div></div>}
       rodape={<>
-        <BotaoSec onClick={() => { setSelAbrir(null); setAbrindo(true); }} title="Cria um ciclo VAZIO num dia — depois é só direcionar/mover clientes pra ele.">＋ Abrir ciclo</BotaoSec>
-        {totalComDia > 0 && <BotaoSec onClick={() => setConfEsvaziar(true)} title="Todos os clientes saem dos ciclos e ficam aguardando — pra redistribuir do zero." style={{ color: 'var(--rubro)' }}>Esvaziar ciclos…</BotaoSec>}
+        <BotaoSec onClick={() => { setSelAbrir(null); setAbrindo(true); }} title="Cria um ciclo VAZIO num dia — depois é só direcionar ou mover clientes para ele.">＋ Abrir ciclo</BotaoSec>
+        {totalComDia > 0 && <button type="button" className="cic-esv" onClick={() => setConfEsvaziar(true)} title="Todos os clientes saem dos ciclos e ficam aguardando — para redistribuir do zero.">Esvaziar ciclos…</button>}
         <span style={{ flex: 1 }} />
         <BotaoSec onClick={aoFechar}>Fechar</BotaoSec>
       </>}>
@@ -3380,19 +3383,20 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditar(dia); } }}>
             <span className="cm-ciclo-cod">{t.codigo}</span>
             <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{t.leads.length} cliente{t.leads.length === 1 ? '' : 's'} nesta turma</span></div>
-            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto pra este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
-              <BotaoSec mini onClick={() => setConfUm(dia)} title="Remove TODAS as pessoas deste ciclo (ficam aguardando). O ciclo continua aberto e as datas do calendário dele permanecem.">Esvaziar</BotaoSec>
+            {/* só Enter/Espaço ficam aqui (abririam a linha); o Esc segue até o modal e fecha */}
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}>
+              <button type="button" className="cic-esv" onClick={() => setConfUm(dia)} title="Remove TODAS as pessoas deste ciclo (ficam aguardando). O ciclo continua aberto e as datas do calendário dele permanecem.">Esvaziar</button>
+              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto para este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
             </span>
-            <span className="fin-ciclo-acoes" style={{ opacity: 0.55, fontSize: 20, paddingRight: 4 }} aria-hidden>›</span>
+            <span className="fin-ciclo-acoes cic-seta" aria-hidden><IcT d="m9 18 6-6-6-6" s={16} mr={0} /></span>
           </div>
         ) : (
           <div className="fin-ciclo-row" key={dia} style={{ opacity: 0.8 }}>
             <span className="cm-ciclo-cod">D{d2(dia)}</span>
-            <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{novosPorDia(dia) > 0 ? `${novosPorDia(dia)} novo${novosPorDia(dia) === 1 ? '' : 's'} vence${novosPorDia(dia) === 1 ? '' : 'm'} aqui — ninguém em cobrança` : 'vazio — direcione ou mova clientes pra cá'}</span></div>
+            <div className="fin-ciclo-info"><b>vence dia {d2(dia)}</b><span>{novosPorDia(dia) > 0 ? `${novosPorDia(dia)} novo${novosPorDia(dia) === 1 ? '' : 's'} vence${novosPorDia(dia) === 1 ? '' : 'm'} aqui — ninguém em cobrança` : 'vazio — direcione ou mova clientes para cá'}</span></div>
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto pra este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
-              <BotaoSec mini onClick={() => aoFecharDia(dia)} title="Tira este dia da lista de abertos (os clientes que vencem nele não mudam).">Fechar ciclo</BotaoSec>
+              <BotaoSec mini onClick={() => aoFecharDia(dia)} title="Retira este dia da lista de abertos (os clientes que vencem nele não mudam).">Fechar ciclo</BotaoSec>
+              {podeImportar && <BotaoSec mini onClick={() => { setImportErro(null); setImportDia(dia); }} title="Sobe uma planilha de clientes direto para este ciclo — as datas do calendário dele permanecem."><IcT d={IC_PATH.importar} />Importar</BotaoSec>}
             </span>
           </div>
         ))}
@@ -3400,7 +3404,7 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
       </div>
       {abrindo && (
         <ModalV2 aberto aoFechar={() => setAbrindo(false)} largura={360}
-          titulo={<div>Abrir ciclo<div className="mod-sub">Escolha o dia do mês — o ciclo nasce vazio, pronto pra receber clientes.</div></div>}
+          titulo={<div>Abrir ciclo<div className="mod-sub">Escolha o dia do mês — o ciclo nasce vazio, pronto para receber clientes.</div></div>}
           rodape={<><BotaoSec onClick={() => setAbrindo(false)}>Cancelar</BotaoSec><BotaoPrimario disabled={selAbrir == null} onClick={() => { if (selAbrir != null) { aoAbrir(selAbrir); setAbrindo(false); } }}>{selAbrir != null ? `Abrir dia ${d2(selAbrir)}` : 'Escolha um dia'}</BotaoPrimario></>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
             {Array.from({ length: 31 }, (_, k) => k + 1).map((dd0) => (
@@ -3414,26 +3418,26 @@ export function GerenciarCiclos({ turmas, abertos, totalCobranca, totalNovos, no
       )}
       {turmaConfUm && (
         <ModalV2 aberto aoFechar={() => setConfUm(null)} largura={420}
-          titulo={<div>Esvaziar o ciclo {turmaConfUm.codigo}?<div className="mod-sub">Remove todas as pessoas — o ciclo fica pronto pra receber gente nova.</div></div>}
-          rodape={<><BotaoSec onClick={() => setConfUm(null)}>Cancelar</BotaoSec><BotaoPrimario disabled={salvando} onClick={() => { aoEsvaziarUm(turmaConfUm.dia); setConfUm(null); }}>{salvando ? 'Esvaziando…' : `Esvaziar ${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)} cliente${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia) === 1 ? '' : 's'}`}</BotaoPrimario></>}>
+          titulo={<div>Esvaziar o ciclo {turmaConfUm.codigo}?<div className="mod-sub">Remove todas as pessoas — o ciclo fica pronto para receber clientes novos.</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfUm(null)}>Cancelar</BotaoSec><button type="button" className="p-btn btn-perigo" disabled={salvando} onClick={() => { aoEsvaziarUm(turmaConfUm.dia); setConfUm(null); }}>{salvando ? 'Esvaziando…' : `Esvaziar ${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)} cliente${turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia) === 1 ? '' : 's'}`}</button></>}>
           <p className="cm-hint" style={{ margin: 0 }}>
             Os <b>{turmaConfUm.leads.length + novosPorDia(turmaConfUm.dia)}</b> clientes do dia {d2(turmaConfUm.dia)} ({turmaConfUm.leads.length} em cobrança{novosPorDia(turmaConfUm.dia) > 0 ? ` + ${novosPorDia(turmaConfUm.dia)} novos` : ''}) saem do ciclo e ficam
             <b> aguardando ciclo</b> — nenhum cadastro nem pagamento é apagado. O ciclo <b>D{d2(turmaConfUm.dia)} continua aberto</b> e as
-            <b> datas do calendário dele permanecem</b> — é só subir/direcionar as pessoas novas pra ele.
+            <b> datas do calendário dele permanecem</b> — basta subir ou direcionar os clientes novos para ele.
           </p>
-          <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>⚠ Dá pra reverter num clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
+          <p className="cm-hint" style={{ margin: '8px 0 0' }}>É possível reverter com um clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
         </ModalV2>
       )}
       {confEsvaziar && (
         <ModalV2 aberto aoFechar={() => setConfEsvaziar(false)} largura={420}
-          titulo={<div>Esvaziar todos os ciclos?<div className="mod-sub">Pra reorganizar a estrutura do zero.</div></div>}
-          rodape={<><BotaoSec onClick={() => setConfEsvaziar(false)}>Cancelar</BotaoSec><BotaoPrimario disabled={salvando} onClick={() => { aoEsvaziar(); setConfEsvaziar(false); }}>{salvando ? 'Esvaziando…' : `Esvaziar tudo (${totalComDia})`}</BotaoPrimario></>}>
+          titulo={<div>Esvaziar todos os ciclos?<div className="mod-sub">Para reorganizar a estrutura do zero.</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfEsvaziar(false)}>Cancelar</BotaoSec><button type="button" className="p-btn btn-perigo" disabled={salvando} onClick={() => { aoEsvaziar(); setConfEsvaziar(false); }}>{salvando ? 'Esvaziando…' : `Esvaziar tudo (${totalComDia})`}</button></>}>
           <p className="cm-hint" style={{ margin: 0 }}>
             Todos os <b>{totalComDia}</b> clientes com dia ({totalCobranca} em cobrança + {totalNovos} novos) saem dos ciclos e ficam
             <b> aguardando ciclo</b> — nenhum cadastro nem pagamento é apagado. Depois você redistribui: abre os dias que quiser e
-            direciona os clientes pra eles. As datas manuais do calendário (deste mês em diante) também são limpas.
+            direciona os clientes para eles. As datas manuais do calendário (deste mês em diante) também são limpas.
           </p>
-          <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>⚠ Dá pra reverter TUDO num clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
+          <p className="cm-hint" style={{ margin: '8px 0 0' }}>É possível reverter TUDO com um clique no botão <b>Desfazer</b> do topo (por 5 minutos).</p>
         </ModalV2>
       )}
       {alvo && <EditorDiaCiclo ciclo={alvo} turmas={turmas} novosPorDia={novosPorDia} datasManuaisDe={datasManuaisDe} salvando={salvando} aoMover={(de, para) => { aoMover(de, para); setEditar(null); }} aoFechar={() => setEditar(null)} />}
@@ -3715,14 +3719,14 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
   const direcionar = (l: GLinha, dia: number) => {
     if (!(dia >= 1 && dia <= 31)) return;
     editarMut.mutate({ id: l.id, patch: { dia } }, {
-      onSuccess: () => setAviso(`${l.nome}: direcionado pro ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`),
+      onSuccess: () => setAviso(`${l.nome}: direcionado para o ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`),
       onError: (e) => setAviso(msgErro(e)),
     });
   };
   // marcou "parado" errado? devolve pros Novos (débito volta a ATIVO, data de parada limpa)
   const voltarNovos = (l: GLinha) => {
     editarMut.mutate({ id: l.id, patch: { situacao: 'ativo', dataParou: '' } }, {
-      onSuccess: () => setAviso(`${l.nome}: voltou pros Novos — débito segue ativo.`),
+      onSuccess: () => setAviso(`${l.nome}: voltou para os Novos — débito segue ativo.`),
       onError: (e) => setAviso(msgErro(e)),
     });
   };
@@ -3947,8 +3951,8 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
             onPointerEnter={() => arrastarSobre(dia)}
             onClick={() => { if (arrastouRef.current) { arrastouRef.current = false; return; } setFCiclo(fCicloAtivo === dia ? null : dia); }}
             title={t
-              ? `vence dia ${d2(dia)} · turma ${fmtBRL(t.base)}${podeOrdenar ? ' — arraste pra organizar' : ''}`
-              : `Ciclo aberto — vazio; direcione clientes pro dia ${d2(dia)}${podeOrdenar ? ' — arraste pra organizar' : ''}`}>
+              ? `vence dia ${d2(dia)} · turma ${fmtBRL(t.base)}${podeOrdenar ? ' — arraste para organizar' : ''}`
+              : `Ciclo aberto — vazio; direcione clientes para o dia ${d2(dia)}${podeOrdenar ? ' — arraste para organizar' : ''}`}>
             {t ? `${t.codigo} · ${t.leads.length}` : `D${d2(dia)} · 0`}
           </button>
         ))}
@@ -3989,7 +3993,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
         {visiveis.length === 0 && <div className="pl-vazio">Nenhum lead com esses filtros.</div>}
       </div>
 
-      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar pro ciclo"
+      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar para o ciclo"
         rodape={<BotaoSec onClick={() => setDirOpen(false)}>Fechar</BotaoSec>}>
         {aguardando.length === 0 ? <div className="fin-vazio">Ninguém aguardando — todos os clientes estão em um ciclo.</div> : (
           <>
@@ -4005,7 +4009,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
                       {ciclosDisp.map((d) => <option key={d} value={d}>D{d2(d)} — cobra {dataBRcurta(proximaDoCiclo(d))} ({diaSemanaBR(proximaDoCiclo(d))})</option>)}
                     </select>
                     <BotaoPrimario onClick={() => direcionar(l, dia)} disabled={editarMut.isPending || !(dia >= 1)}>Aplicar</BotaoPrimario>
-                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta pros Novos com o débito ativo.">Voltar pros Novos</BotaoSec>
+                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta para os Novos com o débito ativo.">Voltar para Novos</BotaoSec>
                   </div>
                 );
               })}
@@ -4029,7 +4033,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
           return Object.entries(porComp).filter(([comp, w]) => comp >= compCorr && (w.cobranca || w.inicio || w.fim)).map(([comp]) => rotuloMesCurto(comp));
         }}
         aoAbrir={(dia) => abrirCicloMut.mutate(dia, {
-          onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes pra ele.`),
+          onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes para ele.`),
           onError: (e) => setAviso(msgErro(e)),
         })}
         aoFecharDia={(dia) => fecharCicloMut.mutate(dia, {
@@ -4065,7 +4069,7 @@ export function AbaPlanilha({ gestor, papel }: { demo: boolean; gestor: boolean;
               <div className="pl-cel-pop-in"><span className="pl-cel-rs">R$</span><input className="inp" inputMode="decimal" autoFocus value={celVal} onChange={(e) => setCelVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') confirmarPago(); if (e.key === 'Escape') setEditCel(null); }} /></div>
               <label className="pl-cel-comp">{celComp ? <span><IcT d={IC_PATH.imagem} s={13} />{celComp.nome}</span> : <span>Anexar comprovante (imagem)</span>}<input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) anexarImg(f); }} /></label>
               <div className="pl-cel-pop-acoes">
-                <button type="button" className="fin-btn fin-ok" onClick={confirmarPago}>✓ Pago</button>
+                <button type="button" className="fin-btn fin-ok" onClick={confirmarPago}>Pago</button>
                 <button type="button" className="fin-btn fin-rec" onClick={() => naoPagouMut.mutate({ leadId: editCel.leadId, comp: comps[editCel.k] }, { onSuccess: fecharPop, onError: aoFalhar })}>Não pagou</button>
                 {gestor && <button type="button" className="fin-btn" onClick={() => limparMut.mutate({ leadId: editCel.leadId, comp: comps[editCel.k] }, { onSuccess: fecharPop, onError: aoFalhar })}>Limpar</button>}
               </div>
@@ -4149,8 +4153,8 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       onSuccess: () => {
         setPedir(null);
         setAviso(podeAprovar
-          ? `${l.nome}: débito parado registrado — está em "Aguardando aprovação" aqui em cima. Defina o ciclo e o valor pra enviar à Gestão.`
-          : `${l.nome}: pedido enviado pra aprovação. O financeiro, o cadastro ou o administrador definem o ciclo e o valor — você é avisado no sino.`);
+          ? `${l.nome}: débito parado registrado — está em "Aguardando aprovação", logo acima. Defina o ciclo e o valor para enviar à Gestão.`
+          : `${l.nome}: pedido enviado para aprovação. O financeiro, o cadastro ou o administrador definem o ciclo e o valor — você é avisado no sino.`);
       },
       // fecha o modal: o aviso aparece na página (atrás do véu ninguém via o erro)
       onError: (e) => { setPedir(null); setAviso(msgErro(e)); },
@@ -4182,7 +4186,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     aprovarMut.mutate({ leadId: l.id, dia, valor, dataParou: aprParou, quem: meuNome }, {
       onSuccess: () => {
         setAprovar(null);
-        setAviso(`${l.nome}: aprovado — entrou na Gestão no ciclo D${d2(dia)}${valor != null ? ` com parcela de ${fmtBRL(valor)}` : ''}. Dá pra reverter no Desfazer.`);
+        setAviso(`${l.nome}: aprovado — entrou na Gestão no ciclo D${d2(dia)}${valor != null ? ` com parcela de ${fmtBRL(valor)}` : ''}. É possível reverter no Desfazer.`);
         if (l.cpf) enviarPraPlanilha({ ...l, situacao: 'cancelado', dataParou: aprParou, dia, valor: valor ?? l.valor }); // espelha na planilha (dedup por CPF)
       },
       onError: (e) => { setAprovar(null); setAviso(msgErro(e)); },
@@ -4203,7 +4207,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // 4) CANCELAR o próprio pedido (quem pediu)
   const cancelarPedido = (l: GLinha) => {
     cancelarMut.mutate({ leadId: l.id }, {
-      onSuccess: () => setAviso(`${l.nome}: pedido cancelado — voltou pra lista de Novos.`),
+      onSuccess: () => setAviso(`${l.nome}: pedido cancelado — voltou para a lista de Novos.`),
       onError: (e) => setAviso(msgErro(e)),
     });
   };
@@ -4239,6 +4243,15 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // e na Gestão (bloco Novos); o ciclo é escolhido por quem aprova o débito parado.
   const [erroNovo, setErroNovo] = useState('');
   const abrirNovo = () => { setErroNovo(''); setNovo(true); };
+  // "+ Novo cliente" do Painel chega com ?novo=1: abre o formulário direto (e limpa a URL)
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('novo') !== '1') return;
+    if (podeOperar) abrirNovo();
+    const p = new URLSearchParams(params); p.delete('novo');
+    setParams(p, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, podeOperar]);
   const criarLead = (l0: GLinha) => {
     setErroNovo('');
     criarMut.mutate({ ...l0 }, {
@@ -4257,14 +4270,14 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
   // remover UM novo (vai pra lixeira; Desfazer restaura só esse — useExcluirLead)
   const removerUm = (l: GLinha) => {
     excluirMut.mutate(l.id, {
-      onSuccess: () => { setConfRemover(null); setSel(null); setAviso(`${l.nome} removido — dá pra reverter no Desfazer (ou na Lixeira, na Gestão).`); },
+      onSuccess: () => { setConfRemover(null); setSel(null); setAviso(`${l.nome} removido — é possível reverter no Desfazer (ou na Lixeira, na Gestão).`); },
       onError: (e) => { setConfRemover(null); setAviso(msgErro(e)); },
     });
   };
   // remover TODOS os novos de uma vez (Desfazer traz todos de volta)
   const removerTodos = () => {
     removerNovosMut.mutate(undefined, {
-      onSuccess: (res) => { setConfRemoverTodos(false); setAviso(`${res.removidos.length} cliente${res.removidos.length === 1 ? '' : 's'} novo${res.removidos.length === 1 ? '' : 's'} removido${res.removidos.length === 1 ? '' : 's'} — dá pra trazer todos de volta no Desfazer (ou um a um na Lixeira).`); },
+      onSuccess: (res) => { setConfRemoverTodos(false); setAviso(`${res.removidos.length} cliente${res.removidos.length === 1 ? '' : 's'} novo${res.removidos.length === 1 ? '' : 's'} removido${res.removidos.length === 1 ? '' : 's'} — o Desfazer traz todos de volta (ou um a um, na Lixeira).`); },
       onError: (e) => { setConfRemoverTodos(false); setAviso(msgErro(e)); },
     });
   };
@@ -4278,8 +4291,12 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     { chave: 'recl', titulo: 'Data reclamação', dir: true, classe: 'num', render: (l) => l.dataReclamacao ? dataBRcurta(l.dataReclamacao) : '—' },
     { chave: 'ac', titulo: '', render: (l) => (
       <div className="fin-acoes">
-        {podeSolicitar ? <button type="button" className="fin-btn fin-ok" onClick={() => abrirPedir(l)} title="O desconto parou? Vira um pedido: o financeiro, o cadastro ou o administrador aprovam e definem ciclo e valor.">Marcar débito parado</button> : <BadgeStatus tom="ok">descontando</BadgeStatus>}
-        {gestor && <button type="button" className="fin-btn" style={{ color: 'var(--rubro)' }} onClick={() => setConfRemover(l)} title="Remove este cliente novo (vai pra Lixeira; reversível no Desfazer)">Remover</button>}
+        {podeSolicitar ? <button type="button" className="fin-btn fin-ok nv-parado" onClick={() => abrirPedir(l)} title="O desconto parou? Vira um pedido: o financeiro, o cadastro ou o administrador aprovam e definem ciclo e valor.">Marcar débito parado</button> : <BadgeStatus tom="ok">descontando</BadgeStatus>}
+        {gestor && (
+          <button type="button" className="nv-rm" onClick={() => setConfRemover(l)} aria-label={`Remover ${l.nome}`} title="Remover este cliente novo (vai para a Lixeira; reversível no Desfazer)">
+            <IcT d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5" s={15} mr={0} />
+          </button>
+        )}
       </div>
     ) },
   ];
@@ -4303,7 +4320,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
             <button type="button" className="fin-btn" style={{ color: 'var(--rubro)' }} onClick={() => { setRecusar(l); setRecMotivo(''); }}>Recusar</button>
           </>
         ) : l.paradoSolicitadoPor && l.paradoSolicitadoPor === meuId ? (
-          <button type="button" className="fin-btn" onClick={() => cancelarPedido(l)} disabled={cancelarMut.isPending} title="Tira o pedido — o cliente volta pra lista de Novos">Cancelar pedido</button>
+          <button type="button" className="fin-btn" onClick={() => cancelarPedido(l)} disabled={cancelarMut.isPending} title="Retira o pedido — o cliente volta para a lista de Novos">Cancelar pedido</button>
         ) : <BadgeStatus tom="atencao">aguardando</BadgeStatus>}
       </div>
     ) },
@@ -4315,21 +4332,18 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     <div className="fin-raiz">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
       <div className="kpis sobe">
-        <Kpi rotulo="Novos (débito ativo)" valor={normais.length} formato="mil" tomValor="ok" />
-        <Kpi rotulo="Aguardando aprovação" valor={pendentes.length} formato="mil" tomValor={pendentes.length > 0 ? 'erro' : undefined} nota={pendentes.length > 0 ? (podeAprovar ? 'defina ciclo e valor' : 'com o financeiro') : 'nada pendente'} />
-        <Kpi rotulo="Em parcelas/mês" valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " />
-        <Kpi rotulo="Total de leads" valor={linhas.length} formato="mil" />
+        <Kpi rotulo="Novos (débito ativo)" valor={normais.length} formato="mil" nota="clientes ainda com o desconto no benefício" />
+        <Kpi rotulo="Aguardando aprovação" valor={pendentes.length} formato="mil" nota={pendentes.length > 0 ? (podeAprovar ? 'defina o ciclo e o valor' : 'com o financeiro') : 'nada pendente'} />
+        <Kpi rotulo="Em parcelas/mês" valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " sufixo={`,${String(Math.round((emParcelas % 1) * 100)).padStart(2, '0')}`}
+          nota={`${ativos.length} parcela${ativos.length === 1 ? '' : 's'} ativa${ativos.length === 1 ? '' : 's'}`} />
+        <Kpi rotulo="Total de clientes" valor={linhas.length} formato="mil" nota="na planilha de cobranças" />
       </div>
-      <p className="cm-hint sobe" style={{ animationDelay: '.06s' }}>
-        Clientes que <b>ainda não pararam o desconto</b> — o débito segue ativo no benefício. Quando o desconto parar, clique em <b>Marcar débito parado</b>:
-        o cliente vai pra <b>Aguardando aprovação</b> e só entra na Gestão depois que o <b>financeiro, o cadastro ou o administrador</b> aprovar e definir o ciclo e o valor.
-      </p>
       {pendentes.length > 0 && (
         <CardVidro spot className="fin-panel nv-pend sobe" style={{ animationDelay: '.08s' }}>
           <div className="fin-head">
             <h3>Aguardando aprovação</h3>
             <span className="pl-count num">{pendentesVis.length}</span>
-            <span className="nv-pend-sub">{podeAprovar ? 'Débito parado marcado — defina o ciclo, o valor e a data pra enviar à Gestão.' : 'Débito parado marcado — aguardando o financeiro, o cadastro ou o administrador aprovar.'}</span>
+            <span className="nv-pend-sub">{podeAprovar ? 'Débito parado marcado — defina o ciclo, o valor e a data para enviar à Gestão.' : 'Débito parado marcado — aguardando o financeiro, o cadastro ou o administrador aprovar.'}</span>
           </div>
           {pendentesVis.length === 0
             ? <div className="fin-vazio">Nenhum pedido neste filtro.</div>
@@ -4338,15 +4352,23 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       )}
       <CardVidro spot className="fin-panel sobe" style={{ animationDelay: '.1s' }}>
         <div className="fin-head">
-          <h3>Novos — débito ativo</h3>
+          <h3 title="Clientes que ainda não pararam o desconto: o débito segue ativo no benefício. Quando o desconto parar, use Marcar débito parado — o cliente vai para Aguardando aprovação e só entra na Gestão depois que o financeiro, o cadastro ou o administrador aprovar e definir o ciclo e o valor.">Novos — débito ativo</h3>
           <span className="pl-count num">{visiveis.length}</span>
           <div className="fin-filtros">
+            <input className="inp" placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar cliente" />
+            <select className="inp pl-sel" value={fCom} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial"><option value="todos">Comercial: todos</option>{comerciais.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+            {gestor && ativos.length > 0 && <BotaoSec onClick={() => exportarXlsx(ativos, comps, 'clientes-novos')}><IcT d="M12 4v11m0 0 4-4m-4 4-4-4M4 20h16" />Exportar</BotaoSec>}
+            {gestor && (
+              <MenuMais titulo="Mais ações" so itens={[
+                { rotulo: 'Importar novos', icone: IC_PATH.importar, aoClicar: () => setImportOpen(true) },
+                ...(normais.length > 0 ? [{
+                  rotulo: 'Remover todos os novos', icone: 'M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5', perigo: true, separar: true,
+                  aoClicar: () => setConfRemoverTodos(true),
+                  dica: 'Remove TODOS os clientes novos de uma vez (vão para a Lixeira; o Desfazer traz todos de volta). Quem está aguardando aprovação fica.',
+                }] : []),
+              ]} />
+            )}
             {podeOperar && <BotaoPrimario onClick={abrirNovo}>＋ Novo cliente</BotaoPrimario>}
-            {gestor && <BotaoSec mini onClick={() => setImportOpen(true)}><IcT d={IC_PATH.importar} />Importar novos</BotaoSec>}
-            {gestor && ativos.length > 0 && <BotaoSec mini onClick={() => exportarXlsx(ativos, comps, 'clientes-novos')}>Exportar</BotaoSec>}
-            {gestor && normais.length > 0 && <BotaoSec mini onClick={() => setConfRemoverTodos(true)} style={{ color: 'var(--rubro)' }} title="Remove TODOS os clientes novos de uma vez (vão pra Lixeira; o Desfazer traz todos de volta). Quem está aguardando aprovação fica.">Remover todos</BotaoSec>}
-            <select className="inp pl-sel" value={fCom} onChange={(e) => setFCom(e.target.value)}><option value="todos">Comercial: todos</option>{comerciais.map((c) => <option key={c} value={c}>{c}</option>)}</select>
-            <input className="inp" placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         </div>
         {visiveis.length === 0
@@ -4356,15 +4378,15 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       {/* 1) PEDIR: só a data em que o desconto parou → aprovação */}
       <ModalV2 aberto={!!pedir} aoFechar={() => setPedir(null)} largura={420}
         titulo={pedir ? <div>Marcar débito parado<div className="mod-sub">{pedir.nome}{pedir.comercial ? ` · ${pedir.comercial}` : ''}</div></div> : ''}
-        rodape={<><BotaoSec onClick={() => setPedir(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarPedido} disabled={!pedirParou || solicitarMut.isPending}>{solicitarMut.isPending ? 'Enviando…' : 'Enviar pra aprovação'}</BotaoPrimario></>}>
+        rodape={<><BotaoSec onClick={() => setPedir(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarPedido} disabled={!pedirParou || solicitarMut.isPending}>{solicitarMut.isPending ? 'Enviando…' : 'Enviar para aprovação'}</BotaoPrimario></>}>
         {pedir && (
           <div>
             <label className="cd-f" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span>Data em que o desconto parou</span>
               <input className="inp" type="date" value={pedirParou} max={hojeIso()} onChange={(e) => setPedirParou(e.target.value)} />
             </label>
             <p className="cm-hint" style={{ margin: '12px 2px 0' }}>
-              O pedido vai pra <b>Aguardando aprovação</b>. O <b>financeiro, o cadastro ou o administrador</b> define o <b>ciclo</b> e o <b>valor</b> — aí o cliente entra na Gestão.
-              {podeAprovar ? ' Como você aprova, ele já aparece lá em cima pra você concluir.' : ' Você é avisado no sino quando aprovarem (ou recusarem).'}
+              O pedido vai para <b>Aguardando aprovação</b>. O <b>financeiro, o cadastro ou o administrador</b> define o <b>ciclo</b> e o <b>valor</b> — então o cliente entra na Gestão.
+              {podeAprovar ? ' Como você aprova, ele já aparece no topo da tela para você concluir.' : ' Você é avisado no sino quando aprovarem (ou recusarem).'}
             </p>
           </div>
         )}
@@ -4373,7 +4395,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       {/* 2) APROVAR: quem aprova decide ciclo, valor e data → Gestão */}
       <ModalV2 aberto={!!aprovar} aoFechar={() => setAprovar(null)} largura={460}
         titulo={aprovar ? <div>Aprovar débito parado<div className="mod-sub">{aprovar.nome}{aprovar.comercial ? ` · ${aprovar.comercial}` : ''}{aprovar.paradoSolicitadoNome ? ` · pedido por ${aprovar.paradoSolicitadoNome}` : ''}</div></div> : ''}
-        rodape={<><BotaoSec onClick={() => setAprovar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarAprovacao} disabled={!aprDia || aprovarMut.isPending}>{aprovarMut.isPending ? 'Aprovando…' : aprDia ? `Aprovar e enviar pro ciclo D${d2(aprDia)}` : 'Escolha o ciclo'}</BotaoPrimario></>}>
+        rodape={<><BotaoSec onClick={() => setAprovar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarAprovacao} disabled={!aprDia || aprovarMut.isPending}>{aprovarMut.isPending ? 'Aprovando…' : aprDia ? `Aprovar e enviar para o ciclo D${d2(aprDia)}` : 'Escolha o ciclo'}</BotaoPrimario></>}>
         {aprovar && (() => {
           const comp = mesesFut[mesIdx] ?? mesesFut[0];
           const marcado = aprDataCob ?? (aprDia ? `${comp}-${d2(aprDia)}` : undefined);
@@ -4431,7 +4453,7 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
                 <input className="inp" type="date" value={aprParou} max={hojeIso()} onChange={(e) => setAprParou(e.target.value)} />
               </label>
             </div>
-            <p className="cm-hint" style={{ margin: '10px 2px 0' }}>Ao aprovar, o cliente sai dos Novos e entra na <b>Gestão</b> nesse ciclo. {aprovar.paradoSolicitadoNome ? `${aprovar.paradoSolicitadoNome} é avisado no sino. ` : ''}Dá pra reverter no <b>Desfazer</b>.</p>
+            <p className="cm-hint" style={{ margin: '10px 2px 0' }}>Ao aprovar, o cliente sai dos Novos e entra na <b>Gestão</b> nesse ciclo. {aprovar.paradoSolicitadoNome ? `${aprovar.paradoSolicitadoNome} é avisado no sino. ` : ''}É possível reverter no <b>Desfazer</b>.</p>
           </div>
         ); })()}
       </ModalV2>
@@ -4442,10 +4464,10 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
         rodape={<><BotaoSec onClick={() => setRecusar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarRecusa} disabled={recusarMut.isPending} style={{ background: 'var(--rubro)' }}>{recusarMut.isPending ? 'Recusando…' : 'Recusar pedido'}</BotaoPrimario></>}>
         {recusar && (
           <div>
-            <label className="cd-f" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span>Motivo (opcional — vai no aviso pra quem pediu)</span>
+            <label className="cd-f" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span>Motivo (opcional — vai no aviso para quem pediu)</span>
               <textarea className="inp" rows={3} value={recMotivo} placeholder="Ex.: o desconto ainda aparece no extrato" onChange={(e) => setRecMotivo(e.target.value)} />
             </label>
-            <p className="cm-hint" style={{ margin: '10px 2px 0' }}>O cliente <b>continua nos Novos</b> com o débito ativo. Dá pra reverter no <b>Desfazer</b>.</p>
+            <p className="cm-hint" style={{ margin: '10px 2px 0' }}>O cliente <b>continua nos Novos</b> com o débito ativo. É possível reverter no <b>Desfazer</b>.</p>
           </div>
         )}
       </ModalV2>
@@ -4460,9 +4482,9 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
       }} ocupado={importarMut.isPending} aoFechar={() => setImportOpen(false)} />}
       {confRemover && (
         <ModalV2 aberto aoFechar={() => setConfRemover(null)} largura={400}
-          titulo={<div>Remover {confRemover.nome}?<div className="mod-sub">O cliente sai dos Novos e vai pra Lixeira.</div></div>}
+          titulo={<div>Remover {confRemover.nome}?<div className="mod-sub">O cliente sai dos Novos e vai para a Lixeira.</div></div>}
           rodape={<><BotaoSec onClick={() => setConfRemover(null)}>Cancelar</BotaoSec><BotaoPrimario disabled={excluirMut.isPending} onClick={() => removerUm(confRemover)} style={{ background: 'var(--rubro)' }}>{excluirMut.isPending ? 'Removendo…' : 'Remover'}</BotaoPrimario></>}>
-          <p className="cm-hint" style={{ margin: 0 }}>Nada é apagado de vez: o cadastro (com senhas e histórico) vai pra <b>Lixeira</b>. Dá pra reverter num clique no <b>Desfazer</b> do topo, ou restaurar depois pela Lixeira na Gestão.</p>
+          <p className="cm-hint" style={{ margin: 0 }}>Nada é apagado de vez: o cadastro (com senhas e histórico) vai para a <b>Lixeira</b>. É possível reverter num clique no <b>Desfazer</b> do topo, ou restaurar depois pela Lixeira na Gestão.</p>
         </ModalV2>
       )}
       {confRemoverTodos && (
@@ -4470,9 +4492,9 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
           titulo={<div>Remover todos os {normais.length} clientes novos?<div className="mod-sub">Todos os clientes com débito ativo saem de uma vez.</div></div>}
           rodape={<><BotaoSec onClick={() => setConfRemoverTodos(false)}>Cancelar</BotaoSec><BotaoPrimario disabled={removerNovosMut.isPending} onClick={removerTodos} style={{ background: 'var(--rubro)' }}>{removerNovosMut.isPending ? 'Removendo…' : `Remover todos (${normais.length})`}</BotaoPrimario></>}>
           <p className="cm-hint" style={{ margin: 0 }}>
-            Os <b>{normais.length}</b> clientes novos (débito ainda ativo) vão inteiros pra <b>Lixeira</b> — cadastro, senhas e histórico. Ninguém em cobrança é tocado{pendentes.length === 1 ? <>, e o <b>1</b> aguardando aprovação fica</> : pendentes.length > 1 ? <>, e os <b>{pendentes.length}</b> aguardando aprovação ficam</> : null}.
+            Os <b>{normais.length}</b> clientes novos (débito ainda ativo) vão inteiros para a <b>Lixeira</b> — cadastro, senhas e histórico. Ninguém em cobrança é tocado{pendentes.length === 1 ? <>, e o <b>1</b> aguardando aprovação fica</> : pendentes.length > 1 ? <>, e os <b>{pendentes.length}</b> aguardando aprovação ficam</> : null}.
           </p>
-          <p className="cm-hint" style={{ margin: '8px 0 0', color: 'var(--ambar)' }}>⚠ Dá pra trazer <b>todos de volta</b> num clique no <b>Desfazer</b> do topo (por 5 minutos). Depois disso, ainda dá pra restaurar um a um pela Lixeira.</p>
+          <p className="cm-hint" style={{ margin: '8px 0 0' }}>É possível trazer <b>todos de volta</b> num clique no <b>Desfazer</b> do topo (por 5 minutos). Depois disso, ainda é possível restaurar um a um pela Lixeira.</p>
         </ModalV2>
       )}
     </div>
@@ -4563,20 +4585,24 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
   return (
     <div className="calx">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
-      {!gestor && <p className="cm-hint" style={{ margin: '0 0 10px' }}>Modo visualização — as datas dos ciclos são ajustadas pelo administrador (arrastar desabilitado).</p>}
+      {/* crítica 12/11: o mesmo seletor de mês do Painel; contadores no estilo do Painel; aviso em selos;
+          filtro de ciclos com estado legível ("Filtrado: 8 de 9 ciclos · Limpar") */}
       <div className="calx-top sobe" style={{ animationDelay: '.05s' }}>
         <div className="calx-nav">
-          <button type="button" className="calx-seta" onClick={() => irMes(-1)} aria-label="Mês anterior">‹</button>
-          <div className="calx-mes"><b>{CALX_MESES[cursor.m - 1]}</b><span className="num">{cursor.y}</span></div>
-          <button type="button" className="calx-seta" onClick={() => irMes(1)} aria-label="Próximo mês">›</button>
-          <button type="button" className="calx-hojebtn" onClick={irHoje}>Hoje</button>
+          <div className="pn-mes calx-mesgrp" role="group" aria-label="Mês do calendário">
+            <button type="button" className="pn-mes-seta" onClick={() => irMes(-1)} aria-label="Mês anterior"><IcT d="m15 18-6-6 6-6" s={14} mr={0} /></button>
+            <span className="calx-mes-rot num" aria-live="polite">{`${CALX_MESES[cursor.m - 1]} de ${cursor.y}`}</span>
+            <button type="button" className="pn-mes-seta" onClick={() => irMes(1)} aria-label="Próximo mês"><IcT d="m9 18 6-6-6-6" s={14} mr={0} /></button>
+          </div>
+          <button type="button" className="calx-hojebtn" onClick={irHoje} disabled={cursor.y === hoje.getFullYear() && cursor.m === hoje.getMonth() + 1}>Hoje</button>
+          {!gestor && <span className="st s-ne calx-ro" title="As datas dos ciclos são ajustadas pelo administrador (arrastar desabilitado)."><i aria-hidden />Somente leitura</span>}
         </div>
         <div className="calx-kpis">
-          <div className="calx-kpi"><span className="num">{visiveis.length}</span><em>ciclos</em></div>
-          <div className="calx-kpi"><span className="num">{totalPessoas}</span><em>pessoas</em></div>
-          <div className={`calx-kpi${deslocados.length ? ' alerta' : ''}`}><span className="num">{deslocados.length}</span><em>deslocados</em></div>
+          <span className="pn-barra-stat num"><b>{visiveis.length}</b> ciclo{visiveis.length === 1 ? '' : 's'}</span>
+          <span className="pn-barra-stat num"><b>{totalPessoas}</b> pessoa{totalPessoas === 1 ? '' : 's'}</span>
+          <span className={`pn-barra-stat num${deslocados.length ? ' calx-stat-alerta' : ''}`}><b>{deslocados.length}</b> reprogramado{deslocados.length === 1 ? '' : 's'}</span>
         </div>
-        <select className="inp calx-sit" value={fSit} onChange={(e) => setFSit(e.target.value as typeof fSit)}>
+        <select className="inp calx-sit" value={fSit} onChange={(e) => setFSit(e.target.value as typeof fSit)} aria-label="Filtrar clientes">
           <option value="todos">Todos os clientes</option>
           <option value="cancelado">Em cobrança</option>
           <option value="ativo">Débito ativo</option>
@@ -4585,22 +4611,35 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
 
       {deslocados.length > 0 && (
         <div className="calx-alerta sobe" style={{ animationDelay: '.08s' }} role="status">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a1.5 1.5 0 0 0 1.3 2.2h16.6a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z" /></svg>
-          <div><b>Ajuste automático de {CALX_MESES[cursor.m - 1]}:</b> {deslocados.map((x, i) => (
-            <span key={x.c.dia} className="calx-al-item"><b>{x.c.codigo}</b> recebe {diaBR(x.c.dia)}{x.cd.motivo ? ` (${x.cd.motivo})` : ''} → cobrança <b>{dataBRcurta(x.cd.iso)}</b> ({diaSemanaBR(x.cd.iso)}){i < deslocados.length - 1 ? '' : ''}</span>
-          ))}</div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a1.5 1.5 0 0 0 1.3 2.2h16.6a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0z" /></svg>
+          <span className="calx-al-tit">Cobranças reprogramadas em {CALX_MESES[cursor.m - 1]}</span>
+          <span className="calx-al-selos">
+            {deslocados.map((x) => (
+              <span key={x.c.dia} className="calx-al-selo num" title={`${x.c.codigo} recebe dia ${diaBR(x.c.dia)}${x.cd.motivo ? ` (${x.cd.motivo})` : ''} — cobrança em ${dataBRcurta(x.cd.iso)} (${diaSemanaBR(x.cd.iso)})`}>
+                <b>{x.c.codigo}</b>{diaSemanaBR(`${comp}-${d2(Math.min(x.c.dia, ult))}`).slice(0, 3)} {d2(Math.min(x.c.dia, ult))}
+                <IcT d="M5 12h14m-5-5 5 5-5 5" s={12} mr={0} />{diaSemanaBR(x.cd.iso).slice(0, 3)} {dataBRcurta(x.cd.iso).slice(0, 5)}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
-      <div className="calx-chips sobe" style={{ animationDelay: '.1s' }}>
-        <button type="button" className={`calx-chip${ocultos.size === 0 ? ' on' : ''}`} onClick={() => setOcultos(new Set())}>Todos</button>
+      <div className="calx-chips sobe" style={{ animationDelay: '.1s' }} role="group" aria-label="Filtrar ciclos">
+        <button type="button" className={`calx-chip calx-todos${ocultos.size === 0 ? ' on' : ''}`} aria-pressed={ocultos.size === 0} onClick={() => setOcultos(new Set())}>Todos</button>
         {ciclos.map((c) => (
-          <button type="button" key={c.dia} className={`calx-chip${ocultos.has(c.dia) ? ' off' : ' on'}`}
+          <button type="button" key={c.dia} className={`calx-chip${ocultos.has(c.dia) ? ' off' : ''}`} aria-pressed={!ocultos.has(c.dia)}
+            title={ocultos.has(c.dia) ? `${c.codigo} oculto — clique para mostrar` : `Clique para ocultar ${c.codigo}`}
             onMouseEnter={() => setCicloFoco(c.dia)} onMouseLeave={() => setCicloFoco(null)} onFocus={() => setCicloFoco(c.dia)} onBlur={() => setCicloFoco(null)}
             onClick={() => alternarCiclo(c.dia)}>
             {c.codigo}<span className="calx-chip-n">{c.leads.length}</span>
           </button>
         ))}
+        {ocultos.size > 0 && (
+          <span className="calx-filtrado num">
+            Filtrado: {ciclos.length - ciclos.filter((c) => ocultos.has(c.dia)).length} de {ciclos.length} ciclos
+            <button type="button" className="mc-lnk" onClick={() => setOcultos(new Set())}>Limpar</button>
+          </span>
+        )}
       </div>
 
       <div className="calx-layout sobe" style={{ animationDelay: '.14s' }}>
@@ -4625,13 +4664,13 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
                     {pills.map((p) => (
                       <span key={`c${p.dia}`} draggable={gestor} onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(p.dia)); e.dataTransfer.effectAllowed = 'move'; }}
                         className={`calx-pill${p.deslocado ? ' desl' : ''}${p.motivo === 'ajuste manual' ? ' manual' : ''}${cicloFoco === p.dia ? ' foco' : ''}`}
-                        title={`Ciclo D${d2(p.dia)} — ${p.count} pessoa${p.count === 1 ? '' : 's'}${p.deslocado ? ` · ${p.motivo === 'ajuste manual' ? 'ajuste manual (arraste de volta p/ desfazer)' : `deslocado (${p.motivo})`}` : ''}${gestor ? ' · arraste p/ mudar a data' : ''}`}>
+                        title={`Ciclo D${d2(p.dia)} — ${p.count} pessoa${p.count === 1 ? '' : 's'}${p.deslocado ? ` · ${p.motivo === 'ajuste manual' ? 'ajuste manual (arraste de volta para desfazer)' : `deslocado (${p.motivo})`}` : ''}${gestor ? ' · arraste para mudar a data' : ''}`}>
                         {p.motivo === 'ajuste manual' ? <span className="calx-rot" aria-hidden><IcT d={IC_PATH.pino} s={9} mr={0} /></span> : p.deslocado ? <span className="calx-rot" aria-hidden><IcT d={IC_PATH.girar} s={9} mr={0} /></span> : null}D{d2(p.dia)}<b>{p.count}</b>
                       </span>
                     ))}
                     {ghosts.map((g) => (
-                      <span key={`g${g.dia}`} className={`calx-pill fantasma${cicloFoco === g.dia ? ' foco' : ''}`} title={`Recebe dia ${d2(g.dia)}, mas ${g.motivo}: cobrança anda para ${dataBRcurta(g.destino)}`}>
-                        D{d2(g.dia)}→{Number(g.destino.slice(8, 10))}
+                      <span key={`g${g.dia}`} className={`calx-pill fantasma${cicloFoco === g.dia ? ' foco' : ''}`} title={`D${d2(g.dia)} cobrado no dia ${dataBRcurta(g.destino)} (${g.motivo})`}>
+                        <span className="calx-rot" aria-hidden><IcT d={IC_PATH.girar} s={10} mr={0} /></span>D{d2(g.dia)}
                       </span>
                     ))}
                   </div>
@@ -4683,7 +4722,7 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
                   <div className="calx-ah-tit">{diaSemanaBR(diaSel).replace(/^./, (c) => c.toUpperCase())}, {Number(diaSel.slice(8, 10))} de {CALX_MESES[cursor.m - 1]}</div>
                   {nomeFerSel && <div className="calx-ah-fer"><IcT d={IC_PATH.bandeira} s={11} mr={0} /> {nomeFerSel}</div>}
                 </div>
-                <button type="button" className="calx-ah-x" onClick={() => setDiaSel(null)} aria-label="Fechar">×</button>
+                <button type="button" className="calx-ah-x" onClick={() => setDiaSel(null)} aria-label="Fechar"><IcT d="M18 6 6 18M6 6l12 12" s={15} mr={0} /></button>
               </div>
               {gruposDia.length === 0 ? (
                 <div className="calx-aside-vazio"><p>Nenhuma cobrança neste dia.</p></div>
@@ -4714,7 +4753,6 @@ export function AbaCalendario({ gestor }: { demo: boolean; gestor: boolean }) {
           )}
         </aside>
       </div>
-      {!gestor && <p className="cm-hint" style={{ marginTop: 10 }}>Visão somente leitura.</p>}
     </div>
   );
 }

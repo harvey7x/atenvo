@@ -2,11 +2,13 @@
    (PainelResumoVista / EquipeVista), alimentado pela base REAL.
    A demo é o contrato: aqui só muda a fonte dos números. */
 import { useMemo, useState } from 'react';
-import { BadgeStatus, CardVidro, Chip, Chips, EstadoVazio, Input, TabelaPadrao, type Coluna } from '../components';
-import { PainelResumoVista } from './painel/PainelResumo';
+import { useNavigate } from 'react-router-dom';
+import { BadgeStatus, CardVidro, EstadoVazio, TabelaPadrao, type Coluna } from '../components';
+import { Dinheiro, PainelResumoVista, mesAno } from './painel/PainelResumo';
+import type { ClienteAnalise } from './cobrancaAnalytics';
 import { proximaCobrancaDoCiclo } from './cicloCalendario';
 import { seriePorAtendente, seriePorCiclo } from './cobrancaAnalytics';
-import { atendentesReais, clientesReais, compHoje, previsaoReal, resumoCarteiraReal } from './revizaAnalytics';
+import { atendentesReais, clientesReais, previsaoReal, resumoCarteiraReal } from './revizaAnalytics';
 import { PainelComercialVista, comissoesDe } from './RevizaComissoes';
 import { EquipeVista } from './painel/EquipeVista';
 import { fmtPct, useComissoes, useComissoesHist, useSalvarComissao } from '../data/cobranca/comissoes';
@@ -26,7 +28,7 @@ function proximaCobranca(dia: number, ciclosDatas?: Dados['ciclosDatas']): strin
 }
 
 /* QUEM VÊ O QUÊ (dono 14/09 + 27/09: "pro comercial, esse dashboard deve aparecer de
-   forma individual de seus clientes, e pro financeiro, administrador deve aparecer geral"):
+   forma individual de seus clientes, e para o financeiro, administrador deve aparecer geral"):
    COMERCIAL = o MESMO painel, só com os clientes DELE (o RLS já filtra; o filtro por nome
    aqui é a segunda trava) + a comissão dele; financeiro/gestor/admin = painel GERAL. */
 export function PainelReviza() {
@@ -84,44 +86,34 @@ export function PainelGeralReviza({ soComercial }: {
     const l = dados.linhas.filter((x) => x.situacao !== 'cancelado');
     return { n: l.length, mensal: l.reduce((s, x) => s + x.valor / 2, 0) };
   }, [dados.linhas]);
-  // meses que já chegaram (coluna aberta antes da hora / lixo de teste não conta no "X de N pagas")
-  const hojeComp = compHoje();
-  const nMeses = useMemo(() => dados.comps.filter((c) => c <= hojeComp).length, [dados.comps, hojeComp]);
 
-  // a lista segue a MESMA segmentação da Gestão: 'cancelado' = carteira EM
-  // COBRANÇA (padrão), 'ativo' = Novos. Os chips antigos (Concluídas/Canceladas)
-  // eram herança do mockup e devolviam lista vazia; o status era fixo 'Ativa'.
-  const [filtro, setFiltro] = useState<'cobranca' | 'novos' | 'todas'>('cobranca');
-  const [busca, setBusca] = useState('');
-  const compPorId = useMemo(() => new Map(cs.map((c) => [c.id, c.comportamento])), [cs]);
-  const lista = useMemo(() => {
-    const seg = filtro === 'todas' ? dados.linhas
-      : dados.linhas.filter((l) => (filtro === 'cobranca' ? l.situacao === 'cancelado' : l.situacao !== 'cancelado'));
-    const q = busca.trim().toLowerCase();
-    if (!q) return seg;
-    const dig = q.replace(/\D/g, '');                     // com ≥3 dígitos, a busca também casa com o CPF
-    return seg.filter((l) =>
-      l.nome.toLowerCase().includes(q) || (l.telefone || '').includes(dig || q) || (l.comercial || '').toLowerCase().includes(q)
-      || (dig.length >= 3 && (l.cpf || '').replace(/\D/g, '').includes(dig)));
-  }, [dados.linhas, filtro, busca]);
-
-  const nPagas = (l: GLinha) => l.celulas.slice(0, nMeses).filter((c) => { const n = Number(String(c).replace(',', '.')); return c !== '-' && c !== '' && !Number.isNaN(n) && n > 0; }).length;
-  const statusDe = (l: GLinha) => {
-    if (l.situacao !== 'cancelado') return <BadgeStatus tom="neutro">Novo</BadgeStatus>;
-    const comp = compPorId.get(l.id);
-    if (comp === 'inadimplente') return <BadgeStatus tom="erro">Inadimplente</BadgeStatus>;
-    if (comp === 'faltou') return <BadgeStatus tom="atencao">Em atraso</BadgeStatus>;
-    return <BadgeStatus tom="ok">Em dia</BadgeStatus>;
+  /* crítica 12/11: no lugar da lista cortada (100 de 453), "Clientes que precisam de atenção" —
+     os inadimplentes (e quem faltou no último mês) de MAIOR valor, com o caminho para a Gestão.
+     A lista completa é a própria Gestão. */
+  const navigate = useNavigate();
+  const LIMITE_ATENCAO = 10;
+  const emAtraso = useMemo(() => cs
+    .filter((c) => c.ativo !== false && !c.cancelado && (c.comportamento === 'inadimplente' || c.comportamento === 'faltou'))
+    .sort((a, b) => (a.comportamento === b.comportamento ? 0 : a.comportamento === 'inadimplente' ? -1 : 1) || b.mensalidade - a.mensalidade || a.nome.localeCompare(b.nome, 'pt-BR')),
+  [cs]);
+  const atencao = emAtraso.slice(0, LIMITE_ATENCAO);
+  const linhaPorId = useMemo(() => new Map(dados.linhas.map((l) => [l.id, l])), [dados.linhas]);
+  const abrirNaGestao = (nome?: string) => {
+    // a Gestão consome esta chave ao abrir e já filtra a busca pelo cliente (mesma ponte da paleta ⌘K)
+    if (nome) { try { sessionStorage.setItem('alfa_paleta_busca', nome); } catch { /* sem sessionStorage: abre sem filtro */ } }
+    navigate('/cobrancas/planilha');
   };
-  const COLUNAS_TODAS: Coluna<GLinha>[] = [
-    { chave: 'cliente', titulo: 'Cliente', render: (l) => <div><div>{l.nome}</div><div className="num" style={{ color: 'var(--txt-3)', fontSize: 11.5 }}>{l.telefone || 'sem tel.'}</div></div> },
-    { chave: 'mensal', titulo: 'Valor mensal', dir: true, classe: 'num', render: (l) => fmtBRL(l.valor / 2) },
-    { chave: 'ciclos', titulo: 'Ciclos', classe: 'num', render: (l) => `${nPagas(l)} de ${nMeses} pagas` },
-    { chave: 'prox', titulo: 'Próxima', dir: true, classe: 'num', render: (l) => proximaCobranca(l.dia, dados.ciclosDatas) },
-    { chave: 'status', titulo: 'Status', render: statusDe },
-    { chave: 'resp', titulo: 'Responsável', render: (l) => l.comercial || '—' },
+  const COLUNAS_TODAS: Coluna<ClienteAnalise>[] = [
+    { chave: 'cliente', titulo: 'Cliente', render: (c) => <button type="button" className="pl-nome pn-at-nome" onClick={() => abrirNaGestao(c.nome)} title="Abrir na Gestão de cobranças">{c.nome}</button> },
+    { chave: 'resp', titulo: 'Comercial', render: (c) => (c.atendente && c.atendente !== '—' ? c.atendente : '—') },
+    { chave: 'ciclo', titulo: 'Ciclo', classe: 'num', render: (c) => { const l = linhaPorId.get(c.id); return l && l.dia > 0 ? `D${String(l.dia).padStart(2, '0')}` : '—'; } },
+    { chave: 'prox', titulo: 'Próxima cobrança', classe: 'num', render: (c) => { const l = linhaPorId.get(c.id); return l && l.dia > 0 ? proximaCobranca(l.dia, dados.ciclosDatas) : '—'; } },
+    { chave: 'mensal', titulo: 'Valor mensal', classe: 'num', render: (c) => fmtBRL(c.mensalidade) },
+    { chave: 'status', titulo: 'Situação', render: (c) => (c.comportamento === 'inadimplente'
+      ? <BadgeStatus tom="erro">Inadimplente</BadgeStatus>
+      : <BadgeStatus tom="atencao">Faltou pagar</BadgeStatus>) },
   ];
-  // painel individual: a coluna Responsável seria sempre o próprio comercial
+  // painel individual: a coluna Comercial seria sempre o próprio comercial
   const COLUNAS = individual ? COLUNAS_TODAS.filter((c) => c.chave !== 'resp') : COLUNAS_TODAS;
 
   if (individual && dados.linhas.length === 0 && !(dados.cancelados?.length)) {
@@ -135,51 +127,48 @@ export function PainelGeralReviza({ soComercial }: {
   return (
     <>
       <PainelResumoVista r={r} ciclosM={ciclosM} atendM={atendM} ciclosDatas={dados.ciclosDatas} novos={novos}
-        individual={individual ? soComercial : undefined} />
+        individual={individual ? soComercial : undefined}
+        limiteAtend={5} aoVerEquipe={() => navigate('/cobrancas/atendentes')}
+        aposKpis={previsao.some((p) => p.previsto > 0) ? (
+          /* Previsão de faturamento (6 meses) subiu para logo abaixo dos indicadores: faixa compacta */
+          <CardVidro spot className="pn-card pn-prev sobe" style={{ animationDelay: '.06s' }}>
+            <div className="pn-card-cab">
+              <div><h3>Previsão de faturamento</h3><p>Próximos 6 meses · líquido do escritório</p></div>
+            </div>
+            <div className="pn-prev-faixa">
+              {previsao.map((p, i) => (
+                <div className={i === 0 ? 'pn-prev-mes atual' : 'pn-prev-mes'} key={p.mes}>
+                  <span className="pn-prev-rot num">{mesAno(p.mes)}{i === 0 && <em>mês atual</em>}</span>
+                  <b className="pn-prev-val num"><Dinheiro v={p.previsto} /></b>
+                  <span className="pn-prev-sub num">
+                    {p.recebido > 0 && <span>Recebido {fmtBRL(p.recebido)}</span>}
+                    {p.atraso > 0 && <span className="atraso">Em atraso {fmtBRL(p.atraso)}</span>}
+                    {!(p.recebido > 0) && !(p.atraso > 0) && <span>{p.qtd} parcela{p.qtd === 1 ? '' : 's'}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardVidro>
+        ) : undefined}
+        antesAtend={dados.linhas.length > 0 ? (
+          <CardVidro spot className="pn-card pn-sec pn-atencao sobe" style={{ animationDelay: '.18s' }}>
+            <div className="pn-card-cab">
+              <div>
+                <h3>Clientes que precisam de atenção</h3>
+                <p>{emAtraso.length === 0
+                  ? 'Nenhum cliente em atraso na carteira'
+                  : `${emAtraso.length.toLocaleString('pt-BR')} em atraso · ${emAtraso.length > LIMITE_ATENCAO ? `os ${LIMITE_ATENCAO} de maior valor, inadimplentes primeiro` : 'inadimplentes primeiro'}`}</p>
+              </div>
+              <button type="button" className="pn-link pn-ver" onClick={() => abrirNaGestao()}>Abrir na Gestão<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m9 18 6-6-6-6" /></svg></button>
+            </div>
+            {atencao.length === 0
+              ? <EstadoVazio titulo="Carteira em dia" descricao="Nenhum cliente com pagamento em atraso." />
+              : <TabelaPadrao colunas={COLUNAS} linhas={atencao} chave={(c) => c.id} />}
+          </CardVidro>
+        ) : undefined} />
 
       {individual && <MinhaComissao nome={soComercial ?? ''} dados={dados} />}
 
-      <div className="cm-sec-lista sobe" style={{ animationDelay: '.26s' }}><span className="caps">Clientes</span></div>
-
-      <div className="cob-filtros sobe" style={{ animationDelay: '.12s' }}>
-        <Chips>
-          <Chip ativo={filtro === 'cobranca'} onClick={() => setFiltro('cobranca')}>Em cobrança</Chip>
-          <Chip ativo={filtro === 'novos'} onClick={() => setFiltro('novos')}>Novos</Chip>
-          <Chip ativo={filtro === 'todas'} onClick={() => setFiltro('todas')}>Todos</Chip>
-        </Chips>
-        <div className="cob-busca">
-          <Input placeholder={individual ? 'Buscar por cliente ou telefone…' : 'Buscar por cliente, telefone, CPF ou responsável…'} value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar cobranças" />
-        </div>
-      </div>
-
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
-        {lista.length === 0 ? (
-          dados.linhas.length === 0 ? (
-            <EstadoVazio titulo="Nenhuma cobrança cadastrada" descricao="Importe as planilhas em “Gestão de cobranças” e “Novos” — os números aparecem aqui automaticamente." />
-          ) : (
-            <EstadoVazio titulo="Nenhuma cobrança encontrada" descricao="Ajuste a busca ou os filtros." acao={{ rotulo: 'Limpar filtros', onClick: () => { setFiltro('todas'); setBusca(''); } }} />
-          )
-        ) : (
-          <TabelaPadrao colunas={COLUNAS} linhas={lista.slice(0, 100)} chave={(l) => l.id}
-            rodape={{ texto: `${lista.length} cliente${lista.length === 1 ? '' : 's'}${filtro === 'cobranca' ? ' em cobrança' : filtro === 'novos' ? ' nos Novos' : ''}` }} />
-        )}
-      </CardVidro>
-
-      {previsao.some((p) => p.previsto > 0) && (
-        <div className="sobe" style={{ marginTop: 20, animationDelay: '.24s' }}>
-          <span className="caps" style={{ display: 'block', marginBottom: 10 }}>Previsão de faturamento (6 meses) · líquido do escritório</span>
-          <div className="prev-grid">
-            {previsao.map((p) => (
-              <CardVidro spot className="prev-card" key={p.mes}>
-                <div className="prev-mes num">{p.mes.split('-').reverse().join('/')}</div>
-                <div className="prev-val num">{fmtBRL(p.previsto)}</div>
-                <div className="prev-sub num">Recebido {fmtBRL(p.recebido)}{p.atraso > 0 && <span className="atraso"> · Atraso {fmtBRL(p.atraso)}</span>}</div>
-                <div className="prev-qtd num">{p.qtd} parcela{p.qtd === 1 ? '' : 's'}</div>
-              </CardVidro>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }
@@ -207,7 +196,7 @@ export function AtendentesReviza() {
       <EquipeVista linhas={linhas} comissoes={comissoes} podeEditarPct={!!sessao.gestor} salvando={salvarPct.isPending} aoAvisar={setAviso}
         aoSalvarPct={(comercial, pct, desde) => salvarPct.mutate({ comercial, pct, desde }, {
           onSuccess: (r) => setAviso(`Comissão de ${comercial}: ${pct}% da mensalidade ${desde === '2000-01' ? 'em todos os meses' : `a partir de ${mesAnoPct(desde)}`}${r.n ? ` — ${r.n.toLocaleString('pt-BR')} pagamento${r.n === 1 ? '' : 's'} refeito${r.n === 1 ? '' : 's'} na planilha` : ''}.`),
-          onError: (e) => setAviso(`Não deu pra salvar a comissão: ${(e as Error).message}`),
+          onError: (e) => setAviso(`Não foi possível salvar a comissão: ${(e as Error).message}`),
         })} />
     </>
   );

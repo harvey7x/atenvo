@@ -362,7 +362,8 @@ export default function CobrancasV2() {
 
   return (
     <>
-      <div className="ph sobe">
+      {/* Gestão de cobranças: o cabeçalho (título + ações numa linha só) é da própria tela */}
+      {aba !== 'planilha' && <div className="ph sobe">
         <div>
           <div className="cob-migalha">Cobranças</div>
           <h2>{abaAtual?.rotulo ?? 'Cobranças'}</h2>
@@ -372,10 +373,11 @@ export default function CobrancasV2() {
           {gestor && !demo && !isRevizaMode && <BotaoSec onClick={() => setImportar(true)}>Importar planilha</BotaoSec>}
           {gestor && aba === 'painel' && !isRevizaMode && !demo && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
           {/* criar cliente = tela Novos ("＋ Novo cliente": ficha completa + ponte + células);
-              a Gestão agora é a planilha, onde criar é só pelo menu da linha */}
-          {gestor && aba === 'painel' && (isRevizaMode || demo) && <BotaoPrimario onClick={() => navigate('/cobrancas/novos')}>＋ Nova cobrança</BotaoPrimario>}
+              a Gestão agora é a planilha, onde criar é só pelo menu da linha. Crítica 12/11: o
+              mesmo nome do botão de Novos, e já abre o formulário (?novo=1) */}
+          {gestor && aba === 'painel' && (isRevizaMode || demo) && <BotaoPrimario onClick={() => navigate('/cobrancas/novos?novo=1')}>＋ Novo cliente</BotaoPrimario>}
         </div>
-      </div>
+      </div>}
 
       {importar && !demo && (
         <ImportarPlanilha orgId={currentOrg.id} ciclos={ciclosImport}

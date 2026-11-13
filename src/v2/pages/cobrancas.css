@@ -1648,3 +1648,95 @@
 
 /* demo: "ver a tela como" não estoura no celular */
 @media (max-width: 760px) { .v2 .rg-vercomo { flex-wrap: wrap; } .v2 .rg-vercomo select { max-width: 100%; min-width: 0; } }
+
+/* ===== crítica 12/11 — cob_gestao ===== */
+/* Novos: ação da linha quieta (contorno só no hover da linha) e "remover" como ícone discreto */
+html[data-barra-alfa]:not(#rv-sis) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado:not(:hover):not(:focus-visible) {
+  color: var(--txt-2); background: transparent; border-color: rgba(var(--tint), .09); box-shadow: none;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 tr:hover .fin-acoes .fin-btn.fin-ok.nv-parado.nv-parado:not(:hover) { color: var(--txt); border-color: rgba(var(--tint), .18); }
+.v2 .nv-rm {
+  display: inline-grid; place-items: center; flex: none;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--txt-3); cursor: pointer;
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+.v2 .nv-rm:hover { color: var(--cor-erro-txt, var(--rubro)); background: rgba(var(--rubro-rgb), .1); }
+.v2 .nv-rm:focus-visible { outline: 2px solid rgba(var(--rubro-rgb), .5); outline-offset: 1px; }
+/* Novo cliente: ícone de pessoa com "+" no lugar das iniciais do título */
+.v2 .cm-num-av.nv-ic-novo { color: var(--txt-2); font-size: 0; }
+/* cabeçalho do cartão de Novos: filtros à esquerda das ações, a principal por último */
+.v2 .fin-head .fin-filtros .mm { flex: none; }
+/* Ciclos (Gerenciar): "Esvaziar" é destrutivo — texto vermelho, sem fundo (confirmação no clique) */
+.v2 .cic-esv {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 8px;
+  border: 0; border-radius: 8px; background: none; cursor: pointer;
+  color: var(--cor-erro-txt, var(--rubro)); font: 500 12px var(--fonte); white-space: nowrap;
+}
+.v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .1); }
+.v2 .cic-esv:focus-visible { outline: 2px solid rgba(var(--rubro-rgb), .5); outline-offset: 1px; }
+.v2 .p-modal-rodape .cic-esv { height: 32px; font-size: 13px; }
+.v2 .cic-seta { display: inline-flex; align-items: center; color: var(--txt-3); padding-right: 2px; }
+/* Ficha do cliente: título de seção = marco (13/600 com divisória), não mais igual ao rótulo do campo */
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec {
+  font-size: var(--fs-13, 13px); font-weight: var(--fw-forte, 600); letter-spacing: -.005em; text-transform: none;
+  color: var(--txt); margin: 22px 0 12px; padding-top: 16px; border-top: 1px solid var(--linha);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .p-modal-corpo .cm-dr-sec .gs-lab-nota { font-size: var(--fs-12, 12px); font-weight: 400; color: var(--txt-3); margin-left: 4px; }
+/* "Excluir cliente" à esquerda, vermelho sem fundo, separado das ações de salvar */
+.v2 .p-modal-rodape .ficha-excluir { margin-right: 8px; }
+/* ---- Calendário (crítica 12/11): o mês cabe na tela, seletor de mês igual ao do Painel ---- */
+.v2 .calx { display: flex; flex-direction: column; gap: 12px; }
+.v2 .calx > * { margin-top: 0; margin-bottom: 0; }
+.v2 .calx-mesgrp { flex: none; }
+.v2 .calx-mes-rot { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; min-width: 150px; justify-content: center;
+  border-radius: 8px; background: rgba(var(--tint), .06); color: var(--txt); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.v2 .calx-hojebtn:disabled { opacity: .45; cursor: default; }
+.v2 .calx-ro { margin-left: 4px; }
+.v2 .calx-kpis { gap: 0; }
+.v2 .calx-kpis .pn-barra-stat + .pn-barra-stat { margin-left: 11px; }
+.v2 .calx-stat-alerta b { color: var(--cor-alerta-txt, var(--ambar)); }
+/* aviso de reprogramação: título curto + selos "D01 dom 01 → ter 03/11" */
+.v2 .calx-alerta { align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 8px 12px; }
+.v2 .calx-alerta > svg { margin-top: 0; color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .calx-alerta { border-left-color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .calx-al-tit { font-size: 12.5px; font-weight: 600; color: var(--txt); margin-right: 4px; }
+.v2 .calx-al-selos { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.v2 .calx-al-selo { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-2); white-space: nowrap; cursor: default; }
+.v2 .calx-al-selo b { color: var(--txt); font-weight: 600; margin-right: 2px; }
+.v2 .calx-al-selo svg { color: var(--txt-3); }
+/* filtro de ciclos: "Todos" é a seleção (dourado); ciclo oculto fica riscado; o estado do filtro em texto */
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.calx-todos.on {
+  color: var(--txt); background: var(--cor-acento-suave); border: 1px solid var(--cor-acento-fio);
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.off { opacity: 1; color: var(--txt-3); border-style: dashed; background: transparent; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .calx-chips .calx-chip.calx-chip.off > :first-child,
+.v2 .calx-chip.off { text-decoration: line-through; text-decoration-color: rgba(var(--tint), .4); }
+.v2 .calx-chip.off .calx-chip-n { text-decoration: none; }
+.v2 .calx-filtrado { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; font-size: 12px; color: var(--txt-2); }
+/* grade mais baixa: o mês inteiro cabe em 820px */
+.v2 .calx-cal { padding: 14px 16px 12px; }
+.v2 .calx-wk { margin-bottom: 4px; }
+.v2 .calx-wk span { padding-bottom: 4px; }
+.v2 .calx-grid { gap: 4px; }
+.v2 .calx-cell { min-height: 74px; padding: 6px 9px 7px; gap: 2px; }
+.v2 .calx-fer { font-size: 11px; letter-spacing: .02em; text-transform: none; font-weight: 600; min-width: 0; max-width: 100%; display: block; }
+.v2 .calx-fer::before { display: inline-block; vertical-align: middle; margin-right: 4px; }
+.v2 .calx-leg { margin-top: 10px; padding-top: 9px; gap: 16px; }
+.v2 .calx-leg span { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.v2 .calx-aside { max-height: calc(100vh - 180px); }
+.v2 .calx-ah-x { display: inline-grid; place-items: center; }
+/* Ciclos (Gerenciar): o código do ciclo é dado, não seleção — texto neutro (dourado só no que está ativo) */
+html[data-barra-alfa] .v2 .fin-ciclo-row .cm-ciclo-cod { color: var(--txt); }
+/* celular: KPIs de Novos/Cancelados em 2 colunas (4 colunas cortavam "R$ 23.94…"); filtros e ações quebram linha */
+@media (max-width: 760px) {
+  .v2 .fin-raiz > .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .fin-raiz > .kpis .kpi .val { white-space: nowrap; font-size: 22px; }
+  .v2 .fin-raiz .fin-head { flex-wrap: wrap; row-gap: 10px; }
+  .v2 .fin-raiz .fin-head .fin-filtros { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; margin-left: 0; }
+  .v2 .fin-raiz .fin-head .fin-filtros > .inp { flex: 1 1 150px; min-width: 0; width: auto; }
+  .v2 .calx-top { gap: 10px 14px; }
+  .v2 .calx-kpis { margin-left: 0; }
+}

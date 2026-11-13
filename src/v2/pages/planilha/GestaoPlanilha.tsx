@@ -44,6 +44,7 @@ import {
 import { LegendaEstados, PlanilhaExcel, type OrigemSalvar, type PermsPlanilha } from './PlanilhaExcel';
 import { NovoMesModal, planoNovoMes, rotuloNovoMes } from './NovoMes';
 import { BotaoSincronizacao, SeloSync } from './SyncPainel';
+import { MenuMais, type ItemMenuMais } from './MenuMais';
 import { MoverCancelados } from '../cancelados/AbaCancelados';
 import './gestao.css';
 
@@ -107,6 +108,7 @@ const IC = {
   fechar: 'M18 6 6 18M6 6l12 12',
   check: 'M20 6 9 17l-5-5',
   externo: 'M14 4h6v6M20 4l-8.5 8.5M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10',
+  lixeira: 'M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5',
 } as const;
 
 /** colunas ocultas SÓ PARA ESTE USUÁRIO (quem não mexe na estrutura da folha) */
@@ -158,6 +160,8 @@ export function exportarPlanilhaXlsx(dados: PlDados, nomeBase = 'gestao-cobranca
 function GestaoLegada({ semRpc, gestor, papel }: { semRpc: boolean; gestor: boolean; papel?: Papel }) {
   return (
     <>
+      {/* o cabeçalho da página é desta tela (título e ações na mesma linha) */}
+      <div className="ph"><div><h2>Gestão de cobranças</h2></div></div>
       <div className="gs-aviso" role="status">
         <span>{semRpc
           ? 'A planilha nova ainda não está instalada no banco — mostrando a gestão de cobranças anterior.'
@@ -245,8 +249,8 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   const [fCom, setFCom] = useState(''); // '' = todos; senão o nome em MAIÚSCULAS
   const [fBloco, setFBloco] = useState<string | null>(null);
   /* busca vinda da paleta ⌘K do shell (sessionStorage 'alfa_paleta_busca'): consome
-     a chave (ler + remover) e preenche a busca da grade — no mount (navegou pra cá)
-     ou pelo evento (a tela já estava aberta). Zera comercial/ciclo pro cliente
+     a chave (ler + remover) e preenche a busca da grade — no mount (navegou para cá)
+     ou pelo evento (a tela já estava aberta). Zera comercial/ciclo para o cliente
      escolhido não ficar escondido atrás de um filtro ativo. */
   useEffect(() => {
     const consumir = () => {
@@ -290,8 +294,8 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   // célula ativa da grade (ref: a seleção muda a cada seta — não re-renderiza a tela)
   const celulaAtiva = useRef<{ linhaId: string; colunaId: string } | null>(null);
   /* o ÚLTIMO modal de pagamento da tela fechou (informar, recusar, comprovante, seletor): o foco
-     volta pra grade — senão fica no body e as setas/Enter/Delete param até clicar na grade de
-     novo. Depois do commit (o modal já saiu do DOM); passar de um modal pro outro (comprovante →
+     volta para grade — senão fica no body e as setas/Enter/Delete param até clicar na grade de
+     novo. Depois do commit (o modal já saiu do DOM); passar de um modal para o outro (comprovante →
      recusar, seletor → informar) não conta. Só quando ninguém pegou o foco. */
   const focarGradeRef = useRef<(() => void) | null>(null);
   const modalPagamento = !!informar || !!recusarId || !!verComp || lancarOpen || novoMesOpen;
@@ -309,7 +313,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
 
   /* ---------- a folha ---------- */
   /* CANCELADOS (mig 79): a linha do cliente fica na folha (no mesmo lugar, pra voltar), mas some
-     da tela — tudo daqui pra baixo (grade, contagens, filtros, exportar) já vê a folha sem eles.
+     da tela — tudo daqui para baixo (grade, contagens, filtros, exportar) já vê a folha sem eles.
      A folha só aparece depois que a lista de clientes chegou (é ela que diz quem está nos
      Cancelados — antes disso eles piscariam na grade, editáveis) */
   const folha = plQ.data;
@@ -500,7 +504,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
       const cp = raizRef.current?.querySelector<HTMLElement>('.plx-copia');
       // menu da grade e modais podem estar em portal: procura no documento
       ocupadoAntes = (!!cp && getComputedStyle(cp).display !== 'none')
-        || !!document.querySelector('.plx-pop, .plx-menu, .gp-cols-pop, .veu, .veu-drawer');
+        || !!document.querySelector('.plx-pop, .plx-menu, .gp-cols-pop, .mm-pop, .veu, .veu-drawer');
     };
     const tecla = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || ocupadoAntes) return;
@@ -656,13 +660,13 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
   const direcionar = (l: GLinha, dia: number) => {
     if (!(dia >= 1 && dia <= 31)) return;
     editarMut.mutate({ id: l.id, patch: { dia } }, {
-      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: direcionado pro ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`); },
+      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: direcionado para o ciclo D${d2(dia)} — próxima cobrança ${dataBRcurta(proximaDoCiclo(dia))}.`); },
       onError: (e) => setAviso(msgErro(e)),
     });
   };
   const voltarNovos = (l: GLinha) => {
     editarMut.mutate({ id: l.id, patch: { situacao: 'ativo', dataParou: '' } }, {
-      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: voltou pros Novos — débito segue ativo.`); },
+      onSuccess: () => { relerPlanilha(); setAviso(`${l.nome}: voltou para os Novos — débito segue ativo.`); },
       onError: (e) => setAviso(msgErro(e)),
     });
   };
@@ -941,69 +945,67 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
         </div>
       )}
 
-      <div className="gp-barra">
-        <input ref={buscaRef} className="inp gp-busca" type="search" placeholder="Buscar na planilha (nome, NB, CPF…)" value={busca}
-          onChange={(e) => setBusca(e.target.value)} aria-label="Buscar na planilha" />
-        <select className="inp gp-sel" value={comAtivo} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial">
-          <option value="">Comercial: todos</option>
-          {comerciaisFolha.map((c) => <option key={c.k} value={c.k}>{c.v}</option>)}
-        </select>
-        <span className="gp-conta num">
-          {nClientes} cliente{nClientes === 1 ? '' : 's'}{filtro ? ` · ${nVis} no filtro` : ''}
-        </span>
-        <span className="gp-esp" />
-        {salvando && <span className="gp-salvando" role="status">Salvando…</span>}
-        {isRevizaMode && <SeloAoVivo />}
-        {/* sincronização com a planilha do Google: só aparecem quando ela está configurada */}
-        <SeloSync />
-        <BotaoSincronizacao papel={papel} gestor={gestor} />
-        {podeLancar && (
-          <BotaoSec mini onClick={abrirLancar} disabled={!dadosQ}
-            title="Informa o pagamento de um mês com o comprovante. Na célula de um mês em aberto do cliente, já vai direto para ela; fora dela, escolha o cliente e o mês">
-            <IcT d={IC_PATH.pagamento} />Lançar pagamento
-          </BotaoSec>
-        )}
-        {podeDirecionar && (
-          <BotaoSec mini onClick={() => setMoverCanc(clientesSelRef.current?.() ?? [])} disabled={!dadosQ}
-            title="Leva os clientes das linhas selecionadas pra aba Cancelados (saem da Gestão e da régua; nada é apagado). Dá pra selecionar várias linhas de uma vez">
-            <IcT d={IC.fechar} />Mover p/ Cancelados
-          </BotaoSec>
-        )}
-        {gestor && <BotaoSec mini onClick={() => setLixeiraOpen(true)}><IcT d={IC_PATH.girar} />Lixeira</BotaoSec>}
-        {gestor && dados && dados.linhas.length > 0 && (
-          <BotaoSec mini onClick={() => exportarPlanilhaXlsx(dados)} title="Baixa a planilha em .xlsx, igual à tela (sem senhas)"><IcT d={IC.exportar} />Exportar</BotaoSec>
-        )}
-        {finMais && dados && (
-          <BotaoSec mini onClick={() => setNovoMesOpen(true)} disabled={salvando}
-            title={`Abre a coluna do mês seguinte em todos os ciclos (${(planoMes && rotuloNovoMes(planoMes)) || 'próximo mês'})`}>
-            <IcT d={IC.novoMes} />Novo mês
-          </BotaoSec>
-        )}
-        <div className="gp-cols-wrap" ref={colsRef}>
-          <BotaoSec mini onClick={alternarCols} aria-expanded={colsAberto} disabled={!dados}><IcT d={IC.colunas} />Colunas</BotaoSec>
-          {colsAberto && (
-            <div className={colsEsq ? 'gp-cols-pop gp-cols-pop-esq' : 'gp-cols-pop'} role="dialog" aria-label="Mostrar ou ocultar colunas">
-              <div className="gp-cols-nota">{finMais ? 'Ocultar vale para toda a equipe.' : 'Ocultar vale só para você.'}</div>
-              {colunasOrd.map((c, i) => {
-                const trava = !finMais && ocultasEquipe.has(c.id);
-                return (
-                  <label key={c.id} className={trava ? 'gp-cols-item gp-cols-trava' : 'gp-cols-item'}
-                    title={trava ? 'Oculta pela equipe — só o financeiro, o gestor ou o administrador mostra de novo.' : undefined}>
-                    <input type="checkbox" checked={!c.oculta} disabled={trava} onChange={() => alternarColuna(c)} />
-                    <span className="gp-cols-letra num">{letraColuna(i)}</span>
-                    <span className="gp-cols-tit">{c.titulo || '(sem título)'}</span>
-                    {trava && <span className="gp-cols-tag">oculta pela equipe</span>}
-                  </label>
-                );
-              })}
-            </div>
+      {/* crítica 12/11: título e ações numa linha só — "Lançar pagamento" é a ação do dia (a única
+          dourada); as ações raras ficam no "Mais"; a tela cheia é só o ícone */}
+      <div className="ph gp-ph">
+        <div><h2>Gestão de cobranças</h2></div>
+        <div className="acoes gp-acoes">
+          {salvando && <span className="gp-salvando" role="status">Salvando…</span>}
+          {isRevizaMode && <SeloAoVivo />}
+          {/* sincronização com a planilha do Google: só aparecem quando ela está configurada */}
+          <SeloSync />
+          <BotaoSincronizacao papel={papel} gestor={gestor} />
+          {/* a tela cheia cobre o topo: o Desfazer global vem junto para cá */}
+          {cheia && (isRevizaMode || isDemoMode) && <span className="gp-desfazer"><BotaoDesfazer /></span>}
+          {gestor && dados && dados.linhas.length > 0 && (
+            <BotaoSec onClick={() => exportarPlanilhaXlsx(dados)} title="Baixa a planilha em .xlsx, igual à tela (sem senhas)"><IcT d={IC.exportar} />Exportar</BotaoSec>
+          )}
+          {(() => {
+            const itens: ItemMenuMais[] = [];
+            if (finMais && dados) itens.push({
+              rotulo: 'Novo mês', icone: IC.novoMes, desabilitado: salvando, aoClicar: () => setNovoMesOpen(true),
+              dica: `Abre a coluna do mês seguinte em todos os ciclos (${(planoMes && rotuloNovoMes(planoMes)) || 'próximo mês'})`,
+            });
+            if (dados) itens.push({ rotulo: 'Mostrar ou ocultar colunas', icone: IC.colunas, aoClicar: alternarCols });
+            if (podeDirecionar) itens.push({
+              rotulo: 'Mover para Cancelados', icone: IC.fechar, separar: true, desabilitado: !dadosQ,
+              aoClicar: () => setMoverCanc(clientesSelRef.current?.() ?? []),
+              dica: 'Leva os clientes das linhas selecionadas para Cancelados (saem da Gestão e da régua; nada é apagado). Selecione várias linhas de uma vez, se precisar',
+            });
+            if (gestor) itens.push({ rotulo: 'Lixeira', icone: IC.lixeira, separar: !podeDirecionar, aoClicar: () => setLixeiraOpen(true), dica: 'Clientes excluídos — restaure quem saiu por engano' });
+            if (!itens.length) return null;
+            return (
+              <MenuMais itens={itens} titulo="Mais ações" className="gp-cols-wrap"
+                extra={colsAberto && (
+                  <div ref={colsRef} className={colsEsq ? 'gp-cols-pop gp-cols-pop-esq' : 'gp-cols-pop'} role="dialog" aria-label="Mostrar ou ocultar colunas">
+                    <div className="gp-cols-nota">{finMais ? 'Ocultar vale para toda a equipe.' : 'Ocultar vale só para você.'}</div>
+                    {colunasOrd.map((c, i) => {
+                      const trava = !finMais && ocultasEquipe.has(c.id);
+                      return (
+                        <label key={c.id} className={trava ? 'gp-cols-item gp-cols-trava' : 'gp-cols-item'}
+                          title={trava ? 'Oculta pela equipe — só o financeiro, o gestor ou o administrador mostra de novo.' : undefined}>
+                          <input type="checkbox" checked={!c.oculta} disabled={trava} onChange={() => alternarColuna(c)} />
+                          <span className="gp-cols-letra num">{letraColuna(i)}</span>
+                          <span className="gp-cols-tit">{c.titulo || '(sem título)'}</span>
+                          {trava && <span className="gp-cols-tag">oculta pela equipe</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )} />
+            );
+          })()}
+          <button type="button" className={`p-btn btn-sec gp-cheia-bt${cheia ? ' on' : ''}`} onClick={() => setCheia((v) => !v)}
+            title={cheia ? 'Sair da tela cheia (Esc)' : 'Tela cheia'} aria-label={cheia ? 'Sair da tela cheia' : 'Tela cheia'} aria-pressed={cheia}>
+            <IcT d={cheia ? IC.sair : IC.cheia} mr={0} />
+          </button>
+          {podeLancar && (
+            <BotaoPrimario onClick={abrirLancar} disabled={!dadosQ}
+              title="Informa o pagamento de um mês com o comprovante. Na célula de um mês em aberto do cliente, vai direto para ela; fora dela, escolha o cliente e o mês">
+              <IcT d={IC_PATH.pagamento} />Lançar pagamento
+            </BotaoPrimario>
           )}
         </div>
-        {/* a tela cheia cobre o topo: o Desfazer global vem junto pra cá */}
-        {cheia && (isRevizaMode || isDemoMode) && <span className="gp-desfazer"><BotaoDesfazer /></span>}
-        <BotaoSec mini onClick={() => setCheia((v) => !v)} title={cheia ? 'Voltar ao layout normal (Esc)' : 'A planilha ocupa a tela inteira'}>
-          <IcT d={cheia ? IC.sair : IC.cheia} />{cheia ? 'Sair da tela cheia' : 'Tela cheia'}
-        </BotaoSec>
       </div>
 
       {aguardando.length > 0 && podeDirecionar && (
@@ -1014,7 +1016,15 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
         </button>
       )}
 
-      <div className="gp-linha-chips">
+      {/* faixa de filtros: busca e comercial à esquerda, ciclos no resto da linha */}
+      <div className="gp-barra gp-linha-chips">
+        <input ref={buscaRef} className="inp gp-busca" type="search" placeholder="Buscar nome, NB ou CPF…" value={busca}
+          onChange={(e) => setBusca(e.target.value)} aria-label="Buscar na planilha" />
+        <select className="inp gp-sel" value={comAtivo} onChange={(e) => setFCom(e.target.value)} aria-label="Filtrar por comercial">
+          <option value="">Comercial: todos</option>
+          {comerciaisFolha.map((c) => <option key={c.k} value={c.k}>{c.v}</option>)}
+        </select>
+        {filtro && <span className="gp-conta num">{nVis} no filtro</span>}
         <SeletorCiclos
           itens={[
             ...chips.map(({ b, n, ag }) => ({
@@ -1032,7 +1042,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
             if (id && id.startsWith('aberto-')) {
               const dd0 = Number(id.slice(7));
               if (finMais) setCiclosOpen(true);
-              else setAviso(`O ciclo D${d2(dd0)} está aberto, ainda sem clientes — ele aparece na planilha quando o primeiro cliente for direcionado pra ele.`);
+              else setAviso(`O ciclo D${d2(dd0)} está aberto, ainda sem clientes — ele aparece na planilha quando o primeiro cliente for direcionado para ele.`);
               return;
             }
             clicarChip(id);
@@ -1069,7 +1079,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
             onAbrirFicha={(leadId) => setFichaId(leadId)}
             onBuscar={focarBusca}
             irParaBloco={irPara}
-            barraExtra={<LegendaEstados className="gp-legenda" />}
+            rodapeExtra={<LegendaEstados className="gp-legenda" />}
             onInformarPagamento={abrirInformar}
             onAprovarEntrada={aprovarEntrada}
             onRecusarEntrada={pedirRecusa}
@@ -1083,7 +1093,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
         )}
       </div>
 
-      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar pro ciclo"
+      <ModalV2 aberto={dirOpen} aoFechar={() => setDirOpen(false)} largura={640} titulo="Direcionar para o ciclo"
         rodape={<BotaoSec onClick={() => setDirOpen(false)}>Fechar</BotaoSec>}>
         {aguardando.length === 0 ? <div className="fin-vazio">Ninguém aguardando — todos os clientes estão em um ciclo.</div> : (
           <>
@@ -1098,7 +1108,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
                       {ciclosDisp.map((d) => <option key={d} value={d}>D{d2(d)} — cobra {dataBRcurta(proximaDoCiclo(d))} ({diaSemanaBR(proximaDoCiclo(d))})</option>)}
                     </select>
                     <BotaoPrimario onClick={() => direcionar(l, dia)} disabled={editarMut.isPending || !(dia >= 1)}>Aplicar</BotaoPrimario>
-                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta pros Novos com o débito ativo.">Voltar pros Novos</BotaoSec>
+                    <BotaoSec mini onClick={() => voltarNovos(l)} disabled={editarMut.isPending} title="Marcou parado por engano? O cliente volta para os Novos com o débito ativo.">Voltar para Novos</BotaoSec>
                   </div>
                 );
               })}
@@ -1212,7 +1222,7 @@ function GestaoPlanilhaNova({ gestor, papel, aoSemRpc }: { demo: boolean; gestor
             return Object.entries(porComp).filter(([comp, w]) => comp >= compCorr && (w.cobranca || w.inicio || w.fim)).map(([comp]) => rotuloMes(comp));
           }}
           aoAbrir={(dia) => abrirCicloMut.mutate(dia, {
-            onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes pra ele.`),
+            onSuccess: () => setAviso(`Ciclo D${d2(dia)} aberto (vazio) — direcione ou mova clientes para ele.`),
             onError: (e) => setAviso(msgErro(e)),
           })}
           aoFecharDia={(dia) => fecharCicloMut.mutate(dia, {
@@ -1444,14 +1454,14 @@ function InformarPagamento({ nome, mes, ciclo, valorInicial, valorDigitado, divi
             {semPct ? (
               <span className={pctSituacao === 'erro' ? 'gp-inf-div-aviso' : undefined} role={pctSituacao === 'erro' ? 'alert' : undefined}>
                 {pctSituacao === 'erro'
-                  ? 'Não deu pra carregar a % da comissão — recarregue a página antes de enviar (sem ela a divisão sairia errada).'
+                  ? 'Não foi possível carregar a % da comissão — recarregue a página antes de enviar (sem ela a divisão sairia errada).'
                   : 'Carregando a % da comissão…'}
               </span>
             ) : valorOk && v != null && liquido != null ? (<>
               <span>Escritório <b className="num">{fmtBRL(liquido)}</b></span>
               {divisao
                 ? <span>{nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%) <b className="num">{fmtBRL(parteDoComercial(liquido, divisao.pct))}</b></span>
-                : <span>Cliente sem comercial — o valor todo fica pro escritório.</span>}
+                : <span>Cliente sem comercial — o valor todo fica para o escritório.</span>}
               {totalReg != null && totalReg !== Math.round(v * 100) / 100 && (
                 <span className="gp-inf-div-nota">Arredondamento da divisão: fica registrado que o cliente pagou {fmtBRL(totalReg)}.</span>
               )}
@@ -1462,9 +1472,9 @@ function InformarPagamento({ nome, mes, ciclo, valorInicial, valorDigitado, divi
                 <span className="gp-inf-div-aviso" role="status">Abaixo da mensalidade deste cliente (cerca de {fmtBRL(divisao.esperado)}) — confira.</span>
               )}
             </>) : divisao ? (
-              <span>Digite o total que o cliente pagou — aqui embaixo aparece quanto fica pro escritório e quanto é de {nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%).</span>
+              <span>Digite o total que o cliente pagou — aqui embaixo aparece quanto fica para o escritório e quanto é de {nomeCurto(divisao.comercial)} ({fmtPct(divisao.pct)}%).</span>
             ) : (
-              <span>Digite o total que o cliente pagou. Cliente sem comercial: o valor todo fica pro escritório.</span>
+              <span>Digite o total que o cliente pagou. Cliente sem comercial: o valor todo fica para o escritório.</span>
             )}
           </div>
         </div>

@@ -61,7 +61,7 @@ const maxMesPos = (d: PlDados) => d.colunas.reduce((mx, c) => (c.tipo === 'mes' 
 const msgAmigavel = (e: unknown) => {
   const m = String((e as Error)?.message ?? '');
   if (/fetch|network|rede|timeout/i.test(m)) return 'Sem resposta do servidor — confira a internet. Se o mês chegou a ser criado, ele já aparece na planilha.';
-  return m || 'Não deu pra adicionar o mês agora. Tente de novo.';
+  return m || 'Não foi possível adicionar o mês agora. Tente de novo.';
 };
 
 export function NovoMesModal({ dados, aoFechar, criar, conferir, aoCriado }: {
@@ -128,7 +128,7 @@ export function NovoMesModal({ dados, aoFechar, criar, conferir, aoCriado }: {
       </>}>
       <div className="gp-nm" ref={btRef}>
         <p className="gp-nm-alerta" id={avisoId}>
-          <b>Não dá pra desfazer:</b> coluna de mês não pode ser excluída depois — ela alimenta o painel, a régua e as comissões.
+          <b>Não é possível desfazer:</b> coluna de mês não pode ser excluída depois — ela alimenta o painel, a régua e as comissões.
         </p>
         {jaCriado && (
           <div className="gs-aviso erro" role="alert"><span>O {plano.titulo} já foi criado enquanto esta janela estava aberta. Feche e confira a planilha.</span></div>
