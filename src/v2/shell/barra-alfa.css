@@ -15,7 +15,7 @@ html[data-barra-alfa] .v2 {
   --ba-fio: rgba(255, 255, 255, .075);
   --ba-txt: #F2F3F5;
   --ba-mudo: #9EA2AA;
-  --ba-rotulo: #73777F;
+  --ba-rotulo: #8A8E96;
   --ba-hover: rgba(255, 255, 255, .05);
   --ba-ativo: color-mix(in srgb, var(--azul) 15%, transparent);
   --ba-ativo-ico: var(--azul);
@@ -29,6 +29,7 @@ html[data-barra-alfa] .v2 {
   --ba-sombra-menu: 0 20px 25px -5px rgba(0, 0, 0, .35), 0 8px 10px -6px rgba(0, 0, 0, .3);
   --ba-sombra-trilho: 14px 0 34px rgba(0, 0, 0, .42);
   --ba-foco: color-mix(in srgb, var(--azul) 72%, transparent);
+  --ba-badge-on-tx: var(--azul);
   --ba-e: cubic-bezier(.4, 0, .2, 1);
   --ba-cheia: 260px;
 }
@@ -37,7 +38,7 @@ html[data-barra-alfa][data-tema="light"] .v2 {
   --ba-fio: #E6E7EA;
   --ba-txt: #0C0D0F;
   --ba-mudo: #61656D;
-  --ba-rotulo: #7E828A;
+  --ba-rotulo: #6B6F77;
   --ba-hover: rgba(15, 18, 24, .045);
   --ba-ativo: color-mix(in srgb, var(--azul) 13%, transparent);
   --ba-ativo-ico: var(--rv-tinta, #8C6608);
@@ -45,8 +46,11 @@ html[data-barra-alfa][data-tema="light"] .v2 {
   --ba-badge-tx: var(--rv-tinta, #8C6608);
   --ba-kbd-fio: #E2E3E6;
   --ba-kbd-bg: #FAFAFB;
-  --ba-kbd-tx: #7E828A;
+  --ba-kbd-tx: #6B6F77;
   --ba-menu: #FFFFFF;
+  /* foco e contador sobre o item ativo no claro: a tinta escura do dourado (o dourado puro fica a ~2,3:1) */
+  --ba-foco: color-mix(in srgb, var(--rv-tinta, #8C6608) 88%, transparent);
+  --ba-badge-on-tx: color-mix(in srgb, var(--azul), #000 40%);
   --ba-sombra-menu: 0 20px 25px -5px rgba(16, 24, 40, .1), 0 8px 10px -6px rgba(16, 24, 40, .08);
   --ba-sombra-trilho: 14px 0 34px rgba(16, 24, 40, .1);
 }
@@ -55,7 +59,9 @@ html[data-barra-alfa][data-tema="light"] .v2 {
 html[data-barra-alfa] .v2 .p-app {
   --ba-w: var(--ba-cheia);
   padding-left: var(--ba-w);
-  transition: padding-left .28s var(--ba-e);
+  /* o conteúdo pula para o lugar novo de uma vez (animar o padding refazia o layout da página inteira a
+     cada quadro); a barra é que anima — e a faixa dela já vem pintada, sem vão enquanto ela cresce */
+  background: linear-gradient(90deg, var(--ba-fundo) var(--ba-w), transparent var(--ba-w));
 }
 html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] { --ba-w: 64px; }
 html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] { --ba-w: 0px; }
@@ -74,17 +80,33 @@ html[data-barra-alfa] .v2 .ba-in {
   width: calc(var(--ba-cheia) - 1px); height: 100%; padding: 12px;
 }
 
-/* recolhida (trilho): 64px, só os ícones; o mouse ou o Tab abre por cima do conteúdo */
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra { width: 64px; transition-delay: .12s; }
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:hover, :has(:focus-visible), [data-menu]) {
-  width: var(--ba-cheia); box-shadow: var(--ba-sombra-trilho); transition-delay: .05s;
+/* recolhida (trilho): 64px, só os ícones — o texto, os contadores e os atalhos somem (sem mudar o layout:
+   abrir não reflui nada); o item e a marca viram um "botão de ícone" de 40px, com o destaque redondo */
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra { width: 64px; transition-delay: .08s; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-cab-bt) { opacity: 0; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra .ba-cab-bt { visibility: hidden; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra .ba-ponto { opacity: 1; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra :is(.ba-item, .ba-ws-gat) { width: 40px; }
+/* aberta por cima do conteúdo: com o Tab dentro, com o menu de ambiente aberto ou pelo botão do topo… */
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]),
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra { width: var(--ba-cheia); box-shadow: var(--ba-sombra-trilho); transition-delay: 0s; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-cab-bt),
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-cab-bt) { opacity: 1; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) .ba-cab-bt,
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra .ba-cab-bt { visibility: visible; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) .ba-ponto,
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra .ba-ponto { opacity: 0; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:has(:focus-visible), [data-menu]) :is(.ba-item, .ba-ws-gat),
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"][data-sobre] .ba-barra :is(.ba-item, .ba-ws-gat) { width: 100%; }
+/* …e no mouse — só onde existe mouse: no toque o "hover" gruda depois do toque e a barra ficava presa
+   aberta por cima da página (tablet); lá o trilho navega pelos ícones e o botão do topo abre */
+@media (hover: hover) {
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover { width: var(--ba-cheia); box-shadow: var(--ba-sombra-trilho); transition-delay: .05s; }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-cab-bt) { opacity: 1; }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover .ba-cab-bt { visibility: visible; }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover .ba-ponto { opacity: 0; }
+  html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:hover :is(.ba-item, .ba-ws-gat) { width: 100%; }
 }
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu])
-  :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao) { opacity: 0; }
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu]) .ba-ponto { opacity: 1; }
-/* recolhida, o item e o quadrado da marca viram um "botão de ícone" de 40px: o destaque do ativo e o
-   hover ficam redondos em volta do ícone, em vez de cortados retos na borda do trilho */
-html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu]) :is(.ba-item, .ba-ws-gat) { width: 40px; }
 
 /* celular (gaveta): some; o botão do topo abre por cima, com o véu atrás */
 html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] { --ba-cheia: min(280px, 86vw); }
@@ -92,7 +114,7 @@ html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] .ba-barra {
   z-index: 60; transform: translateX(-102%); visibility: hidden;
   transition: transform .28s var(--ba-e), visibility 0s linear .28s;
 }
-html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"][data-gaveta] .ba-barra {
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"][data-sobre] .ba-barra {
   transform: none; visibility: visible; box-shadow: 18px 0 48px rgba(0, 0, 0, .45);
   transition: transform .28s var(--ba-e);
 }
@@ -101,10 +123,22 @@ html[data-barra-alfa] .v2 .ba-veu {
   background: rgba(6, 7, 9, .55); animation: ba-veu .2s ease;
 }
 html[data-barra-alfa][data-tema="light"] .v2 .ba-veu { background: rgba(16, 24, 40, .32); }
+/* trilho aberto pelo botão (tela média): o véu só pega o clique fora — não escurece */
+html[data-barra-alfa] .v2 .ba-veu.leve, html[data-barra-alfa][data-tema="light"] .v2 .ba-veu.leve { z-index: 29; background: transparent; animation: none; }
+/* celular: itens de 40px (dedo), mesmo em tela baixa; e o aviso flutuante não fica por cima da gaveta */
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] .ba-item { padding-top: 10px; padding-bottom: 10px; }
+html[data-barra-alfa] .v2 .p-app[data-sobre] .av-alerta { display: none; }
 @keyframes ba-veu { from { opacity: 0; } }
 
-/* ---- o "workspace": empresa + ambiente (troca Cobranças ⇄ Atendimento) ---- */
-html[data-barra-alfa] .v2 .ba-ws { position: relative; flex: none; margin-bottom: 12px; }
+/* ---- o "workspace": empresa + ambiente (troca Cobranças ⇄ Atendimento) + o botão do canto (fixar
+   aberta / recolher / fechar) quando a barra está por cima do conteúdo ---- */
+html[data-barra-alfa] .v2 .ba-cab { display: flex; align-items: center; gap: 4px; flex: none; margin-bottom: 12px; }
+html[data-barra-alfa] .v2 .ba-ws { position: relative; flex: 1; min-width: 0; }
+html[data-barra-alfa] .v2 .ba-cab-bt {
+  display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--ba-mudo); cursor: pointer;
+  transition: background-color .15s var(--ba-e), color .15s var(--ba-e), opacity .15s;
+}
 html[data-barra-alfa] .v2 .ba-ws-gat {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 6px 6px 6px 4px; border: 0; border-radius: 8px;
@@ -124,7 +158,7 @@ html[data-barra-alfa] .v2 .ba-ws-amb { overflow: hidden; white-space: nowrap; te
 html[data-barra-alfa] .v2 .ba-ws-nome { font-size: 13px; font-weight: 600; line-height: 16px; letter-spacing: .01em; color: var(--ba-txt); }
 html[data-barra-alfa] .v2 .ba-ws-amb { font-size: 11.5px; line-height: 15px; color: var(--ba-mudo); }
 html[data-barra-alfa] .v2 .ba-ws-seta {
-  flex: none; color: color-mix(in srgb, var(--ba-mudo) 65%, transparent);
+  flex: none; color: color-mix(in srgb, var(--ba-mudo) 88%, transparent);
   transition: color .15s var(--ba-e), opacity .15s;
 }
 html[data-barra-alfa] .v2 .ba-menu {
@@ -195,6 +229,8 @@ html[data-barra-alfa] .v2 .ba-ponto {
   position: absolute; top: -2px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--azul); box-shadow: 0 0 0 2px var(--ba-fundo); opacity: 0; transition: opacity .15s;
 }
+html[data-barra-alfa] .v2 .ba-item.on .ba-ponto { box-shadow: none; }
+html[data-barra-alfa] .v2 .ba-item.on .ba-badge { color: var(--ba-badge-on-tx); }
 
 /* a trilha do topo ("Cobranças / Painel") já diz onde a pessoa está: o rótulo pequeno em caixa alta
    que algumas páginas punham acima do título (COBRANÇAS, FERRAMENTAS) sai para não repetir */
@@ -211,8 +247,8 @@ html[data-barra-alfa] .v2 .ba-versao {
 }
 
 /* ---- foco e hover (hover só com mouse: no toque ele ficaria preso) ---- */
-html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar):focus { outline: none; }
-html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar):focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
+html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar, .ba-cab-bt):focus { outline: none; }
+html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar, .ba-cab-bt):focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
 @media (hover: hover) {
   html[data-barra-alfa] .v2 .ba-ws-gat:not(.estatico):hover { background: var(--ba-hover); }
   html[data-barra-alfa] .v2 .ba-ws-gat:not(.estatico):hover .ba-ws-seta { color: var(--ba-txt); }
@@ -220,10 +256,11 @@ html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar)
   html[data-barra-alfa] .v2 .ba-item:not(.on):hover { background: var(--ba-hover); color: color-mix(in srgb, var(--ba-txt) 92%, transparent); }
   html[data-barra-alfa] .v2 .ba-item:not(.on):hover .ba-ico { color: color-mix(in srgb, var(--ba-txt) 78%, transparent); }
   html[data-barra-alfa] .v2 .ba-item:hover .ba-kbd { display: inline-flex; }
-  html[data-barra-alfa] .v2 .ba-alternar:hover { background: var(--ba-hover); color: var(--ba-txt); }
+  html[data-barra-alfa] .v2 :is(.ba-alternar, .ba-cab-bt):hover { background: var(--ba-hover); color: var(--ba-txt); }
 }
 
-/* ---- tela baixa: o ritmo aperta para o menu da Cobrança (16 itens) caber sem rolar ---- */
+/* ---- tela baixa: o ritmo aperta para o menu da Cobrança (16 itens) caber sem rolar até ~760px de altura;
+   abaixo disso a lista rola (com o esmaecido na borda) ---- */
 @media (max-height: 900px) {
   html[data-barra-alfa] .v2 .ba-in { padding: 10px 12px; }
   html[data-barra-alfa] .v2 .ba-ws { margin-bottom: 8px; }
@@ -247,7 +284,8 @@ html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar {
   background: var(--ba-fundo); border-bottom: 1px solid var(--ba-fio);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-html[data-barra-alfa] .v2 .ba-topo { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+/* min-width: o botão de recolher nunca fica por baixo dos botões da direita (no celular o Desfazer crescia por cima dele) */
+html[data-barra-alfa] .v2 .ba-topo { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 40px; }
 html[data-barra-alfa] .v2 .ba-alternar {
   display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0;
   border: 0; border-radius: 6px; background: none; color: var(--ba-mudo); cursor: pointer;
@@ -278,6 +316,13 @@ html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .av
 }
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn:hover { border-color: color-mix(in srgb, var(--azul) 60%, transparent); }
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 2px; }
+/* Desfazer (estilo em linha no componente): anel de foco dourado; no celular só o ícone */
+html[data-barra-alfa] .v2 .p-topbar .bd-botao:focus { outline: none; }
+html[data-barra-alfa] .v2 .p-topbar .bd-botao:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 2px; }
+@media (max-width: 760px) {
+  html[data-barra-alfa] .v2 .p-topbar .bd-botao { padding: 0 9px !important; gap: 0 !important; }
+  html[data-barra-alfa] .v2 .p-topbar :is(.bd-rotulo, .bd-acao) { display: none; }
+}
 /* celular: sem a trilha do ambiente (só a página) e os botões mais juntos */
 @media (max-width: 760px) {
   html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar { padding: 0 10px; gap: 8px; }
@@ -285,6 +330,9 @@ html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .av
   html[data-barra-alfa] .v2 .ba-trilha { font-size: 13.5px; }
   html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .top-dir { gap: 2px; }
 }
+
+/* o "Perfil salvo" das Configurações flutua centrado no CONTEÚDO (a conta antiga era do trilho de 84px) */
+html[data-barra-alfa] .v2 .aviso-inline.cfg-aviso { left: calc(50% + var(--ba-w) / 2); }
 
 /* =====================================================================
    BUSCA (⌘K) na pele da referência: véu com desfoque, caixa de 576px a 15%
@@ -327,17 +375,20 @@ html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item {
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item.on { background: var(--ba-ativo); color: var(--ba-txt); }
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item .pal-ico svg { stroke-width: 1.5; }
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item.on .pal-ico { color: var(--ba-ativo-ico); }
-html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-meta.pal-meta { font-size: 12px; color: color-mix(in srgb, var(--ba-mudo) 78%, transparent); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-meta.pal-meta { font-size: 12px; color: var(--ba-mudo); }
 html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-vazio.pal-vazio { padding: 28px 12px; text-align: center; font-size: 13px; font-weight: 500; color: var(--ba-mudo); }
 html[data-barra-alfa] .v2 .pal-rodape { display: none; }
 @media (max-width: 639px) { html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-topo.pal-topo kbd { display: none; } }
 
-/* ---- Modo de Performance (leve) e quem pediu menos movimento: sem animação nem desfoque ---- */
-html[data-barra-alfa][data-perf="lite"] .v2 :is(.p-app, .ba-barra, .ba-item, .ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ponto, .ba-versao),
-html[data-barra-alfa][data-perf="lite"] .v2 .ba-menu { transition: none !important; animation: none !important; }
+/* ---- Modo de Performance (Leve, o padrão de quase todos): o base.css desliga TODA transição — a da barra
+   volta (largura e esmaecido são baratos: o miolo tem largura fixa, nada reflui); o desfoque do véu sai ---- */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-perf="lite"] .v2 .p-app .ba-barra { transition: width .24s var(--ba-e), box-shadow .24s var(--ba-e), transform .28s var(--ba-e) !important; }
+  html[data-barra-alfa][data-perf="lite"] .v2 .p-app .ba-barra :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-ponto, .ba-cab-bt) { transition: opacity .15s !important; }
+}
 html[data-barra-alfa][data-perf="lite"][data-repaginada][data-repaginada] .v2 .pal-veu.pal-veu { -webkit-backdrop-filter: none; backdrop-filter: none; }
 @media (prefers-reduced-motion: reduce) {
-  html[data-barra-alfa] .v2 :is(.p-app, .ba-barra, .ba-item, .ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ponto, .ba-versao, .ba-menu, .ba-veu) {
+  html[data-barra-alfa] .v2 :is(.ba-barra, .ba-item, .ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ponto, .ba-versao, .ba-menu, .ba-veu, .ba-cab-bt) {
     transition-duration: .01ms !important; animation-duration: .01ms !important;
   }
 }

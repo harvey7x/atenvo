@@ -36,7 +36,7 @@ import { getCobrancaRepo } from '../data/cobranca/cobrancaRepo';
 import { chavesCobranca } from '../data/cobranca/keys';
 import type { Dados } from '../data/cobranca/types';
 import { BotaoDesfazer } from './BotaoDesfazer';
-import { BarraAlfa, TopoAlfa, IcFechar, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
+import { BarraAlfa, TopoAlfa, IcFechar, type AcaoTopoBarra, type GrupoBarra, type ItemBarra, type ModoBarra } from './BarraAlfa';
 
 /* ALFA (Reviza de verdade e a demo): barra lateral e topo no desenho da referência "Dashboard
    Sidebar" (dono 12/11) — BarraAlfa.tsx. O Atenvo (fora daqui) segue com a cápsula flutuante. */
@@ -46,9 +46,14 @@ const CHAVE_BARRA = 'reviza.barra';
 const lerPrefBarra = (): 'aberta' | 'trilho' | null => {
   try { const v = localStorage.getItem(CHAVE_BARRA); return v === 'aberta' || v === 'trilho' ? v : null; } catch { return null; }
 };
-/* celular (gaveta): a barra some e abre por cima pelo botão do topo */
-const MQ_CELULAR = '(max-width: 760px)';
-const ehCelularAgora = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(MQ_CELULAR).matches;
+/* zonas pela largura da tela: celular (≤760px) = gaveta; média (761–1439px, os notebooks da equipe) =
+   trilho — encaixada ali a barra espremeria as telas, que foram feitas para o trilho de antes; o botão
+   do topo abre por cima; larga (≥1440px) = a escolha da pessoa, aberta de saída */
+const LARGURA_CELULAR = 760;
+const LARGURA_ENCAIXE = 1440;
+const zonaDaLargura = (w: number): 'gaveta' | 'media' | 'larga' => (w <= LARGURA_CELULAR ? 'gaveta' : w < LARGURA_ENCAIXE ? 'media' : 'larga');
+/* atalho de teclado não age com o foco num campo de texto (Ctrl+, apagava o rascunho do WhatsApp) */
+const ehEditavel = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
 const IconeSol = () => (
@@ -268,7 +273,12 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   const [ativo, setAtivo] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listaRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // ao abrir, o foco vai para o campo; ao fechar, volta para onde estava (o item Buscar, por exemplo)
+  useEffect(() => {
+    const antes = document.activeElement as HTMLElement | null;
+    inputRef.current?.focus();
+    return () => { if (antes && antes.isConnected && antes !== document.body) antes.focus({ preventScroll: true }); };
+  }, []);
   useEffect(() => { setAtivo(0); }, [q]);
 
   // clientes = a MESMA query da Gestão (chave compartilhada → cache aproveitado). Quem decide é o
@@ -315,6 +325,14 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   };
   const aoTeclar = (e: RKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') { e.preventDefault(); aoFechar(); return; }
+    // ALFA (como a referência): o Tab fica dentro da busca — o campo e o fechar; os resultados vão nas setas
+    if (alfa && e.key === 'Tab') {
+      const paradas = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('.pal-inp, .pal-fechar'));
+      const at = paradas.indexOf(document.activeElement as HTMLElement);
+      e.preventDefault();
+      paradas[(at + (e.shiftKey ? -1 : 1) + paradas.length) % paradas.length]?.focus();
+      return;
+    }
     if (e.key === 'ArrowDown') { e.preventDefault(); setAtivo(Math.min(at + 1, Math.max(0, itens.length - 1))); return; }
     if (e.key === 'ArrowUp') { e.preventDefault(); setAtivo(Math.max(at - 1, 0)); return; }
     if (e.key === 'Enter' && itens[at]) { e.preventDefault(); abrir(itens[at]); }
@@ -343,7 +361,7 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
             return (
               <Fragment key={it.tipo === 'secao' ? 's-' + it.slug : 'c-' + it.id}>
                 {cabecalho && <div className="pal-glabel">{it.tipo === 'secao' ? 'Seções' : 'Clientes'}</div>}
-                <button type="button" className={i === at ? 'pal-item on' : 'pal-item'}
+                <button type="button" className={i === at ? 'pal-item on' : 'pal-item'} tabIndex={alfa ? -1 : undefined}
                   onMouseEnter={() => setAtivo(i)} onClick={() => abrir(it)}>
                   <span className="pal-ico" aria-hidden>{it.tipo === 'secao' ? iconeDoItem(it.slug) : COB_ICONES.clientes}</span>
                   {it.tipo === 'secao' ? (
@@ -373,7 +391,7 @@ function PaletaBusca({ secoes, raiz, aoFechar, comClientes, alfa = false }: { se
   );
 }
 
-/** Shell autenticado v2: sidebar em overlay (64→242 no hover), topbar e palco. */
+/** Shell autenticado v2: barra lateral (ALFA: BarraAlfa — aberta/trilho/gaveta; Atenvo: cápsula em overlay 64→242 no hover), topbar e palco. */
 export default function AppShellV2() {
   const { user, signOut } = useAuth();
   const { currentOrg } = useOrg();
@@ -608,29 +626,35 @@ export default function AppShellV2() {
 
   // BARRA DA ALFA: aberta (260px) ou recolhida (trilho) — preferência deste aparelho, e o padrão
   // segue a largura da tela; no celular vira gaveta (o botão do topo abre por cima)
-  const [prefBarra, setPrefBarra] = useState<'aberta' | 'trilho'>(() => lerPrefBarra() ?? (typeof window !== 'undefined' && window.innerWidth < 1200 ? 'trilho' : 'aberta'));
-  const [celular, setCelular] = useState(ehCelularAgora);
-  const [gavetaAberta, setGavetaAberta] = useState(false);
+  const [prefBarra, setPrefBarra] = useState<'aberta' | 'trilho'>(() => lerPrefBarra() ?? 'aberta');
+  const [largura, setLargura] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : LARGURA_ENCAIXE));
   useEffect(() => {
-    if (!ALFA || typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia(MQ_CELULAR);
-    // o 'change' da media query não dispara em janela emulada: o resize cobre
-    const ver = () => setCelular(mq.matches);
-    mq.addEventListener?.('change', ver);
+    if (!ALFA || typeof window === 'undefined') return;
+    const ver = () => setLargura(window.innerWidth);
     window.addEventListener('resize', ver);
-    return () => { mq.removeEventListener?.('change', ver); window.removeEventListener('resize', ver); };
+    return () => window.removeEventListener('resize', ver);
   }, []);
-  useEffect(() => { setGavetaAberta(false); }, [location.pathname, celular]);
-  const modoBarra: ModoBarra = celular ? 'gaveta' : prefBarra;
+  const zonaBarra = zonaDaLargura(largura);
+  // por cima do conteúdo: a gaveta do celular ou o trilho aberto pelo botão (tela média). Fecha ao navegar.
+  const [sobreposta, setSobreposta] = useState(false);
+  useEffect(() => { setSobreposta(false); }, [location.pathname, zonaBarra]);
+  const modoBarra: ModoBarra = zonaBarra === 'gaveta' ? 'gaveta' : zonaBarra === 'media' ? 'trilho' : prefBarra;
+  const guardarPref = useCallback((prox: 'aberta' | 'trilho') => {
+    setPrefBarra(prox);
+    try { localStorage.setItem(CHAVE_BARRA, prox); } catch { /* sem storage: vale só nesta aba */ }
+  }, []);
   const alternarBarra = useCallback(() => {
-    if (celular) { setGavetaAberta((v) => !v); return; }
-    setPrefBarra((v) => {
-      const prox = v === 'aberta' ? 'trilho' : 'aberta';
-      try { localStorage.setItem(CHAVE_BARRA, prox); } catch { /* sem storage: vale só nesta aba */ }
-      return prox;
-    });
-  }, [celular]);
-  const fecharGaveta = useCallback(() => setGavetaAberta(false), []);
+    if (zonaBarra !== 'larga') { setSobreposta((v) => !v); return; }
+    guardarPref(prefBarra === 'aberta' ? 'trilho' : 'aberta');
+  }, [zonaBarra, prefBarra, guardarPref]);
+  const fecharSobreposta = useCallback(() => setSobreposta(false), []);
+  // o botão do canto da barra quando ela está por cima: no trilho da tela larga, "manter aberta" (o botão do
+  // topo fica coberto pela barra aberta pelo mouse); na tela média, recolher; no celular, fechar
+  const acaoTopo: AcaoTopoBarra | null = modoBarra === 'gaveta'
+    ? { rotulo: 'Fechar o menu', tipo: 'fechar', aoClicar: fecharSobreposta }
+    : modoBarra === 'trilho' && zonaBarra === 'media'
+      ? (sobreposta ? { rotulo: 'Recolher a barra lateral', tipo: 'recolher', aoClicar: fecharSobreposta } : null)
+      : modoBarra === 'trilho' ? { rotulo: 'Manter a barra aberta', tipo: 'fixar', aoClicar: () => guardarPref('aberta') } : null;
   // os itens da barra: os MESMOS do menu (mesmo filtro de papel), com o ícone e o contador de cada um
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
@@ -644,7 +668,8 @@ export default function AppShellV2() {
     .map((g) => ({ rotulo: g.rotulo, itens: filtrarItensNav(g.itens).map(itemDaBarra) }))
     .filter((g) => g.itens.length > 0);
   const rodapeBarra: ItemBarra[] = modulo.grupos.filter((g) => g.fixo).flatMap((g) => filtrarItensNav(g.itens)).map(itemDaBarra);
-  // ⌘, (Ctrl+, no Windows) abre Configurações — só onde o item está no pé (Atendimento)
+  // ⌘, (Ctrl+, no Windows) abre Configurações — só onde o item está no pé (Atendimento), nunca digitando
+  // num campo nem com a busca aberta
   const atalhoConfigRef = useRef(false);
   atalhoConfigRef.current = ALFA && !acessoCarregando && rodapeBarra.some((i) => i.slug === 'configuracoes');
   const trocarModulo = useCallback((m: Modulo) => {
@@ -654,11 +679,12 @@ export default function AppShellV2() {
 
   // Paleta de busca global: a barra do topo abre de verdade (clique ou ⌘K/Ctrl+K)
   const [paletaAberta, setPaletaAberta] = useState(false);
+  if (paletaAberta) atalhoConfigRef.current = false; // busca aberta: o Ctrl+, não troca a página por baixo dela
   const fecharPaleta = useCallback(() => setPaletaAberta(false), []);
   useEffect(() => {
     const aoTecla = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletaAberta((v) => !v); return; }
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ',' && atalhoConfigRef.current && !e.repeat) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ',' && atalhoConfigRef.current && !e.repeat && !ehEditavel(e.target)) {
         e.preventDefault(); navigate('/configuracoes');
       }
     };
@@ -703,11 +729,11 @@ export default function AppShellV2() {
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
-      <div className="p-app" data-barra={ALFA ? modoBarra : undefined} data-gaveta={ALFA && modoBarra === 'gaveta' && gavetaAberta ? '' : undefined}>
+      <div className="p-app" data-barra={ALFA ? modoBarra : undefined} data-sobre={ALFA && sobreposta ? '' : undefined}>
         {ALFA ? (
           <BarraAlfa
-            modo={modoBarra} gavetaAberta={gavetaAberta} aoFecharGaveta={fecharGaveta}
-            org={org}
+            modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
+            org="ALFA GROUP"
             ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
             aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}
@@ -802,8 +828,9 @@ export default function AppShellV2() {
         <main className="principal">
           <div className="p-topbar">
             {ALFA ? (
-              <TopoAlfa modo={modoBarra} gavetaAberta={gavetaAberta} aoAlternar={alternarBarra}
-                ambiente={acessoCarregando ? '' : modulo.rotulo} pagina={tituloDaRota(location.pathname)} />
+              <TopoAlfa modo={modoBarra} sobreposta={sobreposta} aoAlternar={alternarBarra}
+                ambiente={acessoCarregando || semAcessoAoAmbiente ? '' : modulo.rotulo}
+                pagina={acessoCarregando || semAcessoAoAmbiente ? '' : tituloDaRota(location.pathname)} />
             ) : (
             /* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */
             <button type="button" className="busca" title="Buscar (⌘K)" aria-haspopup="dialog" aria-expanded={paletaAberta}
