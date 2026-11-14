@@ -46,7 +46,11 @@ async function lerTudo<T extends { contato_id: string }>(nome: string, args: Rec
       /* a 1ª página falhou: lê do jeito antigo (uma chamada só, com o teto) — melhor a fila de antes que fila nenhuma */
       if (pagina === 0) {
         const antigo = await supabase.rpc(nome, args);
-        return antigo.error ? { data: null, error: antigo.error } : { data: (antigo.data ?? []) as T[], error: null };
+        if (antigo.error) return { data: null, error: antigo.error };
+        const linhas = (antigo.data ?? []) as T[];
+        /* com 1000 linhas a resposta pode ter vindo cortada: vira erro (a lista anterior fica, o aviso aparece e tenta
+           de novo em 5 s) — uma fila menor que o teto está inteira */
+        return linhas.length >= PAGINA ? { data: null, error } : { data: linhas, error: null };
       }
       return { data: null, error };
     }
@@ -111,6 +115,8 @@ export function useFonteReal(): FonteFila {
     const uid = admin ? null : (await supabase.auth.getSession()).data.session?.user.id ?? null;
     const res: Partial<Record<Periodo, NumeroAtendente[]>> = {};
     const chegou: Partial<Record<Periodo, Chegadas>> = {};
+    /* os períodos em que só as marcações falharam: ficam as marcações da leitura anterior */
+    const semMarc: Periodo[] = [];
     for (const p of ['hoje', '7d', 'mes', 'mes_ant'] as Periodo[]) {
       const faixa = { p_org: org, p_inicio: inicioPeriodo(p).toISOString(), p_fim: fimPeriodo(p).toISOString() };
       /* as marcações feitas no período (dono 12/11: "quantas marcações a gente fez no dia") vêm de outra função;
@@ -132,6 +138,7 @@ export function useFonteReal(): FonteFila {
         chegou[p] = { por, desde: ms(d.desde) ?? null };
       }
       if (error) continue;
+      if (marc.error) semMarc.push(p);
       const porUid = marc.error ? null : new Map(((marc.data ?? []) as LinhaMarcacoes[]).map((m) => [m.usuario_id, m.marcacoes]));
       res[p] = ((data ?? []) as LinhaNumero[])
         .filter((n) => admin || n.usuario_id === uid)
@@ -140,7 +147,14 @@ export function useFonteReal(): FonteFila {
         .filter((n) => EQUIPE.some((a) => a.id === n.atendente));
     }
     /* o período cuja leitura falhou fica com o último valor bom (a releitura de 5 min nunca apaga um número certo) */
-    setNums((x) => ({ ...x, ...res }));
+    setNums((x) => {
+      const n = { ...x, ...res };
+      for (const p of semMarc) {
+        const antes = x[p];
+        if (antes && res[p]) n[p] = res[p]!.map((r) => ({ ...r, marcacoes: antes.find((o) => o.atendente === r.atendente)?.marcacoes }));
+      }
+      return n;
+    });
     setCheg((x) => ({ ...x, ...chegou }));
   }, [org, currentOrg?.role]);
 

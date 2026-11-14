@@ -52,7 +52,9 @@ const BLOCOS: { id: Bloco; rotulo: string; sub: string; ajuda: string }[] = [
   })),
   { id: 'esperando_iris', rotulo: 'Esperando a Iris', sub: 'cliente escreveu por último', ajuda: 'O cliente escreveu por último e a Iris ainda não respondeu.' },
 ];
-const doBloco = (c: ClienteIris, b: Bloco, agora: number) => (b === 'esperando_iris' ? vezDe(c) === 'cliente' : grupoDe(c, agora) === b);
+/* com o pedido de "representação" a Iris para e espera um atendente: não conta como "esperando a Iris" */
+const doBloco = (c: ClienteIris, b: Bloco, agora: number) => (b === 'esperando_iris'
+  ? vezDe(c) === 'cliente' && c.pediuHumano !== 'representacao' : grupoDe(c, agora) === b);
 
 /** a situação em duas linhas curtas, com o tom (vermelho só para quem espera resposta) */
 function situacaoDe(c: ClienteIris, agora: number): { rotulo: string; detalhe: string; tom?: 'alerta' | 'fraco' } {
@@ -253,7 +255,8 @@ function LinhaIris({ c, agora, Avatar, aoConversa }: {
       <span className="fi-col-cli">
         <span className="fi-av-caixa">
           <span className="fi-av" style={{ width: 34, height: 34 }}>{iniciais(c.nome) || '·'}</span>
-          {sit.tom === 'alerta' ? <i className="fi-av-pt" title="Esperando a Iris responder" /> : null}
+          {sit.tom === 'alerta'
+            ? <i className="fi-av-pt" title={c.pediuHumano === 'representacao' ? 'Esperando um atendente' : 'Esperando a Iris responder'} /> : null}
         </span>
         <span className="fi-lin-tx">
           <b className="fi-lin-nome" title={c.nome}>{doisNomes(c.nome)}</b>
