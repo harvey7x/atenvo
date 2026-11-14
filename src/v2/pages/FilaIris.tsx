@@ -14,6 +14,7 @@ import { useAcessoFila } from '../hooks/useAcessoFila';
 import { useFonteLocal } from './filaIris/fonte';
 import { useFonteReal } from './filaIris/fonteReal';
 import { leadsFicticios, type Lead } from './filaIris/lead';
+import { chegadasDeExemplo, irisDeExemplo } from './filaIris/irisAgoraRegras';
 import { EQUIPE } from './filaIris/dados';
 import { definirEuLocal, useRecadosLocais } from './filaIris/recados';
 import { useRecadosReais } from './filaIris/recadosReal';
@@ -31,7 +32,9 @@ function usePedidoCliente(): [string | null, () => void] {
 
 function FilaDemo() {
   const iniciais = useMemo(() => leadsFicticios(), []);
-  const fonte = useFonteLocal(iniciais, 'demo', 'Demonstração · clientes fictícios');
+  /* a Iris agora e os adicionados (dono 14/11), com os mesmos clientes fictícios */
+  const extras = useMemo(() => ({ irisAgora: irisDeExemplo(iniciais), chegadas: chegadasDeExemplo(iniciais) }), [iniciais]);
+  const fonte = useFonteLocal(iniciais, 'demo', 'Demonstração · clientes fictícios', undefined, extras);
   const [cliente, consumir] = usePedidoCliente();
   /* demonstração: os recados ficam na página (o "Ver como" troca quem está olhando) */
   const [eu, setEu] = useState('matheus');

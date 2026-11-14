@@ -11,6 +11,54 @@ import { registrarFilaLocal, useDonosLocais } from './recados';
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes_ant';
 export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number; /** marcações feitas no período (fila_iris_marcacoes_numeros) */ marcacoes?: number }
 
+/* ---------------------------------------------------------------- dono 14/11: a Iris agora e os adicionados */
+/** as categorias em que a Iris passa um cliente para a fila */
+export type CategoriaChegada = 'quente' | 'documentacao' | 'sem_resposta';
+/** quantos clientes a Iris PASSOU para a fila de cada atendente no período, por categoria (o registro do "a Iris
+    passou para você", fila_iris_avisos) — dono 14/11: "foi adicionado no dia 13 clientes sem resposta para o Matheus" */
+export interface Chegadas {
+  /** por atendente (id da equipe) */
+  por: Record<string, Partial<Record<CategoriaChegada, number>>>;
+  /** começo do registro: o período que começa antes conta só daqui em diante */
+  desde: number | null;
+}
+/** um cliente que a Iris está atendendo agora (fila_iris_iris_agora: a régua do selo "Iris atendendo" do WhatsApp) */
+export interface ClienteIris {
+  contatoId: string;
+  conversaId: string;
+  nome: string;
+  fone: string;
+  /** id da equipe ('matheus'…); outro uid = alguém fora da equipe; null = sem dono */
+  dono: string | null;
+  /** o tráfego: a campanha da ORIGEM do lead (diego · juros · antonio · antonio2 · outros) */
+  campanha: string;
+  /** o número em que a Iris conversa com ele */
+  numero: string | null;
+  /** a campanha desse número (a tela mostra o número só quando ela é diferente do tráfego de origem) */
+  numeroCampanha?: string | null;
+  /** a etapa da Iris (ia_sessoes.etapa) */
+  etapa: string | null;
+  /** começo do atendimento da Iris (a sessão) */
+  desde: number;
+  ultCliente?: number;
+  ultNossa?: number;
+  /** de onde saiu a nossa última: 'bot' = a Iris; 'telefone' = celular; o resto = atendente pelo painel */
+  ultNossaOrigem?: string | null;
+  /** o cliente já respondeu a Iris neste atendimento (escreveu depois da 1ª mensagem dela); null = ela ainda não escreveu */
+  respondeuIris?: boolean | null;
+  /** a Iris pediu um atendente (o motivo) */
+  pediuHumano?: string | null;
+  /** a categoria na fila, se ele já está nela */
+  categoriaFila?: string | null;
+}
+export interface IrisAgora {
+  clientes: ClienteIris[];
+  /** quando a lista foi lida (o "há X" e os grupos contam a partir daqui) */
+  lidaEm: number;
+  /** a última leitura falhou (a lista mostra a anterior; sem anterior, o aviso) */
+  erro?: string | null;
+}
+
 export interface FonteFila {
   modo: 'demo' | 'previa' | 'real';
   /** o que aparece ao lado do título ("Prévia · dados de hoje", "Demonstração"…) */
@@ -32,6 +80,10 @@ export interface FonteFila {
   /** o REAL: a seção inteira da conversa COMPLETA, com fotos e áudios (ConversaWa.tsx — a mesma bolha do WhatsApp;
       fica fora da prévia para ela não carregar o WhatsApp) */
   SecaoConversa?: ComponentType<{ l: Lead }>;
+  /** quantos a Iris passou para a fila de cada atendente no período (dono 14/11); null = ainda não leu */
+  chegadas?: (p: Periodo) => Chegadas | null;
+  /** os clientes que a Iris está atendendo agora (dono 14/11); só o administrador recebe */
+  irisAgora?: IrisAgora | null;
 }
 
 /** uma mensagem da conversa, como a ficha mostra */
@@ -110,7 +162,8 @@ function comDocs(l: Lead, estado: 'completos' | 'incompletos' | null): Lead {
 }
 
 /* ---------------------------------------------------------------- local (demonstração e prévia) */
-export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: string, numeros?: Partial<Record<Periodo, NumeroAtendente[]>>): FonteFila {
+export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: string, numeros?: Partial<Record<Periodo, NumeroAtendente[]>>,
+  extras?: { chegadas?: Partial<Record<Periodo, Chegadas>>; irisAgora?: IrisAgora | null }): FonteFila {
   const [leads, setLeads] = useState<Lead[]>(inicial);
   const mexer = (id: string, f: (l: Lead) => Lead | null) => setLeads((t) => t.flatMap((l) => {
     if (l.id !== id) return [l];
@@ -143,5 +196,7 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     tirarDaFila: (id) => mexer(id, () => null),
     numeros: (p) => numeros?.[p] ?? null,
     usarConversa: (l) => conversaDeExemplo(l, modo),
-  }), [comDono, modo, rotulo, numeros]);
+    chegadas: (p) => extras?.chegadas?.[p] ?? null,
+    irisAgora: extras?.irisAgora ?? null,
+  }), [comDono, modo, rotulo, numeros, extras]);
 }

@@ -903,3 +903,122 @@
   background: rgba(var(--tint), .07); color: var(--txt-2); border: 1px solid rgba(var(--tint), .12);
 }
 .v2 .fi-msg-quem[data-de="cliente"] { background: rgba(var(--rubro-rgb), .14); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .38); }
+
+/* ============================================================ A IRIS AGORA e os ADICIONADOS (dono 14/11)
+   "preciso saber quantas pessoas a Iris está atendendo… de quem que é os clientes… quanto tempo… quanto foi
+   adicionado no dia… de qual tráfego". Régua do visual sóbrio: cinza; o acento só no filtro escolhido; vermelho só
+   em quem espera resposta. */
+/* o resumo do período no cabeçalho "Por atendente" */
+.v2 .fi-eq-per-tot { flex-basis: 100%; font-size: 12.5px; color: var(--txt-2); }
+.v2 .fi-eq-per-tot b { font-weight: 600; color: var(--txt); }
+/* o cartão do atendente: adicionados no período (a faixa irmã de recebidos · marcações · fechados) */
+.v2 .fi-eq-adic { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--fi-borda); border-radius: 8px; }
+.v2 .fi-eq-adic-t {
+  grid-column: 1 / -1; padding: 6px 8px 0; text-align: center; font-size: 10.5px; font-weight: 600; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .fi-eq-adic-c {
+  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 4px 7px; font-size: 11px; line-height: 1.25;
+  color: var(--txt-3); text-align: center;
+}
+.v2 .fi-eq-adic-c + .fi-eq-adic-c { border-left: 1px solid var(--fi-borda); }
+.v2 .fi-eq-adic-c b { font-size: 15px; font-weight: 600; color: var(--txt); letter-spacing: -.02em; }
+.v2 .fi-eq-adic-c[data-zero] b { color: var(--txt-3); font-weight: 500; }
+/* o cartão do atendente: com a Iris agora (leva à lista, filtrada nele) */
+.v2 .fi-eq-iris {
+  display: flex; align-items: center; gap: 7px; width: 100%; height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid var(--fi-borda); background: rgba(var(--tint), .035); color: var(--txt-2); font: inherit; font-size: 12.5px;
+  text-align: left; cursor: pointer; transition: background-color var(--fi-t), color var(--fi-t);
+}
+.v2 .fi-eq-iris:hover:not(:disabled) { background: rgba(var(--tint), .075); color: var(--txt); }
+.v2 .fi-eq-iris:disabled { cursor: default; }
+.v2 .fi-eq-iris span { flex: 1 1 auto; min-width: 0; }
+.v2 .fi-eq-iris b { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .fi-eq-iris svg { flex: none; color: var(--txt-3); }
+.v2 .fi-eq-iris:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--azul-rgb), .5); }
+
+/* a seção "A Iris está atendendo" (dono 14/11: "aqui eu preciso de algo mais profissional") — na régua do painel do
+   topo: blocos com número (os mesmos .fi-pn), divisão em barras e tabela com busca */
+.v2 .fi-ir { flex: none; }
+.v2 .fi-ir-cab { gap: 8px; }
+.v2 .fi-ir-info { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--txt-3); cursor: help; }
+.v2 .fi-ir-info:hover { color: var(--txt-2); background: rgba(var(--tint), .05); }
+.v2 .fi-ir-limpar { margin-left: auto; }
+/* os blocos: com a Iris (o total) + os grupos — a mesma peça do painel do topo, com o divisor entre eles */
+.v2 .fi-ir-blocos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-bottom: 1px solid var(--fi-borda); }
+.v2 .fi-ir-blocos > .fi-pn + .fi-pn::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 1px; background: var(--linha); }
+.v2 .fi-ir-blocos .fi-pn-s { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.v2 .fi-ir-total .fi-pn-r { color: var(--txt); font-weight: 600; }
+/* a divisão em barras: por atendente · por tráfego */
+.v2 .fi-ir-divisao { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--fi-borda); }
+.v2 .fi-ir-div { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 14px 24px 14px 20px; }
+.v2 .fi-ir-div + .fi-ir-div { border-left: 1px solid var(--linha); }
+.v2 .fi-ir-div-t {
+  margin-bottom: 6px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); cursor: help;
+  align-self: flex-start;
+}
+.v2 .fi-ir-div-l {
+  display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) 48px 40px; align-items: center; column-gap: 12px;
+  height: 30px; padding: 0 8px; margin: 0 -8px; border: 0; border-radius: 7px; background: none; color: var(--txt);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: background-color var(--fi-t);
+}
+.v2 .fi-ir-div-l:hover { background: rgba(var(--tint), .04); }
+.v2 .fi-ir-div-l[data-ativo] { background: rgba(var(--azul-rgb), .07); }
+.v2 .fi-ir-div-nome { min-width: 0; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .fi-ir-div-nome .fi-av { font-size: 9px; flex: none; }
+.v2 .fi-ir-div-barra { height: 6px; border-radius: 3px; background: rgba(var(--tint), .07); overflow: hidden; }
+.v2 .fi-ir-div-barra i { display: block; height: 100%; border-radius: 3px; background: rgba(var(--tint), .36); transition: width .25s var(--ease); }
+.v2 .fi-ir-div-l[data-ativo] .fi-ir-div-barra i { background: var(--azul); }
+.v2 .fi-ir-div-l[data-ativo] .fi-ir-div-nome { color: var(--azul); font-weight: 600; }
+.v2 .fi-ir-div-n { text-align: right; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.v2 .fi-ir-div-pct { text-align: right; font-size: 12px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .fi-ir-div-l:focus-visible { outline: none; box-shadow: inset 0 0 0 2px rgba(var(--azul-rgb), .5); }
+/* a tabela */
+.v2 .fi-ir-ferr { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 24px 8px 20px; }
+.v2 .fi-ir-ferr-t { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .fi-ir-busca { margin-left: auto; width: min(300px, 40%); }
+.v2 .fi-colunas.fi-ir-cols, .v2 .fi-lin.fi-ir-lin {
+  grid-template-columns: minmax(210px, 1.15fr) minmax(0, .7fr) minmax(0, .75fr) minmax(0, .95fr) minmax(0, 1.35fr) minmax(0, .6fr) 40px;
+}
+.v2 .fi-lin.fi-ir-lin { height: 58px; }
+.v2 .fi-ir-dono { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; font-size: 13px; white-space: nowrap; }
+.v2 .fi-ir-dono .fi-av { font-size: 9px; flex: none; }
+.v2 .fi-ir-cel { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
+.v2 .fi-ir-etapa {
+  max-width: 100%; height: 24px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: 6px;
+  border: 1px solid rgba(var(--tint), .13); background: rgba(var(--tint), .035); font-size: 12px; color: var(--txt);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .fi-ir-sit .fi-l1 { font-weight: 500; }
+.v2 .fi-ir-sit[data-tom="alerta"] .fi-l1 { color: var(--txt); }
+.v2 .fi-ir-sit[data-tom="fraco"] .fi-l1 { color: var(--txt-2); font-weight: 400; }
+.v2 .fi-ir-sit .fi-l1 > .fi-pt { margin-right: 6px; vertical-align: 1px; }
+.v2 .fi-ir-sit-l2 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; }
+.v2 .fi-ir-tag {
+  flex: none; height: 17px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: 5px;
+  border: 1px solid rgba(var(--tint), .16); font-size: 10.5px; font-weight: 500; color: var(--txt-2); white-space: nowrap; cursor: help;
+}
+.v2 .fi-ir-vazio { margin: 0; padding: 22px 20px; text-align: center; font-size: 13px; color: var(--txt-3); }
+.v2 .fi-ir-pe { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px 0 14px; border-top: 1px solid var(--fi-sep); }
+.v2 .fi-ir-pe-t { font-size: 12px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .fi-ir-mais {
+  height: 30px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(var(--tint), .14); background: rgba(var(--tint), .04);
+  color: var(--txt); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.v2 .fi-ir-mais:hover { background: rgba(var(--tint), .08); }
+.v2 .fi-ir-mais:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--azul-rgb), .5); }
+/* telas menores: os blocos em 3 por linha; tabela mais justa */
+@media (max-width: 1366px) {
+  .v2 .fi-ir-blocos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .v2 .fi-ir-blocos > .fi-pn:nth-child(3n + 1)::before { display: none; }
+  .v2 .fi-ir-blocos > .fi-pn:nth-child(n + 4) { border-top: 1px solid var(--linha); }
+  .v2 .fi-colunas.fi-ir-cols, .v2 .fi-lin.fi-ir-lin {
+    grid-template-columns: minmax(180px, 1fr) minmax(0, .65fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, 1.25fr) minmax(0, .55fr) 36px;
+    column-gap: 12px;
+  }
+}
+@media (max-width: 1100px) { .v2 .fi-ir-divisao { grid-template-columns: minmax(0, 1fr); } .v2 .fi-ir-div + .fi-ir-div { border-left: 0; border-top: 1px solid var(--linha); } }
+/* estilo Linear (linear.css): o tempo com a Iris em mono, como os outros horários */
+html:root[data-linear][data-linear][data-linear] .v2 .fi-ir-lin .fi-ir-cel:nth-child(6) .fi-l2 {
+  font-family: var(--mono); font-size-adjust: .5; letter-spacing: 0; word-spacing: -.3em; font-feature-settings: 'zero' 0;
+}

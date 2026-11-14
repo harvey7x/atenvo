@@ -18,7 +18,11 @@ import {
 import {
   PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, ultimaMensagem, type Lead,
 } from './lead';
-import { textoPeriodo, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo } from './fonte';
+import {
+  inicioPeriodo, textoPeriodo, type CategoriaChegada, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo,
+} from './fonte';
+import { IrisAgoraSecao, contarIrisPorDono } from './IrisAgora';
+import { CATEGORIAS_CHEGADA, ROTULO_ADICIONADOS } from './irisAgoraRegras';
 import {
   IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcIris, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
 } from './icones';
@@ -786,8 +790,15 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
 }
 
 /** visão do administrador: um cartão por atendente (quem → agora → mês → composição) */
-function CartaoAtendente({ a, aoAbrir, leads, numero }: {
+function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicionados, comIris, aoVerIris }: {
   a: Atendente; aoAbrir: (esperando?: boolean) => void; leads: Lead[]; numero?: NumeroAtendente | null;
+  /** quantos a Iris passou para a fila dele no período, por categoria (dono 14/11); null = não leu */
+  adicionados?: Partial<Record<CategoriaChegada, number>> | null;
+  /** "hoje", "em 7 dias"… */
+  rotuloAdicionados: string;
+  /** quantos clientes dele a Iris atende agora; null = não sabe (o atendente não recebe a lista) */
+  comIris?: number | null;
+  aoVerIris?: () => void;
 }) {
   const meus = leads.filter((l) => l.atendente === a.id);
   const por = (cat: Categoria) => meus.filter((l) => l.cat === cat).length;
@@ -820,6 +831,26 @@ function CartaoAtendente({ a, aoAbrir, leads, numero }: {
           <span><b className="num">{numero.fechados}</b>{numero.fechados === 1 ? 'fechado' : 'fechados'}</span>
           <span title="Taxa de fechamento: fechados ÷ recebidos no período"><b className="num">{taxa == null ? '—' : porcento(taxa)}</b>taxa</span>
         </div>
+      )}
+      {adicionados !== undefined && (
+        <div className="fi-eq-adic" aria-label={`Adicionados ${rotuloAdicionados}: clientes que a Iris passou para a fila`}>
+          <span className="fi-eq-adic-t">Adicionados {rotuloAdicionados}</span>
+          {CATEGORIAS_CHEGADA.map((k) => {
+            const n = adicionados ? adicionados[k] ?? 0 : null;
+            return (
+              <span key={k} className="fi-eq-adic-c" data-zero={!n ? '' : undefined}
+                title={n == null ? 'Ainda carregando' : `${n} ${n === 1 ? 'cliente passado' : 'clientes passados'} pela Iris para ${ROTULO_CURTO[k]} ${rotuloAdicionados}`}>
+                <b className="num">{n == null ? '—' : n ? `+${n}` : '0'}</b>{ROTULO_CURTO[k]}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {comIris != null && (
+        <button type="button" className="fi-eq-iris" onClick={aoVerIris} disabled={!aoVerIris}
+          title={`Ver os clientes de ${a.nome} que a Iris está atendendo agora`}>
+          <IcIris t={12} /><span>Com a Iris agora</span><b className="num">{comIris}</b>{aoVerIris && <IcSeta t={11} />}
+        </button>
       )}
       <div className="fi-eq-linhas">
         {CATEGORIAS.map((k) => {
@@ -900,6 +931,18 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const semFilaPropria = real && !meuId;
   const verComo = meuId ?? 'matheus';
   const [periodo, setPeriodo] = useState<Periodo>('mes');
+  /* dono 14/11: os adicionados do período (o que a Iris passou para a fila) e a Iris agora */
+  const chegadasPer = fonte.chegadas?.(periodo) ?? null;
+  const totalAdicionados = chegadasPer
+    ? CATEGORIAS_CHEGADA.reduce((t, k) => ({ ...t, [k]: Object.values(chegadasPer.por).reduce((s, p) => s + (p[k] ?? 0), 0) }),
+      {} as Record<CategoriaChegada, number>)
+    : null;
+  const irisPorDono = useMemo(() => contarIrisPorDono(fonte.irisAgora), [fonte.irisAgora]);
+  const [filtroIrisDono, setFiltroIrisDono] = useState<string | null>(null);
+  const verIrisDe = (id: string) => {
+    setFiltroIrisDono(id);
+    window.setTimeout(() => document.getElementById('fi-iris-agora')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
   const [tirando, setTirando] = useState<Lead | null>(null);
   const [visao, setVisao] = useState<Visao>(semFilaPropria ? 'equipe' : 'minha');
   const [alvo, setAlvo] = useState('matheus');
@@ -1165,15 +1208,40 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
               <span className="fi-eq-per-rot">Recebidos, marcações e fechados</span>
               <Segmentado rotulo="Período dos números" valor={periodo} aoMudar={setPeriodo}
                 opcoes={[{ valor: 'hoje', rotulo: 'Hoje' }, { valor: '7d', rotulo: '7 dias' }, { valor: 'mes', rotulo: 'Mês' }, { valor: 'mes_ant', rotulo: 'Mês passado' }]} />
-              <span className="fi-eq-per-nota">{textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · marcações = feitas na fila · fechados = placar do CAF · taxa = fechados ÷ recebidos</span>
+              <span className="fi-eq-per-nota">
+                {textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · marcações = feitas na fila · fechados = placar do CAF · taxa = fechados ÷ recebidos
+                {fonte.chegadas ? ' · adicionados = clientes que a Iris passou para a fila no período' : ''}
+                {chegadasPer?.desde && chegadasPer.desde > inicioPeriodo(periodo).getTime() ? ` (o registro começou em ${dataHora(chegadasPer.desde)})` : ''}
+              </span>
+              {totalAdicionados && (
+                <span className="fi-eq-per-tot">
+                  A Iris passou {ROTULO_ADICIONADOS[periodo]}:
+                  {CATEGORIAS_CHEGADA.map((k, i) => (
+                    <span key={k}>{i ? ' · ' : ' '}<b className="num">{totalAdicionados[k]}</b> {ROTULO_CURTO[k].toLowerCase()}</span>
+                  ))}
+                </span>
+              )}
             </div>
           )}
           <div className="fi-eq-grade">
             {EQUIPE.map((a) => (
               <CartaoAtendente key={a.id} a={a} aoAbrir={(esp) => abrirFilaDe(a.id, esp)} leads={leads}
-                numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null} />
+                numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null}
+                adicionados={fonte.chegadas ? chegadasPer?.por[a.id] ?? (chegadasPer ? {} : null) : undefined}
+                rotuloAdicionados={ROTULO_ADICIONADOS[periodo]}
+                comIris={fonte.irisAgora ? irisPorDono.get(a.id) ?? 0 : null}
+                aoVerIris={fonte.irisAgora ? () => verIrisDe(a.id) : undefined} />
             ))}
           </div>
+          {admin && fonte.irisAgora !== undefined && (
+            <IrisAgoraSecao iris={fonte.irisAgora} Avatar={AvatarAtendente} dono={filtroIrisDono} aoDono={setFiltroIrisDono}
+              aoConversa={(c) => {
+                const l = leads.find((x) => x.id === c.contatoId);
+                if (l) conversa(l);
+                else if (abrirConversa) abrirConversa({ conversaId: c.conversaId, nome: c.nome } as Lead);
+                else avisar(`Prévia: aqui abre a conversa de ${doisNomes(c.nome)} no WhatsApp.`);
+              }} />
+          )}
           {recados && admin && (
             <ListaRecados fonte={recados} aoConversa={(r) => {
               const l = leads.find((x) => x.id === r.contatoId);

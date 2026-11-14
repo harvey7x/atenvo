@@ -7,8 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { EQUIPE, equipeDoUid } from './dados';
-import { leadDeLinha, type Lead, type LinhaFila } from './lead';
-import { fimPeriodo, inicioPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
+import { foneBonito, leadDeLinha, nomeBonito, type Lead, type LinhaFila } from './lead';
+import {
+  fimPeriodo, inicioPeriodo, type CategoriaChegada, type Chegadas, type ClienteIris, type FonteFila, type IrisAgora, type NumeroAtendente, type Periodo,
+} from './fonte';
 import ConversaWa from './ConversaWa';
 import { EVENTO_FILA_RECARREGAR } from './recados';
 
@@ -16,6 +18,56 @@ import { EVENTO_FILA_RECARREGAR } from './recados';
 
 type LinhaNumero = { usuario_id: string; nome: string; recebidos: number; fechados: number };
 type LinhaMarcacoes = { usuario_id: string; marcacoes: number };
+/* dono 14/11: a Iris agora (fila_iris_iris_agora) e os adicionados (fila_iris_chegadas) */
+type LinhaIris = {
+  contato_id: string; conversa_id: string; nome: string | null; telefone: string | null; dono_id: string | null;
+  campanha: string | null; numero: string | null; numero_campanha: string | null; etapa: string | null; desde: string;
+  ult_cliente_em: string | null; ult_nossa_em: string | null; ult_nossa_origem: string | null; respondeu_iris: boolean | null;
+  pediu_humano: string | null; categoria_fila: string | null;
+};
+type RespostaChegadas = { linhas: { usuario_id: string; categoria: CategoriaChegada; n: number }[] | null; desde: string | null };
+const ms = (t: string | null) => (t ? Date.parse(t) : undefined);
+
+/* O PostgREST corta qualquer resposta em 1000 linhas SEM AVISAR (db-max-rows, o mesmo teto do inbox em 18/09): em
+   14/11 a fila tinha 1.088 linhas e a tela mostrava "1000 clientes" — 88 sumiam. Lê em páginas por contato_id
+   (imutável), pegando de novo o último contato da página (um cliente com dois cards ocupa duas linhas) e tirando os
+   repetidos pela chave. */
+const PAGINA = 1000;
+async function lerTudo<T extends { contato_id: string }>(nome: string, args: Record<string, unknown>, chave: (r: T) => string):
+  Promise<{ data: T[] | null; error: { message: string } | null }> {
+  if (!supabase) return { data: null, error: { message: 'sem conexão' } };
+  const todos = new Map<string, T>();
+  let cursor: string | null = null;
+  for (let pagina = 0; pagina < 20; pagina++) {
+    let q = supabase.rpc(nome, args).order('contato_id').limit(PAGINA);
+    if (cursor) q = q.gte('contato_id', cursor);
+    const { data, error } = await q;
+    if (error) {
+      /* a 1ª página falhou: lê do jeito antigo (uma chamada só, com o teto) — melhor a fila de antes que fila nenhuma */
+      if (pagina === 0) {
+        const antigo = await supabase.rpc(nome, args);
+        return antigo.error ? { data: null, error: antigo.error } : { data: (antigo.data ?? []) as T[], error: null };
+      }
+      return { data: null, error };
+    }
+    const lote = (data ?? []) as T[];
+    for (const r of lote) todos.set(chave(r), r);
+    if (lote.length < PAGINA) break;
+    const ultimo = lote[lote.length - 1].contato_id;
+    if (ultimo === cursor) break;
+    cursor = ultimo;
+  }
+  return { data: [...todos.values()], error: null };
+}
+function clienteIris(r: LinhaIris): ClienteIris {
+  return {
+    contatoId: r.contato_id, conversaId: r.conversa_id, nome: nomeBonito(r.nome, r.telefone), fone: foneBonito(r.telefone),
+    dono: r.dono_id ? equipeDoUid(r.dono_id) ?? r.dono_id : null, campanha: r.campanha ?? 'sem_campanha', numero: r.numero,
+    numeroCampanha: r.numero_campanha, respondeuIris: r.respondeu_iris,
+    etapa: r.etapa, desde: Date.parse(r.desde), ultCliente: ms(r.ult_cliente_em), ultNossa: ms(r.ult_nossa_em),
+    ultNossaOrigem: r.ult_nossa_origem, pediuHumano: r.pediu_humano, categoriaFila: r.categoria_fila,
+  };
+}
 
 export function useFonteReal(): FonteFila {
   const { currentOrg } = useOrg();
@@ -24,13 +76,18 @@ export function useFonteReal(): FonteFila {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [nums, setNums] = useState<Partial<Record<Periodo, NumeroAtendente[]>>>({});
+  const [cheg, setCheg] = useState<Partial<Record<Periodo, Chegadas>>>({});
+  const admin = currentOrg?.role === 'admin';
+  /* a Iris agora só vai para o administrador (a visão Equipe); undefined = esta pessoa não recebe */
+  const [iris, setIris] = useState<IrisAgora | null | undefined>(admin ? null : undefined);
   /* queda de rede não pode parar a fila num aviso: tenta de novo sozinho (5 s, 10 s… até 4 vezes; o relógio de 2 min continua) */
   const tentativa = useRef(0);
   const retentar = useRef<number | null>(null);
 
   const carregar = useCallback(async () => {
     if (!supabase || !org) return;
-    const { data, error } = await supabase.rpc('fila_iris_itens', { p_org: org, p_dono: null });
+    const { data, error } = await lerTudo<LinhaFila>('fila_iris_itens', { p_org: org, p_dono: null },
+      (r) => `${r.contato_id}|${r.oportunidade_id ?? ''}`);
     if (error) {
       tentativa.current += 1;
       const rede = /failed to fetch|networkerror|load failed|network request failed/i.test(error.message);
@@ -53,14 +110,27 @@ export function useFonteReal(): FonteFila {
     const admin = currentOrg?.role === 'admin';
     const uid = admin ? null : (await supabase.auth.getSession()).data.session?.user.id ?? null;
     const res: Partial<Record<Periodo, NumeroAtendente[]>> = {};
+    const chegou: Partial<Record<Periodo, Chegadas>> = {};
     for (const p of ['hoje', '7d', 'mes', 'mes_ant'] as Periodo[]) {
       const faixa = { p_org: org, p_inicio: inicioPeriodo(p).toISOString(), p_fim: fimPeriodo(p).toISOString() };
       /* as marcações feitas no período (dono 12/11: "quantas marcações a gente fez no dia") vêm de outra função;
-         sem ela (falhou), a tela conta as da fila carregada */
-      const [{ data, error }, marc] = await Promise.all([
+         sem ela (falhou), a tela conta as da fila carregada. Os adicionados (dono 14/11) vêm do registro da Iris. */
+      const [{ data, error }, marc, ch] = await Promise.all([
         supabase.rpc('fila_iris_numeros', faixa),
         supabase.rpc('fila_iris_marcacoes_numeros', faixa),
+        supabase.rpc('fila_iris_chegadas', faixa),
       ]);
+      if (!ch.error && ch.data) {
+        const d = ch.data as RespostaChegadas;
+        const por: Chegadas['por'] = {};
+        for (const a of EQUIPE) if (admin || a.uid === uid) por[a.id] = {};
+        for (const l of d.linhas ?? []) {
+          const id = equipeDoUid(l.usuario_id);
+          if (!id || (!admin && l.usuario_id !== uid)) continue;
+          (por[id] ??= {})[l.categoria] = l.n;
+        }
+        chegou[p] = { por, desde: ms(d.desde) ?? null };
+      }
       if (error) continue;
       const porUid = marc.error ? null : new Map(((marc.data ?? []) as LinhaMarcacoes[]).map((m) => [m.usuario_id, m.marcacoes]));
       res[p] = ((data ?? []) as LinhaNumero[])
@@ -70,27 +140,46 @@ export function useFonteReal(): FonteFila {
         .filter((n) => EQUIPE.some((a) => a.id === n.atendente));
     }
     setNums(res);
+    setCheg(chegou);
   }, [org, currentOrg?.role]);
+
+  /* a Iris agora (só o administrador): relê junto da fila, a cada minuto */
+  const carregarIris = useCallback(async () => {
+    if (!supabase || !org || !admin) return;
+    const { data, error } = await lerTudo<LinhaIris>('fila_iris_iris_agora', { p_org: org }, (r) => r.conversa_id);
+    if (error) {
+      /* falhou: fica a lista anterior (com o aviso); sem anterior, só o aviso */
+      setIris((x) => ({ clientes: x?.clientes ?? [], lidaEm: x?.lidaEm ?? Date.now(), erro: 'Não deu para ler a lista da Iris agora. Tenta de novo sozinho.' }));
+      return;
+    }
+    setIris({ clientes: ((data ?? []) as LinhaIris[]).map(clienteIris), lidaEm: Date.now(), erro: null });
+  }, [org, admin]);
 
   useEffect(() => {
     void carregar();
     void carregarNumeros();
+    void carregarIris();
     /* a fila muda sozinha (mensagens, 24 h, documentos, fechados): relê a cada minuto (dono 13/11: "sempre tem que
-       atualizar pra última mensagem") e ao voltar para a aba */
-    const t = window.setInterval(() => { void carregar(); }, 60_000);
+       atualizar pra última mensagem") e ao voltar para a aba; os números do período (recebidos, marcações, fechados,
+       adicionados), a cada 5 minutos */
+    const t = window.setInterval(() => { void carregar(); void carregarIris(); }, 60_000);
+    const tn = window.setInterval(() => { void carregarNumeros(); }, 5 * 60_000);
     let lidaEm = Date.now();
-    const voltou = () => { if (document.visibilityState === 'visible' && Date.now() - lidaEm > 15_000) { lidaEm = Date.now(); void carregar(); } };
+    const voltou = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lidaEm > 15_000) { lidaEm = Date.now(); void carregar(); void carregarIris(); }
+    };
     document.addEventListener('visibilitychange', voltou);
     /* um repasse pelo recado do administrador trocou o dono de um cliente: relê na hora */
     const releia = () => { void carregar(); };
     window.addEventListener(EVENTO_FILA_RECARREGAR, releia);
     return () => {
       window.clearInterval(t);
+      window.clearInterval(tn);
       window.removeEventListener(EVENTO_FILA_RECARREGAR, releia);
       document.removeEventListener('visibilitychange', voltou);
       if (retentar.current != null) { window.clearTimeout(retentar.current); retentar.current = null; }
     };
-  }, [carregar, carregarNumeros]);
+  }, [carregar, carregarNumeros, carregarIris]);
 
   const rpc = useCallback(async (nome: string, args: Record<string, unknown>) => {
     if (!supabase || !org) return;
@@ -113,5 +202,7 @@ export function useFonteReal(): FonteFila {
     recarregar: carregar,
     /* a conversa COMPLETA na ficha, com fotos e áudios (dono 12/11: "preciso das imagens e áudios, cvs completas") */
     SecaoConversa: ConversaWa,
-  }), [carregando, erro, leads, nums, rpc, carregar]);
+    chegadas: (p) => cheg[p] ?? null,
+    irisAgora: iris,
+  }), [carregando, erro, leads, nums, rpc, carregar, cheg, iris]);
 }
