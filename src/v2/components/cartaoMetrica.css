@@ -103,3 +103,113 @@
 .v2 .pmc-root.rvm.rvm-carregando .rvm-val { color: var(--txt-3); }
 .v2 .pmc-root.rvm.rvm-carregando .rvm-graf { border-radius: 8px; margin-left: 0; margin-right: 0; background: rgba(var(--tint), .04); animation: pmc-pulse 2s cubic-bezier(.4, 0, .6, 1) infinite; }
 @media (prefers-reduced-motion: reduce) { .v2 .pmc-root.rvm.rvm-carregando .rvm-graf { animation: none; } }
+
+/* =====================================================================
+   14/11 (2) — "deixa o resto atraente, tudo que tiver métrica": os blocos
+   de cards do Dashboard (Melhor campanha, atendentes) e o mesmo visual nos
+   indicadores das outras telas.
+   ===================================================================== */
+
+/* grade de 3 (Melhor campanha): 3 por linha; 1 no celular */
+.v2 .pmc-grade[data-col="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container pmcgrade (max-width: 760px) {
+  .v2 .pmc-grade[data-col="3"] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* bloco de cards com o título por fora (sem cartão em volta de cartão) */
+.v2 .rvm-bloco { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2 .rvm-bloco-cab { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.v2 .rvm-bloco-tx { min-width: 0; }
+.v2 .rvm-bloco-tit { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-16, 16px); font-weight: 600; letter-spacing: -.012em; color: var(--txt); }
+.v2 .rvm-bloco-sub { margin: 3px 0 0; max-width: 78ch; font-size: 12.5px; line-height: 1.45; color: var(--txt-3); }
+.v2 .rvm-bloco-acao { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.v2 .rvm-ctl { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.v2 .rvm-ctl-ord { display: inline-flex; align-items: center; gap: 8px; }
+.v2 .rvm-ctl-rot { font-size: 12px; color: var(--txt-3); white-space: nowrap; }
+
+/* peças novas do card */
+.v2 .pmc-root.rvm .rvm-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; }
+.v2 .pmc-root.rvm .rvm-cab-esq { display: flex; align-items: center; min-width: 0; }
+.v2 .pmc-root.rvm .rvm-tit-det { font-size: 11.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-un { margin-left: -5px; font-size: 12.5px; font-weight: 500; color: var(--txt-3); white-space: nowrap; }
+.v2 .pmc-root.rvm .rvm-numsub { margin-left: auto; font-size: 12px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2 .pmc-root.rvm .rvm-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; max-width: 58%;
+  height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--pmc-border);
+  background: rgba(var(--tint), .04); color: var(--txt-2);
+  font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .pmc-root.rvm .rvm-chip i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.v2 .pmc-root.rvm .rvm-delta .d5-var { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .pmc-root.rvm .rvm-delta .d5-var-ctx { font-size: 12px; color: var(--txt-3); }
+
+/* o card do atendente: quem é, os fechados com gráfico e os seis números em grade */
+.v2 .rvm-grade-at { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.v2 .pmc-root.rvm .rvm-pessoa { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .pmc-root.rvm .rvm-pessoa b { font-size: 14px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pmc-root.rvm .rvm-pos { min-width: 20px; font-size: 11.5px; font-weight: 600; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .pmc-root.rvm .rvm-pos-1 { color: var(--azul); }
+.v2 .pmc-root.rvm .rvm-pessoa .d5-av { width: 26px; height: 26px; min-width: 26px; font-size: 10.5px; }
+.v2 .pmc-root.rvm .rvm-extra { margin-top: 2px; }
+.v2 .pmc-root.rvm .rvm-stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px;
+  margin: 0; padding: 10px 0 2px; border-top: 1px solid var(--linha);
+}
+.v2 .pmc-root.rvm .rvm-stat { min-width: 0; }
+.v2 .pmc-root.rvm .rvm-stat dt {
+  display: flex; align-items: center; gap: 3px; margin: 0 0 2px;
+  font-size: 11px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .pmc-root.rvm .rvm-stat dt .d5-ajuda-btn { width: 14px; height: 14px; }
+.v2 .pmc-root.rvm .rvm-stat dd { display: flex; flex-direction: column; margin: 0; min-width: 0; }
+.v2 .pmc-root.rvm .rvm-stat dd b { font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .pmc-root.rvm .rvm-stat dd small { font-size: 11px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pmc-root.rvm .rvm-stat dd small.d5-sem-relogio { color: var(--cor-alerta-txt, var(--ambar)); }
+
+/* "Carteira agora": número com a barra proporcional embaixo */
+.v2 .rvm-celbar { display: inline-flex; flex-direction: column; align-items: center; gap: 5px; }
+.v2 .rvm-barra { display: block; width: 104px; height: 4px; overflow: hidden; border-radius: 3px; background: rgba(var(--tint), .07); }
+.v2 .rvm-barra i { display: block; height: 100%; border-radius: 3px; background: var(--dado-1); transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.v2 .rvm-barra-alerta i { background: var(--rubro); }
+
+/* os gráficos de ondas (Campanhas, Fechados da equipe): o fundo de pontos do card de métrica,
+   sumindo para a esquerda, atrás das linhas */
+.v2 .d5-ondas .d5-graf::before {
+  content: ''; position: absolute; inset: 0 0 20px 36px; z-index: 0; pointer-events: none; border-radius: 8px;
+  background-image: radial-gradient(circle, rgba(var(--tint), .1) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 60%);
+  mask-image: linear-gradient(to right, transparent, #000 60%);
+}
+.v2 .d5-ondas .d5-graf-svg { position: relative; z-index: 1; }
+
+/* =====================================================================
+   OS INDICADORES DAS OUTRAS TELAS no visual do card de métrica (Novos,
+   Cancelados, Envios, Registros, Conversas, Atendentes, Números…): o fundo
+   de pontos que some para a esquerda e o card que sobe e cresce um pouco ao
+   passar o mouse. Não têm histórico: nada de gráfico inventado.
+   Prefixo com id e 4 atributos: vence a camada Linear (que para o hover).
+   ===================================================================== */
+html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  position: relative;
+  background:
+    linear-gradient(to right, var(--vidro-a) 42%, transparent 100%),
+    radial-gradient(circle, rgba(var(--tint), .085) 1px, transparent 1.4px) 0 0 / 12px 12px,
+    var(--vidro-a);
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s ease, border-color .22s ease;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover {
+    transform: translateY(-3px) scale(1.025);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .7);
+    z-index: 3;
+  }
+  html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa][data-tema="light"]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover {
+    box-shadow: 0 16px 36px -16px rgba(16, 24, 40, .22);
+  }
+}
+/* celular: o "Ordenar por" vira só os botões (o rótulo some) e o segmentado rola se precisar */
+@media (max-width: 760px) {
+  .v2 .rvm-ctl-rot { display: none; }
+  .v2 .rvm-ctl-ord { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+}

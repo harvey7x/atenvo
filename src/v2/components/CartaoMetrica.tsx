@@ -35,6 +35,12 @@ const CORES = {
   light: { bom: '#2A7352', ruim: '#A23F33', neutro: '#666C76' },
 } as const;
 const FAIXA_NEUTRA = 0.5;
+const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
+export function diaDoBalao(dia: string, hoje?: string): string {
+  const [y, m, d] = dia.split('-');
+  return `${d} ${MES_ABREV[Number(m) - 1] ?? m} ${y}${hoje && dia === hoje ? ' · até agora' : ''}`;
+}
 const pctTexto = (n: number) => `${Math.abs(n).toFixed(1).replace('.', ',')}%`;
 
 const SETAS = {
@@ -45,6 +51,7 @@ const SETAS = {
 
 export function CartaoMetrica({
   titulo, data, total, sentido = 'maior', periodos, periodo, formatar, formatarData, rotuloDelta, carregando,
+  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className,
 }: {
   titulo: string;
   /** a série, do mais antigo ao mais novo */
@@ -52,21 +59,39 @@ export function CartaoMetrica({
   /** o número grande: pronto, ou calculado da janela escolhida (soma dos dias, por exemplo) */
   total: ReactNode | ((janela: SeriesPoint[]) => ReactNode);
   sentido?: SentidoMetrica;
-  periodos: PeriodOption[];
+  /** o menu do período; sem ele o card usa a série inteira e mostra `cabDireita` */
+  periodos?: PeriodOption[];
   /** o período que abre escolhido (pelo rótulo) */
-  periodo: string;
+  periodo?: string;
   /** valor do balão e da variação ("R$ 4.066", "22 fechados") */
   formatar: (v: number) => string;
   formatarData: (d: string) => string;
   /** o que vem depois da variação do último ponto ("vs set/26", "hoje vs ontem") */
-  rotuloDelta: string;
+  rotuloDelta?: string;
   carregando?: boolean;
+  /** cabeçalho próprio no lugar do título (avatar + nome, por exemplo); o título fica para o leitor de tela */
+  cabEsquerda?: ReactNode;
+  /** à direita do cabeçalho quando não há menu de período (a campanha, o placar…) */
+  cabDireita?: ReactNode;
+  /** palavra pequena depois do número ("fechados") */
+  unidade?: string;
+  /** texto pequeno na linha do número, à direita ("16 fechados · 29 NE") */
+  numSub?: ReactNode;
+  /** a variação pronta no lugar da conta do card (ou false para esconder) */
+  variacao?: ReactNode | false;
+  /** a cor do gráfico decidida fora (melhor campanha, atendente: contra o período anterior) */
+  tom?: 'bom' | 'ruim' | 'neutro';
+  /** o rodapé pronto no lugar de "+N vs …" */
+  rodape?: ReactNode;
+  /** bloco entre o gráfico e o rodapé (os números do atendente) */
+  extra?: ReactNode;
+  className?: string;
 }) {
   const tema = useTemaAtual();
   const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
-  const [rotulo, setRotulo] = useState(periodo);
+  const [rotulo, setRotulo] = useState(periodo ?? '');
   const [view, setView] = useState<ChartView>('curve');
-  const opcao = periodos.find((p) => p.label === rotulo) ?? periodos[periodos.length - 1];
+  const opcao = periodos?.find((p) => p.label === rotulo) ?? periodos?.[periodos.length - 1];
   const janela = useMemo(
     () => (opcao?.points && opcao.points < data.length ? data.slice(-opcao.points) : data),
     [data, opcao],
@@ -80,27 +105,36 @@ export function CartaoMetrica({
   const pct = primeiro ? ((ultimo - primeiro) / primeiro) * 100 : 0;
   const rumo: 'up' | 'down' | 'flat' = Math.abs(pct) < FAIXA_NEUTRA ? 'flat' : ultimo >= primeiro ? 'up' : 'down';
   const pal = CORES[tema];
-  const cor = sentido === 'neutro' || rumo === 'flat' ? pal.neutro : (rumo === 'up') === (sentido === 'maior') ? pal.bom : pal.ruim;
+  const cor = tom ? pal[tom]
+    : sentido === 'neutro' || rumo === 'flat' ? pal.neutro : (rumo === 'up') === (sentido === 'maior') ? pal.bom : pal.ruim;
   const passo = ultimo - penultimo;
   const delta = (passo >= 0 ? '+' : '−') + formatar(Math.abs(passo));
   const series = useMemo(() => [{ name: titulo, data: janela, color: cor }], [titulo, janela, cor]);
   const valor = typeof total === 'function' ? total(janela) : total;
 
   return (
-    <article className={`pmc-root rvm${carregando ? ' rvm-carregando' : ''}`} aria-busy={carregando || undefined}>
+    <article className={`pmc-root rvm${carregando ? ' rvm-carregando' : ''}${className ? ` ${className}` : ''}`} aria-busy={carregando || undefined}>
       <PmcStyles />
       <header className="rvm-cab">
-        <h3 className="rvm-tit">{titulo}</h3>
-        <PeriodSelect value={rotulo} options={periodos} onChange={(o) => setRotulo(o.label)} accentText={cor} />
+        {cabEsquerda
+          ? <div className="rvm-cab-esq"><h3 className="rvm-sr">{titulo}</h3>{cabEsquerda}</div>
+          : <h3 className="rvm-tit">{titulo}</h3>}
+        {periodos
+          ? <PeriodSelect value={rotulo} options={periodos} onChange={(o) => setRotulo(o.label)} accentText={cor} />
+          : cabDireita}
       </header>
       <div className="rvm-num">
         <span className="rvm-val">{carregando ? '—' : valor}</span>
-        {temGrafico && !carregando && (
-          <span className="rvm-var" style={{ color: cor }} title={`Do primeiro ao último ponto (${rotulo.toLowerCase()})`}>
-            <Icon size={13} strokeWidth={2.5}>{SETAS[rumo]}</Icon>
-            {pctTexto(pct)}
-          </span>
-        )}
+        {unidade && !carregando && <span className="rvm-un">{unidade}</span>}
+        {variacao !== undefined
+          ? (variacao !== false && !carregando && variacao)
+          : temGrafico && !carregando && (
+            <span className="rvm-var" style={{ color: cor }} title={`Do primeiro ao último ponto (${(rotulo || 'período').toLowerCase()})`}>
+              <Icon size={13} strokeWidth={2.5}>{SETAS[rumo]}</Icon>
+              {pctTexto(pct)}
+            </span>
+          )}
+        {numSub && !carregando && <span className="rvm-numsub">{numSub}</span>}
       </div>
       <div className="rvm-graf">
         {temGrafico && !carregando ? (
@@ -123,18 +157,19 @@ export function CartaoMetrica({
               dateFormatter={formatarData}
               padTop={6}
               tipAuto
-              label={`${titulo}: gráfico de ${view === 'curve' ? 'curva' : 'barras'}, ${rotulo}. Use as setas para percorrer os pontos.`}
+              label={`${titulo}: gráfico de ${view === 'curve' ? 'curva' : 'barras'}${rotulo ? `, ${rotulo}` : ''}. Use as setas para percorrer os pontos.`}
             />
           </>
         ) : (
           <span className="rvm-vazio">{carregando ? '' : 'Ainda sem histórico para desenhar'}</span>
         )}
       </div>
+      {extra && !carregando && <div className="rvm-extra">{extra}</div>}
       <footer className="rvm-pe">
         <span className="rvm-delta">
-          {temGrafico && !carregando && <b style={{ color: cor }}>{delta}</b>} {rotuloDelta}
+          {rodape !== undefined ? rodape : <>{temGrafico && !carregando && <b style={{ color: cor }}>{delta}</b>} {rotuloDelta}</>}
         </span>
-        <ViewToggle value={view} onChange={setView} />
+        {temGrafico && <ViewToggle value={view} onChange={setView} />}
       </footer>
     </article>
   );
@@ -157,10 +192,24 @@ export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape }: {
 }
 
 /** Grade dos cards: 4 por linha (como os indicadores de antes); 2 em tela média; 1 no celular. */
-export function GradeMetricas({ children, rotulo }: { children: ReactNode; rotulo: string }) {
+export function GradeMetricas({ children, rotulo, colunas = 4 }: { children: ReactNode; rotulo: string; colunas?: 3 | 4 }) {
   return (
     <section className="pmc-grade-caixa" aria-label={rotulo}>
-      <div className="pmc-grade">{children}</div>
+      <div className="pmc-grade" data-col={colunas}>{children}</div>
     </section>
+  );
+}
+
+/** O título de um bloco de cards (no lugar do cartão grande em volta: card dentro de card
+ *  pesava). Título + ajuda + subtítulo à esquerda; controles à direita. */
+export function TituloBloco({ titulo, ajuda, sub, acao }: { titulo: string; ajuda?: ReactNode; sub?: ReactNode; acao?: ReactNode }) {
+  return (
+    <div className="rvm-bloco-cab">
+      <div className="rvm-bloco-tx">
+        <h2 className="rvm-bloco-tit">{titulo}{ajuda}</h2>
+        {sub && <p className="rvm-bloco-sub">{sub}</p>}
+      </div>
+      {acao && <div className="rvm-bloco-acao">{acao}</div>}
+    </div>
   );
 }

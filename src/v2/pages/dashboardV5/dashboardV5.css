@@ -755,3 +755,7 @@ html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .d5-sec:ha
 html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .d5-sec:has(.d5-graf-leg li + li) { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }
 /* aba Atendentes: a 1ª coluna (nome + "fecha mais por …") não espreme em três linhas quando a tabela rola */
 html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab th.d5-nome { min-width: 176px; }
+/* (14/11) a bolinha da campanha nos cards (Melhor campanha, "fecha mais por") usa a MESMA cor da
+   linha dela nas ondas — dentro dos cards o --dado-1 é o da série, não o cinza das barras */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #7C83F2; --dado-1-rgb: 124, 131, 242; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }

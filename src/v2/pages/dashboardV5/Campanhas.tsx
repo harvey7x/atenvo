@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { CampanhasV5, QuadroJanelaV5, ResumoCampanhaV5 } from '@/data/dashboardV5.abas.tipos';
+import type { CampanhasV5, PontoSerieV5, QuadroJanelaV5, ResumoCampanhaV5 } from '@/data/dashboardV5.abas.tipos';
 import { CAMPANHAS_GRAF, rotuloCampanha } from '@/data/dashboardV5.abas.tipos';
 import {
   baldesDe, fimComHoje, leituraOnda, melhorCampanha, somarEmBaldes, type Balde, type BaldeTipo,
@@ -10,6 +10,7 @@ import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
 import { GrafLinhas, LegendaGraf, useLinhasGraf, type NotaSerie, type SerieGraf } from './GrafLinhas';
+import { CartaoMetrica, CartaoMetricaFixo, GradeMetricas, TituloBloco, diaDoBalao } from '../../components/CartaoMetrica';
 
 /* Aba CAMPANHAS (12/11): o melhor do dia/semana/mês, as ondas por campanha
    (alternáveis dia · semana · mês CAF), a tabela do período, quem chegou já tendo
@@ -64,9 +65,14 @@ const AJUDA_PARENTE = 'Clientes que disseram que NÃO recebem INSS, mas um paren
   + 'pelo benefício do parente. Conta "algum parente" (pai ou mãe especificamente não fica registrado). O dia de '
   + 'hoje cresce ao longo do dia: a resposta sobre o parente vem depois da entrada.';
 
-/* ---------------- quadro: melhor do dia / semana / mês ---------------- */
-function CartaoQuadro({ titulo, quadro, metrica, comparacao }: {
-  titulo: string; quadro: QuadroJanelaV5; metrica: 'entradas' | 'ganhos'; comparacao: string;
+/* ---------------- quadro: melhor do dia / semana / mês ----------------
+   (dono 14/11: "deixa atraente, tudo que tiver métrica") — cada quadro é um card de métrica:
+   a campanha que venceu, o número, e o gráfico DIA A DIA dessa campanha na janela do gráfico
+   de ondas (a mesma série; período curto = últimos 7 dias). A variação segue a régua de sempre
+   (o MESMO trecho do anterior), no rodapé. */
+function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dias, hoje }: {
+  titulo: string; detalhe?: string; quadro: QuadroJanelaV5; metrica: 'entradas' | 'ganhos'; comparacao: string;
+  serie: PontoSerieV5[]; dias: string[]; hoje: string;
 }) {
   const soCampanhas = (l: ResumoCampanhaV5[]) => l.filter((x) => !['outros', 'sem_campanha'].includes(x.campanha));
   const atual = soCampanhas(quadro.atual);
@@ -78,28 +84,35 @@ function CartaoQuadro({ titulo, quadro, metrica, comparacao }: {
   const vence = caiu ? melhorCampanha(atual, (x) => x.entradas, (x) => x.ganhos) : melhor;
   const usa: 'entradas' | 'ganhos' = caiu ? 'entradas' : metrica;
   const ant = soCampanhas(quadro.anterior).find((x) => x.campanha === vence?.campanha);
+  const pontos = useMemo(() => {
+    if (!vence) return [];
+    const m = new Map(dias.map((dia) => [dia, 0]));
+    for (const p of serie) if (p.campanha === vence.campanha && m.has(p.dia)) m.set(p.dia, (m.get(p.dia) ?? 0) + p[usa]);
+    return [...m].map(([dia, v]) => ({ value: v, date: dia }));
+  }, [vence, serie, dias, usa]);
+  const cab = <span className="rvm-tit">{titulo}{detalhe && <small className="rvm-tit-det"> {detalhe}</small>}</span>;
+  if (!vence) {
+    return <CartaoMetricaFixo titulo={titulo} valor="—" detalhe={<span className="d5-mudo">Sem movimento ainda.</span>} rodape={comparacao} />;
+  }
+  const n = usa === 'ganhos' ? vence.ganhos : vence.entradas;
+  const nAnt = ant ? (usa === 'ganhos' ? ant.ganhos : ant.entradas) : 0;
+  const palavra = (v: number) => (usa === 'ganhos' ? (v === 1 ? 'fechado' : 'fechados') : (v === 1 ? 'entrada' : 'entradas'));
+  const cor = CAMPANHAS_GRAF.find((c) => c.slug === vence.campanha)?.cor ?? 'var(--txt-3)';
   return (
-    <div className="d5-qd">
-      <span className="d5-qd-t">{titulo}</span>
-      {vence ? (
-        <>
-          <b className="d5-qd-camp">{rotuloCampanha(vence.campanha)}</b>
-          <span className="d5-qd-n num">
-            {fmtInt(usa === 'ganhos' ? vence.ganhos : vence.entradas)}
-            <small> {usa === 'ganhos' ? (vence.ganhos === 1 ? 'fechado' : 'fechados') : 'entradas'}</small>
-          </span>
-          <small className="d5-qd-sub num">
-            <Legenda partes={[
-              usa === 'ganhos' ? `${fmtInt(vence.entradas)} entradas` : caiu ? 'sem fechados lançados ainda' : `${fmtInt(vence.ganhos)} fechados`,
-              vence.ne > 0 && `${fmtInt(vence.ne)} NE`,
-            ]} />
-          </small>
-          <Variacao atual={usa === 'ganhos' ? vence.ganhos : vence.entradas}
-            anterior={ant ? (usa === 'ganhos' ? ant.ganhos : ant.entradas) : 0}
-            sentido="maior" comparacao={comparacao} />
-        </>
-      ) : <span className="d5-mudo">Sem movimento ainda.</span>}
-    </div>
+    <CartaoMetrica
+      titulo={`${titulo}: ${rotuloCampanha(vence.campanha)}`}
+      cabEsquerda={cab}
+      cabDireita={<span className="rvm-chip" title="A campanha que venceu"><i style={{ background: cor }} />{rotuloCampanha(vence.campanha)}</span>}
+      data={pontos} total={fmtInt(n)} unidade={palavra(n)} variacao={false}
+      tom={n > nAnt ? 'bom' : n < nAnt ? 'ruim' : 'neutro'}
+      numSub={<Legenda partes={[
+        usa === 'ganhos' ? `${fmtInt(vence.entradas)} entradas` : caiu ? 'sem fechados lançados ainda' : `${fmtInt(vence.ganhos)} fechados`,
+        vence.ne > 0 && `${fmtInt(vence.ne)} NE`,
+      ]} />}
+      formatar={(v) => `${fmtInt(v)} ${palavra(v)}`}
+      formatarData={(dia) => diaDoBalao(dia, hoje)}
+      rodape={<Variacao atual={n} anterior={nAnt} sentido="maior" comparacao={comparacao} />}
+    />
   );
 }
 
@@ -136,6 +149,8 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
     return { baldes: bs, series: ss };
   }, [d.serie, campanhas, periodo, balde, metrica, hoje, jm]);
 
+  // os dias do gráfico (a janela das ondas): o gráfico de cada quadro "melhor campanha"
+  const diasGraf = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), 'dia').map((b) => b.chave), [jm, periodo, hoje]);
   const tituloMetrica = METRICAS.find((m) => m.valor === metrica)!.rotulo;
   const avisoRetencao = d.retornosConfiavelDesde !== '' && periodo.iniDate < d.retornosConfiavelDesde;
   const comRetornos = [...campanhas].filter((c) => c.peloAnuncio > 0).sort((a, b) => b.retornos - a.retornos);
@@ -145,14 +160,15 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
 
   return (
     <>
-      <Secao className="d5-quadro" titulo="Melhor campanha" ajuda={AJUDA_MELHOR}
-        sub="Hoje por entradas; semana e mês pelo placar de fechados. Sempre os quadros de agora, independentes do período escolhido acima.">
-        <div className="d5-qds">
-          <CartaoQuadro titulo="Hoje" quadro={d.quadro.dia} metrica="entradas" comparacao="vs ontem, mesmo horário" />
-          <CartaoQuadro titulo="Esta semana (seg–dom)" quadro={d.quadro.semana} metrica="ganhos" comparacao="vs semana passada, mesmo ponto" />
-          <CartaoQuadro titulo="Nosso mês (11 a 10)" quadro={d.quadro.mes} metrica="ganhos" comparacao="vs mês anterior, mesmo ponto" />
-        </div>
-      </Secao>
+      <div className="rvm-bloco">
+        <TituloBloco titulo="Melhor campanha" ajuda={<Ajuda texto={AJUDA_MELHOR} rotulo="Melhor campanha" />}
+          sub="Hoje por entradas; semana e mês pelo placar de fechados. Os números são os de agora, independentes do período escolhido acima; o gráfico mostra a campanha dia a dia." />
+        <GradeMetricas rotulo="Melhor campanha" colunas={3}>
+          <CartaoQuadro titulo="Hoje" quadro={d.quadro.dia} metrica="entradas" comparacao="vs ontem, mesmo horário" serie={d.serie} dias={diasGraf} hoje={hoje} />
+          <CartaoQuadro titulo="Esta semana" detalhe="seg–dom" quadro={d.quadro.semana} metrica="ganhos" comparacao="vs semana passada, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
+          <CartaoQuadro titulo="Nosso mês" detalhe="11 a 10" quadro={d.quadro.mes} metrica="ganhos" comparacao="vs mês anterior, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
+        </GradeMetricas>
+      </div>
 
       <Secao className="d5-ondas" titulo="Ondas por campanha" ajuda={AJUDA_ONDAS}
         sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês da casa'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
@@ -356,11 +372,12 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
 export function CampanhasSkeleton() {
   return (
     <>
-      <Secao className="d5-quadro" titulo="Melhor campanha">
-        <div className="d5-sk-linhas" aria-hidden>
-          {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} altura={72} raio={10} />)}
+      <div className="rvm-bloco">
+        <TituloBloco titulo="Melhor campanha" />
+        <div className="pmc-grade" data-col={3} aria-hidden>
+          {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} altura={193} raio={12} />)}
         </div>
-      </Secao>
+      </div>
       <Secao className="d5-ondas" titulo="Ondas por campanha">
         <div className="d5-sk-linhas" aria-hidden><Skeleton altura={220} raio={10} /></div>
       </Secao>
