@@ -17,7 +17,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { BadgeStatus, CardVidro } from '../../components';
 import { SeloAoVivo } from '../../components/SeloAoVivo';
-import { ROTULO_COMP, type AtendSerie, type CicloSerie, type Comportamento, type ResumoCarteira, type TipoMsg } from '../cobrancaAnalytics';
+import { ROTULO_COMP, type AtendSerie, type CicloSerie, type Comportamento, type HistoricoMes, type ResumoCarteira, type TipoMsg } from '../cobrancaAnalytics';
+import { CartaoMetrica, GradeMetricas, type PeriodOption, type SeriesPoint } from '../../components/CartaoMetrica';
 import { cobrancaDoCiclo } from '../cicloCalendario';
 import type { Dados } from '../../data/cobranca/types';
 import './painel.css';
@@ -142,8 +143,11 @@ export function Proporcao({ partes }: { partes: { v: number; tom: string; titulo
 export interface NovosResumo { n: number; mensal: number }
 
 /** Markup do Painel — demo e instância real usam O MESMO; só muda a fonte dos números. */
-export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, individual, aposKpis, antesAtend, limiteAtend, aoVerEquipe }: {
+export function PainelResumoVista({ r, ciclosM, atendM, historico, ciclosDatas, novos, individual, aposKpis, antesAtend, limiteAtend, aoVerEquipe }: {
   r: ResumoCarteira; ciclosM: CicloSerie[]; atendM: AtendSerie[];
+  /** histórico mês a mês (historicoMensal): com ele, os 4 indicadores viram os cards de métrica
+      com gráfico (dono 14/11); sem ele, os indicadores de antes */
+  historico?: HistoricoMes[];
   /** datas manuais de cobrança do Calendário (vencimento do ciclo no mês) */
   ciclosDatas?: Dados['ciclosDatas'];
   /** clientes nos Novos (débito ainda ativo) — contexto do topo */
@@ -283,7 +287,15 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
         </div>
       </div>
 
-      {/* 2. indicadores */}
+      {/* 2. indicadores — com o histórico, os cards de métrica com gráfico (dono 14/11: "todas as
+          métricas dessa forma"); o número grande é o de AGORA (o mesmo de antes) e o gráfico, a
+          história mês a mês; "Recebido" segue o mês de referência */}
+      {historico && historico.length > 0 ? (
+        <div className="sobe" style={{ animationDelay: '.04s' }}>
+          <IndicadoresMetrica r={r} historico={historico} meses={meses} serie={serie} sel={sel}
+            parcial={parcial} carteira={carteira} />
+        </div>
+      ) : (<>
       <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
         <Indicador rotulo="Recorrência mensal" valor={<Dinheiro v={r.recorrencia} />}
           pe={<>{carteira.toLocaleString('pt-BR')} clientes · ticket médio <b className="num">{brl(carteira ? r.recorrencia / carteira : 0)}</b></>}
@@ -301,6 +313,7 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
           pe={carteira ? <><b className="num">{emDiaN.toLocaleString('pt-BR')}</b> de {carteira.toLocaleString('pt-BR')} clientes em dia</> : 'nenhum cliente em cobrança'}
           visual={<div className="pn-trilho"><i className={adimTom ?? 'neutro'} style={{ width: `${carteira ? Math.min(100, r.adimplencia) : 0}%` }} /></div>} />
       </div>
+      </>)}
 
       {aposKpis}
 
@@ -537,5 +550,67 @@ export function PainelResumoVista({ r, ciclosM, atendM, ciclosDatas, novos, indi
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------------- os 4 indicadores como cards de métrica (dono 14/11) ---------------- */
+const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** '2026-10' → 'out 2026' (a data do balão do gráfico) */
+const mesDoBalao = (comp: string) => `${MES_ABREV[Number(comp.slice(5, 7)) - 1] ?? comp.slice(5, 7)} ${comp.slice(0, 4)}`;
+const reais = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+const PERIODOS_MESES: PeriodOption[] = [
+  { label: 'Últimos 3 meses', points: 3 },
+  { label: 'Últimos 6 meses', points: 6 },
+  { label: 'Todos os meses' },
+];
+
+function IndicadoresMetrica({ r, historico, meses, serie, sel, parcial, carteira }: {
+  r: ResumoCarteira; historico: HistoricoMes[]; meses: { comp: string; k: number }[];
+  serie: { comp: string; valor: number }[]; sel: number; parcial: boolean; carteira: number;
+}) {
+  const porComp = useMemo(() => new Map(historico.map((h) => [h.competencia, h])), [historico]);
+  // só os meses até hoje, a partir do primeiro com alguém em cobrança
+  const mesesHist = useMemo(() => {
+    const ini = meses.findIndex((m) => (porComp.get(m.comp)?.clientes ?? 0) > 0);
+    return ini < 0 ? [] : meses.slice(ini);
+  }, [meses, porComp]);
+  // o mês corrente ainda não fechou: "Em atraso" e "Adimplência" param no último mês FECHADO
+  // (no mês aberto ninguém "não pagou" ainda — a linha despencaria para zero)
+  const compHoje = meses[meses.length - 1]?.comp ?? '';
+  const pontos = (f: (h: HistoricoMes) => number | null, soFechados = false): SeriesPoint[] => mesesHist.flatMap((m) => {
+    if (soFechados && m.comp >= compHoje) return [];
+    const h = porComp.get(m.comp);
+    const v = h ? f(h) : null;
+    return v == null ? [] : [{ value: v, date: m.comp }];
+  });
+  const recorrencia = useMemo(() => pontos((h) => h.recorrencia), [mesesHist, porComp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const atraso = useMemo(() => pontos((h) => h.emAtraso, true), [mesesHist, porComp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const adimplencia = useMemo(() => pontos((h) => h.adimplencia, true), [mesesHist, porComp]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Recebido: os meses até o mês de referência (o card anda junto com o seletor do topo)
+  const recebido = useMemo<SeriesPoint[]>(() => {
+    const ini = serie.findIndex((m) => m.valor > 0);
+    return ini < 0 || sel < ini ? [] : serie.slice(ini, sel + 1).map((m) => ({ value: m.valor, date: m.comp }));
+  }, [serie, sel]);
+  const compSel = serie[sel]?.comp;
+  const vsAnterior = (pts: SeriesPoint[]) => (pts.length >= 2 ? `vs ${mesAno(pts[pts.length - 2].date)}` : 'no mês');
+
+  return (
+    <GradeMetricas rotulo="Indicadores da carteira">
+      <CartaoMetrica title="Recorrência mensal" data={recorrencia} total={brl(r.recorrencia)}
+        valueFormatter={reais} dateFormatter={mesDoBalao}
+        period="Últimos 6 meses" periodOptions={PERIODOS_MESES} deltaLabel={vsAnterior(recorrencia)} />
+      <CartaoMetrica key={compSel} title={`Recebido em ${compSel ? mesAno(compSel) : '—'}`} data={recebido} total={brl(serie[sel]?.valor ?? 0)}
+        valueFormatter={reais} dateFormatter={mesDoBalao}
+        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
+        deltaLabel={`${vsAnterior(recebido)}${parcial ? ' · mês ainda aberto' : ''}`} />
+      <CartaoMetrica title="Em atraso" data={atraso} total={brl(r.emAtrasoValor)} sentido="menor"
+        valueFormatter={reais} dateFormatter={mesDoBalao}
+        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
+        deltaLabel={vsAnterior(atraso)} />
+      <CartaoMetrica title="Adimplência" data={adimplencia} total={carteira ? `${r.adimplencia}%` : '—'}
+        valueFormatter={(v) => `${Math.round(v)}%`} dateFormatter={mesDoBalao}
+        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
+        deltaLabel={vsAnterior(adimplencia)} />
+    </GradeMetricas>
   );
 }

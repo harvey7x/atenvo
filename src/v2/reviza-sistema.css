@@ -341,7 +341,8 @@ html[data-barra-alfa]:not(#rv-sis) .v2 td select.inp { height: var(--btn-h-p); m
 html[data-barra-alfa]:not(#rv-sis) .v2 :is(.wa-busca, .kb-busca) > svg { width: var(--ic-p); height: var(--ic-p); }
 
 /* ---- 8. ÍCONES no conteúdo: traço 1,5 (o mesmo da barra lateral) ---- */
-html[data-barra-alfa]:not(#rv-sis) .v2 :is(button, .p-btn, [role="button"], .chip, .estado, .card-cab, .pn-card-cab, .ph, .wa-busca, .ev-st-ic) svg[stroke-width] { stroke-width: var(--ic-traco); }
+/* (o card de métrica, .pmc-root, desenha os próprios ícones — fica de fora; :not(:where()) não pesa) */
+html[data-barra-alfa]:not(#rv-sis) .v2 :is(button, .p-btn, [role="button"], .chip, .estado, .card-cab, .pn-card-cab, .ph, .wa-busca, .ev-st-ic) svg[stroke-width]:not(:where(.pmc-root *)) { stroke-width: var(--ic-traco); }
 html[data-barra-alfa]:not(#rv-sis) .v2 :is(.ib2, .tool, .pn-mes-seta, .calx-seta, .gp-sc-seta, .d5-ib) > svg { width: var(--ic); height: var(--ic); }
 
 /* ---- 9. CARTÕES: raio 12; borda + sombra sempre juntas ---- */

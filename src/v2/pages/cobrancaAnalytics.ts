@@ -267,3 +267,40 @@ export function resumoCarteira(cs: ClienteAnalise[]): ResumoCarteira {
     porComportamento, faturamentoMensal, respostaPorTipo,
   };
 }
+
+/* ---------- histórico MÊS A MÊS dos indicadores do Painel (dono 14/11: os cards de métrica
+   com gráfico). Demo e real usam a MESMA conta, lida do status de cada cliente em cada
+   competência (o mesmo que pinta a Gestão):
+   - em cobrança no mês = status paga, nao_paga ou atraso (prevista = desconto ainda ativo/futuro)
+   - recorrência  = soma das mensalidades de quem estava em cobrança no mês
+   - em atraso    = soma das mensalidades de quem NÃO pagou no mês
+   - adimplência  = quem pagou ÷ (quem pagou + quem não pagou); o "aguardando entrada"
+                    (atraso) fica fora da conta até virar pago ou não pago
+   ---------- */
+export interface HistoricoMes {
+  competencia: string;
+  clientes: number;
+  recorrencia: number;
+  emAtraso: number;
+  /** null = ninguém com mês fechado (pago ou não pago) nessa competência */
+  adimplencia: number | null;
+}
+
+export function historicoMensal(cs: ClienteAnalise[]): HistoricoMes[] {
+  // a MESMA população dos números de agora (resumoCarteira/resumoCarteiraReal): quem está EM
+  // COBRANÇA hoje — os Novos (débito ainda descontando) e os Cancelados ficam fora
+  const at = cs.filter((c) => c.ativo !== false);
+  return competenciasDe(cs).map((competencia, k) => {
+    let clientes = 0, recorrencia = 0, emAtraso = 0, pagos = 0, naoPagos = 0;
+    for (const c of at) {
+      const st = c.meses[k]?.status;
+      if (st !== 'paga' && st !== 'nao_paga' && st !== 'atraso') continue;
+      clientes++;
+      recorrencia += c.mensalidade;
+      if (st === 'paga') pagos++;
+      else if (st === 'nao_paga') { naoPagos++; emAtraso += c.mensalidade; }
+    }
+    const fechados = pagos + naoPagos;
+    return { competencia, clientes, recorrencia, emAtraso, adimplencia: fechados ? Math.round((pagos / fechados) * 100) : null };
+  });
+}

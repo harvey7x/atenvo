@@ -49,6 +49,7 @@ const Maturacao = lazy(() => v1().then((m) => ({ default: m.Maturacao })));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
 const LoginV2 = lazy(() => import('@/v2/pages/Login'));
+const ProgressMetricCardDemo = lazy(() => import('@/components/progress-metric-card-demo'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
@@ -103,6 +104,10 @@ function RedirDeV2() {
 const routes: RouteObject[] = [
   // ============ ROTAS OFICIAIS = Platina (o corte) ============
   { path: '/login', element: <Lz><LoginV2 /></Lz> },
+  // demonstração do card de métrica (dono 14/11), página inteira e só fora da produção (dev e prévia)
+  ...(import.meta.env.DEV || String(import.meta.env.VITE_PREVIA) === 'true'
+    ? [{ path: '/progress-metric-card', element: <Lz><ProgressMetricCardDemo /></Lz> }]
+    : []),
   { path: '/redefinir-senha', element: <Lz><RedefinirSenhaV2 /></Lz> },
   { path: '/definir-senha', element: <Lz><DefinirSenhaV2 /></Lz> },
   {

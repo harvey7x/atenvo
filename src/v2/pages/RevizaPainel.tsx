@@ -7,7 +7,7 @@ import { BadgeStatus, CardVidro, EstadoVazio, TabelaPadrao, type Coluna } from '
 import { Dinheiro, PainelResumoVista, mesAno } from './painel/PainelResumo';
 import type { ClienteAnalise } from './cobrancaAnalytics';
 import { proximaCobrancaDoCiclo } from './cicloCalendario';
-import { seriePorAtendente, seriePorCiclo } from './cobrancaAnalytics';
+import { historicoMensal, seriePorAtendente, seriePorCiclo } from './cobrancaAnalytics';
 import { atendentesReais, clientesReais, previsaoReal, resumoCarteiraReal } from './revizaAnalytics';
 import { PainelComercialVista, comissoesDe } from './RevizaComissoes';
 import { EquipeVista } from './painel/EquipeVista';
@@ -78,6 +78,8 @@ export function PainelGeralReviza({ soComercial }: {
   const cs = useMemo(() => clientesReais(dados), [dados]);
   const ciclosM = useMemo(() => seriePorCiclo(cs), [cs]);
   const atendM = useMemo(() => seriePorAtendente(cs), [cs]);
+  // histórico mês a mês dos indicadores (cards de métrica com gráfico, dono 14/11)
+  const historico = useMemo(() => historicoMensal(cs), [cs]);
   const pctsPrev = useComissoes().data;
   const histPrev = useComissoesHist().data;
   const previsao = useMemo(() => previsaoReal(dados, pctsPrev, histPrev), [dados, pctsPrev, histPrev]);
@@ -126,7 +128,7 @@ export function PainelGeralReviza({ soComercial }: {
 
   return (
     <>
-      <PainelResumoVista r={r} ciclosM={ciclosM} atendM={atendM} ciclosDatas={dados.ciclosDatas} novos={novos}
+      <PainelResumoVista r={r} ciclosM={ciclosM} atendM={atendM} historico={historico} ciclosDatas={dados.ciclosDatas} novos={novos}
         individual={individual ? soComercial : undefined}
         limiteAtend={5} aoVerEquipe={() => navigate('/cobrancas/atendentes')}
         aposKpis={previsao.some((p) => p.previsto > 0) ? (
