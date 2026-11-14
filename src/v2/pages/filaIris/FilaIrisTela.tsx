@@ -838,9 +838,9 @@ function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicion
           {CATEGORIAS_CHEGADA.map((k) => {
             const n = adicionados ? adicionados[k] ?? 0 : null;
             return (
-              <span key={k} className="fi-eq-adic-c" data-zero={!n ? '' : undefined}
+              <span key={k} className="fi-eq-adic-l" data-zero={!n ? '' : undefined}
                 title={n == null ? 'Ainda carregando' : `${n} ${n === 1 ? 'cliente passado' : 'clientes passados'} pela Iris para ${ROTULO_CURTO[k]} ${rotuloAdicionados}`}>
-                <b className="num">{n == null ? '—' : n ? `+${n}` : '0'}</b>{ROTULO_CURTO[k]}
+                <span>{ROTULO_CURTO[k]}</span><b className="num">{n == null ? '—' : n ? `+${n}` : '0'}</b>
               </span>
             );
           })}
@@ -1122,7 +1122,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         onKeyDown={(e) => {
           if (e.key === 'Escape') { setBusca(''); e.currentTarget.blur(); }
           else if (e.key === 'Enter' && termo && navegacao[0]) { setAberto(navegacao[0].id); e.currentTarget.blur(); }
-          else if (e.key === 'ArrowDown') { e.preventDefault(); document.querySelector<HTMLElement>('.fi-lin')?.focus(); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); e.currentTarget.closest('.fi-lista')?.querySelector<HTMLElement>('.fi-lin')?.focus(); }
         }} />
       {busca ? <button type="button" className="fi-busca-x" onClick={() => { setBusca(''); campoBusca.current?.focus(); }} aria-label="Limpar a busca"><IcX t={10} /></button>
         : <kbd className="fi-busca-k" aria-hidden>/</kbd>}
@@ -1229,18 +1229,16 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
                 numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null}
                 adicionados={fonte.chegadas ? chegadasPer?.por[a.id] ?? (chegadasPer ? {} : null) : undefined}
                 rotuloAdicionados={ROTULO_ADICIONADOS[periodo]}
-                comIris={fonte.irisAgora ? irisPorDono.get(a.id) ?? 0 : null}
-                aoVerIris={fonte.irisAgora ? () => verIrisDe(a.id) : undefined} />
+                comIris={fonte.irisAgora?.lidaEm ? irisPorDono.get(a.id) ?? 0 : null}
+                aoVerIris={fonte.irisAgora?.lidaEm ? () => verIrisDe(a.id) : undefined} />
             ))}
           </div>
           {admin && fonte.irisAgora !== undefined && (
             <IrisAgoraSecao iris={fonte.irisAgora} Avatar={AvatarAtendente} dono={filtroIrisDono} aoDono={setFiltroIrisDono}
-              aoConversa={(c) => {
-                const l = leads.find((x) => x.id === c.contatoId);
-                if (l) conversa(l);
-                else if (abrirConversa) abrirConversa({ conversaId: c.conversaId, nome: c.nome } as Lead);
-                else avisar(`Prévia: aqui abre a conversa de ${doisNomes(c.nome)} no WhatsApp.`);
-              }} />
+              aoConversa={(c) => (abrirConversa
+                /* a conversa em que a Iris atende (o contato pode ter outra mais recente) */
+                ? abrirConversa({ conversaId: c.conversaId, nome: c.nome } as Lead)
+                : avisar(`Prévia: aqui abre a conversa de ${doisNomes(c.nome)} no WhatsApp.`))} />
           )}
           {recados && admin && (
             <ListaRecados fonte={recados} aoConversa={(r) => {

@@ -912,18 +912,12 @@
 .v2 .fi-eq-per-tot { flex-basis: 100%; font-size: 12.5px; color: var(--txt-2); }
 .v2 .fi-eq-per-tot b { font-weight: 600; color: var(--txt); }
 /* o cartão do atendente: adicionados no período (a faixa irmã de recebidos · marcações · fechados) */
-.v2 .fi-eq-adic { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--fi-borda); border-radius: 8px; }
-.v2 .fi-eq-adic-t {
-  grid-column: 1 / -1; padding: 6px 8px 0; text-align: center; font-size: 10.5px; font-weight: 600; letter-spacing: .07em;
-  text-transform: uppercase; color: var(--txt-3);
-}
-.v2 .fi-eq-adic-c {
-  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 4px 7px; font-size: 11px; line-height: 1.25;
-  color: var(--txt-3); text-align: center;
-}
-.v2 .fi-eq-adic-c + .fi-eq-adic-c { border-left: 1px solid var(--fi-borda); }
-.v2 .fi-eq-adic-c b { font-size: 15px; font-weight: 600; color: var(--txt); letter-spacing: -.02em; }
-.v2 .fi-eq-adic-c[data-zero] b { color: var(--txt-3); font-weight: 500; }
+.v2 .fi-eq-adic { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px 9px; border: 1px solid var(--fi-borda); border-radius: 8px; }
+.v2 .fi-eq-adic-t { margin-bottom: 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .fi-eq-adic-l { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; font-size: 12.5px; color: var(--txt-2); }
+.v2 .fi-eq-adic-l > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .fi-eq-adic-l b { flex: none; font-size: 13.5px; font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .fi-eq-adic-l[data-zero] b { color: var(--txt-3); font-weight: 500; }
 /* o cartão do atendente: com a Iris agora (leva à lista, filtrada nele) */
 .v2 .fi-eq-iris {
   display: flex; align-items: center; gap: 7px; width: 100%; height: 32px; padding: 0 10px; border-radius: 8px;

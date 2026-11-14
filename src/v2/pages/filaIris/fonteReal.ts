@@ -139,8 +139,9 @@ export function useFonteReal(): FonteFila {
           marcacoes: porUid ? (porUid.get(n.usuario_id) ?? 0) : undefined }))
         .filter((n) => EQUIPE.some((a) => a.id === n.atendente));
     }
-    setNums(res);
-    setCheg(chegou);
+    /* o período cuja leitura falhou fica com o último valor bom (a releitura de 5 min nunca apaga um número certo) */
+    setNums((x) => ({ ...x, ...res }));
+    setCheg((x) => ({ ...x, ...chegou }));
   }, [org, currentOrg?.role]);
 
   /* a Iris agora (só o administrador): relê junto da fila, a cada minuto */
@@ -149,7 +150,9 @@ export function useFonteReal(): FonteFila {
     const { data, error } = await lerTudo<LinhaIris>('fila_iris_iris_agora', { p_org: org }, (r) => r.conversa_id);
     if (error) {
       /* falhou: fica a lista anterior (com o aviso); sem anterior, só o aviso */
-      setIris((x) => ({ clientes: x?.clientes ?? [], lidaEm: x?.lidaEm ?? Date.now(), erro: 'Não deu para ler a lista da Iris agora. Tenta de novo sozinho.' }));
+      /* sem leitura boa antes: lidaEm 0 = "não sei" (a tela não mostra 0 como se fosse dado) */
+      const msg = 'Não deu para ler a lista da Iris agora. Tenta de novo sozinho.';
+      setIris((x) => (x?.lidaEm ? { ...x, erro: msg } : { clientes: [], lidaEm: 0, erro: msg }));
       return;
     }
     setIris({ clientes: ((data ?? []) as LinhaIris[]).map(clienteIris), lidaEm: Date.now(), erro: null });
@@ -166,7 +169,7 @@ export function useFonteReal(): FonteFila {
     const tn = window.setInterval(() => { void carregarNumeros(); }, 5 * 60_000);
     let lidaEm = Date.now();
     const voltou = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lidaEm > 15_000) { lidaEm = Date.now(); void carregar(); void carregarIris(); }
+      if (document.visibilityState === 'visible' && Date.now() - lidaEm > 15_000) { lidaEm = Date.now(); void carregar(); void carregarIris(); void carregarNumeros(); }
     };
     document.addEventListener('visibilitychange', voltou);
     /* um repasse pelo recado do administrador trocou o dono de um cliente: relê na hora */

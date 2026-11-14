@@ -37,7 +37,10 @@ const doisNomes = (n: string) => {
   return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : n;
 };
 const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const nomeDono = (dono: string | null) => (!dono ? 'Sem dono' : EQUIPE.find((a) => a.id === dono)?.nome ?? 'Outro atendente');
+/** a chave do dono nos filtros (sem dono também filtra) */
+const SEM_DONO = 'sem_dono';
+const chaveDono = (c: ClienteIris) => c.dono ?? SEM_DONO;
+const nomeDono = (dono: string | null) => (!dono || dono === SEM_DONO ? 'Sem dono' : EQUIPE.find((a) => a.id === dono)?.nome ?? 'Outro atendente');
 
 /** os blocos de cima: os grupos da situação + "esperando a Iris" (o cliente escreveu e ela ainda não respondeu) */
 type Bloco = GrupoIris | 'esperando_iris';
@@ -45,7 +48,7 @@ const BLOCOS: { id: Bloco; rotulo: string; sub: string; ajuda: string }[] = [
   ...GRUPOS_IRIS.map((g) => ({
     id: g.id, rotulo: g.id === 'parado' ? 'Parados' : g.rotulo, ajuda: g.ajuda,
     sub: g.id === 'conversando' ? 'cliente escreveu em 24 h' : g.id === 'esperando' ? '1 a 3 dias sem escrever'
-      : g.id === 'parado' ? 'mais de 3 dias sem escrever' : 'só a primeira mensagem',
+      : g.id === 'parado' ? 'mais de 3 dias sem escrever' : 'não responderam a Iris',
   })),
   { id: 'esperando_iris', rotulo: 'Esperando a Iris', sub: 'cliente escreveu por último', ajuda: 'O cliente escreveu por último e a Iris ainda não respondeu.' },
 ];
@@ -54,11 +57,16 @@ const doBloco = (c: ClienteIris, b: Bloco, agora: number) => (b === 'esperando_i
 /** a situação em duas linhas curtas, com o tom (vermelho só para quem espera resposta) */
 function situacaoDe(c: ClienteIris, agora: number): { rotulo: string; detalhe: string; tom?: 'alerta' | 'fraco' } {
   const vez = vezDe(c);
-  if (vez === 'cliente') return { rotulo: 'Cliente respondeu', detalhe: `${haQuanto(minutos(agora, c.ultCliente))} · esperando a Iris`, tom: 'alerta' };
+  /* com o pedido de "representação" a Iris para e espera um atendente; nos outros pedidos ela continua */
+  if (vez === 'cliente') {
+    return { rotulo: 'Cliente respondeu', tom: 'alerta',
+      detalhe: `${haQuanto(minutos(agora, c.ultCliente))} · ${c.pediuHumano === 'representacao' ? 'esperando um atendente' : 'esperando a Iris'}` };
+  }
   if (vez === 'atendente') return { rotulo: 'Atendente escreveu', detalhe: haQuanto(minutos(agora, c.ultNossa)) };
   if (!vez) return { rotulo: 'Sem mensagens', detalhe: '—', tom: 'fraco' };
   if (c.respondeuIris === false) return { rotulo: 'Ainda não respondeu', detalhe: `Iris escreveu ${haQuanto(minutos(agora, c.ultNossa))}`, tom: 'fraco' };
-  return { rotulo: 'Esperando o cliente', detalhe: `Iris escreveu ${haQuanto(minutos(agora, c.ultNossa))}` };
+  /* não "Esperando o cliente": é o nome de um bloco (1 a 3 dias) e a linha pode estar em qualquer grupo */
+  return { rotulo: 'Vez do cliente', detalhe: `Iris escreveu ${haQuanto(minutos(agora, c.ultNossa))}` };
 }
 
 export interface PropsIrisAgora {
@@ -84,14 +92,14 @@ export function IrisAgoraSecao({ iris, Avatar, dono, aoDono, aoConversa }: Props
   /* cada contagem leva em conta os OUTROS filtros (o número que aparece é o que a tabela vai mostrar ao clicar) */
   const passa = (c: ClienteIris, sem: 'bloco' | 'dono' | 'trafego' | null) =>
     (sem === 'bloco' || !bloco || doBloco(c, bloco, agora))
-    && (sem === 'dono' || !dono || c.dono === dono)
+    && (sem === 'dono' || !dono || chaveDono(c) === dono)
     && (sem === 'trafego' || !trafego || c.campanha === trafego)
     && (!termo || semAcento(c.nome).includes(termo) || (digitos.length >= 3 && c.fone.replace(/\D/g, '').includes(digitos)));
   const baseBlocos = todos.filter((c) => passa(c, 'bloco'));
   const baseDono = todos.filter((c) => passa(c, 'dono'));
   const baseTrafego = todos.filter((c) => passa(c, 'trafego'));
   const porDono = new Map<string, number>();
-  for (const c of baseDono) porDono.set(c.dono ?? '', (porDono.get(c.dono ?? '') ?? 0) + 1);
+  for (const c of baseDono) porDono.set(chaveDono(c), (porDono.get(chaveDono(c)) ?? 0) + 1);
   const porTrafego = new Map<string, number>();
   for (const c of baseTrafego) porTrafego.set(c.campanha, (porTrafego.get(c.campanha) ?? 0) + 1);
   const lista = useMemo(() => todos.filter((c) => passa(c, null)).sort((a, b) => ultimaAtividade(b) - ultimaAtividade(a)),
@@ -116,12 +124,17 @@ export function IrisAgoraSecao({ iris, Avatar, dono, aoDono, aoConversa }: Props
         + 'A lista atualiza sozinha a cada minuto.'}>
         <IcInfo t={13} />
       </span>
-      {iris && <span className="fi-lista-n">atualizada às {dataHora(agora).slice(6)}</span>}
+      {iris?.lidaEm ? <span className="fi-lista-n">atualizada às {dataHora(agora).slice(6)}</span> : null}
       {filtrando && <button type="button" className="fi-limpar fi-ir-limpar" onClick={limpar}><IcX t={9} />Limpar filtros</button>}
     </header>
   );
-  if (!iris) {
-    return <section className="fi-lista vidro fi-ir" id="fi-iris-agora" aria-label="A Iris está atendendo">{cab}<p className="fi-ir-vazio">Carregando…</p></section>;
+  /* sem uma leitura boa (carregando ou a 1ª falhou): nada de "0" como se fosse dado */
+  if (!iris || !iris.lidaEm) {
+    return (
+      <section className="fi-lista vidro fi-ir" id="fi-iris-agora" aria-label="A Iris está atendendo">
+        {cab}<p className="fi-ir-vazio" role={iris?.erro ? 'status' : undefined}>{iris?.erro ?? 'Carregando…'}</p>
+      </section>
+    );
   }
   return (
     <section className="fi-lista vidro fi-ir" id="fi-iris-agora" aria-label="A Iris está atendendo">
@@ -152,7 +165,7 @@ export function IrisAgoraSecao({ iris, Avatar, dono, aoDono, aoConversa }: Props
         <Divisao titulo="Por atendente" ajuda="De quem são os clientes que a Iris está atendendo (o dono na fila)."
           itens={donos.map((id) => {
             const a = EQUIPE.find((x) => x.id === id);
-            return { id, nome: nomeDono(id || null), n: porDono.get(id) ?? 0, avatar: a ? <Avatar a={a} tam={18} /> : null };
+            return { id, nome: nomeDono(id), n: porDono.get(id) ?? 0, avatar: a ? <Avatar a={a} tam={18} /> : null };
           })}
           total={baseDono.length} max={maxDono} sel={dono} aoSel={(id) => { aoDono(dono === id ? null : id); setVer(LOTE); }} />
         <Divisao titulo="Por tráfego" ajuda="A campanha do número por onde o lead entrou (a mesma do Dashboard)."

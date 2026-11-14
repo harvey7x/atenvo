@@ -15,7 +15,7 @@ export const GRUPOS_IRIS: { id: GrupoIris; rotulo: string; ajuda: string }[] = [
   { id: 'conversando', rotulo: 'Conversando', ajuda: 'O cliente escreveu nas últimas 24 horas.' },
   { id: 'esperando', rotulo: 'Esperando o cliente', ajuda: 'O cliente escreveu pela última vez entre 1 e 3 dias atrás.' },
   { id: 'parado', rotulo: 'Parados há mais de 3 dias', ajuda: 'O cliente não escreve há mais de 3 dias. A Iris continua com ele.' },
-  { id: 'nunca', rotulo: 'Nunca responderam', ajuda: 'O cliente mandou a primeira mensagem e não respondeu mais nada à Iris (há mais de 24 horas).' },
+  { id: 'nunca', rotulo: 'Nunca responderam', ajuda: 'O cliente não escreveu nada depois que a Iris falou com ele neste atendimento (há mais de 24 horas).' },
 ];
 export function grupoDe(c: ClienteIris, agora: number): GrupoIris {
   if (!c.ultCliente) return 'nunca';
