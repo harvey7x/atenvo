@@ -339,7 +339,8 @@ export default function ProgressMetricCard({
 // as aspas e quebraria os seletores.
 const HOISTS_STYLES = Number(version.split('.')[0]) >= 19;
 
-function PmcStyles() {
+// exportado (Reviza 14/11): o card compacto da casa (v2/components/CartaoMetrica) reusa este CSS
+export function PmcStyles() {
   if (HOISTS_STYLES) {
     const hoist = { href: 'progress-metric-card', precedence: 'default' } as StyleHTMLAttributes<HTMLStyleElement>;
     return <style {...hoist}>{PMC_CSS}</style>;

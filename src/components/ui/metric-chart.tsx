@@ -57,6 +57,9 @@ interface MetricChartProps {
   padTop?: number;
   /** O nome do gráfico para o leitor de tela. */
   label?: string;
+  /** Reviza (14/11): o balão vira para a DIREITA do ponto quando não cabe à esquerda (gráfico na
+   *  largura toda do card compacto). Sem isso, sempre à esquerda, como no original. */
+  tipAuto?: boolean;
 }
 
 // As animações: a curva em 900 ms (ease-in-out), as barras em 700 ms (ease), as duas dois quadros depois da troca.
@@ -86,6 +89,7 @@ export function MetricChart({
   dateFormatter,
   padTop = 36,
   label,
+  tipAuto = false,
 }: MetricChartProps) {
   const uid = useId().replace(/:/g, '');
   const reduce = usePrefersReducedMotion();
@@ -183,6 +187,7 @@ export function MetricChart({
         ? (target.lines[0]?.[index]?.x ?? 0)
         : (index + 0.5) * target.band;
   const tipY = active?.y ?? mid;
+  const tipSide = tipAuto && tipX < Math.min(170, w * 0.5) ? 'right' : undefined;
 
   return (
     <div ref={ref} className="pmc-chart">
@@ -273,7 +278,7 @@ export function MetricChart({
           </svg>
 
           {index != null && (
-            <div className="pmc-tip-wrap" style={{ transform: `translate(${tipX}px, ${tipY}px)` }}>
+            <div className="pmc-tip-wrap" data-side={tipSide} style={{ transform: `translate(${tipX}px, ${tipY}px)` }}>
               <div className="pmc-tip">
                 {series.map((s, k) => (
                   <div key={k} className="pmc-tip__row">

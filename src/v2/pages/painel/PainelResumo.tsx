@@ -559,9 +559,9 @@ const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set'
 const mesDoBalao = (comp: string) => `${MES_ABREV[Number(comp.slice(5, 7)) - 1] ?? comp.slice(5, 7)} ${comp.slice(0, 4)}`;
 const reais = (v: number) => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
 const PERIODOS_MESES: PeriodOption[] = [
-  { label: 'Últimos 3 meses', points: 3 },
-  { label: 'Últimos 6 meses', points: 6 },
-  { label: 'Todos os meses' },
+  { label: '3 meses', points: 3 },
+  { label: '6 meses', points: 6 },
+  { label: 'Tudo' },
 ];
 
 function IndicadoresMetrica({ r, historico, meses, serie, sel, parcial, carteira }: {
@@ -596,21 +596,18 @@ function IndicadoresMetrica({ r, historico, meses, serie, sel, parcial, carteira
 
   return (
     <GradeMetricas rotulo="Indicadores da carteira">
-      <CartaoMetrica title="Recorrência mensal" data={recorrencia} total={brl(r.recorrencia)}
-        valueFormatter={reais} dateFormatter={mesDoBalao}
-        period="Últimos 6 meses" periodOptions={PERIODOS_MESES} deltaLabel={vsAnterior(recorrencia)} />
-      <CartaoMetrica key={compSel} title={`Recebido em ${compSel ? mesAno(compSel) : '—'}`} data={recebido} total={brl(serie[sel]?.valor ?? 0)}
-        valueFormatter={reais} dateFormatter={mesDoBalao}
-        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
-        deltaLabel={`${vsAnterior(recebido)}${parcial ? ' · mês ainda aberto' : ''}`} />
-      <CartaoMetrica title="Em atraso" data={atraso} total={brl(r.emAtrasoValor)} sentido="menor"
-        valueFormatter={reais} dateFormatter={mesDoBalao}
-        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
-        deltaLabel={vsAnterior(atraso)} />
-      <CartaoMetrica title="Adimplência" data={adimplencia} total={carteira ? `${r.adimplencia}%` : '—'}
-        valueFormatter={(v) => `${Math.round(v)}%`} dateFormatter={mesDoBalao}
-        period="Últimos 6 meses" periodOptions={PERIODOS_MESES}
-        deltaLabel={vsAnterior(adimplencia)} />
+      <CartaoMetrica titulo="Recorrência mensal" data={recorrencia} total={brl(r.recorrencia)}
+        formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
+        rotuloDelta={vsAnterior(recorrencia)} />
+      <CartaoMetrica key={compSel} titulo={`Recebido em ${compSel ? mesAno(compSel) : '—'}`} data={recebido} total={brl(serie[sel]?.valor ?? 0)}
+        formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
+        rotuloDelta={`${vsAnterior(recebido)}${parcial ? ' · mês aberto' : ''}`} />
+      <CartaoMetrica titulo="Em atraso" data={atraso} total={brl(r.emAtrasoValor)} sentido="menor"
+        formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
+        rotuloDelta={vsAnterior(atraso)} />
+      <CartaoMetrica titulo="Adimplência" data={adimplencia} total={carteira ? `${r.adimplencia}%` : '—'}
+        formatar={(v) => `${Math.round(v)}%`} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
+        rotuloDelta={vsAnterior(adimplencia)} />
     </GradeMetricas>
   );
 }
