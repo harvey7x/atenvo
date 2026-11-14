@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { useDashAtendentesAba, useDashCampanhas } from '@/data/dashboardV5.abas';
-import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
+import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
 import { CardVidro, EstadoErro, Segmentado } from '../components';
 import { Cabecalho, rotuloPeriodoV5 } from './dashboardV5/Cabecalho';
@@ -123,6 +123,13 @@ export default function DashboardV2() {
   const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : qAt;
   const trocando = qAtivo.isPlaceholderData && qAtivo.isFetching;
 
+  // o trecho do anterior que a busca comparou: sai do MESMO instante com que o hook cortou
+  // a janela (buscaEm), então o rótulo nomeia o minuto que foi de fato para a RPC
+  const buscaEm = d?.buscaEm ?? null;
+  const comparacao = useMemo(
+    () => rotuloComparacaoV5(periodoAnteriorV5(periodo, buscaEm ? new Date(buscaEm) : new Date()), periodo, hoje),
+    [periodo, buscaEm, hoje],
+  );
   const janelaMapa = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
 
   const atualizar = () => { void qAtivo.refetch(); };
@@ -163,9 +170,9 @@ export default function DashboardV2() {
               </p>
             )}
 
-            {/* os 4 números do topo como cards de métrica com gráfico (dono 14/11); os de antes (Kpis)
-                ficam só para o esqueleto da primeira carga */}
-            {carregando ? <KpisSkeleton /> : <KpisCartoes k={d.kpis} preset={preset} hoje={hoje} rotuloPeriodo={rotuloPeriodoV5(preset, periodo, hoje)} />}
+            {/* os 4 números do topo como cards de métrica com gráfico (dono 14/11), no período do topo;
+                os de antes (Kpis) ficam só para o esqueleto da primeira carga */}
+            {carregando ? <KpisSkeleton /> : <KpisCartoes k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} periodo={periodo} hoje={hoje} rotuloPeriodo={rotuloPeriodoV5(preset, periodo, hoje)} />}
 
             <div className="d5-linha2">
               {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}

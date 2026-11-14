@@ -1,79 +1,87 @@
 import { useMemo } from 'react';
 import type { KpisV5 } from '@/data/dashboardV5.tipos';
-import type { PresetDash } from '@/data/dashboardV5';
-import { periodoDash } from '@/data/dashboardV5';
 import { useDashCampanhas } from '@/data/dashboardV5.abas';
+import { baldesDe, fimComHoje } from '@/data/dashboardV5.series';
 import { fmtDuracaoH, fmtInt } from '@/data/dashboardV5.formato';
-import { addDias } from '@/data/relatorios';
+import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
+import type { Periodo } from '@/data/relatorios';
+import { useAdmStatus } from '@/data/admFechados';
 import {
-  CartaoMetrica, CartaoMetricaFixo, GradeMetricas, type PeriodOption, type SeriesPoint,
+  CartaoMetrica, CartaoMetricaFixo, GradeMetricas, diaDoBalao, type SeriesPoint,
 } from '../../components/CartaoMetrica';
+import { Ajuda, Variacao } from './comum';
+import { AJUDA_KPIS, SeloAdministrativo } from './Kpis';
 
 /* ------------------------------------------------------------------
-   Os 4 números do topo do Dashboard como cards de métrica (dono 14/11:
-   "todas as métricas … dessa forma"). Entradas, Não elegíveis e Fechados ganham
-   o gráfico DIA A DIA dos últimos 30 dias — a mesma série da aba Campanhas
-   (dashboard_v5_campanhas, somadas as campanhas), numa busca própria de 30 dias;
-   o menu do card escolhe 7, 14 ou 30 dias e o número grande é o total da janela
-   (o card é o compacto da casa, 4 por linha — dono 14/11: "bem encaixado").
-   O card abre na janela mais perto do período do topo (Hoje/3 dias/7 dias → 7;
-   Nosso mês/Personalizado → 30). O Tempo para fechar não tem série dia a dia:
-   fica na mesma moldura, sem gráfico, com o período do topo.
+   Os 4 números do topo do Dashboard como cards de métrica (dono 14/11).
+   O PERÍODO É O DO TOPO (Hoje · 3 dias · 7 dias · Nosso mês · Personalizado) —
+   dono: "lá em cima já tem para definir, não faz sentido" um menu de período
+   em cada card. O número grande e a comparação são os de sempre (o MESMO
+   trecho do período anterior); o gráfico é a série dia a dia da aba Campanhas
+   (somadas as campanhas) na janela do período — período curto (Hoje, 3 dias)
+   desenha os últimos 7 dias, a mesma régua das ondas. O Tempo para fechar não
+   tem série dia a dia: fica na mesma moldura, sem gráfico.
    ------------------------------------------------------------------ */
 
-const PERIODOS: PeriodOption[] = [
-  { label: '7 dias', points: 7 },
-  { label: '14 dias', points: 14 },
-  { label: '30 dias' },
-];
-const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-
-export function KpisCartoes({ k, preset, hoje, rotuloPeriodo }: {
-  k: KpisV5; preset: PresetDash; hoje: string; rotuloPeriodo: string;
+export function KpisCartoes({ k, ant, comparacao, periodo, hoje, rotuloPeriodo }: {
+  k: KpisV5; ant: KpisV5 | null; comparacao: string; periodo: Periodo; hoje: string; rotuloPeriodo: string;
 }) {
-  const p30 = useMemo(() => periodoDash('custom', addDias(hoje, -29), hoje), [hoje]);
-  const q = useDashCampanhas(p30, true);
+  const placar = useAdmStatus().data?.placar ?? false;
+  const q = useDashCampanhas(periodo, true);
+  const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
+  const dias = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), 'dia').map((b) => b.chave), [jm, periodo, hoje]);
 
   // a série da aba Campanhas, somada por dia; dia sem nada = 0 (o gráfico não pula dias)
   const porDia = useMemo(() => {
-    const m = new Map<string, { entradas: number; ganhos: number; ne: number }>();
-    for (let i = 29; i >= 0; i--) m.set(addDias(hoje, -i), { entradas: 0, ganhos: 0, ne: 0 });
+    const m = new Map(dias.map((dia) => [dia, { entradas: 0, ganhos: 0, ne: 0 }]));
     for (const s of q.data?.serie ?? []) {
       const d = m.get(s.dia);
       if (d) { d.entradas += s.entradas; d.ganhos += s.ganhos; d.ne += s.ne; }
     }
     return [...m.entries()];
-  }, [q.data, hoje]);
+  }, [q.data, dias]);
   const serie = (campo: 'entradas' | 'ganhos' | 'ne'): SeriesPoint[] => porDia.map(([dia, v]) => ({ value: v[campo], date: dia }));
   const entradas = useMemo(() => serie('entradas'), [porDia]); // eslint-disable-line react-hooks/exhaustive-deps
   const ne = useMemo(() => serie('ne'), [porDia]); // eslint-disable-line react-hooks/exhaustive-deps
   const ganhos = useMemo(() => serie('ganhos'), [porDia]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dataDoBalao = (dia: string) => {
-    const [y, m, d] = dia.split('-');
-    return `${d} ${MES_ABREV[Number(m) - 1] ?? m} ${y}${dia === hoje ? ' · até agora' : ''}`;
-  };
-  const periodoInicial = preset === 'mes_caf' || preset === 'custom' ? '30 dias' : '7 dias';
-  const carregando = !q.data && !q.isError;
-  const somaDaJanela = (j: SeriesPoint[]) => fmtInt(j.reduce((t, p) => t + p.value, 0));
-  const comuns = {
-    periodos: PERIODOS, periodo: periodoInicial, formatarData: dataDoBalao,
-    rotuloDelta: 'hoje vs ontem', carregando, total: somaDaJanela,
-  };
-  const n = (rot: string, rots: string) => (v: number) => `${fmtInt(v)} ${v === 1 ? rot : rots}`;
+  const carregandoGraf = !q.data && !q.isError;
+  const tomDe = (atual: number, anterior: number | undefined, neutro?: boolean) => (
+    neutro || anterior == null || atual === anterior ? 'neutro' as const : atual > anterior ? 'bom' as const : 'ruim' as const
+  );
+  const palavra = (um: string, varios: string) => (v: number) => `${fmtInt(v)} ${v === 1 ? um : varios}`;
+  const cab = (titulo: string, ajuda: string) => (
+    <span className="rvm-tit rvm-tit-ajuda">{titulo}<Ajuda texto={ajuda} rotulo={titulo} /></span>
+  );
+  const comuns = { formatarData: (dia: string) => diaDoBalao(dia, hoje), variacao: false as const };
 
   return (
-    <GradeMetricas rotulo="Resumo do período">
-      <CartaoMetrica key={`ent-${periodoInicial}`} titulo="Entradas de clientes" data={entradas} formatar={n('entrada', 'entradas')} {...comuns} />
-      <CartaoMetrica key={`ne-${periodoInicial}`} titulo="Não elegíveis" data={ne} sentido="neutro" formatar={n('não elegível', 'não elegíveis')} {...comuns} />
-      <CartaoMetrica key={`gan-${periodoInicial}`} titulo="Fechados" data={ganhos} formatar={n('fechado', 'fechados')} {...comuns} />
-      <CartaoMetricaFixo
-        titulo="Tempo para fechar"
-        valor={fmtDuracaoH(k.fechMedianaH)}
-        detalhe={k.fechN > 0
-          ? <span>média <b>{fmtDuracaoH(k.fechMediaH)}</b> · <b>{fmtInt(k.fechN)}</b> {k.fechN === 1 ? 'fechado' : 'fechados'}</span>
-          : 'nenhum fechamento no período'}
-        rodape={`Mediana · ${rotuloPeriodo}`} />
-    </GradeMetricas>
+    <div className="rvm-bloco">
+      <GradeMetricas rotulo="Resumo do período">
+        <CartaoMetrica titulo="Entradas de clientes" cabEsquerda={cab('Entradas de clientes', AJUDA_KPIS.entradas)}
+          data={entradas} graficoCarregando={carregandoGraf} total={fmtInt(k.entradas)} tom={tomDe(k.entradas, ant?.entradas)}
+          formatar={palavra('entrada', 'entradas')} {...comuns}
+          rodape={<Variacao atual={k.entradas} anterior={ant?.entradas} sentido="maior" comparacao={comparacao} />} />
+        <CartaoMetrica titulo="Não elegíveis" cabEsquerda={cab('Não elegíveis', AJUDA_KPIS.ne)}
+          data={ne} graficoCarregando={carregandoGraf} total={fmtInt(k.ne)} tom="neutro"
+          formatar={palavra('não elegível', 'não elegíveis')} {...comuns}
+          rodape={<Variacao atual={k.ne} anterior={ant?.ne} sentido="neutro" comparacao={comparacao} />} />
+        <CartaoMetrica titulo="Fechados" cabEsquerda={cab('Fechados', placar ? AJUDA_KPIS.ganhosPlacar : AJUDA_KPIS.ganhos)}
+          cabDireita={<SeloAdministrativo />}
+          data={ganhos} graficoCarregando={carregandoGraf} total={fmtInt(k.ganhos)} tom={tomDe(k.ganhos, ant?.ganhos)}
+          formatar={palavra('fechado', 'fechados')} {...comuns}
+          rodape={<Variacao atual={k.ganhos} anterior={ant?.ganhos} sentido="maior" comparacao={comparacao} />} />
+        <CartaoMetricaFixo
+          titulo="Tempo para fechar"
+          valor={fmtDuracaoH(k.fechMedianaH)}
+          detalhe={k.fechN > 0
+            ? <span>média <b>{fmtDuracaoH(k.fechMediaH)}</b> · <b>{fmtInt(k.fechN)}</b> {k.fechN === 1 ? 'fechado' : 'fechados'}</span>
+            : 'nenhum fechamento no período'}
+          rodape={`Mediana · ${rotuloPeriodo}`} />
+      </GradeMetricas>
+      {jm.estendido && (
+        <p className="rvm-nota">Os números são do período escolhido acima; nos gráficos, os últimos 7 dias, dia a dia, para dar contexto.</p>
+      )}
+    </div>
   );
 }

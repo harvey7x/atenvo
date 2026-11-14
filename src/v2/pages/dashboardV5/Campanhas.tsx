@@ -9,8 +9,8 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, useLinhasGraf, type NotaSerie, type SerieGraf } from './GrafLinhas';
-import { CartaoMetrica, CartaoMetricaFixo, GradeMetricas, TituloBloco, diaDoBalao } from '../../components/CartaoMetrica';
+import { GrafLinhas, type NotaSerie, type SerieGraf } from './GrafLinhas';
+import { CartaoMetrica, CartaoMetricaFixo, CartaoSeries, GradeMetricas, TituloBloco, diaDoBalao } from '../../components/CartaoMetrica';
 
 /* Aba CAMPANHAS (12/11): o melhor do dia/semana/mês, as ondas por campanha
    (alternáveis dia · semana · mês CAF), a tabela do período, quem chegou já tendo
@@ -120,7 +120,6 @@ function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dia
 export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Periodo; hoje: string }) {
   const [metrica, setMetrica] = useState<MetricaOnda>('entradas');
   const [balde, setBalde] = useState<BaldeTipo>(() => (periodo.dias <= 14 ? 'dia' : 'semana'));
-  const linhas = useLinhasGraf();
 
   const campanhas = d.campanhas.filter((c) => !['outros', 'sem_campanha'].includes(c.campanha));
   const resto = d.campanhas.filter((c) => ['outros', 'sem_campanha'].includes(c.campanha));
@@ -170,24 +169,26 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
         </GradeMetricas>
       </div>
 
-      <Secao className="d5-ondas" titulo="Ondas por campanha" ajuda={AJUDA_ONDAS}
+      {/* as ondas no formato do card de métrica (dono 14/11: "eu quero mudar essas métricas aqui") */}
+      <CartaoSeries
+        titulo="Ondas por campanha"
+        ajuda={<Ajuda texto={AJUDA_ONDAS} rotulo="Ondas por campanha" />}
         sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês da casa'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
         acao={(
-          <div className="d5-ondas-ctl">
-            <LegendaGraf series={series} controle={linhas} />
-            <span className="d5-ondas-sels">
-              <Seletor<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="O que o gráfico mostra" />
-              <Seletor<BaldeTipo> opcoes={BALDES} valor={balde} aoMudar={setBalde} rotulo="Agrupar o gráfico" />
-            </span>
-          </div>
-        )}>
-        <GrafLinhas baldes={baldes} series={series} controle={linhas}
-          titulo={`${tituloMetrica} por campanha e ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês'}`}
-          vazio="Sem movimento para desenhar neste período."
-          rodape={metrica === 'ganhos'
-            ? 'Fechados entram quando o administrativo lança (dias úteis): fim de semana e feriado aparecem zerados.'
-            : undefined} />
-      </Secao>
+          <span className="d5-ondas-sels">
+            <Seletor<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="O que o gráfico mostra" />
+            <Seletor<BaldeTipo> opcoes={BALDES} valor={balde} aoMudar={setBalde} rotulo="Agrupar o gráfico" />
+          </span>
+        )}
+        pontos={baldes.map((b) => ({ chave: b.chave, rotulo: b.rotuloLongo }))}
+        eixo={baldes.map((b) => b.rotulo)}
+        series={series}
+        unidade={(n) => (metrica === 'entradas' ? (n === 1 ? 'entrada' : 'entradas') : metrica === 'ganhos' ? (n === 1 ? 'fechado' : 'fechados') : (n === 1 ? 'não elegível' : 'não elegíveis'))}
+        rodape={metrica === 'ganhos'
+          ? 'Fechados entram quando o administrativo lança (dias úteis): fim de semana e feriado aparecem zerados.'
+          : 'Clique numa campanha para esconder ou mostrar a linha.'}
+        vazio="Sem movimento para desenhar neste período."
+      />
 
       <Secao className="d5-camp-tab" titulo="Campanhas no período" ajuda={AJUDA_FECHADOS}
         sub="Entradas, fechados do placar e não elegíveis pela campanha do número por onde o cliente entrou.">
@@ -378,9 +379,7 @@ export function CampanhasSkeleton() {
           {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} altura={193} raio={12} />)}
         </div>
       </div>
-      <Secao className="d5-ondas" titulo="Ondas por campanha">
-        <div className="d5-sk-linhas" aria-hidden><Skeleton altura={220} raio={10} /></div>
-      </Secao>
+      <div aria-hidden><Skeleton altura={380} raio={12} /></div>
     </>
   );
 }

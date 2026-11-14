@@ -8,7 +8,7 @@ import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
 /* Os quatro números do topo. Entradas, não elegíveis e fechados comparam com o
    MESMO trecho do período anterior; o tempo para fechar mostra mediana, média e n. */
 
-const AJUDA = {
+export const AJUDA_KPIS = {
   entradas: 'Tudo que entrou no período, em qualquer número, contado como no Gerenciador de Anúncios: cada cliente que chega por um número num dia é uma entrada — o cliente novo e quem já tinha falado com a ALFA e voltou pela mensagem do anúncio (quem volta em outro dia conta de novo). O número interno do escritório não conta. Quem já estava no sistema está na seção "Anúncio e quem já estava no sistema".',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
@@ -46,7 +46,7 @@ function Cartao({ rotulo, ajuda, valor, children, selo }: {
 }
 
 /** Selo "administrativo" ao lado de Fechados: a fonte do número e a hora da última leitura. */
-function SeloAdministrativo() {
+export function SeloAdministrativo() {
   const st = useAdmStatus().data;
   if (!st?.ativo) return null;
   const hora = st.ultimaLeituraEm
@@ -62,16 +62,16 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
   );
   return (
     <section className="d5-kpis" aria-label="Resumo do período">
-      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}>
+      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA_KPIS.entradas} valor={fmtInt(k.entradas)}>
         {v(k.entradas, ant?.entradas, 'maior')}
       </Cartao>
-      <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)}>
+      <Cartao rotulo="Não elegíveis" ajuda={AJUDA_KPIS.ne} valor={fmtInt(k.ne)}>
         {v(k.ne, ant?.ne, 'neutro')}
       </Cartao>
-      <Cartao rotulo="Fechados" ajuda={placar ? AJUDA.ganhosPlacar : AJUDA.ganhos} valor={fmtInt(k.ganhos)} selo={<SeloAdministrativo />}>
+      <Cartao rotulo="Fechados" ajuda={placar ? AJUDA_KPIS.ganhosPlacar : AJUDA_KPIS.ganhos} valor={fmtInt(k.ganhos)} selo={<SeloAdministrativo />}>
         {v(k.ganhos, ant?.ganhos, 'maior')}
       </Cartao>
-      <Cartao rotulo="Tempo para fechar" ajuda={AJUDA.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>
+      <Cartao rotulo="Tempo para fechar" ajuda={AJUDA_KPIS.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>
         {/* "mediana" já está na definição do "i": a legenda fica numa linha só */}
         <span className="d5-var-ctx d5-kpi-leg"
           title={k.fechN > 0 ? `Mediana ${fmtDuracaoH(k.fechMedianaH)} · média ${fmtDuracaoH(k.fechMediaH)} · ${fmtInt(k.fechN)} ${k.fechN === 1 ? 'fechado' : 'fechados'}` : undefined}>

@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { AtendenteAbaV5, AtendentesAbaV5 } from '@/data/dashboardV5.abas.tipos';
-import { CAMPANHAS_GRAF, rotuloCampanha } from '@/data/dashboardV5.abas.tipos';
+import { rotuloCampanha } from '@/data/dashboardV5.abas.tipos';
 import { baldesDe, fimComHoje, somarEmBaldes, type BaldeTipo } from '@/data/dashboardV5.series';
-import { fmtDuracaoH, fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
+import { fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
 import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
-import { Segmentado, Skeleton } from '../../components';
-import { CartaoMetrica, TituloBloco, diaDoBalao } from '../../components/CartaoMetrica';
+import { Skeleton } from '../../components';
+import { CartaoSeries } from '../../components/CartaoMetrica';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, useLinhasGraf, type SerieGraf } from './GrafLinhas';
+import type { SerieGraf } from './GrafLinhas';
 
 /* Aba ATENDENTES (12/11): quem fecha mais (placar do CAF), os DOIS relógios com os
    excluídos à vista — "preciso de um resultado exato, não posso aceitar algo falso"
@@ -85,23 +85,6 @@ function Cabeca({ col, ordem, aoOrdenar }: { col: Coluna; ordem: { chave: Chave;
 
 const CORES_EQUIPE = ['var(--dado-1)', 'var(--dado-2)', 'var(--dado-3)', 'var(--dado-4)', 'var(--dado-5)'];
 
-/* ---------------- o card de cada atendente (dono 14/11: "deixar o desempenho por atendente
-   mais organizado, mais profissional, mais bonito") ----------------
-   Os MESMOS números da tabela, cada pessoa num card: a posição, quem é e por qual campanha
-   mais fecha; os fechados com o gráfico dia a dia (a mesma série do "Fechados da equipe");
-   embaixo os seis números do período em grade; no rodapé, contra o período anterior. */
-const ORDENS: { valor: Chave; rotulo: string }[] = [
-  { valor: 'ganhos', rotulo: 'Fechados' },
-  { valor: 'recebidos', rotulo: 'Recebidos' },
-  { valor: 'resp', rotulo: 'Resposta' },
-  { valor: 'cli', rotulo: 'Espera' },
-];
-type Vista = 'cartoes' | 'tabela';
-const VISTAS: { valor: Vista; rotulo: string }[] = [
-  { valor: 'cartoes', rotulo: 'Cartões' },
-  { valor: 'tabela', rotulo: 'Tabela' },
-];
-
 /** número da tabela "Carteira agora" com a barra proporcional embaixo */
 function CelBarra({ v, max, alerta }: { v: number; max: number; alerta?: boolean }) {
   return (
@@ -112,78 +95,8 @@ function CelBarra({ v, max, alerta }: { v: number; max: number; alerta?: boolean
   );
 }
 
-function Numero({ rotulo, valor, sub, ajuda, alerta }: { rotulo: string; valor: string; sub?: string | null; ajuda?: string; alerta?: boolean }) {
-  return (
-    <div className="rvm-stat">
-      <dt>{rotulo}{ajuda && <Ajuda texto={ajuda} rotulo={rotulo} />}</dt>
-      <dd>
-        <b className={'num' + (valor === '—' || valor === '0' ? ' d5-mudo' : '')}>{valor}</b>
-        {sub && <small className={'num' + (alerta ? ' d5-sem-relogio' : '')}>{sub}</small>}
-      </dd>
-    </div>
-  );
-}
-
-function CartaoAtendente({ a, pos, dias, serieGanhos, hoje }: {
-  a: AtendenteAbaV5; pos: number; dias: string[]; serieGanhos: AtendentesAbaV5['serieGanhos']; hoje: string;
-}) {
-  const pontos = useMemo(() => {
-    const m = new Map(dias.map((dia) => [dia, 0]));
-    for (const p of serieGanhos) if (p.usuarioId === a.usuarioId && m.has(p.dia)) m.set(p.dia, (m.get(p.dia) ?? 0) + p.ganhos);
-    return [...m].map(([dia, v]) => ({ value: v, date: dia }));
-  }, [a.usuarioId, serieGanhos, dias]);
-  const camp = a.campanhas[0];
-  const corCamp = camp ? CAMPANHAS_GRAF.find((c) => c.slug === camp.campanha)?.cor ?? 'var(--txt-3)' : null;
-  const fechados = (v: number) => `${fmtInt(v)} ${v === 1 ? 'fechado' : 'fechados'}`;
-  return (
-    <CartaoMetrica
-      className="rvm-at"
-      titulo={`${pos}º ${a.nome}: ${fechados(a.ganhos)}`}
-      cabEsquerda={(
-        <span className="rvm-pessoa">
-          <span className={'rvm-pos' + (pos === 1 && a.ganhos > 0 ? ' rvm-pos-1' : '')}>{pos}º</span>
-          <Avatar nome={a.nome} />
-          <b>{a.nome}</b>
-        </span>
-      )}
-      cabDireita={camp && corCamp ? (
-        <span className="rvm-chip" title={'Fecha mais por: ' + a.campanhas.map((c) => `${rotuloCampanha(c.campanha)} ${c.ganhos}`).join(' · ')}>
-          <i style={{ background: corCamp }} />{rotuloCampanha(camp.campanha)}
-        </span>
-      ) : undefined}
-      data={pontos}
-      total={fmtInt(a.ganhos)}
-      unidade={a.ganhos === 1 ? 'fechado' : 'fechados'}
-      variacao={false}
-      tom={a.ganhos > a.ganhosAnt ? 'bom' : a.ganhos < a.ganhosAnt ? 'ruim' : 'neutro'}
-      formatar={fechados}
-      formatarData={(dia) => diaDoBalao(dia, hoje)}
-      extra={(
-        <dl className="rvm-stats">
-          <Numero rotulo="Recebidos" valor={fmtInt(a.recebidos)}
-            sub={a.transferidos > 0 ? `+${fmtInt(a.transferidos)} ${a.transferidos === 1 ? 'transferido' : 'transferidos'}` : null} />
-          <Numero rotulo="Marcou NE" valor={fmtInt(a.neMarcados)} sub="não elegíveis" />
-          <Numero rotulo="Respostas" valor={fmtInt(a.respN)} sub={a.respCelularN > 0 ? `${fmtInt(a.respCelularN)} pelo celular` : null} />
-          <Numero rotulo="Resposta" ajuda={AJUDA_RESP}
-            valor={a.respN > 0 && a.respMedianaMin != null ? fmtDuracaoMin(a.respMedianaMin) : '—'}
-            sub={a.respN > 0 ? `média ${fmtDuracaoMin(a.respMediaMin)}` : null} />
-          <Numero rotulo="Espera do cliente" ajuda={AJUDA_CLI}
-            valor={a.cliN > 0 && a.cliMedianaH != null ? fmtDuracaoH(a.cliMedianaH) : '—'}
-            sub={a.cliN > 0 ? `média ${fmtDuracaoH(a.cliMediaH)}` : null} />
-          <Numero rotulo="Tempo do atendente" ajuda={AJUDA_AT}
-            valor={a.fechN > 0 && a.fechMedianaH != null ? fmtDuracaoH(a.fechMedianaH) : '—'}
-            sub={a.fechSemRelogio > 0 ? `${fmtInt(a.fechSemRelogio)} sem relógio` : a.fechN > 0 ? `média ${fmtDuracaoH(a.fechMediaH)}` : null}
-            alerta={a.fechSemRelogio > 0} />
-        </dl>
-      )}
-      rodape={<Variacao atual={a.ganhos} anterior={a.ganhosAnt} sentido="maior" comparacao="vs período anterior" />}
-    />
-  );
-}
-
 export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; periodo: Periodo; hoje: string }) {
   const [ordem, setOrdem] = useState<{ chave: Chave; dir: Dir }>({ chave: 'ganhos', dir: 'desc' });
-  const [vista, setVista] = useState<Vista>('cartoes');
   const linhas = useMemo(() => ordenar(d.atendentes, ordem.chave, ordem.dir), [d.atendentes, ordem]);
   const aoOrdenar = (c: Coluna) => setOrdem((o) => (o.chave === c.chave
     ? { chave: c.chave, dir: o.dir === 'asc' ? 'desc' : 'asc' }
@@ -191,7 +104,6 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   const maxGanhos = Math.max(1, ...d.atendentes.map((a) => a.ganhos));
 
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
-  const linhasGraf = useLinhasGraf();
   // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
   const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const serieEquipe = useMemo<SerieGraf[]>(() => {
@@ -207,7 +119,6 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
     }));
   }, [d.atendentes, d.serieGanhos, balde]);
   const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
-  const diasGraf = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), 'dia').map((b) => b.chave), [jm, periodo, hoje]);
 
   const vacuoTotal = d.atendentes.reduce((s, a) => s + a.vacuo3o, 0);
   // "Carteira agora": a barra de cada número contra o maior da equipe (comparar num relance)
@@ -216,41 +127,11 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
     carteira: Math.max(1, ...d.atendentes.map((a) => a.carteira)),
     parados: Math.max(1, ...d.atendentes.map((a) => a.parados7d)),
   };
-  const controles = (
-    <div className="rvm-ctl">
-      {vista === 'cartoes' && (
-        <span className="rvm-ctl-ord">
-          <span className="rvm-ctl-rot">Ordenar por</span>
-          <Segmentado<Chave> opcoes={ORDENS} valor={ORDENS.some((o) => o.valor === ordem.chave) ? ordem.chave : 'ganhos'}
-            aoMudar={(v) => setOrdem({ chave: v, dir: COLS.find((c) => c.chave === v)?.primeira ?? 'desc' })} rotulo="Ordenar os atendentes" />
-        </span>
-      )}
-      <Segmentado<Vista> opcoes={VISTAS} valor={vista} aoMudar={setVista} rotulo="Mostrar em cartões ou em tabela" />
-    </div>
-  );
-
 
   return (
     <>
-      {vista === 'cartoes' ? (
-        <div className="rvm-bloco">
-          <TituloBloco titulo="Desempenho por atendente" ajuda={<Ajuda texto={AJUDA_FECHADOS} rotulo="Desempenho por atendente" />}
-            sub="Fechados pelo placar da ALFA, dia a dia; embaixo, quem recebeu, respondeu e esperou — o cliente e o atendente."
-            acao={controles} />
-          {d.atendentes.length === 0 ? (
-            <Vazio texto="Ninguém da equipe teve movimento no período." />
-          ) : (
-            <div className="rvm-grade-at">
-              {linhas.map((a, i) => (
-                <CartaoAtendente key={a.usuarioId} a={a} pos={i + 1} dias={diasGraf} serieGanhos={d.serieGanhos} hoje={hoje} />
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
       <Secao className="d5-at d5-at-aba" titulo="Desempenho por atendente"
-        sub="Fechados pelo placar da ALFA; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar."
-        acao={controles}>
+        sub="Fechados pelo placar da ALFA; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar.">
         {d.atendentes.length === 0 ? (
           <Vazio texto="Ninguém da equipe teve movimento no período." />
         ) : (
@@ -321,19 +202,22 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
           </div>
         )}
       </Secao>
-      )}
 
       {serieEquipe.length > 0 && (
-        <Secao className="d5-ondas d5-ondas-eq" titulo="Fechados da equipe, no tempo"
-          ajuda={'Fechados do placar da ALFA por atendente. O administrativo lança em dia útil: fim de semana e feriado '
+        /* no formato do card de métrica (dono 14/11), como as ondas por campanha */
+        <CartaoSeries
+          titulo="Fechados da equipe, no tempo"
+          ajuda={<Ajuda rotulo="Fechados da equipe, no tempo" texto={'Fechados do placar da ALFA por atendente. O administrativo lança em dia útil: fim de semana e feriado '
             + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
-            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'}
+            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'} />}
           sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
-          acao={<div className="d5-ondas-ctl"><LegendaGraf series={serieEquipe} controle={linhasGraf} /></div>}>
-          <GrafLinhas baldes={baldes} series={serieEquipe} controle={linhasGraf}
-            titulo={`Fechados por atendente e ${balde === 'dia' ? 'dia' : 'semana'}`}
-            vazio="Sem fechados lançados neste período." />
-        </Secao>
+          pontos={baldes.map((b) => ({ chave: b.chave, rotulo: b.rotuloLongo }))}
+          eixo={baldes.map((b) => b.rotulo)}
+          series={serieEquipe}
+          unidade={(n) => (n === 1 ? 'fechado' : 'fechados')}
+          rodape="Clique num nome para esconder ou mostrar a linha."
+          vazio="Sem fechados lançados neste período."
+        />
       )}
 
       <Secao className="d5-agora" titulo="Carteira agora" ajuda={AJUDA_AGORA}

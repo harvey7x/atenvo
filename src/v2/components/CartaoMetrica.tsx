@@ -51,7 +51,7 @@ const SETAS = {
 
 export function CartaoMetrica({
   titulo, data, total, sentido = 'maior', periodos, periodo, formatar, formatarData, rotuloDelta, carregando,
-  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className,
+  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className, graficoCarregando,
 }: {
   titulo: string;
   /** a série, do mais antigo ao mais novo */
@@ -86,6 +86,8 @@ export function CartaoMetrica({
   /** bloco entre o gráfico e o rodapé (os números do atendente) */
   extra?: ReactNode;
   className?: string;
+  /** só o gráfico ainda carregando (o número já chegou): a faixa pulsa, sem texto */
+  graficoCarregando?: boolean;
 }) {
   const tema = useTemaAtual();
   const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
@@ -136,8 +138,8 @@ export function CartaoMetrica({
           )}
         {numSub && !carregando && <span className="rvm-numsub">{numSub}</span>}
       </div>
-      <div className="rvm-graf">
-        {temGrafico && !carregando ? (
+      <div className={'rvm-graf' + (graficoCarregando ? ' rvm-graf-carregando' : '')}>
+        {temGrafico && !carregando && !graficoCarregando ? (
           <>
             <div className="pmc-fill" style={{ background: `linear-gradient(to left, ${cor}1c, transparent 80%)` }} />
             <div className="pmc-fill pmc-dots">
@@ -161,7 +163,7 @@ export function CartaoMetrica({
             />
           </>
         ) : (
-          <span className="rvm-vazio">{carregando ? '' : 'Ainda sem histórico para desenhar'}</span>
+          <span className="rvm-vazio">{carregando || graficoCarregando ? '' : 'Ainda sem histórico para desenhar'}</span>
         )}
       </div>
       {extra && !carregando && <div className="rvm-extra">{extra}</div>}
@@ -211,5 +213,170 @@ export function TituloBloco({ titulo, ajuda, sub, acao }: { titulo: string; ajud
       </div>
       {acao && <div className="rvm-bloco-acao">{acao}</div>}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   Card de VÁRIAS SÉRIES (dono 14/11: as ondas — "Ondas por campanha" e
+   "Fechados da equipe" — no formato do card de métrica). É o modo "series"
+   do Progress Metric Card na medida da casa: as linhas juntas sem área (ou
+   barras lado a lado), a troca curva/barras, o fundo de pontos, o balão com
+   todas as séries no ponto marcado, a legenda que esconde/mostra cada linha
+   (com o total dela e o cresceu/caiu), o total do que está visível e, no
+   rodapé, o máximo, o mínimo e a média por ponto.
+   ------------------------------------------------------------------ */
+
+/** a cor de série da casa (--dado-1…5) em hex: o gráfico desenha em atributo SVG, onde var() não vale.
+ *  Os mesmos tons das bolinhas e dos selos (dashboardV5.css). */
+const CORES_SERIE = {
+  dark: ['#7C83F2', '#4CB0D9', '#3FB868', '#D1789B', '#8496AB'],
+  light: ['#4F46E5', '#1F7E95', '#1E8A44', '#A14A77', '#5E7183'],
+} as const;
+const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number): string => {
+  const n = Number(/--dado-(\d)/.exec(cor)?.[1] ?? 0);
+  const pal = CORES_SERIE[tema];
+  return n >= 1 && n <= pal.length ? pal[n - 1] : /^#/.test(cor) ? cor : pal[i % pal.length];
+};
+
+export interface SerieCartao {
+  id: string;
+  rotulo: string;
+  /** token da casa ('var(--dado-2)') ou hex */
+  cor: string;
+  /** valor por chave do ponto (ausente = 0) */
+  valores: ReadonlyMap<string, number>;
+  notas?: { texto: string; tom: 'ok' | 'er' | 'am' }[];
+}
+
+export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade, rodape, vazio, eixo }: {
+  titulo: string;
+  ajuda?: ReactNode;
+  sub?: ReactNode;
+  /** controles do topo (o que mostrar, como agrupar) — ficam antes da troca curva/barras */
+  acao?: ReactNode;
+  /** os pontos do eixo, em ordem (dia, semana ou mês): a chave e o texto do balão */
+  pontos: { chave: string; rotulo: string }[];
+  series: SerieCartao[];
+  /** a palavra depois do número ("entradas", "fechados"), pelo valor */
+  unidade: (n: number) => string;
+  /** nota pequena no rodapé, à esquerda */
+  rodape?: ReactNode;
+  vazio: string;
+  /** o texto curto de cada ponto no eixo de baixo ('08/11', 'sem 03/11'); sem ele, sem eixo */
+  eixo?: string[];
+}) {
+  const tema = useTemaAtual();
+  const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
+  const [view, setView] = useState<ChartView>('curve');
+  const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
+  const alternar = (id: string) => setOcultas((prev) => {
+    const prox = new Set(prev);
+    if (prox.has(id)) prox.delete(id);
+    else if (series.length - prox.size > 1) prox.add(id);   // a última linha visível nunca some
+    return prox;
+  });
+
+  const comCor = useMemo(() => series.map((s, i) => ({
+    ...s,
+    hex: corDaSerie(s.cor, tema, i),
+    total: pontos.reduce((t, p) => t + (s.valores.get(p.chave) ?? 0), 0),
+  })), [series, pontos, tema]);
+  const visiveis = comCor.filter((s) => !ocultas.has(s.id));
+  const chart = useMemo(() => visiveis.map((s) => ({
+    name: s.rotulo,
+    color: s.hex,
+    data: pontos.map((p) => ({ value: s.valores.get(p.chave) ?? 0, date: p.rotulo })),
+  })), [visiveis, pontos]);
+  const porPonto = pontos.map((p) => visiveis.reduce((t, s) => t + (s.valores.get(p.chave) ?? 0), 0));
+  const total = porPonto.reduce((a, b) => a + b, 0);
+  const temDado = pontos.length >= 2 && comCor.some((s) => s.total > 0);
+  const max = porPonto.length ? Math.max(...porPonto) : 0;
+  const min = porPonto.length ? Math.min(...porPonto) : 0;
+  const media = porPonto.length ? Math.round(total / porPonto.length) : 0;
+  const n = (v: number) => v.toLocaleString('pt-BR');
+
+  return (
+    <article className="pmc-root rvm rvm-series">
+      <PmcStyles />
+      <header className="rvm-cab rvm-series-cab">
+        <div className="rvm-series-tx">
+          <h3 className="rvm-series-tit">{titulo}{ajuda}</h3>
+          {sub && <p className="rvm-series-sub">{sub}</p>}
+        </div>
+        <div className="rvm-series-acao">
+          {acao}
+          {temDado && <ViewToggle value={view} onChange={setView} />}
+        </div>
+      </header>
+      <div className="rvm-num">
+        <span className="rvm-val">{n(total)}</span>
+        <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas linhas visíveis' : ''}</span>
+      </div>
+      <ul className="rvm-leg" aria-label="Linhas do gráfico (clique para esconder ou mostrar)">
+        {comCor.map((s) => {
+          const ligada = !ocultas.has(s.id);
+          return (
+            <li key={s.id}>
+              <button type="button" className="rvm-leg-bt" aria-pressed={ligada} onClick={() => alternar(s.id)}
+                title={ligada ? `Esconder ${s.rotulo}` : `Mostrar ${s.rotulo}`}>
+                <i style={{ background: s.hex }} />
+                <span className="rvm-leg-nome">{s.rotulo}</span>
+                <b className="num">{n(s.total)}</b>
+                {s.notas?.map((nt) => <span key={nt.texto} className={`rvm-leg-nota rvm-leg-${nt.tom}`}>{nt.texto}</span>)}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="rvm-graf rvm-graf-g">
+        {temDado ? (
+          <>
+            <div className="pmc-fill pmc-dots">
+              <svg aria-hidden="true">
+                <defs>
+                  <pattern id={grade} width="14" height="14" patternUnits="userSpaceOnUse">
+                    <circle cx="1" cy="1" r="1" fill="currentColor" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill={`url(#${grade})`} />
+              </svg>
+            </div>
+            <MetricChart
+              series={chart}
+              view={view}
+              valueFormatter={n}
+              dateFormatter={(d) => d}
+              padTop={14}
+              tipAuto
+              label={`${titulo}: gráfico de ${view === 'curve' ? 'curvas' : 'barras'}. Use as setas para percorrer os pontos.`}
+            />
+          </>
+        ) : <span className="rvm-vazio">{vazio}</span>}
+      </div>
+      {temDado && eixo && eixo.length === pontos.length && (
+        <div className="rvm-eixo" aria-hidden>
+          {eixo.map((t, i) => {
+            // no máximo ~8 rótulos; a posição segue o desenho (curva: nas pontas; barras: no meio da barra)
+            const passo = Math.ceil(eixo.length / 8);
+            if (i % passo !== 0 && i !== eixo.length - 1) return null;
+            const x = view === 'curve' ? (eixo.length > 1 ? (i / (eixo.length - 1)) * 100 : 50) : ((i + 0.5) / eixo.length) * 100;
+            const lado = view === 'curve' && i === 0 ? 'ini' : view === 'curve' && i === eixo.length - 1 ? 'fim' : 'meio';
+            return <span key={i} data-lado={lado} style={{ left: `${x}%` }}>{t}</span>;
+          })}
+        </div>
+      )}
+      <footer className="rvm-pe">
+        <span className="rvm-delta">{rodape}</span>
+        {temDado && (
+          <span className="pmc-stats rvm-series-stats">
+            <span><span className="pmc-stats__value">{n(max)}</span> máx</span>
+            <span className="pmc-stats__sep">·</span>
+            <span><span className="pmc-stats__value">{n(min)}</span> mín</span>
+            <span className="pmc-stats__sep">·</span>
+            <span><span className="pmc-stats__value">{n(media)}</span> média por ponto</span>
+          </span>
+        )}
+      </footer>
+    </article>
   );
 }

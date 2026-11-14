@@ -213,3 +213,53 @@ html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa]:not(#rv
   .v2 .rvm-ctl-rot { display: none; }
   .v2 .rvm-ctl-ord { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 }
+
+/* ---- card de várias séries (as ondas) ---- */
+.v2 .pmc-root.rvm.rvm-series { gap: 8px; padding: 16px 18px 10px; --rvm-pad: 18px; }
+.v2 .pmc-root.rvm .rvm-series-cab { align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; }
+.v2 .pmc-root.rvm .rvm-series-tx { min-width: 0; }
+.v2 .pmc-root.rvm .rvm-series-tit { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-16, 16px); font-weight: 600; letter-spacing: -.012em; color: var(--txt); }
+.v2 .pmc-root.rvm .rvm-series-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-series-acao { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.v2 .pmc-root.rvm .rvm-series-acao .d5-ondas-sels { display: inline-flex; gap: 8px; }
+.v2 .pmc-root.rvm .rvm-series-acao .pmc-toggle { border: 1px solid var(--pmc-border); }
+.v2 .pmc-root.rvm.rvm-series .rvm-num { margin-top: 2px; }
+.v2 .pmc-root.rvm .rvm-leg { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .pmc-root.rvm .rvm-leg-bt {
+  display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--pmc-border); background: rgba(var(--tint), .03); color: var(--txt-2);
+  font: inherit; font-size: 12px; cursor: pointer; transition: opacity .15s ease, border-color .15s ease, background-color .15s ease;
+}
+.v2 .pmc-root.rvm .rvm-leg-bt:hover { color: var(--txt); border-color: var(--lin-fio-hover, rgba(var(--tint), .18)); }
+.v2 .pmc-root.rvm .rvm-leg-bt:focus-visible { outline: 2px solid var(--pmc-ring); outline-offset: 1px; }
+.v2 .pmc-root.rvm .rvm-leg-bt i { width: 8px; height: 8px; flex: none; border-radius: 50%; }
+.v2 .pmc-root.rvm .rvm-leg-bt b { font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] { opacity: .5; }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] i { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] .rvm-leg-nome { text-decoration: line-through; }
+.v2 .pmc-root.rvm .rvm-leg-nota { font-size: 11px; font-weight: 600; }
+.v2 .pmc-root.rvm .rvm-leg-ok { color: var(--cor-ok-txt, var(--verde)); }
+.v2 .pmc-root.rvm .rvm-leg-er { color: var(--cor-erro-txt, var(--rubro)); }
+.v2 .pmc-root.rvm .rvm-leg-am { color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .pmc-root.rvm .rvm-graf-g { height: 230px; margin: 6px 0 0; }   /* dentro da margem do card: o eixo de baixo alinha com os pontos */
+.v2 .pmc-root.rvm .rvm-series-stats { gap: 8px; font-size: 12px; white-space: nowrap; }
+/* o card grande não cresce ao passar o mouse (é um gráfico para ler, não um número para destacar) */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .v2 .pmc-root.rvm.rvm-series:hover { transform: none; box-shadow: none; }
+}
+@media (max-width: 760px) {
+  .v2 .pmc-root.rvm .rvm-graf-g { height: 190px; }
+  .v2 .pmc-root.rvm .rvm-series-stats { display: none; }
+}
+.v2 .pmc-root.rvm .rvm-tit-ajuda { display: inline-flex; align-items: center; gap: 4px; }
+.v2 .rvm-nota { margin: -2px 0 0; font-size: 12px; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-graf.rvm-graf-carregando { border-radius: 8px; margin-left: 0; margin-right: 0; background: rgba(var(--tint), .04); animation: pmc-pulse 2s cubic-bezier(.4, 0, .6, 1) infinite; }
+@media (prefers-reduced-motion: reduce) { .v2 .pmc-root.rvm .rvm-graf.rvm-graf-carregando { animation: none; } }
+/* eixo de baixo do card de séries: os dias (ou semanas) sob o desenho */
+.v2 .pmc-root.rvm .rvm-eixo { position: relative; height: 16px; margin: 2px 0 0; }
+.v2 .pmc-root.rvm .rvm-eixo span {
+  position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap;
+  font-size: 11px; color: var(--txt-3); font-variant-numeric: tabular-nums;
+}
+.v2 .pmc-root.rvm .rvm-eixo span[data-lado="ini"] { transform: none; }
+.v2 .pmc-root.rvm .rvm-eixo span[data-lado="fim"] { transform: translateX(-100%); }
