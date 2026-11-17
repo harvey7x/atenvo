@@ -13,6 +13,7 @@ import {
 } from './fonte';
 import ConversaWa from './ConversaWa';
 import { EVENTO_FILA_RECARREGAR } from './recados';
+import { avisarMarcacaoEmAndamento, avisarMarcacaoMexida, PARA_SEMPRE } from './avisosTexto';
 
 /* ---------------------------------------------------------------- real (banco) */
 
@@ -198,28 +199,77 @@ export function useFonteReal(): FonteFila {
     };
   }, [carregar, carregarNumeros, carregarIris]);
 
-  const rpc = useCallback(async (nome: string, args: Record<string, unknown>) => {
+  /** `mexendo`: as marcações em que o pedido mexe — os avisos delas esperam a resposta (mesmo com a rede lenta, e com a
+      ficha já fechada); `aoDarCerto` roda assim que o banco responde sem erro, ANTES de reler a fila (o aviso sai na
+      hora, não depois da releitura inteira). Com ou sem erro, a espera solta */
+  const rpc = useCallback(async (nome: string, args: Record<string, unknown>, mexendo: string[] = [], aoDarCerto?: () => void): Promise<void> => {
     if (!supabase || !org) return;
-    const { error } = await supabase.rpc(nome, { p_org: org, ...args });
-    if (error) setErro(error.message);
+    avisarMarcacaoEmAndamento(mexendo);
+    try {
+      const { error } = await supabase.rpc(nome, { p_org: org, ...args });
+      if (error) setErro(error.message);
+      else aoDarCerto?.();
+    } finally {
+      avisarMarcacaoEmAndamento(mexendo, true);
+    }
     await carregar();
   }, [org, carregar]);
-
-  return useMemo<FonteFila>(() => ({
-    modo: 'real', rotulo: 'atualiza sozinha a cada minuto', carregando, erro, leads,
-    marcar: (id, tipo, texto) => { void rpc('fila_iris_marcar', { p_contato: id, p_tipo: tipo, p_texto: texto ?? null }); },
-    tirarMarca: (_id, mid) => { void rpc('fila_iris_tirar', { p_marcacao: mid }); },
-    corrigirDocs: (id, estado) => {
-      const l = leads.find((x) => x.id === id);
-      if (estado) void rpc('fila_iris_marcar', { p_contato: id, p_tipo: estado === 'completos' ? 'docs_completos' : 'docs_incompletos', p_texto: null });
-      else if (l?.docsManualId) void rpc('fila_iris_tirar', { p_marcacao: l.docsManualId });
-    },
-    tirarDaFila: (id) => { void rpc('fila_iris_marcar', { p_contato: id, p_tipo: 'fora_da_fila', p_texto: 'tirado pelo atendente' }); },
-    numeros: (p) => nums[p] ?? null,
-    recarregar: carregar,
-    /* a conversa COMPLETA na ficha, com fotos e áudios (dono 12/11: "preciso das imagens e áudios, cvs completas") */
-    SecaoConversa: ConversaWa,
-    chegadas: (p) => cheg[p] ?? null,
-    irisAgora: iris,
-  }), [carregando, erro, leads, nums, rpc, carregar, cheg, iris]);
+  /* dono 16/11: o que a fila mexe numa marcação (+1, tirar, atualizar, tirar o cliente da fila) tira na hora o aviso
+     dela do meio da tela, que esperava a ficha fechar — senão ele voltava, por até 30 s, para o que acabou de ser
+     resolvido. Vai o vencimento de antes: um aviso de um vencimento novo, mais tarde, continua valendo */
+  return useMemo<FonteFila>(() => {
+    const marcaDe = (contato: string, f: (m: Lead['marcas'][number]) => boolean) => leads.find((x) => x.id === contato)?.marcas.find(f);
+    /* sem o vencimento na fila (o banco ainda sem o prazo) não há aviso a esconder: nada vai — "para sempre" é só do tirar */
+    const mexida = (m: Lead['marcas'][number] | undefined, ate?: number) => {
+      const limite = ate ?? m?.venceEm;
+      if (m && limite != null) avisarMarcacaoMexida([{ marcacaoId: m.id, ate: limite }]);
+    };
+    return {
+      modo: 'real', rotulo: 'atualiza sozinha a cada minuto', carregando, erro, leads,
+      marcar: (id, tipo, texto) => {
+        const antes = tipo === 'nao_atendeu' ? marcaDe(id, (m) => m.tipo === 'nao_atendeu') : undefined;
+        void rpc('fila_iris_marcar', { p_contato: id, p_tipo: tipo, p_texto: texto ?? null }, antes ? [antes.id] : [], () => mexida(antes));
+      },
+      tirarMarca: (id, mid) => {
+        const antes = marcaDe(id, (m) => m.id === mid);
+        void rpc('fila_iris_tirar', { p_marcacao: mid }, [mid], () => mexida(antes, PARA_SEMPRE));
+      },
+      /* dono 16/11: atualizar a marcação (o que foi feito) — o prazo recomeça; o erro volta para o campo */
+      atualizarMarca: async (id, mid, texto) => {
+        if (!supabase || !org) throw new Error('Sem conexão agora. Tente de novo em instantes.');
+        const antes = marcaDe(id, (m) => m.id === mid);
+        avisarMarcacaoEmAndamento([mid]);
+        try {
+          const { error } = await supabase.rpc('fila_iris_marcacao_atualizar', { p_org: org, p_marcacao: mid, p_texto: texto.trim() });
+          if (error) {
+            const rede = /failed to fetch|networkerror|load failed|network request failed/i.test(error.message);
+            throw new Error(rede ? 'Sem conexão agora. Tente de novo em instantes.'
+              : error.code === 'PGRST202' ? 'O prazo das marcações ainda não está pronto no sistema. Recarregue a página.'
+                : error.code === 'P0001' || error.code === '42501' ? error.message : 'Não deu para atualizar agora. Tente de novo.');
+          }
+          mexida(antes);
+        } finally {
+          avisarMarcacaoEmAndamento([mid], true);
+        }
+        await carregar();
+      },
+      corrigirDocs: (id, estado) => {
+        const l = leads.find((x) => x.id === id);
+        if (estado) void rpc('fila_iris_marcar', { p_contato: id, p_tipo: estado === 'completos' ? 'docs_completos' : 'docs_incompletos', p_texto: null });
+        else if (l?.docsManualId) void rpc('fila_iris_tirar', { p_marcacao: l.docsManualId });
+      },
+      tirarDaFila: (id) => {
+        /* o cliente sai da fila: os avisos dele saem junto (se ele voltar, o prazo recomeça e um aviso novo vale) */
+        const comPrazo = leads.find((x) => x.id === id)?.marcas.filter((m) => m.venceEm != null) ?? [];
+        void rpc('fila_iris_marcar', { p_contato: id, p_tipo: 'fora_da_fila', p_texto: 'tirado pelo atendente' }, comPrazo.map((m) => m.id),
+          () => avisarMarcacaoMexida(comPrazo.map((m) => ({ marcacaoId: m.id, ate: m.venceEm! }))));
+      },
+      numeros: (p) => nums[p] ?? null,
+      recarregar: carregar,
+      /* a conversa COMPLETA na ficha, com fotos e áudios (dono 12/11: "preciso das imagens e áudios, cvs completas") */
+      SecaoConversa: ConversaWa,
+      chegadas: (p) => cheg[p] ?? null,
+      irisAgora: iris,
+    };
+  }, [carregando, erro, leads, nums, rpc, carregar, cheg, iris, org]);
 }

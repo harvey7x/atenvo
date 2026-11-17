@@ -1,0 +1,39 @@
+/* ==================================================================
+   MARCAÇÃO VENCIDA NO MEIO DA TELA (dono 16/11: "aviso tem que ser no meio da tela, obrigando a atualizar").
+   O cartão é o do recado do administrador (.rcd-*, recado.css) com o filete VERMELHO da marcação vencida.
+   O véu é PRÓPRIO (.mvc-veu, não .rcd-veu): o recado e a mensagem do Murillo esperam .rcd-veu — com a mesma
+   classe, um esperaria o outro e os dois piscariam. Este espera os dois (a ordem: recado, mensagem, marcação) e
+   fica POR BAIXO deles (z 93; o recado é 95, a mensagem 94): o que chega enquanto ele está na tela aparece na hora
+   por cima, no instante em que ele ainda não saiu.
+   ================================================================== */
+.v2 .mvc-veu {
+  position: fixed; inset: 0; z-index: 93; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 24px;
+  box-sizing: border-box; overflow-y: auto;
+  background: rgba(10, 12, 16, .46); animation: rcd-veu .2s var(--ease) both;
+}
+html:root[data-tema="light"] .v2 .mvc-veu { background: rgba(22, 28, 40, .30); }
+@media (prefers-reduced-motion: reduce) { .v2 .mvc-veu { animation: none; } }
+.v2 .mvc-veu .mvc-caixa { position: relative; width: min(520px, 100%); }
+.v2 .mvc-veu .rcd-aviso { max-height: calc(100dvh - 48px); padding: 18px 20px 20px 22px; gap: 12px; border-radius: 20px; }
+.v2 .mvc-veu .rcd-aviso, html:root[data-tema="light"] .v2 .mvc-veu .rcd-aviso { border-left-color: var(--rubro); }
+.v2 .mvc-veu .rcd-marca { font-size: 12px; }
+.v2 .mvc-veu .rcd-marca svg { color: var(--rubro); }
+.v2 .mvc-veu .rcd-cliente { font-size: 19px; }
+.v2 .mvc-veu .rcd-bt { height: 36px; padding: 0 14px; font-size: 13px; }
+.v2 .mvc-veu .rcd-campo { font-size: 13px; }
+/* a marcação que venceu */
+.v2 .mvc-marcacao {
+  display: flex; align-items: center; gap: 9px; margin: 0; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .08);
+  font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--rcd-txt); overflow-wrap: anywhere;
+}
+.v2 .mvc-marcacao i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--rubro); }
+/* quando foi marcada e a última atualização */
+.v2 .mvc-meta { margin: -4px 0 0; font-size: 12px; line-height: 1.4; color: var(--rcd-txt-2); overflow-wrap: anywhere; }
+.v2 .mvc-faca { margin: 0; font-size: 13px; line-height: 1.45; color: var(--rcd-txt-2); }
+/* "O que foi feito?" */
+.v2 .mvc-form { display: flex; flex-direction: column; gap: 8px; padding-top: 11px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.v2 .mvc-atalhos { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .mvc-atalhos .rcd-op { height: 30px; font-size: 12.5px; }
+.v2 .mvc-atalhos .rcd-op:disabled { opacity: .5; cursor: default; }
+.v2 .mvc-linha { display: flex; align-items: flex-start; gap: 6px; }

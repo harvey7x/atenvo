@@ -27,6 +27,7 @@ import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { AssistenteBalao, vozLiberadaPara } from '../components/AssistenteBalao';
 import { LembreteAviso } from '../components/LembreteAviso';
 import { AvisoIris } from '../components/AvisoIris';
+import { AvisoMarcacao } from '../components/AvisoMarcacao';
 import { AvisoRecado } from '../components/AvisoRecado';
 import { AvisoMensagemEquipe, BotaoMensagemEquipe } from '../components/AvisoMensagemEquipe';
 import { ComparadorVisual } from '../components/ComparadorVisual';
@@ -704,6 +705,8 @@ export default function AppShellV2() {
         <AvisoRecado oculto={bomDia !== null} acesso={acessoFila} />
         {/* Aviso da Iris (dono 12/11): "a Iris passou para você" em qualquer página; acima do lembrete */}
         <AvisoIris oculto={bomDia !== null} acesso={acessoFila} />
+        {/* Marcação vencida (dono 16/11): no meio da tela, em qualquer página, até o atendente atualizar ou tirar a marcação */}
+        <AvisoMarcacao oculto={bomDia !== null} acesso={acessoFila} />
         {/* Mensagem do Murillo (dono 13/11): no meio da tela de quem recebeu, em qualquer página, até o "Ok, entendi" */}
         <AvisoMensagemEquipe oculto={bomDia !== null} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL

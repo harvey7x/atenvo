@@ -3,7 +3,7 @@
    No real, cada linha vem de public.fila_iris_itens (supabase/migrations/20261111200000_fila_iris.sql):
    a fila do atendente com os clientes DELE, classificados pelo andamento do atendimento.
    ============================================================================ */
-import { CLIENTES, DOCUMENTOS, docsOk, equipeDoUid, type Categoria, type ClienteFila, type Marca, type TipoMarca } from './dados';
+import { CLIENTES, DOCUMENTOS, docsOk, equipeDoUid, marcasIniciais, type Categoria, type ClienteFila, type Marca, type TipoMarca } from './dados';
 
 export interface Lead {
   /** id do contato */
@@ -75,7 +75,11 @@ export interface LinhaFila {
   comprovante: boolean;
   falta: string[] | null;
   assinado_em: string | null;
-  marcacoes: { id: string; tipo: string; texto: string | null; vezes: number; em: string }[] | null;
+  marcacoes: {
+    id: string; tipo: string; texto: string | null; vezes: number; em: string;
+    /** dono 16/11: o prazo (só as tarefas) e a última atualização */
+    vence_em?: string | null; ult?: { texto: string; por: string | null; por_nome?: string | null; em: string } | null;
+  }[] | null;
   ult_cliente_texto: string | null;
   /** a NOSSA última mensagem (texto) e de onde saiu: bot (IA/robô) · atenvo (painel) · telefone (celular) — 13/11 */
   ult_nossa_texto?: string | null;
@@ -240,7 +244,11 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
       docsManualId = m.id;
       manualEm = Date.parse(m.em) || undefined;
     } else if ((TIPOS_MARCA as string[]).includes(m.tipo)) {
-      marcas.push({ id: m.id, tipo: m.tipo as TipoMarca, texto: m.texto ?? undefined, vezes: m.vezes, em: Date.parse(m.em) });
+      marcas.push({
+        id: m.id, tipo: m.tipo as TipoMarca, texto: m.texto ?? undefined, vezes: m.vezes, em: Date.parse(m.em),
+        venceEm: m.vence_em ? Date.parse(m.vence_em) : undefined,
+        ult: m.ult ? { texto: m.ult.texto, por: m.ult.por ?? undefined, porNome: m.ult.por_nome ?? undefined, em: Date.parse(m.ult.em) } : undefined,
+      });
     }
   }
   const base = {
@@ -305,6 +313,8 @@ const CAT_FICTICIA: Record<string, Categoria> = { quente: 'quente', documentacao
 export function leadsFicticios(): Lead[] {
   const agora = Date.now();
   const hoje0 = new Date(agora); hoje0.setHours(0, 0, 0, 0);
+  /* as marcações de exemplo (uma vencida, uma perto de vencer — dono 16/11): a lista não abre vazia de marcações */
+  const marcasDeExemplo = marcasIniciais();
   return CLIENTES.map((c: ClienteFila, ordem) => {
     const total = DOCUMENTOS[c.produto].length;
     const ok = c.cat === 'quente' ? total : docsOk(c);
@@ -319,7 +329,7 @@ export function leadsFicticios(): Lead[] {
       ...base, id: c.id, nome: c.nome, fone: '(51) 9' + String(10000000 + ordem * 7919).slice(0, 4) + '-' + String(1000 + ordem * 37).slice(-4),
       atendente: c.atendente, lista: c.cat === 'quente' ? 1 : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
       campanha: c.canal, funil: c.cat === 'quente' ? 'Documentos' : 'Lead Qualificado', ud: c.cat === 'sem_resposta' ? t - 3_600_000 : t,
-      esperandoEm: ordem % 5 === 0 ? t : undefined, disse: c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: [],
+      esperandoEm: ordem % 5 === 0 ? t : undefined, disse: c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: marcasDeExemplo[c.id] ?? [],
       /* a nossa última mensagem (a lista mostra a última, de quem for): nos sem resposta falamos por último */
       ...(c.cat === 'sem_resposta' ? { nossaTexto: 'Oi! Conseguiu separar os documentos? Estou aqui para te ajudar.', nossaOrigem: 'bot' } : {}),
       /* "Entrou hoje": metade dos quentes chegou hoje; o resto, dias atrás */

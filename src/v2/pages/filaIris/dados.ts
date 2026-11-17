@@ -444,6 +444,44 @@ export interface Marca {
   vezes?: number;
   /** quando foi marcado (epoch ms) */
   em: number;
+  /** dono 16/11 ("o atendente tem 36h para atualizar a marcação"): quando vence; sem prazo = não é tarefa */
+  venceEm?: number;
+  /** a última atualização: o que foi feito, por quem (uid e nome) e quando */
+  ult?: { texto: string; por?: string; porNome?: string; em: number };
+}
+
+/* ---------------------------------------------------------------- o prazo das marcações (dono 16/11) */
+/** o mesmo número do banco (fila_iris_config.horas_marcacao): mudar lá = mudar aqui (os textos da tela dizem 36 h) */
+export const HORAS_MARCACAO = 36;
+/** faltando 6 h ou menos, a marcação está perto de vencer */
+const PERTO_MS = 6 * 3_600_000;
+export type EstadoPrazo = 'ok' | 'perto' | 'vencida';
+export function estadoPrazo(m: Pick<Marca, 'venceEm'>, agora = Date.now()): EstadoPrazo | null {
+  if (!m.venceEm) return null;
+  if (m.venceEm <= agora) return 'vencida';
+  return m.venceEm - agora <= PERTO_MS ? 'perto' : 'ok';
+}
+/** "vence em 20h", "vence em 40 min", "venceu há 3h" */
+export function textoPrazo(m: Pick<Marca, 'venceEm'>, agora = Date.now()): string | null {
+  if (!m.venceEm) return null;
+  /* a mesma régua do estadoPrazo: venceu = o instante já passou (nada de "venceu agora" com segundos sobrando) */
+  const ms = m.venceEm - agora;
+  if (ms <= 0) return `venceu ${haQuanto(Math.floor(-ms / 60_000))}`;
+  const min = Math.ceil(ms / 60_000);
+  if (min < 60) return `vence em ${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `vence em ${h}h` : `vence em ${Math.floor(h / 24)} dias`;
+}
+/** quantas marcações vencidas o cliente tem */
+export const vencidasDe = (marcas: Marca[], agora = Date.now()) => marcas.filter((m) => estadoPrazo(m, agora) === 'vencida').length;
+/** o que dá para escrever com um toque ao atualizar */
+export const ATALHOS_ATUALIZAR = ['Cobrei de novo', 'Liguei, não atendeu', 'Mandei mensagem', 'Cliente disse que vai mandar'];
+/** em "Ligar de novo", ligar e não atender de novo é o +1 da marcação (conta a ligação e recomeça o prazo) */
+export const LIGUEI_NAO_ATENDEU = 'Liguei, não atendeu';
+/** os atalhos que servem para cada marcação: na ligação, só o que é de ligação ("Cobrei de novo" e "Cliente disse
+    que vai mandar" são de documento e de senha) */
+export function atalhosDoTipo(tipo: TipoMarca): string[] {
+  return tipo === 'nao_atendeu' ? [LIGUEI_NAO_ATENDEU, 'Mandei mensagem'] : ATALHOS_ATUALIZAR;
 }
 
 export const MARCAS: { tipo: TipoMarca; botao: string; tom: 'ambar' | 'azul' }[] = [
@@ -487,13 +525,16 @@ export function textoMarca(m: Marca): string {
 
 /* exemplos já marcados na demonstração (para a lista não abrir vazia de marcações) */
 const atras = (min: number) => Date.now() - min * 60_000;
+const prazo = (minAtras: number) => Date.now() - minAtras * 60_000 + HORAS_MARCACAO * 3_600_000;
 export function marcasIniciais(): Record<string, Marca[]> {
   return {
-    c01: [{ id: 'm1', tipo: 'nao_atendeu', vezes: 1, em: atras(25) }],
-    c04: [{ id: 'm2', tipo: 'recuperar_senha', em: atras(70) }],
-    c05: [{ id: 'm3', tipo: 'mandar_doc', em: atras(200) }, { id: 'm4', tipo: 'falta', texto: 'comprovante no nome dela', em: atras(180) }],
-    c07: [{ id: 'm5', tipo: 'nao_atendeu', vezes: 2, em: atras(300) }],
-    c12: [{ id: 'm6', tipo: 'recuperar_senha', em: atras(100) }],
-    c17: [{ id: 'm7', tipo: 'mandar_senha', em: atras(40) }],
+    c01: [{ id: 'm1', tipo: 'nao_atendeu', vezes: 1, em: atras(25), venceEm: prazo(25) }],
+    c04: [{ id: 'm2', tipo: 'recuperar_senha', em: atras(70), venceEm: prazo(70) }],
+    c05: [{ id: 'm3', tipo: 'mandar_doc', em: atras(38 * 60), venceEm: prazo(38 * 60) },
+      { id: 'm4', tipo: 'falta', texto: 'comprovante no nome dela', em: atras(180), venceEm: prazo(180),
+        ult: { texto: 'Cobrei de novo', em: atras(180) } }],
+    c07: [{ id: 'm5', tipo: 'nao_atendeu', vezes: 2, em: atras(32 * 60), venceEm: prazo(32 * 60) }],
+    c12: [{ id: 'm6', tipo: 'recuperar_senha', em: atras(100), venceEm: prazo(100) }],
+    c17: [{ id: 'm7', tipo: 'mandar_senha', em: atras(40), venceEm: prazo(40) }],
   };
 }

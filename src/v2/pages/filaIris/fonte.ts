@@ -4,9 +4,10 @@
    - real: o banco (fonteReal.ts). Este arquivo não fala com o banco (a prévia em HTML usa só ele).
    ============================================================================ */
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
-import type { Marca, TipoMarca } from './dados';
+import { HORAS_MARCACAO, type Marca, type TipoMarca } from './dados';
 import { textosDoLead, type Lead } from './lead';
 import { registrarFilaLocal, useDonosLocais } from './recados';
+import { mexerFilaDemo, useFilaDemo } from './filaDemo';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes_ant';
 export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number; /** marcações feitas no período (fila_iris_marcacoes_numeros) */ marcacoes?: number }
@@ -68,6 +69,8 @@ export interface FonteFila {
   leads: Lead[];
   marcar: (id: string, tipo: TipoMarca, texto?: string) => void;
   tirarMarca: (id: string, marcaId: string) => void;
+  /** dono 16/11: o atendente diz o que fez e o prazo da marcação recomeça (36 h); falha = Error com a frase */
+  atualizarMarca?: (id: string, marcaId: string, texto: string) => Promise<void>;
   /** correção manual da leitura dos documentos (null = volta ao automático) */
   corrigirDocs: (id: string, estado: 'completos' | 'incompletos' | null) => void;
   tirarDaFila: (id: string) => void;
@@ -161,11 +164,32 @@ function comDocs(l: Lead, estado: 'completos' | 'incompletos' | null): Lead {
   return { ...l, cat, docsManual, lista: cat === 'quente' ? 1 : cat === 'documentacao' ? 3 : l.lista, situacao, curta };
 }
 
+/* ---------------------------------------------------------------- as marcações no modo local (fila e aviso) */
+const PRAZO_MS = HORAS_MARCACAO * 3_600_000;
+/** o +1 do "Liguei, não atendeu": conta a ligação e recomeça o prazo (como o banco); sem a marcação, ela nasce */
+export function comMaisUmaLigacao(l: Lead, agora = Date.now()): Lead {
+  const ja = l.marcas.find((m) => m.tipo === 'nao_atendeu');
+  const venceEm = agora + PRAZO_MS;
+  const nova: Marca = ja ? { ...ja, vezes: (ja.vezes ?? 1) + 1, em: agora, venceEm } : { id: `m${agora}`, tipo: 'nao_atendeu', vezes: 1, em: agora, venceEm };
+  return { ...l, marcas: [nova, ...l.marcas.filter((m) => m.tipo !== 'nao_atendeu')] };
+}
+/** "o que foi feito": o prazo recomeça e a última atualização fica guardada */
+export function comMarcaAtualizada(l: Lead, marcaId: string, texto: string, agora = Date.now()): Lead {
+  return { ...l, marcas: l.marcas.map((m) => (m.id === marcaId ? { ...m, venceEm: agora + PRAZO_MS, ult: { texto, em: agora } } : m)) };
+}
+export function semMarca(l: Lead, marcaId: string): Lead {
+  return { ...l, marcas: l.marcas.filter((m) => m.id !== marcaId) };
+}
+
 /* ---------------------------------------------------------------- local (demonstração e prévia) */
 export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: string, numeros?: Partial<Record<Periodo, NumeroAtendente[]>>,
   extras?: { chegadas?: Partial<Record<Periodo, Chegadas>>; irisAgora?: IrisAgora | null }): FonteFila {
-  const [leads, setLeads] = useState<Lead[]>(inicial);
-  const mexer = (id: string, f: (l: Lead) => Lead | null) => setLeads((t) => t.flatMap((l) => {
+  const [daPagina, setDaPagina] = useState<Lead[]>(inicial);
+  /* a demonstração guarda a fila fora da página: o aviso da marcação vencida (no shell) mexe nas mesmas marcações */
+  const daDemo = useFilaDemo(modo === 'demo');
+  const leads = modo === 'demo' ? daDemo : daPagina;
+  const mexerTudo = modo === 'demo' ? mexerFilaDemo : setDaPagina;
+  const mexer = (id: string, f: (l: Lead) => Lead | null) => mexerTudo((t) => t.flatMap((l) => {
     if (l.id !== id) return [l];
     const n = f(l);
     return n ? [n] : [];
@@ -183,15 +207,17 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     modo, rotulo, carregando: false, erro: null, leads: comDono,
     marcar: (id, tipo, texto) => mexer(id, (l) => {
       const agora = Date.now();
-      if (tipo === 'nao_atendeu') {
-        const ja = l.marcas.find((m) => m.tipo === 'nao_atendeu');
-        const nova: Marca = ja ? { ...ja, vezes: (ja.vezes ?? 1) + 1, em: agora } : { id: `m${agora}`, tipo, vezes: 1, em: agora };
-        return { ...l, marcas: [nova, ...l.marcas.filter((m) => m.tipo !== 'nao_atendeu')] };
-      }
+      /* toda marcação de tarefa nasce com o prazo; o +1 do "Liguei, não atendeu" recomeça o prazo (como o banco) */
+      if (tipo === 'nao_atendeu') return comMaisUmaLigacao(l, agora);
       if (tipo !== 'falta' && l.marcas.some((m) => m.tipo === tipo)) return l;
-      return { ...l, marcas: [{ id: `m${agora}`, tipo, texto, em: agora }, ...l.marcas] };
+      return { ...l, marcas: [{ id: `m${agora}`, tipo, texto, em: agora, venceEm: agora + PRAZO_MS }, ...l.marcas] };
     }),
-    tirarMarca: (id, mid) => mexer(id, (l) => ({ ...l, marcas: l.marcas.filter((m) => m.id !== mid) })),
+    atualizarMarca: async (id, marcaId, texto) => {
+      const t = texto.trim();
+      if (t.length < 2) throw new Error('Escreva o que foi feito.');
+      mexer(id, (l) => comMarcaAtualizada(l, marcaId, t));
+    },
+    tirarMarca: (id, mid) => mexer(id, (l) => semMarca(l, mid)),
     corrigirDocs: (id, estado) => mexer(id, (l) => comDocs(l, estado)),
     tirarDaFila: (id) => mexer(id, () => null),
     numeros: (p) => numeros?.[p] ?? null,

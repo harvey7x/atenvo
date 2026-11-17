@@ -1016,3 +1016,38 @@
 html:root[data-linear][data-linear][data-linear] .v2 .fi-ir-lin .fi-ir-cel:nth-child(6) .fi-l2 {
   font-family: var(--mono); font-size-adjust: .5; letter-spacing: 0; word-spacing: -.3em; font-feature-settings: 'zero' 0;
 }
+
+/* ---------------------------------------------------------------- PRAZO DAS MARCAÇÕES (dono 16/11: "o atendente tem 36h
+   horas para atualizar a marcação"). Sóbrio: o prazo em cinza; a marcação VENCIDA em vermelho, como a etiqueta CLIENTE
+   da última mensagem (as duas pedem ação agora). */
+/* na fila: a vencida vem primeiro e fica vermelha; o "+n" fica vermelho se esconde uma vencida */
+.v2 .fi-chip-marca[data-prazo="vencida"], .v2 .fi-chip-marca[data-grupo][data-prazo="vencida"] {
+  background: rgba(var(--rubro-rgb), .10); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .40);
+}
+.v2 .fi-chip-marca[data-prazo="vencida"] svg, .v2 .fi-chip-marca[data-grupo="docs"][data-prazo="vencida"] svg { color: currentColor; }
+.v2 .fi-chip-marca[data-prazo="vencida"] .fi-chip-n { background: rgba(var(--rubro-rgb), .16); color: var(--rubro); }
+.v2 .fi-chip-mais[data-prazo="vencida"] { background: rgba(var(--rubro-rgb), .10); color: var(--rubro); }
+/* na ficha: embaixo de cada marcação, o prazo, a última atualização e o "Atualizar" */
+.v2 .fi-tile-caixa { display: flex; flex-direction: column; gap: 3px; }
+.v2 .fi-tile-sobre { position: relative; min-width: 0; }
+.v2 .fi-falta-caixa { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .fi-prazo { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 22px; padding: 0 4px 0 49px; font-size: 12px; color: var(--txt-3); }
+.v2 .fi-falta-caixa > .fi-prazo { padding-left: 33px; }
+.v2 .fi-prazo svg { flex: none; }
+.v2 .fi-prazo-tx { flex: none; font-weight: 500; color: var(--txt-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2 .fi-prazo[data-prazo="perto"] .fi-prazo-tx { color: var(--txt); font-weight: 600; }
+.v2 .fi-prazo[data-prazo="vencida"], .v2 .fi-prazo[data-prazo="vencida"] .fi-prazo-tx { color: var(--rubro); font-weight: 600; }
+.v2 .fi-prazo-ult { flex: 1 1 auto; min-width: 0; }
+.v2 .fi-prazo-bt { margin-left: auto; flex: none; font-size: 12px; }
+/* "o que foi feito?" */
+.v2 .fi-atualizar {
+  display: flex; flex-direction: column; gap: 8px; margin: 2px 0 4px; padding: 10px 12px; border-radius: var(--fi-rc);
+  border: 1px solid var(--fi-borda); background: rgba(var(--tint), .035);
+}
+.v2 .fi-atualizar-t { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 600; color: var(--txt); }
+.v2 .fi-atualizar-t small { font-size: 11.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .fi-atualizar-atalhos { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .fi-atualizar-atalhos .fi-fm { height: 26px; padding: 0 9px; font-size: 12px; }
+.v2 .fi-atualizar-erro { font-size: 12px; color: var(--rubro); }
+/* equipe: aguardando resposta + marcações vencidas, juntos embaixo do nome */
+.v2 .fi-eq-alertas { display: flex; flex-direction: column; gap: 6px; }

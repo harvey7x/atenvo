@@ -117,8 +117,9 @@ function useOcupadoNaTela(ativo: boolean): Ocupado {
   useLayoutIso(() => {
     if (!ativo) { setOcupado(LIVRE); return; }
     const conferir = () => {
-      /* também o recado do administrador no meio da tela (por cima de tudo, com véu): o lembrete espera e não fala */
-      const tela = !!document.querySelector(SELETOR_OCUPADO) || !!document.querySelector('.rcd-veu');
+      /* também o que fica no meio da tela, com véu (o recado do administrador, a mensagem do Murillo, a marcação
+         vencida): o lembrete espera e não fala — por baixo do véu ninguém alcança o Ok */
+      const tela = !!document.querySelector(SELETOR_OCUPADO) || !!document.querySelector('.rcd-veu, .mvc-veu');
       const som = tela && !!document.querySelector(SELETOR_COM_SOM);
       setOcupado((o) => (o.tela === tela && o.som === som ? o : { tela, som }));
     };

@@ -16,6 +16,10 @@ import { leadsFicticios, nomeBonito } from './lead';
 import type { AvisoIris, CategoriaAviso } from './avisosTexto';
 export { TEXTO_AVISO, type AvisoIris, type CategoriaAviso } from './avisosTexto';
 
+/* a lista vazia é SEMPRE a mesma (sem dado ainda, sem acesso, erro): um [] novo a cada render virava um laço de renders
+   (revisão 16/11) */
+const SEM_AVISOS: AvisoIris[] = [];
+
 type LinhaAviso = { id: string; contato_id: string; conversa_id: string | null; categoria: CategoriaAviso; nome: string | null; passou_em: string; criado_em: string };
 
 function avisosDaDemo(): AvisoIris[] {
@@ -30,7 +34,7 @@ function avisosDaDemo(): AvisoIris[] {
 }
 
 /** os meus avisos não vistos (o mais novo primeiro) + marcar como vistos. `ativo` = tenho a Fila da Iris. */
-export function useAvisosIris(ativo: boolean): { avisos: AvisoIris[]; marcarVistos: (ids: string[]) => void } {
+export function useAvisosIris(ativo: boolean): { avisos: AvisoIris[]; marcarVistos: (ids: string[]) => void; pronto: boolean } {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const org = currentOrg?.id;
@@ -72,7 +76,7 @@ export function useAvisosIris(ativo: boolean): { avisos: AvisoIris[]; marcarVist
     });
   }, [chave, org, qc]);
 
-  const lista = DEMO_MODE ? demo : (q.data ?? []);
+  const lista = DEMO_MODE ? demo : (q.data ?? SEM_AVISOS);
   /* um por cliente (o banco já entrega assim; aqui é o cinto) e sem os dispensados desta aba */
   const avisos = useMemo(() => {
     const vistos = new Set<string>();
@@ -82,5 +86,6 @@ export function useAvisosIris(ativo: boolean): { avisos: AvisoIris[]; marcarVist
       return true;
     });
   }, [lista]);
-  return { avisos, marcarVistos };
+  /* a 1ª leitura terminou: só então a lista que já existia vira a base da notificação do navegador */
+  return { avisos, marcarVistos, pronto: DEMO_MODE || q.isSuccess };
 }

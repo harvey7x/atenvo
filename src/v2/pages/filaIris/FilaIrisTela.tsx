@@ -11,8 +11,8 @@ import { createPortal } from 'react-dom';
 import { BotaoPrimario, BotaoSec, ConfirmDialogV2, Segmentado } from '../../components';
 import { criarRaizPortalV2 } from '../../components/portal';
 import {
-  CATEGORIAS, EQUIPE, GRUPOS_MARCA, MARCAS, atendente, curtoMarca, equipeDoUid, grupoMarca, haQuanto, infoCategoria, ordenarMarcas, quando,
-  textoMarca, turnoTexto,
+  CATEGORIAS, EQUIPE, GRUPOS_MARCA, HORAS_MARCACAO, LIGUEI_NAO_ATENDEU, MARCAS, atalhosDoTipo, atendente, curtoMarca, equipeDoUid, estadoPrazo, grupoMarca, haQuanto,
+  infoCategoria, ordenarMarcas, quando, textoMarca, textoPrazo, turnoTexto, vencidasDe,
   type Atendente, type Categoria, type GrupoMarca, type Marca, type TipoMarca,
 } from './dados';
 import {
@@ -32,7 +32,8 @@ import './filaIris.css';
 
 type Visao = 'minha' | 'equipe' | 'de';
 type Filtro = Categoria | 'todas';
-type FiltroMarca = GrupoMarca | 'esperando' | 'todas';
+/* 'vencidas' (dono 16/11): quem tem marcação que passou do prazo sem atualizar */
+type FiltroMarca = GrupoMarca | 'esperando' | 'vencidas' | 'todas';
 
 /* cor do avatar do atendente — a mesma paleta do Painel da Equipe (supervisao/zapUi.corDe) */
 const PALETA_AV = ['#3B6E8F', '#7A5A92', '#2F7D6A', '#9A5B3C', '#5862A8', '#8A4E6B', '#4F7A3A', '#A0613A', '#3F6FA0', '#6B6F2E'];
@@ -76,20 +77,31 @@ function IcTipoMarca({ tipo, t = 13 }: { tipo: TipoMarca; t?: number }) {
   return <IcMarca t={t} />;
 }
 
-/** as marcações do atendente na linha da fila: por ordem de urgência, cor por grupo (até 3 + "+n") */
+/** as marcações do atendente na linha da fila: as VENCIDAS primeiro (dono 16/11: 36 h para atualizar), depois por
+    ordem de urgência (até 2 + "+n"); a vencida fica em vermelho */
 function ChipsMarca({ marcas }: { marcas: Marca[] }) {
   if (!marcas.length) return <span className="fi-marc-vazia">—</span>;
-  const ord = ordenarMarcas(marcas);
+  const agora = Date.now();
+  const ord = ordenarMarcas(marcas).map((m, i) => ({ m, i, e: estadoPrazo(m, agora) }))
+    .sort((a, b) => Number(b.e === 'vencida') - Number(a.e === 'vencida') || a.i - b.i);
+  const resto = ord.slice(2);
   return (
     <>
-      {ord.slice(0, 2).map((m) => (
-        <span key={m.id} className="fi-chip-marca" data-grupo={grupoMarca(m.tipo)} title={`${textoMarca(m)} · marcado ${quando(minAtras(m.em))}`}>
-          <IcTipoMarca tipo={m.tipo} t={12} />
-          <span className="fi-elip">{curtoMarca(m)}</span>
-          {m.tipo === 'nao_atendeu' && <b className="fi-chip-n num">{m.vezes ?? 1}x</b>}
-        </span>
-      ))}
-      {ord.length > 2 && <span className="fi-chip-mais" title={ord.slice(2).map(textoMarca).join(' · ')}>+{ord.length - 2}</span>}
+      {ord.slice(0, 2).map(({ m, e }) => {
+        const pz = textoPrazo(m, agora);
+        return (
+          <span key={m.id} className="fi-chip-marca" data-grupo={grupoMarca(m.tipo)} data-prazo={e ?? undefined}
+            title={`${textoMarca(m)} · marcado ${quando(minAtras(m.em))}${pz ? ` · ${pz}` : ''}${e === 'vencida' ? ' sem atualizar' : ''}`}>
+            <IcTipoMarca tipo={m.tipo} t={12} />
+            <span className="fi-elip">{curtoMarca(m)}</span>
+            {m.tipo === 'nao_atendeu' && <b className="fi-chip-n num">{m.vezes ?? 1}x</b>}
+          </span>
+        );
+      })}
+      {resto.length > 0 && (
+        <span className="fi-chip-mais" data-prazo={resto.some((x) => x.e === 'vencida') ? 'vencida' : undefined}
+          title={resto.map(({ m, e }) => `${textoMarca(m)}${e === 'vencida' ? ' (vencida)' : ''}`).join(' · ')}>+{resto.length}</span>
+      )}
     </>
   );
 }
@@ -274,9 +286,12 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
   const nomeMostrado = destacar && !semAcento(nomeCurto).includes(semAcento(destacar)) ? l.nome : nomeCurto;
   /* em "Sem resposta" a situação carrega o que varia: há quanto tempo parou */
   const situacao = l.cat === 'sem_resposta' && l.nu ? `${l.curta} ${haQuanto(minDesde(l.nu) ?? 0)}` : l.curta;
+  /* o leitor de tela também ouve a marcação vencida (a linha é um botão: o que está dentro não é lido) */
+  const nVencidas = vencidasDe(l.marcas);
   return (
     <div className="fi-lin" role="button" tabIndex={0} data-id={l.id} data-cat={l.cat} data-ativo={ativo ? '' : undefined}
-      data-espera={l.esperandoEm ? '' : undefined} aria-label={`Abrir ${l.nome}`}
+      data-espera={l.esperandoEm ? '' : undefined}
+      aria-label={`Abrir ${l.nome}${nVencidas ? `, ${nVencidas === 1 ? '1 marcação vencida' : `${nVencidas} marcações vencidas`}` : ''}`}
       onClick={() => { if (window.getSelection()?.toString()) return; aoAbrir(); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); aoAbrir(); } }}>
       <span className="fi-col-cli">
@@ -354,11 +369,119 @@ function Caminho({ l, comQuem }: { l: Lead; comQuem: string }) {
   );
 }
 
-/** marcações do cliente, agrupadas: Ligação · Meu INSS · Documentos */
-function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
+type AoAtualizarMarca = (marcaId: string, texto: string) => Promise<void>;
+
+/** o prazo de uma marcação na ficha (dono 16/11: "o atendente tem 36h para atualizar a marcação"): vence em… /
+    venceu há…, a última atualização e o botão Atualizar */
+function PrazoDaMarca({ m, donoUid, aberto, aoAbrir, aoFechar, aoAtualizar, avisar }: {
+  m: Marca;
+  /** o uid do dono do cliente: quem atualizou só aparece quando foi outra pessoa (o gestor) */
+  donoUid?: string;
+  aberto: boolean; aoAbrir: () => void; aoFechar: () => void; aoAtualizar?: AoAtualizarMarca; avisar?: (t: string) => void;
+}) {
+  const bt = useRef<HTMLButtonElement>(null);
+  /* o formulário fechou com o foco dentro dele (Salvar, Cancelar, Esc): o foco volta para o Atualizar, não se perde */
+  const antes = useRef(aberto);
+  useEffect(() => {
+    if (antes.current && !aberto) {
+      const a = document.activeElement;
+      if (!a || a === document.body) bt.current?.focus();
+    }
+    antes.current = aberto;
+  }, [aberto]);
+  const e = estadoPrazo(m);
+  const pz = textoPrazo(m);
+  if (!e || !pz) return null;
+  const outro = m.ult?.por && m.ult.por !== donoUid
+    ? (m.ult.porNome?.trim().split(/\s+/)[0] || EQUIPE.find((a) => a.uid === m.ult?.por)?.nome || 'Outra pessoa') : null;
+  return (
+    <>
+      <div className="fi-prazo" data-prazo={e}>
+        <IcRelogio t={11} />
+        <span className="fi-prazo-tx">{pz[0].toUpperCase() + pz.slice(1)}{e === 'vencida' ? ' sem atualizar' : ''}</span>
+        {m.ult && (
+          <span className="fi-prazo-ult fi-elip" title={`Última atualização${outro ? ` (${outro})` : ''}: ${m.ult.texto} · ${quando(minAtras(m.ult.em))}`}>
+            · {outro ? `${outro}: ` : ''}“{m.ult.texto}” {quando(minAtras(m.ult.em))}
+          </span>
+        )}
+        {aoAtualizar && !aberto && (
+          <button ref={bt} type="button" className="fi-link fi-prazo-bt" onClick={aoAbrir}
+            aria-label={`Atualizar a marcação ${textoMarca(m)}`}
+            title={`Dizer o que foi feito: o prazo recomeça (${HORAS_MARCACAO} h)`}>Atualizar</button>
+        )}
+      </div>
+      {aberto && aoAtualizar && <FormAtualizar m={m} aoAtualizar={aoAtualizar} aoFechar={aoFechar} avisar={avisar} />}
+    </>
+  );
+}
+
+/** "o que foi feito?" — com os atalhos de um toque; salvar recomeça o prazo */
+function FormAtualizar({ m, aoAtualizar, aoFechar, avisar }: {
+  m: Marca; aoAtualizar: AoAtualizarMarca; aoFechar: () => void; avisar?: (t: string) => void;
+}) {
+  const [texto, setTexto] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const campo = useRef<HTMLInputElement>(null);
+  /* o formulário pode sumir no meio do salvar (trocou de cliente, fechou a ficha): o resultado não se perde */
+  const vivo = useRef(true);
+  useEffect(() => { vivo.current = true; campo.current?.focus(); return () => { vivo.current = false; }; }, []);
+  /* os atalhos que servem para esta marcação; em "Ligar de novo", ligar e não atender é o +1 do próprio botão */
+  const atalhos = atalhosDoTipo(m.tipo).filter((a) => !(m.tipo === 'nao_atendeu' && a === LIGUEI_NAO_ATENDEU));
+  const salvar = async () => {
+    const t = texto.trim();
+    if (t.length < 2 || salvando) return;
+    setSalvando(true); setErro(null);
+    try {
+      await aoAtualizar(m.id, t);
+      avisar?.(`Marcação atualizada. O prazo recomeçou: ${HORAS_MARCACAO} horas.`);
+      if (vivo.current) aoFechar();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Não deu para atualizar agora. Tente de novo.';
+      /* o foco volta para o campo (com o clique no Salvar ele estava no botão, que fica desabilitado): Enter tenta de
+         novo e o Esc fecha só o formulário */
+      if (vivo.current) { setErro(msg); setSalvando(false); window.setTimeout(() => campo.current?.focus(), 0); }
+      else avisar?.(`A marcação não foi atualizada: ${msg}`);
+    }
+  };
+  return (
+    <div className="fi-atualizar" role="group" aria-label={`Atualizar a marcação: ${textoMarca(m)}`}>
+      <span className="fi-atualizar-t">O que foi feito?<small>o prazo recomeça: mais {HORAS_MARCACAO} horas</small></span>
+      <div className="fi-atualizar-atalhos">
+        {atalhos.map((a) => (
+          <button key={a} type="button" className="fi-fm" aria-pressed={texto.trim() === a} disabled={salvando}
+            onClick={() => { setTexto(a); setErro(null); campo.current?.focus(); }}>{a}</button>
+        ))}
+      </div>
+      <div className="fi-falta">
+        <input ref={campo} className="fi-falta-in" value={texto} maxLength={200} readOnly={salvando} aria-busy={salvando}
+          placeholder="Ex.: cobrei o comprovante" aria-label="O que foi feito"
+          onChange={(e) => { setTexto(e.target.value); setErro(null); }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') void salvar();
+            if (e.key === 'Escape') aoFechar();
+          }} />
+        <BotaoSec mini onClick={aoFechar} disabled={salvando}>Cancelar</BotaoSec>
+        <BotaoPrimario mini onClick={() => void salvar()} disabled={salvando || texto.trim().length < 2}>{salvando ? 'Salvando…' : 'Salvar'}</BotaoPrimario>
+      </div>
+      {erro && <span className="fi-atualizar-erro" role="alert">{erro}</span>}
+    </div>
+  );
+}
+
+/** marcações do cliente, agrupadas: Ligação · Meu INSS · Documentos; cada uma com o prazo para atualizar (dono 16/11) */
+function MarcarCliente({ marcas, aoMarcar, aoTirar, aoAtualizar, avisar, donoUid }: {
   marcas: Marca[]; aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
+  aoAtualizar?: AoAtualizarMarca; avisar?: (t: string) => void; donoUid?: string;
 }) {
   const [escrevendo, setEscrevendo] = useState(false);
+  /* a marcação com o "o que foi feito?" aberto (uma por vez) */
+  const [atualizando, setAtualizando] = useState<string | null>(null);
+  const prazo = (m: Marca) => (
+    <PrazoDaMarca m={m} donoUid={donoUid} aberto={atualizando === m.id} aoAbrir={() => setAtualizando(m.id)}
+      aoFechar={() => setAtualizando((x) => (x === m.id ? null : x))} aoAtualizar={aoAtualizar} avisar={avisar} />
+  );
   const [texto, setTexto] = useState('');
   const campo = useRef<HTMLInputElement>(null);
   useEffect(() => { if (escrevendo) campo.current?.focus(); }, [escrevendo]);
@@ -386,33 +509,39 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
     if (tipo === 'nao_atendeu') {
       return (
         <div key={tipo} className="fi-tile-caixa fi-tile-largo">
-          <button type="button" className="fi-tile" data-grupo={g} data-on={ja ? '' : undefined} onClick={() => aoMarcar(tipo)}
-            title="Cada clique conta mais uma ligação sem resposta">
-            <span className="fi-tile-ic"><IcTelefone t={14} /></span>
-            <span className="fi-tile-tx">
-              <b>{b.botao}</b>
-              {ja && <small>{`Ligar de novo · última tentativa ${quando(minAtras(ja.em))}`}</small>}
-            </span>
-            <span className="fi-tile-dir">{ja ? <b className="fi-tile-n num">{ja.vezes ?? 1}x</b> : <span className="fi-tile-mais">+1</span>}</span>
-          </button>
-          {ja && <button type="button" className="fi-x fi-tile-x" onClick={() => aoTirar(ja.id)} aria-label="Tirar a marcação Ligar de novo" title="Conseguiu falar: tirar a marcação"><IcX t={11} /></button>}
+          <div className="fi-tile-sobre">
+            <button type="button" className="fi-tile" data-grupo={g} data-on={ja ? '' : undefined} onClick={() => aoMarcar(tipo)}
+              title={ja ? `Cada clique conta mais uma ligação sem resposta (e o prazo recomeça: ${HORAS_MARCACAO} h)` : 'Cada clique conta mais uma ligação sem resposta'}>
+              <span className="fi-tile-ic"><IcTelefone t={14} /></span>
+              <span className="fi-tile-tx">
+                <b>{b.botao}</b>
+                {ja && <small>{`Ligar de novo · última tentativa ${quando(minAtras(ja.em))}`}</small>}
+              </span>
+              <span className="fi-tile-dir">{ja ? <b className="fi-tile-n num">{ja.vezes ?? 1}x</b> : <span className="fi-tile-mais">+1</span>}</span>
+            </button>
+            {ja && <button type="button" className="fi-x fi-tile-x" onClick={() => aoTirar(ja.id)} aria-label="Tirar a marcação Ligar de novo" title="Conseguiu falar: tirar a marcação"><IcX t={11} /></button>}
+          </div>
+          {ja && prazo(ja)}
         </div>
       );
     }
     return (
-      <button key={tipo} type="button" className="fi-tile" data-grupo={g} data-on={ja ? '' : undefined} aria-pressed={!!ja}
-        onClick={() => (ja ? aoTirar(ja.id) : aoMarcar(tipo))} title={ja ? 'Resolvido: clique para tirar a marcação' : 'Clique para marcar'}>
-        <span className="fi-tile-ic"><IcTipoMarca tipo={tipo} t={14} /></span>
-        <span className="fi-tile-tx"><b>{b.botao}</b>{ja && <small>{`Marcado ${quando(minAtras(ja.em))}`}</small>}</span>
-        <span className="fi-tile-dir">{ja ? <span className="fi-tile-ok"><IcCheck t={11} /></span> : null}</span>
-      </button>
+      <div key={tipo} className="fi-tile-caixa">
+        <button type="button" className="fi-tile" data-grupo={g} data-on={ja ? '' : undefined} aria-pressed={!!ja}
+          onClick={() => (ja ? aoTirar(ja.id) : aoMarcar(tipo))} title={ja ? 'Resolvido: clique para tirar a marcação' : 'Clique para marcar'}>
+          <span className="fi-tile-ic"><IcTipoMarca tipo={tipo} t={14} /></span>
+          <span className="fi-tile-tx"><b>{b.botao}</b>{ja && <small>{`Marcado ${quando(minAtras(ja.em))}`}</small>}</span>
+          <span className="fi-tile-dir">{ja ? <span className="fi-tile-ok"><IcCheck t={11} /></span> : null}</span>
+        </button>
+        {ja && prazo(ja)}
+      </div>
     );
   };
 
   return (
     <section className="fi-bloco fi-marcar">
       <h3 className="fi-bloco-t">Marcações{marcas.length > 0 && <span className="fi-marcar-tot num">{marcas.length}</span>}
-        <span className="fi-bloco-n">clique para marcar · fica salvo e aparece na fila</span></h3>
+        <span className="fi-bloco-n">clique para marcar · {HORAS_MARCACAO} h para atualizar ou tirar</span></h3>
       {GRUPOS_MARCA.map((gr) => (
         <div key={gr.id} className="fi-marcar-grupo" data-grupo={gr.id}>
           <span className="fi-marcar-rot">{gr.rotulo}</span>
@@ -420,10 +549,13 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
           {gr.id === 'docs' && (escrevendo || faltas.length > 0) && (
             <div className="fi-faltas">
               {faltas.map((m) => (
-                <div key={m.id} className="fi-falta-item">
-                  <IcMarca t={12} /><span className="fi-falta-tx">{m.texto}</span>
-                  <span className="fi-falta-h">{quando(minAtras(m.em))}</span>
-                  <button type="button" className="fi-x" onClick={() => aoTirar(m.id)} aria-label={`Tirar a marcação Falta: ${m.texto}`} title="Resolvido: tirar a marcação"><IcX t={10} /></button>
+                <div key={m.id} className="fi-falta-caixa">
+                  <div className="fi-falta-item">
+                    <IcMarca t={12} /><span className="fi-falta-tx">{m.texto}</span>
+                    <span className="fi-falta-h">{quando(minAtras(m.em))}</span>
+                    <button type="button" className="fi-x" onClick={() => aoTirar(m.id)} aria-label={`Tirar a marcação Falta: ${m.texto}`} title="Resolvido: tirar a marcação"><IcX t={10} /></button>
+                  </div>
+                  {prazo(m)}
                 </div>
               ))}
               {escrevendo && (
@@ -602,12 +734,14 @@ function ConversaCliente({ l, usar }: { l: Lead; usar: (l: Lead) => ConversaFich
 }
 
 /** a ficha do cliente — janela de vidro no meio da tela (exportada para a amostra em cards) */
-export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado, conversa, SecaoConversa }: {
+export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoAtualizar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado, conversa, SecaoConversa }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
   avisar: (t: string) => void; ehDono: boolean;
   /** o gestor olhando o cliente de outro atendente: o recado para o dono */
   recado?: { fonte: FonteRecados; para: string; paraNome: string };
   aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
+  /** dono 16/11: atualizar a marcação (o que foi feito) — o prazo recomeça; sem ele, só mostra o prazo */
+  aoAtualizar?: AoAtualizarMarca;
   aoCorrigirDocs: (estado: 'completos' | 'incompletos' | null) => void; aoTirarDaFila: () => void;
   abrirConversa?: (l: Lead) => void;
   /** a conversa com o cliente (a fonte da fila); sem ela, só a última mensagem */
@@ -751,7 +885,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
 
           <div className="fi-modal-col">
             {recado && <RecadoNaFicha fonte={recado.fonte} cliente={l} para={recado.para} paraNome={recado.paraNome} avisar={avisar} />}
-            <MarcarCliente marcas={marcas} aoMarcar={aoMarcar} aoTirar={aoTirar} />
+            <MarcarCliente marcas={marcas} aoMarcar={aoMarcar} aoTirar={aoTirar} aoAtualizar={aoAtualizar} avisar={avisar} donoUid={dono.uid} />
 
             <section className="fi-bloco">
               <h3 className="fi-bloco-t">Dados do atendimento</h3>
@@ -791,7 +925,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
 
 /** visão do administrador: um cartão por atendente (quem → agora → mês → composição) */
 function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicionados, comIris, aoVerIris }: {
-  a: Atendente; aoAbrir: (esperando?: boolean) => void; leads: Lead[]; numero?: NumeroAtendente | null;
+  a: Atendente; aoAbrir: (filtro?: 'esperando' | 'vencidas') => void; leads: Lead[]; numero?: NumeroAtendente | null;
   /** quantos a Iris passou para a fila dele no período, por categoria (dono 14/11); null = não leu */
   adicionados?: Partial<Record<CategoriaChegada, number>> | null;
   /** "hoje", "em 7 dias"… */
@@ -805,6 +939,11 @@ function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicion
   const maxN = Math.max(1, ...EQUIPE.map((x) => Math.max(...CATEGORIAS.map((k) => leads.filter((l) => l.atendente === x.id && l.cat === k.id).length))));
   const taxa = numero && numero.recebidos ? (numero.fechados / numero.recebidos) * 100 : null;
   const esperando = meus.filter((l) => l.esperandoEm).length;
+  /* dono 16/11: quem tem marcação que passou do prazo sem atualizar — conta CLIENTES, a mesma conta do chip "Vencidas"
+     que o clique abre; as marcações (sem repetir a do cliente com dois cards) ficam no título */
+  const agora = Date.now();
+  const comVencida = new Set(meus.filter((l) => vencidasDe(l.marcas, agora) > 0).map((l) => l.id)).size;
+  const marcVencidas = new Set(meus.flatMap((l) => l.marcas.filter((m) => estadoPrazo(m, agora) === 'vencida').map((m) => m.id))).size;
   return (
     <article className="fi-eq vidro">
       <header className="fi-eq-cab">
@@ -815,8 +954,9 @@ function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicion
         </span>
         <BotaoSec mini onClick={() => aoAbrir()}>Ver fila<IcSeta t={12} /></BotaoSec>
       </header>
+      <div className="fi-eq-alertas">
       {esperando ? (
-        <button type="button" className="fi-eq-agora" onClick={() => aoAbrir(true)}
+        <button type="button" className="fi-eq-agora" onClick={() => aoAbrir('esperando')}
           title={`Abrir a fila de ${a.nome} só com quem aguarda resposta`}
           aria-label={`Ver ${plural(esperando, 'cliente aguardando resposta', 'clientes aguardando resposta')} de ${a.nome}`}>
           <i className="fi-pt" aria-hidden /><b className="num">{esperando}</b> aguardando resposta
@@ -824,6 +964,16 @@ function CartaoAtendente({ a, aoAbrir, leads, numero, adicionados, rotuloAdicion
       ) : (
         <span className="fi-eq-agora" data-zero>Ninguém aguardando resposta</span>
       )}
+      {comVencida ? (
+        <button type="button" className="fi-eq-agora fi-eq-venc" onClick={() => aoAbrir('vencidas')}
+          title={`${plural(comVencida, 'cliente', 'clientes')} com marcação vencida: ${marcVencidas === 1 ? '1 marcação passou' : `${marcVencidas} marcações passaram`} de ${HORAS_MARCACAO} h sem atualizar. Clique para ver.`}
+          aria-label={`${comVencida} com marcação vencida, na fila de ${a.nome}`}>
+          <i className="fi-pt" aria-hidden /><b className="num">{comVencida}</b> com marcação vencida
+        </button>
+      ) : (
+        <span className="fi-eq-agora fi-eq-venc" data-zero>Nenhuma marcação vencida</span>
+      )}
+      </div>
       {numero && (
         <div className="fi-eq-nums" aria-label="Recebidos, marcações e fechados no período">
           <span><b className="num">{numero.recebidos}</b>{numero.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
@@ -956,13 +1106,14 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const campoBusca = useRef<HTMLInputElement>(null);
   const termo = busca.trim();
 
-  /* "/" leva para a busca (fora de campos de texto e com a janela do cliente fechada) */
+  /* "/" leva para a busca (fora de campos de texto, com a janela do cliente fechada e nada no meio da tela — o recado,
+     a mensagem do Murillo e a marcação vencida: a busca fica atrás do véu) */
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement | null;
       if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable)) return;
-      if (document.querySelector('.fi-veu')) return;
+      if (document.querySelector('.fi-veu, .mvc-veu, .rcd-veu')) return;
       e.preventDefault();
       campoBusca.current?.focus();
     };
@@ -998,7 +1149,12 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
     [daFila],
   );
   const passaMarca = (l: Lead) => filtroMarca === 'todas'
-    || (filtroMarca === 'esperando' ? !!l.esperandoEm : l.marcas.some((m) => grupoMarca(m.tipo) === filtroMarca));
+    /* a ficha aberta fica na lista enquanto estiver aberta (o Atualizar tira a vencida, a resposta tira o aguardando):
+       nada de fechar sozinha no meio do trabalho — ao fechar, o filtro vale de novo */
+    || l.id === aberto
+    || (filtroMarca === 'esperando' ? !!l.esperandoEm
+      : filtroMarca === 'vencidas' ? vencidasDe(l.marcas) > 0
+        : l.marcas.some((m) => grupoMarca(m.tipo) === filtroMarca));
   const filtrando = filtro !== 'todas' || filtroMarca !== 'todas' || !!termo;
   /* os contadores dos filtros de marcação contam sobre a MESMA base que o clique vai mostrar */
   const baseMarca = (filtro === 'todas' ? daFila : daFila.filter((l) => l.cat === filtro)).filter((l) => passaBusca(l, termo));
@@ -1006,6 +1162,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
     .map((g) => (filtroMarca === 'todas' && !termo ? g : { ...g, itens: g.itens.filter((l) => passaMarca(l) && passaBusca(l, termo)) }))
     .filter((g) => (filtroMarca === 'todas' && !termo) || g.itens.length > 0);
   const contaMarca = (g: GrupoMarca) => baseMarca.filter((l) => l.marcas.some((m) => grupoMarca(m.tipo) === g)).length;
+  const contaVencidas = new Set(baseMarca.filter((l) => vencidasDe(l.marcas) > 0).map((l) => l.id)).size;
   /* recolher uma seção só vale sem filtro nenhum (filtrou ou buscou, tudo o que passou aparece) */
   const recolhida = (c: Categoria) => !filtrando && recolhidas.includes(c);
   const alternarSecao = (c: Categoria) => setRecolhidas((r) => (r.includes(c) ? r.filter((x) => x !== c) : [...r, c]));
@@ -1040,7 +1197,11 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
     /* o administrador abrindo o cliente de outra pessoa da equipe ("Abrir na fila" do WhatsApp): vai para a fila
        dela e abre a ficha lá (a ficha navega pela lista de quem é o cliente) */
     const lead = leads.find((l) => l.id === pedido);
-    if (lead && admin && lead.atendente !== dono && EQUIPE.some((a) => a.id === lead.atendente)) { abrirFilaDe(lead.atendente); return; }
+    /* na visão Equipe a lista é só a dos quentes: o administrador vai para a fila do dono mesmo quando o "dono" da
+       tela é o mesmo (o Murilo, sem fila própria, cai no Matheus) — senão o pedido ficava preso (revisão 16/11) */
+    if (lead && admin && (lead.atendente !== dono || visaoEf === 'equipe') && EQUIPE.some((a) => a.id === lead.atendente)) {
+      abrirFilaDe(lead.atendente); return;
+    }
     const achou = daFila.some((l) => l.id === pedido);
     if (achou && !navegacao.some((l) => l.id === pedido)) return; /* o filtro ainda está saindo: espera um render */
     if (achou) setAberto(pedido);
@@ -1050,22 +1211,32 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedido, daFila, navegacao, fonte.carregando]);
 
+  /* o cliente da ficha aberta saiu da lista (saiu da fila, trocou de seção com filtro): a ficha fecha de vez — o id
+     não fica guardado para reabrir sozinha quando ele voltar */
+  useEffect(() => {
+    if (aberto && !clienteAberto && !pedido && !fonte.carregando) setAberto(null);
+  }, [aberto, clienteAberto, pedido, fonte.carregando]);
+
   const limparFiltros = () => { setFiltro('todas'); setFiltroMarca('todas'); setBusca(''); setRecolhidas([]); };
   const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); limparFiltros(); aoVerComo?.(id); };
-  const abrirFilaDe = (id: string, esperando = false) => {
+  const abrirFilaDe = (id: string, filtroInicial?: 'esperando' | 'vencidas') => {
     if (id === verComo && !semFilaPropria) setVisao('minha'); else { setAlvo(id); setVisao('de'); }
     limparFiltros();
-    if (esperando) setFiltroMarca('esperando');
+    if (filtroInicial) setFiltroMarca(filtroInicial);
   };
   const n = filtrando ? visiveis.reduce((t, g) => t + g.itens.length, 0) : total;
   const fecharJanela = () => {
     const id = aberto;
+    const pos = id ? navegacao.findIndex((l) => l.id === id) : -1;
     setAberto(null);
     if (!id) return;
     /* quem fecha a ficha acabou de mexer no cliente (talvez respondeu): a fila relê agora */
     void fonte.recarregar?.();
     requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLElement>(`.fi-lin[data-id="${id}"]`);
+      /* a linha do cliente; se ela saiu da lista (o filtro Vencidas depois do Atualizar), a que ficou no lugar dela */
+      const linhas = [...document.querySelectorAll<HTMLElement>('.fi-rolo .fi-lin, .fi-rolo-eq .fi-lin')];
+      const el = document.querySelector<HTMLElement>(`.fi-lin[data-id="${id}"]`)
+        ?? (linhas.length ? linhas[Math.min(Math.max(pos, 0), linhas.length - 1)] : document.querySelector<HTMLElement>('.fi-vazio-geral .fi-link'));
       el?.scrollIntoView({ block: 'nearest' });
       el?.focus();
     });
@@ -1174,6 +1345,8 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
             Cada atendente vê os clientes que o robô distribuiu para ele, como hoje. A fila se organiza sozinha pelo andamento do atendimento.
             Quando o administrativo fecha o cliente, ele sai da fila e vai para a aba Fechados. Cliente no Remarketing não entra.
             Cliente que a Iris acabou de passar chega com o aviso "A Iris passou para você" e fica no topo da seção por 24 horas.
+            Cada marcação tem {HORAS_MARCACAO} horas para ser atualizada (dizer o que foi feito) ou tirada, contadas com o cliente na fila;
+            passou disso, ela fica vencida, em vermelho, e aparece um aviso no meio da tela que só sai quando ela for atualizada ou tirada.
             Clique numa prioridade do topo para filtrar e no título de uma seção para recolher.
             {fonte.modo === 'previa' && ' Prévia: foto da fila de hoje, só leitura; as marcações feitas aqui não são gravadas.'}
             {fonte.modo === 'demo' && ' Demonstração com clientes fictícios.'}
@@ -1225,7 +1398,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           )}
           <div className="fi-eq-grade">
             {EQUIPE.map((a) => (
-              <CartaoAtendente key={a.id} a={a} aoAbrir={(esp) => abrirFilaDe(a.id, esp)} leads={leads}
+              <CartaoAtendente key={a.id} a={a} aoAbrir={(f) => abrirFilaDe(a.id, f)} leads={leads}
                 numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null}
                 adicionados={fonte.chegadas ? chegadasPer?.por[a.id] ?? (chegadasPer ? {} : null) : undefined}
                 rotuloAdicionados={ROTULO_ADICIONADOS[periodo]}
@@ -1268,13 +1441,22 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
       ) : (
         <section className="fi-lista vidro fi-lista-cheia">
           <header className="fi-lista-cab">
-            <h2>{filtro !== 'todas' ? infoCategoria(filtro).rotulo : filtroMarca === 'esperando' ? 'Aguardando resposta' : visaoEf === 'de' ? `Fila de ${donoInfo.nome}` : 'Minha fila'}</h2>
+            <h2>{filtro !== 'todas' ? infoCategoria(filtro).rotulo : filtroMarca === 'esperando' ? 'Aguardando resposta'
+              : filtroMarca === 'vencidas' ? 'Marcações vencidas' : visaoEf === 'de' ? `Fila de ${donoInfo.nome}` : 'Minha fila'}</h2>
             <span className="fi-lista-n">{fonte.carregando && !leads.length ? 'carregando…' : plural(n, 'cliente', 'clientes')}{filtrando && n !== total ? ` de ${total}` : ''}</span>
             {filtrando && (
               <button type="button" className="fi-limpar" onClick={limparFiltros}>Limpar filtro<IcX t={10} /></button>
             )}
             <div className="fi-cab-ferr">
               <div className="fi-filtro-marca" role="group" aria-label="Filtrar pelas marcações">
+                <button type="button" className="fi-fm" data-grupo="vencidas" aria-pressed={filtroMarca === 'vencidas'}
+                  disabled={!contaVencidas && filtroMarca !== 'vencidas'}
+                  onClick={() => setFiltroMarca((f) => (f === 'vencidas' ? 'todas' : 'vencidas'))}
+                  title={filtroMarca === 'vencidas' ? 'Mostrar todos de novo'
+                    : contaVencidas ? `Mostrar só quem tem marcação vencida (passou de ${HORAS_MARCACAO} h sem atualizar)` : `Nenhuma marcação vencida (${HORAS_MARCACAO} h para atualizar cada uma)`}>
+                  {contaVencidas > 0 ? <i className="fi-fm-pt" aria-hidden /> : <IcRelogio t={12} />}
+                  Vencidas{contaVencidas > 0 && <b className="num">{contaVencidas}</b>}
+                </button>
                 {GRUPOS_MARCA.map((g) => {
                   const c = contaMarca(g.id);
                   return (
@@ -1340,6 +1522,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
             : undefined}
           aoMarcar={(tipo, texto) => fonte.marcar(clienteAberto.id, tipo, texto)}
           aoTirar={(mid) => fonte.tirarMarca(clienteAberto.id, mid)}
+          aoAtualizar={fonte.atualizarMarca ? (mid, texto) => fonte.atualizarMarca!(clienteAberto.id, mid, texto) : undefined}
           aoCorrigirDocs={(estado) => {
             fonte.corrigirDocs(clienteAberto.id, estado);
             avisar(estado === 'completos' ? 'Marcada como completa: o cliente sobe para Clientes quentes.'

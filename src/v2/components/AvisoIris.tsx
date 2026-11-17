@@ -127,10 +127,10 @@ function useNotificacaoDoNavegador(avisos: Aviso[], ativo: boolean): void {
 /** montado no shell: busca os avisos de quem tem a Fila da Iris e mostra o cartão */
 export function AvisoIris({ oculto = false, acesso }: { oculto?: boolean; acesso: boolean | null }) {
   const ativo = acesso === true;
-  const { avisos, marcarVistos } = useAvisosIris(ativo);
+  const { avisos, marcarVistos, pronto } = useAvisosIris(ativo);
   const navigate = useNavigate();
-  /* também espera o recado do administrador no meio da tela */
-  const ocupado = useOcupadoNoCanto(ativo && avisos.length > 0, '.rcd-veu');
+  /* também espera o que fica no meio da tela: o recado do administrador e a marcação vencida (dono 16/11) */
+  const ocupado = useOcupadoNoCanto(ativo && avisos.length > 0, '.rcd-veu, .mvc-veu');
   const [pausaAte, setPausaAte] = useState(0);
   useEffect(() => {
     if (!pausaAte) return;
@@ -150,10 +150,16 @@ export function AvisoIris({ oculto = false, acesso }: { oculto?: boolean; acesso
   const soltar = useCallback(() => { segurando.current = false; setExibidos(avisos); }, [avisos]);
 
   const visivel = ativo && exibidos.length > 0 && !oculto && !ocupado && !pausaAte;
+  /* o cartão saiu da tela com o mouse ou o foco nele (Ok, Ver na fila, Esc, uma janela abriu): o navegador não avisa a
+     saída do ponteiro de um elemento que sumiu — sem soltar aqui, a lista ficava parada e nenhum aviso novo aparecia
+     até recarregar a página (revisão 16/11) */
+  useEffect(() => {
+    if (!visivel && segurando.current) { segurando.current = false; setExibidos(avisos); }
+  }, [visivel, avisos]);
   /* acima do lembrete e do recado do gestor (o recado é mais importante: fica mais perto do canto) */
   const base = useBaseNoCanto(visivel, '.lmb-caixa, .rcd-caixa');
   const agora = useAgoraNoCanto(visivel);
-  useNotificacaoDoNavegador(avisos, ativo);
+  useNotificacaoDoNavegador(avisos, ativo && pronto);
 
   /* o leitor de tela: a região viva fica SEMPRE montada e o texto muda quando muda o que está na frente */
   const anuncio = visivel ? anuncioDoAviso(exibidos) : '';

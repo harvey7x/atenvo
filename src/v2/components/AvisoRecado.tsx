@@ -88,7 +88,8 @@ function conversaAbertaAgora(pathname: string, search: string): string | null {
   if (card?.dataset.cid) return card.dataset.cid;
   try { return sessionStorage.getItem(CURR_KEY); } catch { return null; }
 }
-function useConversaAberta(ativo: boolean): string | null {
+/** a conversa aberta no inbox agora (também a usa o aviso da marcação vencida: espera com a conversa do cliente aberta) */
+export function useConversaAberta(ativo: boolean): string | null {
   const { pathname, search } = useLocation();
   const [cid, setCid] = useState<string | null>(null);
   useEffect(() => {
