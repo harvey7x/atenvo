@@ -596,16 +596,16 @@ function IndicadoresMetrica({ r, historico, meses, serie, sel, parcial, carteira
 
   return (
     <GradeMetricas rotulo="Indicadores da carteira">
-      <CartaoMetrica titulo="Recorrência mensal" data={recorrencia} total={brl(r.recorrencia)}
+      <CartaoMetrica icone="repete" titulo="Recorrência mensal" data={recorrencia} total={brl(r.recorrencia)}
         formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
         rotuloDelta={vsAnterior(recorrencia)} />
-      <CartaoMetrica key={compSel} titulo={`Recebido em ${compSel ? mesAno(compSel) : '—'}`} data={recebido} total={brl(serie[sel]?.valor ?? 0)}
+      <CartaoMetrica icone="carteira" key={compSel} titulo={`Recebido em ${compSel ? mesAno(compSel) : '—'}`} data={recebido} total={brl(serie[sel]?.valor ?? 0)}
         formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
         rotuloDelta={`${vsAnterior(recebido)}${parcial ? ' · mês aberto' : ''}`} />
-      <CartaoMetrica titulo="Em atraso" data={atraso} total={brl(r.emAtrasoValor)} sentido="menor"
+      <CartaoMetrica icone="alerta" titulo="Em atraso" data={atraso} total={brl(r.emAtrasoValor)} sentido="menor"
         formatar={reais} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
         rotuloDelta={vsAnterior(atraso)} />
-      <CartaoMetrica titulo="Adimplência" data={adimplencia} total={carteira ? `${r.adimplencia}%` : '—'}
+      <CartaoMetrica icone="certo" titulo="Adimplência" data={adimplencia} total={carteira ? `${r.adimplencia}%` : '—'}
         formatar={(v) => `${Math.round(v)}%`} formatarData={mesDoBalao} periodo="6 meses" periodos={PERIODOS_MESES}
         rotuloDelta={vsAnterior(adimplencia)} />
     </GradeMetricas>

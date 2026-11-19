@@ -58,20 +58,21 @@ export function KpisCartoes({ k, ant, comparacao, periodo, hoje, rotuloPeriodo }
   return (
     <div className="rvm-bloco">
       <GradeMetricas rotulo="Resumo do período">
-        <CartaoMetrica titulo="Entradas de clientes" cabEsquerda={cab('Entradas de clientes', AJUDA_KPIS.entradas)}
+        <CartaoMetrica icone="entra" titulo="Entradas de clientes" cabEsquerda={cab('Entradas de clientes', AJUDA_KPIS.entradas)}
           data={entradas} graficoCarregando={carregandoGraf} total={fmtInt(k.entradas)} tom={tomDe(k.entradas, ant?.entradas)}
           formatar={palavra('entrada', 'entradas')} {...comuns}
           rodape={<Variacao atual={k.entradas} anterior={ant?.entradas} sentido="maior" comparacao={comparacao} />} />
-        <CartaoMetrica titulo="Não elegíveis" cabEsquerda={cab('Não elegíveis', AJUDA_KPIS.ne)}
+        <CartaoMetrica icone="fora" titulo="Não elegíveis" cabEsquerda={cab('Não elegíveis', AJUDA_KPIS.ne)}
           data={ne} graficoCarregando={carregandoGraf} total={fmtInt(k.ne)} tom="neutro"
           formatar={palavra('não elegível', 'não elegíveis')} {...comuns}
           rodape={<Variacao atual={k.ne} anterior={ant?.ne} sentido="neutro" comparacao={comparacao} />} />
-        <CartaoMetrica titulo="Fechados" cabEsquerda={cab('Fechados', placar ? AJUDA_KPIS.ganhosPlacar : AJUDA_KPIS.ganhos)}
+        <CartaoMetrica icone="trofeu" titulo="Fechados" cabEsquerda={cab('Fechados', placar ? AJUDA_KPIS.ganhosPlacar : AJUDA_KPIS.ganhos)}
           cabDireita={<SeloAdministrativo />}
           data={ganhos} graficoCarregando={carregandoGraf} total={fmtInt(k.ganhos)} tom={tomDe(k.ganhos, ant?.ganhos)}
           formatar={palavra('fechado', 'fechados')} {...comuns}
           rodape={<Variacao atual={k.ganhos} anterior={ant?.ganhos} sentido="maior" comparacao={comparacao} />} />
         <CartaoMetricaFixo
+          icone="relogio"
           titulo="Tempo para fechar"
           valor={fmtDuracaoH(k.fechMedianaH)}
           detalhe={k.fechN > 0

@@ -18,6 +18,8 @@ import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua
 import './v2/reviza-sistema.css'; // a régua única da ALFA (crítica de design 12/11) — por último
 import './v2/reviza-linear.css'; // estilo Linear na Reviza (dono 13/11) — só age com [data-linear] + [data-barra-alfa]
 import { aplicarLinearAlfa, lerLinearAlfa } from './v2/lib/linearAlfa';
+import './v2/reviza-moldura.css'; // moldura preta + conteúdo claro (dono 19/11) — só age com [data-moldura] + [data-barra-alfa]
+import { aplicarMoldura, lerMoldura } from './v2/lib/molduraAlfa';
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
@@ -152,6 +154,8 @@ if (typeof document !== 'undefined') aplicarInboxPro(true);
 if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) document.documentElement.setAttribute('data-barra-alfa', '');
 // Estilo Linear (dono 13/11): [data-linear] antes do primeiro paint, só na ALFA; padrão ligado.
 if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarLinearAlfa(lerLinearAlfa());
+// Moldura preta (dono 19/11): [data-moldura] antes do primeiro paint, só na ALFA; padrão ligado.
+if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarMoldura(lerMoldura());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

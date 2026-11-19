@@ -19,6 +19,7 @@ import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
+import { lerMoldura } from '../lib/molduraAlfa';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { LicencaGate } from '../components/LicencaGate';
 import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
@@ -578,8 +579,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
 
   // Tema dual: escolha explícita do usuário, persistida por usuário; padrão dark.
   const escopoTema = user?.id ?? undefined;
-  const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema));
-  useEffect(() => { setTema(lerTema(escopoTema)); }, [escopoTema]); // recarrega a preferência quando o usuário resolve
+  // moldura preta (dono 19/11): quem ainda não escolheu o tema abre no CLARO (o conteúdo branco da referência)
+  const temaPadrao: Tema = ALFA && lerMoldura() ? 'light' : 'dark';
+  const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema, temaPadrao));
+  useEffect(() => { setTema(lerTema(escopoTema, temaPadrao)); }, [escopoTema]); // eslint-disable-line react-hooks/exhaustive-deps // recarrega a preferência quando o usuário resolve
 
   useEffect(() => { aplicarTema(tema); }, [tema]);
   // valor explícito (a intro do dia escolhe direto); o toggle da topbar cicla por cima

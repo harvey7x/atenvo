@@ -10,7 +10,7 @@ import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
 import { GrafLinhas, type NotaSerie, type SerieGraf } from './GrafLinhas';
-import { CartaoMetrica, CartaoMetricaFixo, CartaoSeries, GradeMetricas, TituloBloco, diaDoBalao } from '../../components/CartaoMetrica';
+import { CartaoMetrica, CartaoMetricaFixo, CartaoSeries, GradeMetricas, TituloBloco, diaDoBalao, type IconeMetrica } from '../../components/CartaoMetrica';
 
 /* Aba CAMPANHAS (12/11): o melhor do dia/semana/mês, as ondas por campanha
    (alternáveis dia · semana · mês CAF), a tabela do período, quem chegou já tendo
@@ -70,8 +70,8 @@ const AJUDA_PARENTE = 'Clientes que disseram que NÃO recebem INSS, mas um paren
    a campanha que venceu, o número, e o gráfico DIA A DIA dessa campanha na janela do gráfico
    de ondas (a mesma série; período curto = últimos 7 dias). A variação segue a régua de sempre
    (o MESMO trecho do anterior), no rodapé. */
-function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dias, hoje }: {
-  titulo: string; detalhe?: string; quadro: QuadroJanelaV5; metrica: 'entradas' | 'ganhos'; comparacao: string;
+function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dias, hoje, icone }: {
+  titulo: string; detalhe?: string; icone?: IconeMetrica; quadro: QuadroJanelaV5; metrica: 'entradas' | 'ganhos'; comparacao: string;
   serie: PontoSerieV5[]; dias: string[]; hoje: string;
 }) {
   const soCampanhas = (l: ResumoCampanhaV5[]) => l.filter((x) => !['outros', 'sem_campanha'].includes(x.campanha));
@@ -92,7 +92,7 @@ function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dia
   }, [vence, serie, dias, usa]);
   const cab = <span className="rvm-tit">{titulo}{detalhe && <small className="rvm-tit-det"> {detalhe}</small>}</span>;
   if (!vence) {
-    return <CartaoMetricaFixo titulo={titulo} valor="—" detalhe={<span className="d5-mudo">Sem movimento ainda.</span>} rodape={comparacao} />;
+    return <CartaoMetricaFixo icone={icone} titulo={titulo} valor="—" detalhe={<span className="d5-mudo">Sem movimento ainda.</span>} rodape={comparacao} />;
   }
   const n = usa === 'ganhos' ? vence.ganhos : vence.entradas;
   const nAnt = ant ? (usa === 'ganhos' ? ant.ganhos : ant.entradas) : 0;
@@ -100,6 +100,7 @@ function CartaoQuadro({ titulo, detalhe, quadro, metrica, comparacao, serie, dia
   const cor = CAMPANHAS_GRAF.find((c) => c.slug === vence.campanha)?.cor ?? 'var(--txt-3)';
   return (
     <CartaoMetrica
+      icone={icone}
       titulo={`${titulo}: ${rotuloCampanha(vence.campanha)}`}
       cabEsquerda={cab}
       cabDireita={<span className="rvm-chip" title="A campanha que venceu"><i style={{ background: cor }} />{rotuloCampanha(vence.campanha)}</span>}
@@ -163,9 +164,9 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
         <TituloBloco titulo="Melhor campanha" ajuda={<Ajuda texto={AJUDA_MELHOR} rotulo="Melhor campanha" />}
           sub="Hoje por entradas; semana e mês pelo placar de fechados. Os números são os de agora, independentes do período escolhido acima; o gráfico mostra a campanha dia a dia." />
         <GradeMetricas rotulo="Melhor campanha" colunas={3}>
-          <CartaoQuadro titulo="Hoje" quadro={d.quadro.dia} metrica="entradas" comparacao="vs ontem, mesmo horário" serie={d.serie} dias={diasGraf} hoje={hoje} />
-          <CartaoQuadro titulo="Esta semana" detalhe="seg–dom" quadro={d.quadro.semana} metrica="ganhos" comparacao="vs semana passada, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
-          <CartaoQuadro titulo="Nosso mês" detalhe="11 a 10" quadro={d.quadro.mes} metrica="ganhos" comparacao="vs mês anterior, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
+          <CartaoQuadro icone="sobe" titulo="Hoje" quadro={d.quadro.dia} metrica="entradas" comparacao="vs ontem, mesmo horário" serie={d.serie} dias={diasGraf} hoje={hoje} />
+          <CartaoQuadro icone="calendario" titulo="Esta semana" detalhe="seg–dom" quadro={d.quadro.semana} metrica="ganhos" comparacao="vs semana passada, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
+          <CartaoQuadro icone="trofeu" titulo="Nosso mês" detalhe="11 a 10" quadro={d.quadro.mes} metrica="ganhos" comparacao="vs mês anterior, mesmo ponto" serie={d.serie} dias={diasGraf} hoje={hoje} />
         </GradeMetricas>
       </div>
 

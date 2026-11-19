@@ -3,6 +3,7 @@ import { MetricChart, type ChartView, type SeriesPoint } from '@/components/ui/m
 import { Icon, PeriodSelect, ViewToggle, type PeriodOption } from '@/components/ui/metric-controls';
 import { PmcStyles } from '@/components/ui/progress-metric-card';
 import { useTemaAtual } from '@/v2/lib/temaAtual';
+import { useMoldura } from '@/v2/lib/molduraAlfa';
 import './cartaoMetrica.css';
 
 /* ------------------------------------------------------------------
@@ -35,6 +36,27 @@ const CORES = {
   light: { bom: '#2A7352', ruim: '#A23F33', neutro: '#666C76' },
 } as const;
 const FAIXA_NEUTRA = 0.5;
+/* moldura preta (dono 19/11, referência "Sales Dashboard"): o gráfico de cada card é sempre LARANJA;
+   o verde/vermelho fica só na variação (o número diz se foi bom ou ruim, a cor do desenho é a da casa) */
+const LARANJA = { dark: '#F5A524', light: '#F0921C' } as const;
+
+/* o ícone de cada indicador (quadradinho laranja ao lado do título, só com a moldura) */
+const ICONES = {
+  repete: <><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></>,
+  carteira: <><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></>,
+  alerta: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></>,
+  certo: <><circle cx="12" cy="12" r="9" /><path d="m9 12 2 2 4-4" /></>,
+  entra: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6" /><path d="M22 11h-6" /></>,
+  fora: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m17 8 5 5" /><path d="m22 8-5 5" /></>,
+  trofeu: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></>,
+  relogio: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  sobe: <><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></>,
+  calendario: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></>,
+};
+export type IconeMetrica = keyof typeof ICONES;
+const Selo = ({ icone }: { icone?: IconeMetrica }) => (icone
+  ? <span className="rvm-ico" aria-hidden><Icon size={15} strokeWidth={2}>{ICONES[icone]}</Icon></span>
+  : null);
 const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 /** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
 export function diaDoBalao(dia: string, hoje?: string): string {
@@ -51,7 +73,7 @@ const SETAS = {
 
 export function CartaoMetrica({
   titulo, data, total, sentido = 'maior', periodos, periodo, formatar, formatarData, rotuloDelta, carregando,
-  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className, graficoCarregando,
+  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className, graficoCarregando, icone,
 }: {
   titulo: string;
   /** a série, do mais antigo ao mais novo */
@@ -88,6 +110,8 @@ export function CartaoMetrica({
   className?: string;
   /** só o gráfico ainda carregando (o número já chegou): a faixa pulsa, sem texto */
   graficoCarregando?: boolean;
+  /** o ícone do indicador (aparece com a moldura preta) */
+  icone?: IconeMetrica;
 }) {
   const tema = useTemaAtual();
   const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
@@ -109,9 +133,11 @@ export function CartaoMetrica({
   const pal = CORES[tema];
   const cor = tom ? pal[tom]
     : sentido === 'neutro' || rumo === 'flat' ? pal.neutro : (rumo === 'up') === (sentido === 'maior') ? pal.bom : pal.ruim;
+  const moldura = useMoldura();
+  const corGraf = moldura ? LARANJA[tema] : cor;
   const passo = ultimo - penultimo;
   const delta = (passo >= 0 ? '+' : '−') + formatar(Math.abs(passo));
-  const series = useMemo(() => [{ name: titulo, data: janela, color: cor }], [titulo, janela, cor]);
+  const series = useMemo(() => [{ name: titulo, data: janela, color: corGraf }], [titulo, janela, corGraf]);
   const valor = typeof total === 'function' ? total(janela) : total;
 
   return (
@@ -119,8 +145,8 @@ export function CartaoMetrica({
       <PmcStyles />
       <header className="rvm-cab">
         {cabEsquerda
-          ? <div className="rvm-cab-esq"><h3 className="rvm-sr">{titulo}</h3>{cabEsquerda}</div>
-          : <h3 className="rvm-tit">{titulo}</h3>}
+          ? <div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-sr">{titulo}</h3>{cabEsquerda}</div>
+          : <div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-tit">{titulo}</h3></div>}
         {periodos
           ? <PeriodSelect value={rotulo} options={periodos} onChange={(o) => setRotulo(o.label)} accentText={cor} />
           : cabDireita}
@@ -141,7 +167,7 @@ export function CartaoMetrica({
       <div className={'rvm-graf' + (graficoCarregando ? ' rvm-graf-carregando' : '')}>
         {temGrafico && !carregando && !graficoCarregando ? (
           <>
-            <div className="pmc-fill" style={{ background: `linear-gradient(to left, ${cor}1c, transparent 80%)` }} />
+            <div className="pmc-fill" style={{ background: `linear-gradient(to left, ${corGraf}1c, transparent 80%)` }} />
             <div className="pmc-fill pmc-dots">
               <svg aria-hidden="true">
                 <defs>
@@ -179,13 +205,13 @@ export function CartaoMetrica({
 
 /** Indicador SEM série dia a dia (Tempo para fechar): a mesma moldura, a mesma altura,
  *  com a explicação no lugar do gráfico. */
-export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape }: {
-  titulo: string; valor: ReactNode; detalhe?: ReactNode; rodape?: ReactNode;
+export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape, icone }: {
+  titulo: string; valor: ReactNode; detalhe?: ReactNode; rodape?: ReactNode; icone?: IconeMetrica;
 }) {
   return (
     <article className="pmc-root rvm rvm-fixo">
       <PmcStyles />
-      <header className="rvm-cab"><h3 className="rvm-tit">{titulo}</h3></header>
+      <header className="rvm-cab"><div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-tit">{titulo}</h3></div></header>
       <div className="rvm-num"><span className="rvm-val">{valor}</span></div>
       <div className="rvm-graf rvm-graf-texto">{detalhe}</div>
       <footer className="rvm-pe"><span className="rvm-delta">{rodape}</span></footer>

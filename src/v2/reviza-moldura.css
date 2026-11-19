@@ -1,0 +1,146 @@
+/* =====================================================================
+   MOLDURA PRETA da Reviza (dono 19/11, referência "Sales Dashboard"):
+   "preto com branco, a barra lateral fixa, os dourados, o alaranjado".
+   - A barra lateral e o topo viram UMA moldura preta, sem fios;
+   - o conteúdo é um painel claro de cantos arredondados por dentro dela;
+   - os cards em branco, cantos 16, o PRIMEIRO de cada grade em preto (o
+     destaque da referência), com o ícone num quadradinho laranja;
+   - gráficos dos cards em laranja; botão principal preto com o ícone dourado;
+   - títulos mais fortes (a referência usa peso alto nos títulos e números).
+   Liga com [data-moldura] na raiz, só com [data-barra-alfa]; ausente = o
+   visual de antes, idêntico. Importado DEPOIS de reviza-linear.css.
+
+   ESPECIFICIDADE: prefixo html[data-barra-alfa][data-moldura]×3:not(#rv-mold)
+   (1 id + 4 atributos) — vence a camada Linear (1 id + 3) e a régua (1 id + 1).
+   ===================================================================== */
+
+/* ---- 0. a moldura: preto de ponta a ponta; barra e topo usam os tokens "escuro" sempre ---- */
+/* (!important: o fundo da página vem com !important do modo corporativo) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2.app-v2 { background: #09090B !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .p-app {
+  --ba-fundo: #09090B;
+  --ba-fio: rgba(255, 255, 255, .06);
+  --ba-txt: #F4F4F5;
+  --ba-mudo: #A1A1AA;
+  --ba-rotulo: #6F6F78;
+  --ba-hover: rgba(255, 255, 255, .06);
+  --ba-ativo: rgba(245, 165, 36, .13);
+  --ba-ativo-ico: #F5A524;
+  --ba-ativo-tx: #F7B955;
+  --ba-badge-bg: rgba(245, 165, 36, .16);
+  --ba-badge-tx: #F5A524;
+  --ba-badge-on-tx: #F5A524;
+  --ba-kbd-fio: rgba(255, 255, 255, .1);
+  --ba-kbd-bg: rgba(255, 255, 255, .04);
+  --ba-kbd-tx: #8A8A93;
+  --ba-menu: #151517;
+  --ba-sombra-menu: 0 20px 40px -12px rgba(0, 0, 0, .65);
+  --ba-sombra-trilho: none;
+  --ba-foco: rgba(245, 165, 36, .75);
+}
+/* texto da barra e do topo (e dos menus que abrem deles): claro sobre o preto, nos dois temas */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.ba-barra, .p-topbar) {
+  --txt: #F4F4F5; --txt-2: #B4B4BC; --txt-3: #8A8A93; --tint: 255, 255, 255;
+  --linha: rgba(255, 255, 255, .07); --vidro-a: #151517; --vidro-b: #151517; --surface: #151517;
+  --rp-menu: #151517; --rp-elev: #1F1F22; --rp-campo: #111113; --rp-campo-fio: rgba(255, 255, 255, .1);
+  --lin-fio: rgba(255, 255, 255, .08); --lin-branco: #FFFFFF;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra {
+  background: #09090B; border-right: 0; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2.app-v2 .p-topbar {
+  background: #09090B; border-bottom: 0; box-shadow: none;
+}
+/* item ativo do menu: pílula escura com o texto e o ícone em laranja (a referência) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-item.on {
+  background: var(--ba-ativo); color: var(--ba-ativo-tx); font-weight: 600;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
+
+/* ---- 1. o painel do conteúdo: por dentro da moldura, cantos arredondados ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco {
+  margin: 0 12px 12px 0; border-radius: 20px; overflow: hidden; background: var(--base);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco { box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco > .pagina { background: var(--base); }
+/* escuro: a moldura vai a preto puro para o painel se destacar */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2.app-v2 { background: #000000 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 .p-app { --ba-fundo: #000000; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 :is(.ba-barra, .p-topbar) { background: #000000; }
+@media (max-width: 760px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco { margin: 0 8px 8px; border-radius: 16px; }
+}
+
+/* ---- 2. o claro do conteúdo: fios mais leves, cards com sombra de contato ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco {
+  --lin-fio: #E9E9EC; --linha: #EEEEF0; --d5-fio: #EEEEF0;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  border-radius: 16px;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi) {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+
+/* ---- 3. títulos e números fortes (a referência) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ph :is(h1, h2) {
+  font-size: 26px; font-weight: 700; letter-spacing: -.025em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.pmc-root.rvm .rvm-val, .kpi .val, .pn-kpi-val, .cv2-kpi > b, .d5-kpi-val) {
+  font-weight: 700; letter-spacing: -.025em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .rvm-bloco-tit, .pmc-root.rvm .rvm-series-tit) {
+  font-weight: 650;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-tit { font-weight: 550; color: var(--txt-2); }
+
+/* ---- 4. o ícone de cada card: quadradinho laranja ao lado do título ---- */
+.v2 .pmc-root.rvm .rvm-ico { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-ico {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; margin-right: 10px; border-radius: 9px;
+  background: rgba(245, 165, 36, .14); color: #F5A524;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-ico {
+  background: #FFF2DD; color: #E5840A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-cab { min-height: 30px; }
+
+/* ---- 5. o PRIMEIRO card de cada grade em preto (o destaque da referência) — no claro ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child {
+  --txt: #F4F4F5; --txt-2: #B4B4BC; --txt-3: #8A8A93; --tint: 255, 255, 255;
+  --linha: rgba(255, 255, 255, .08); --lin-fio: rgba(255, 255, 255, .08); --lin-fio-hover: rgba(255, 255, 255, .16);
+  --lin-branco: #FFFFFF; --vidro-a: #111113;
+  --pmc-card: #111113; --pmc-border: rgba(255, 255, 255, .08); --pmc-muted: rgba(255, 255, 255, .08); --pmc-muted-text: #8A8A93;
+  --rp-menu: #1A1A1D; --surface: #1A1A1D;
+  --verde: #3FAA79; --verde-rgb: 63, 170, 121; --rubro: #E0504F; --rubro-rgb: 224, 80, 79;
+  --cor-ok-txt: #4CC38A; --cor-erro-txt: #F07170; --cor-ok-suave: rgba(63, 170, 121, .16); --cor-erro-suave: rgba(224, 80, 79, .16);
+  color: var(--txt); background: #111113; border-color: #111113;
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, .45);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .rvm-ico {
+  background: rgba(245, 165, 36, .16); color: #F5A524;
+}
+/* as cores que o card calcula para o claro (verde/vermelho escuros) acendem um tom sobre o preto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child :is(.rvm-var, .rvm-delta > b) {
+  filter: brightness(1.7) saturate(1.1);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ok { color: #4CC38A; background: rgba(63, 170, 121, .16); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-er { color: #F07170; background: rgba(224, 80, 79, .16); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ne { color: #B4B4BC; background: rgba(255, 255, 255, .08); }
+
+/* ---- 6. botão principal: preto com o ícone dourado (no claro); no escuro segue o dourado ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  color: #FFFFFF; background: #111113; border: 1px solid #111113; border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: #27272A; border-color: #27272A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini) svg { color: #F5A524; }
+
+/* ---- 7. seleção: a opção ligada do segmentado é a pílula preta (claro) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .gp-sc-item.on, .kb-ord > .kb-fchip.on) {
+  color: #FFFFFF; background: #111113; box-shadow: none;
+}
+/* (as abas do Dashboard continuam sublinhadas, com o marcador dourado) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .d5-abas.d5-abas.d5-abas .segm.segm.segm > button.on.on.on { color: var(--txt); }
