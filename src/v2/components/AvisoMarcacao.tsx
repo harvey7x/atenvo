@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useAvisosMarcacao } from '../pages/filaIris/avisosMarcacao';
@@ -12,9 +12,12 @@ import { useConversaAberta } from './AvisoRecado';
    atendente" + "aviso tem que ser no meio da tela, obrigando a atualizar"), montado no shell, em qualquer página,
    para o dono do cliente:
    - véu + cartão no meio, o foco no cartão e o Tab preso nele; nenhuma tecla chega à página de trás. Uma marcação
-     por vez ("1 de N"; as do mesmo cliente juntas, o cliente que venceu primeiro na frente). NÃO FECHA: sem Ok, sem
-     ×, o Esc não some com ele, clicar fora não faz nada. Sai só quando a marcação é ATUALIZADA ("O que foi feito?"
-     → Salvar; o prazo recomeça) ou TIRADA ("Já resolvi"). Aí vem a próxima.
+     por vez ("1 de N"; as do mesmo cliente juntas, o cliente que venceu primeiro na frente). Sem Ok e sem ×; o Esc
+     não some com ele, clicar fora não faz nada. A marcação sai quando é ATUALIZADA ("O que foi feito?" → Salvar; o
+     prazo recomeça) ou TIRADA ("Já resolvi"). Aí vem a próxima.
+   - "Lembrar em 1 hora" (dono 19/11: "aqui tem que dar pra tirar e não aparecer mais, só depois de uma hora, senão
+     fica difícil"): o aviso inteiro sai da tela e volta em 1 hora, com as que ainda estiverem vencidas — em todas as
+     abas da pessoa (a outra aba sabe pelo "storage"); nesse tempo também não sai notificação do navegador.
    - Para conferir antes de escrever: "Abrir a conversa" (o aviso espera enquanto a conversa do cliente estiver
      aberta, e mais 1 min depois de sair dela) e "Ver na fila" (a ficha do cliente; o aviso espera a ficha fechar).
    - Espera o recado do administrador e a mensagem do Murillo (os dois no meio da tela, que vêm antes), o bom dia, o
@@ -24,6 +27,8 @@ import { useConversaAberta } from './AvisoRecado';
    - Com o Atenvo em outra aba: a notificação do navegador para cada vencida NOVA (só com a permissão já dada).
    ================================================================== */
 const SAIU_DA_CONVERSA_MS = 60_000;
+/** "Lembrar em 1 hora" (dono 19/11) */
+const LEMBRAR_DEPOIS_MS = 60 * 60_000;
 /** depois de "Abrir a conversa"/"Ver na fila": o aviso espera a página trocar (sem piscar no meio do caminho) */
 const INDO_MS = 3_000;
 /** uma janela acabou de fechar (a ficha, uma confirmação): o que foi feito nela (o +1, o ×, tirar da fila) chega ao
@@ -85,6 +90,29 @@ function useEscrevendoNoWhats(ativo: boolean): boolean {
   return escrevendo;
 }
 
+/** "Lembrar em 1 hora": até quando o aviso fica fora da tela — por pessoa, em todas as abas (a outra aba sabe pelo
+    "storage"); sobrevive a recarregar a página */
+function useAdiadoAte(chave: string | null): [number, () => void] {
+  const ler = useCallback((): number => {
+    if (!chave) return 0;
+    try { return Number(localStorage.getItem(chave)) || 0; } catch { return 0; }
+  }, [chave]);
+  const [ate, setAte] = useState(ler);
+  useEffect(() => {
+    setAte(ler());
+    if (!chave) return;
+    const outraAba = (e: StorageEvent) => { if (e.key === chave) setAte(ler()); };
+    window.addEventListener('storage', outraAba);
+    return () => window.removeEventListener('storage', outraAba);
+  }, [chave, ler]);
+  const adiar = useCallback(() => {
+    const v = Date.now() + LEMBRAR_DEPOIS_MS;
+    setAte(v);
+    if (chave) { try { localStorage.setItem(chave, String(v)); } catch { /* sem armazenamento: vale só nesta aba */ } }
+  }, [chave]);
+  return [ate, adiar];
+}
+
 /** com o Atenvo em outra aba: a notificação do navegador para cada vencida NOVA (a 1ª leitura não conta) */
 function useNotificacaoVencida(avisos: AvisoVencida[], ativo: boolean): void {
   const avisados = useRef<Set<string> | null>(null);
@@ -144,19 +172,25 @@ export function AvisoMarcacao({ oculto = false, acesso }: { oculto?: boolean; ac
     vinhaOcupado.current = false;
     setEsperaAte((x) => Math.max(x, Date.now() + DEPOIS_DA_JANELA_MS));
   }, [saiuDaJanela]);
+  /* "Lembrar em 1 hora" (dono 19/11): o aviso sai da tela por 1 hora, em todas as abas */
+  const [adiadoAte, adiar] = useAdiadoAte(user?.id ? `atenvo-marcacao-vencida-adiada:${user.id}` : null);
   /* a espera vence no segundo certo */
   const [, setTique] = useState(0);
   useEffect(() => {
-    if (esperaAte <= Date.now()) return;
-    const t = window.setTimeout(() => setTique((x) => x + 1), esperaAte - Date.now() + 50);
+    const fim = Math.max(esperaAte, adiadoAte);
+    if (fim <= Date.now()) return;
+    const proxima = Math.min(...[esperaAte, adiadoAte].filter((v) => v > Date.now()));
+    const t = window.setTimeout(() => setTique((x) => x + 1), proxima - Date.now() + 50);
     return () => window.clearTimeout(t);
-  }, [esperaAte]);
-  const esperando = naConversa || saiuAgora || saiuDaJanela || esperaAte > Date.now();
+  }, [esperaAte, adiadoAte]);
+  const adiado = adiadoAte > Date.now();
+  const esperando = naConversa || saiuAgora || saiuDaJanela || esperaAte > Date.now() || adiado;
 
   const escrevendo = useEscrevendoNoWhats(ativo);
   const centro = tem && !oculto && !ocupado && !escrevendo && !esperando;
   const agora = useAgoraNoCanto(centro);
-  useNotificacaoVencida(avisos, ativo && pronto);
+  /* adiado: também sem notificação do navegador (a que vencer nesse tempo avisa quando a hora passar) */
+  useNotificacaoVencida(avisos, ativo && pronto && !adiado);
 
   /* o que foi escrito em "O que foi feito?" fica guardado por aviso: o cartão sai quando cede a vez (um recado, a
      mensagem do Murillo, o Radar, uma janela) e volta com o texto */
@@ -177,6 +211,8 @@ export function AvisoMarcacao({ oculto = false, acesso }: { oculto?: boolean; ac
      a página de trás — ele iria parar por baixo da tela nova (um Enter ali mandaria o rascunho do WhatsApp) */
   const restam = useRef(0);
   restam.current = avisos.length;
+  /* "Lembrar em 1 hora": o aviso inteiro sai por uma ação daqui — o foco volta para onde a pessoa estava */
+  const adiando = useRef(false);
   useEffect(() => {
     if (!centro) return;
     const antes = document.activeElement;
@@ -188,7 +224,9 @@ export function AvisoMarcacao({ oculto = false, acesso }: { oculto?: boolean; ac
       focoAntes.current = null;
       devolverFoco.current = false;
       /* só quando o ÚLTIMO saiu por uma ação daqui (salvar, tirar) e nada abriu na frente */
-      if (!devolver || restam.current > 0 || !el || !document.contains(el) || document.querySelector(OUTRA_JANELA)) return;
+      const foiAdiado = adiando.current;
+      adiando.current = false;
+      if (!devolver || (restam.current > 0 && !foiAdiado) || !el || !document.contains(el) || document.querySelector(OUTRA_JANELA)) return;
       try { el.focus({ preventScroll: true }); } catch { /* segue */ }
     };
   }, [centro]);
@@ -272,6 +310,12 @@ export function AvisoMarcacao({ oculto = false, acesso }: { oculto?: boolean; ac
                 try { terminou(await tirar(frente), frente); } catch (e) { devolverFoco.current = false; throw e; }
               }}
               aoVerNaFila={() => sair(`/fila-iris?cliente=${encodeURIComponent(frente.contatoId)}`)}
+              aoLembrarDepois={() => {
+                devolverFoco.current = true;
+                adiando.current = true;
+                adiar();
+                setToast('O aviso volta em 1 hora.');
+              }}
               aoAbrirConversa={frente.conversaId
                 ? () => sair(`/whatsapp?conversa=${encodeURIComponent(frente.conversaId!)}`, 'Confira a conversa: o aviso volta quando você sair dela.')
                 : undefined} />

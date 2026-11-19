@@ -65,6 +65,10 @@ describe('aviso da marcação vencida no meio da tela (dono 16/11: "obrigando a 
     expect(html).not.toMatch(/>Ok</);
     const sem = limpo(renderToString(createElement(CartaoMarcacaoVencida, { aviso: { ...a, conversaId: undefined }, total: 1, aoSalvar: fn, aoTirar: fn })));
     expect(sem).not.toContain('Abrir a conversa');
+    /* dono 19/11: "aqui tem que dar pra tirar e não aparecer mais, só depois de uma hora" */
+    expect(sem).not.toContain('Lembrar em 1 hora');
+    const comAdiar = limpo(renderToString(createElement(CartaoMarcacaoVencida, { aviso: a, total: 3, aoSalvar: fn, aoTirar: fn, aoLembrarDepois: () => {} })));
+    expect(comAdiar).toContain('Lembrar em 1 hora');
     expect(sem).not.toContain('1 de');
     expect(curtoDaVencida({ tipo: 'nao_atendeu', vezes: 2 })).toBe('Ligar de novo (2x)');
     expect(anuncioDaVencida(a, 3)).toBe('Marcação vencida, 1 de 3: Ana Lima, Falta: comprovante. '

@@ -20,6 +20,8 @@ html:root[data-tema="light"] .v2 .mvc-veu { background: rgba(22, 28, 40, .30); }
 .v2 .mvc-veu .rcd-marca svg { color: var(--rubro); }
 .v2 .mvc-veu .rcd-cliente { font-size: 19px; }
 .v2 .mvc-veu .rcd-bt { height: 36px; padding: 0 14px; font-size: 13px; }
+/* "Lembrar em 1 hora" (dono 19/11), no canto de cima do cartão */
+.v2 .mvc-veu .rcd-bt.mvc-adiar { height: 28px; padding: 0 11px; margin-left: 10px; font-size: 12px; }
 .v2 .mvc-veu .rcd-campo { font-size: 13px; }
 /* a marcação que venceu */
 .v2 .mvc-marcacao {

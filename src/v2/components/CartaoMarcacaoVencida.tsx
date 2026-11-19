@@ -6,8 +6,8 @@
    - Uma marcação por vez ("1 de N"): o cliente, a marcação, quando foi marcada e a última atualização, o que fazer,
      "O que foi feito?" com os atalhos de um toque (os que servem para aquela marcação) e Salvar (o prazo recomeça);
      "Já resolvi: tirar a marcação"; "Ver na fila" e "Abrir a conversa" (o aviso espera enquanto estiverem abertas).
-   - NÃO fecha: sem Ok, sem ×, o Esc não some com ele. Sai só quando a marcação é atualizada ou tirada. Nenhuma
-     tecla apertada nele chega à página de trás.
+   - Sem Ok e sem ×; o Esc não some com ele. A marcação sai quando é atualizada ou tirada; "Lembrar em 1 hora" (dono
+     19/11) tira o aviso da tela por 1 hora. Nenhuma tecla apertada nele chega à página de trás.
    - Um cartão por aviso (o contêiner troca pela key): o que estava escrito volta pelo `rascunho`.
    ============================================================================ */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
@@ -68,10 +68,12 @@ export interface PropsCartaoMarcacaoVencida {
   aoVerNaFila?: () => void;
   /** sem conversa no cliente, o botão não aparece */
   aoAbrirConversa?: () => void;
+  /** "Lembrar em 1 hora" (dono 19/11): o aviso sai da tela e volta em 1 hora */
+  aoLembrarDepois?: () => void;
 }
 
 export function CartaoMarcacaoVencida({
-  aviso, total, agora, euId, rascunho = '', aoMudarRascunho, aoSalvar, aoTirar, aoVerNaFila, aoAbrirConversa,
+  aviso, total, agora, euId, rascunho = '', aoMudarRascunho, aoSalvar, aoTirar, aoVerNaFila, aoAbrirConversa, aoLembrarDepois,
 }: PropsCartaoMarcacaoVencida) {
   const id = useId();
   const [texto, setTextoLocal] = useState(rascunho);
@@ -111,6 +113,12 @@ export function CartaoMarcacaoVencida({
           <span className="rcd-marca" id={`${id}-m`}><IcRelogio />{TEXTO_VENCIDA.marca}</span>
           {total > 1 && <span className="rcd-conta">1 de {total}</span>}
           <span className="rcd-hora">venceu {haQuantoAviso(aviso.venceEm, agora)}</span>
+          {/* dono 19/11: "aqui tem que dar pra tirar e não aparecer mais, só depois de uma hora" — no canto de cima, onde
+              se fecha uma janela */}
+          {aoLembrarDepois && (
+            <button type="button" className="rcd-bt mvc-adiar" disabled={!!enviando} onClick={aoLembrarDepois}
+              title="Tira o aviso da tela; ele volta em 1 hora com as marcações que ainda estiverem vencidas">Lembrar em 1 hora</button>
+          )}
         </header>
         <div className="rcd-miolo">
           <p className="rcd-cliente" id={`${id}-t`}>{aviso.nome}</p>
@@ -157,6 +165,7 @@ export function CartaoMarcacaoVencida({
               <button type="button" className="rcd-bt rcd-fraco" disabled={!!enviando} onClick={aoAbrirConversa}
                 title="Abre a conversa do cliente; o aviso espera enquanto ela estiver aberta">Abrir a conversa</button>
             )}
+
           </div>
           {erro && <p className="rcd-erro" role="alert">{erro}</p>}
         </div>
