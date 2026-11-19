@@ -16,11 +16,11 @@ import { ehCelular } from './GateMobileApp';
 
 const WhatsAppV2 = lazyComRecarga(() => import('../pages/WhatsApp'));
 
-export default function GateWhatsApp() {
+export default function GateWhatsApp({ modo = 'atendimento' }: { modo?: 'atendimento' | 'posvenda' } = {}) {
   const [params] = useSearchParams();
   if (ehCelular()) {
     const c = params.get('conversa');
     return <Navigate to={c ? `/m/${c}` : '/m'} replace />;
   }
-  return <Suspense fallback={null}><WhatsAppV2 /></Suspense>;
+  return <Suspense fallback={null}><WhatsAppV2 modo={modo} /></Suspense>;
 }

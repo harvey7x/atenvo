@@ -72,6 +72,8 @@ const GRUPOS: GrupoNav[] = [
     rotulo: 'Operação',
     itens: [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
+      // Pós-venda (dono 19/11): clientes FECHADOS num atendimento separado, logo abaixo do WhatsApp
+      { slug: 'pos-venda', rotulo: 'Pós-venda' },
       // Fila da Iris (dono 11/11): só para quem está liberado em fila_iris_config (os 5 atendentes + Murilo)
       { slug: 'fila-iris', rotulo: 'Fila da Iris', fila: true },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
@@ -665,7 +667,7 @@ export default function AppShellV2() {
                 a cada troca de rota e quando a intro abre o palco */}
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
-            <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
+            <div className={/^\/(kanban|whatsapp|pos-venda(?!\/painel))(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               <Outlet />
             </div>
           </div>

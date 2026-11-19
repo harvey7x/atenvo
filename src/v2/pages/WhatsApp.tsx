@@ -80,11 +80,15 @@ function sugerirDado(texto: string, campo: 'senha' | 'email'): string {
 const FOCO_KEY = 'atenvo-wa-foco';
 const ABA_KEY = 'atenvo-wa-aba';
 const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
-const TABS = [
+const ABA_PV_KEY = 'atenvo-pv-aba';
+// Atendimento: SEM a aba "Fechados" — os clientes fechados (ganho) moram na tela própria
+// Pós-venda (/pos-venda), que reaproveita este mesmo inbox em modo 'posvenda' (pedido do dono 19/11).
+const TABS_ATEND = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
-type TabId = typeof TABS[number][0];
+const TABS_PV = [['fechados', 'Todos'], ['pvaguarda', 'Aguardando resposta']] as const;
+type TabId = typeof TABS_ATEND[number][0] | typeof TABS_PV[number][0];
 /* ⚠ do card: só o que o Radar NÃO cobre (dono 29/10: "deixa o Radar como o único aviso de cliente sem
    resposta"). "Sem resposta" é do Radar — selo próprio, por dono, no horário útil — e "parado / 2 dias sem
    fechamento" é assunto do Kanban; os dois saíram daqui. */
@@ -399,7 +403,10 @@ function inserirNoFio(itens: ItemFio[], ev: ItemFio, emIso: string | null): Item
 }
 const horaSP = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-export default function WhatsAppV2() {
+export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimento' | 'posvenda' } = {}) {
+  const posVenda = modo === 'posvenda';
+  const TABS: readonly (readonly [TabId, string])[] = posVenda ? TABS_PV : TABS_ATEND;
+  const abaKey = posVenda ? ABA_PV_KEY : ABA_KEY;
   const nav = useNavigate();
   /* "Abrir na fila" no cabeçalho: só para quem tem a Fila da Iris */
   const acessoFila = useAcessoFila();
@@ -444,7 +451,7 @@ export default function WhatsAppV2() {
   const [draft, setDraft] = useState('');
   // lembra a última aba usada (quem trabalha pelo "Meus" reabre no "Meus")
   const [tab, setTab] = useState<TabId>(() => {
-    try { const t = localStorage.getItem(ABA_KEY); return TABS.some(([id]) => id === t) ? (t as TabId) : 'todos'; } catch { return 'todos'; }
+    try { const t = localStorage.getItem(abaKey); return TABS.some(([id]) => id === t) ? (t as TabId) : (posVenda ? 'fechados' : 'todos'); } catch { return posVenda ? 'fechados' : 'todos'; }
   });
   // aba Iris: só Matheus/Murilo, e só depois da RPC responder (o servidor é a proteção real)
   const { eIris, mapa: irisMapa, carteiraIds: irisCarteira } = useIrisCarteira();
@@ -452,15 +459,17 @@ export default function WhatsAppV2() {
   // aba 'iris' guardada mas sem permissão: cai em 'todos' (sem apagar a preferência)
   const tabEf: TabId = tab === 'iris' && !eIris ? 'todos' : tab;
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
-  const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
+  const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(abaKey, t); } catch { /* privado */ } };
   // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
-  const abas = (vis.veTodos ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
+  const abas = (vis.veTodos || posVenda ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
   useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
   // atalho ?aba=fechados (Central do Radar → "Abrir a aba Fechados"): troca a aba e limpa a URL.
   // Fechados abre no grupo "Aguardando resposta": aberto (só nesta sessão) e com a lista no topo.
   const abaParam = params.get('aba');
   useEffect(() => {
     if (!abaParam) return;
+    // Fechados saiu do atendimento: links antigos (?aba=fechados) vão pra tela Pós-venda
+    if (abaParam === 'fechados' && !posVenda) { nav('/pos-venda', { replace: true }); return; }
     if (TABS.some(([id]) => id === abaParam)) setTab(abaParam as TabId);
     if (abaParam === 'fechados') {
       setGruposFechados((cur) => { if (!cur.has('__aguarda')) return cur; const s = new Set(cur); s.delete('__aguarda'); return s; });
@@ -737,7 +746,10 @@ export default function WhatsAppV2() {
     const varianteAlvo = alvo ? situacaoDe(alvo).variante : null;
     // conversa da carteira da Iris mora SÓ na aba Iris (some das demais) — quem pode vê-la vai pra lá
     if (eIris && irisCarteira.has(conversaParam)) setIrisFiltro('todos');
-    setTab(eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
+    // Fechado mora na tela Pós-venda; qualquer outro, no atendimento — manda pro lado certo.
+    if (alvo && posVenda && varianteAlvo !== 'ganho') { nav('/whatsapp?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
+    if (alvo && !posVenda && varianteAlvo === 'ganho') { nav('/pos-venda?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
+    setTab(posVenda ? 'fechados' : eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
     limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
@@ -797,6 +809,7 @@ export default function WhatsAppV2() {
         : l.origem === 'matheus' && !fechado;
     }
     if (t === 'fechados') return fechado;
+    if (t === 'pvaguarda') return fechado && aguardaFechado(c);
     if (t === 'perdidos') return perdido;
     if (fechado || perdido) return false;
     // carteira da Iris mora SÓ na aba Iris
@@ -826,6 +839,14 @@ export default function WhatsAppV2() {
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, tabEf, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, irisMapa, irisCarteira, eIris, irisFiltro, abas]);
+  /* Pós-venda: a conversa aberta tem que ser UM DOS FECHADOS — nunca um cliente ativo que
+     sobrou selecionado (padrão do inbox = 1ª conversa). Troca sem marcar como lida. */
+  useEffect(() => {
+    if (!posVenda || conversaParam || visiveis.length === 0) return;
+    if (visiveis.some((c) => c.id === currentId)) return;
+    inbox.selecionarSemMarcar(visiveis[0]!.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posVenda, visiveis, currentId, conversaParam]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
@@ -838,7 +859,7 @@ export default function WhatsAppV2() {
     // Radar (v5): dentro de "Aguardando resposta", o estágio do Radar manda — pedido do gestor,
     // último aviso, 2º, 1º, fora do Radar. Fixar desempata DENTRO do mesmo degrau (o último aviso
     // nunca fica abaixo de dezenas de fixadas); depois, a espera mais antiga.
-    if (tabEf === 'fechados') {
+    if (tabEf === 'fechados' || tabEf === 'pvaguarda') {
       const degrau = (c: WaContact) => { const r = radarPorConv.get(c.id); return r?.pedido ? 4 : r?.aviso?.estagio ?? 0; };
       const esperaMs = (c: WaContact) => {
         const t = Date.parse(radarPorConv.get(c.id)?.aviso?.desde ?? c.aguardandoDesde ?? '');
@@ -1178,12 +1199,12 @@ export default function WhatsAppV2() {
                     className={'wa-aba' + (tabEf === id ? ' on' : '')}
                     title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
                       : id === 'iris' ? 'Carteira da Iris: leads reatribuídos e seus clientes atendidos pela Iris.'
-                      : id === 'fechados' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados (pós-venda). O número conta todos os que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
+                      : id === 'pvaguarda' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
                   >
                     {/* Fechados: selo vermelho SÓ com quem aguarda resposta — o total da carteira não alerta nada */}
-                    {rot}{id === 'fechados'
-                      ? (tabCounts.fechadosAguarda ?? 0) > 0 && <span className="n num urg" title={`${tabCounts.fechadosAguarda} aguardando resposta`}>{tabCounts.fechadosAguarda}</span>
+                    {rot}{id === 'pvaguarda'
+                      ? (tabCounts.pvaguarda ?? 0) > 0 && <span className="n num urg" title={`${tabCounts.pvaguarda} aguardando resposta`}>{tabCounts.pvaguarda}</span>
                       : (tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
                   </button>
                 ))}

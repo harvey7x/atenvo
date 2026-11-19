@@ -133,7 +133,7 @@ export default function PendenciasTela() {
   const listaVazia = ehStatus && !f.carregando && lista.length === 0;
   const abrirConversa = (p: Pendencia) => {
     /* todo cliente de pendência é FECHADO: no inbox ele vive na aba Fechados (aba= é lido pelo inbox quando suportado) */
-    if (f.real && p.conversaId) navigate(`/whatsapp?conversa=${encodeURIComponent(p.conversaId)}&aba=fechados`);
+    if (f.real && p.conversaId) navigate(`/pos-venda?conversa=${encodeURIComponent(p.conversaId)}`);
     else avisar(`Demonstração: abriria a conversa deste cliente no número ${nomeBonito(f.ajustes.numero.nome)}.`, 'info');
   };
   /* ↑/↓ movem a seleção quando o foco está na lista */

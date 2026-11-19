@@ -651,7 +651,7 @@ function RadarCentral({ estado, filas, decisoes, gestor, ancora, aoFechar, aoAba
   };
 
   const atalho = aba === 'fechados'
-    ? { rot: rtTit('extra.central.link_fechados', {}, 'Abrir a aba Fechados'), rota: '/whatsapp?aba=fechados' }
+    ? { rot: rtTit('extra.central.link_fechados', {}, 'Abrir a aba Fechados'), rota: '/pos-venda' }
     : aba === 'decisoes' ? { rot: rtTit('extra.central.link_painel', {}, 'Abrir painel do Radar'), rota: '/radar' } : null;
   const titulo = rtTit('central.titulo', {}, 'Aguardando você');
   const subtitulo = rtTxt('central.subtitulo', {}, 'Em ordem de urgência, com tempos em horário útil.');
