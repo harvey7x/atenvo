@@ -142,19 +142,16 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .gp-sc-item.on, .kb-ord > .kb-fchip.on) {
   color: #FFFFFF; background: #111113; box-shadow: none;
 }
-/* (as abas do Dashboard continuam sublinhadas, com o marcador dourado) */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .d5-abas.d5-abas.d5-abas .segm.segm.segm > button.on.on.on { color: var(--txt); }
+/* (as abas do Dashboard continuam sublinhadas, com o marcador dourado — camada Linear) */
 
 /* ---- 8. BARRA LATERAL MINIMALISTA (dono 19/11: "da pra deixar menor? mais minimalista") ----
    212px (era 260), itens de 30px, ícones de 15, rótulos de grupo menores e mais juntos, a marca e a
    busca menores. A gaveta do celular (toque) segue com os alvos grandes. */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 { --ba-cheia: 212px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 { --ba-cheia: 222px; }   /* 222: "Unificador de documentos" cabe inteiro */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra {
-  & .ba-in { padding: 10px; }
+  & .ba-in { padding: 10px 8px; }
   & .ba-cab { margin-bottom: 6px; }
   & .ba-ws-gat { gap: 9px; padding: 4px; }
-  & .ba-ws-marca { width: 26px; height: 26px; border-radius: 7px; }
-  & .ba-ws-marca svg { width: 15px; height: 15px; }
   & .ba-ws-nome { font-size: 12.5px; line-height: 15px; }
   & .ba-ws-amb { font-size: 11px; line-height: 14px; }
   & .ba-cab-bt { width: 24px; height: 24px; }
@@ -171,3 +168,39 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v
   & .ba-pe { margin-top: 8px; padding-top: 8px; gap: 1px; }
   & .ba-versao { padding: 6px 9px 0; font-size: 10px; }
 }
+
+/* ---- 9. O DOURADO DA CASA, mais quente (dono 19/11: "troca essa cor por algo mais dourado,
+   alaranjado, que combina com o sistema"): o acento sai do mostarda (#B8860B no claro) para o
+   dourado-laranja da moldura. O texto em dourado (--rv-tinta) segue um tom mais fundo, legível no branco. ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 {
+  --azul: #EE9A1C; --azul-rgb: 238, 154, 28; --platina-a: #EE9A1C; --platina-b: #EE9A1C; --rv-tinta: #A8650A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 {
+  --azul: #F5A82E; --azul-rgb: 245, 168, 46; --platina-a: #F5A82E; --platina-b: #F5A82E;
+}
+/* a barra do mês escolhido (Recebido por mês) e as barras parciais: o dourado em degradê suave, de cima para baixo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pn-graf-col.on .pn-graf-bar {
+  background: linear-gradient(180deg, #F8BE5C 0%, #EE9A1C 60%, #E08712 100%);
+  border-radius: 7px 7px 2px 2px;
+}
+
+/* ---- 10. A MARCA: o quadrado em dourado-laranja com brilho no alto, o desenho escuro e um halo ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra .ba-ws-marca {
+  width: 32px; height: 32px; border-radius: 9px; color: #1B1206;
+  background:
+    radial-gradient(120% 75% at 28% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 58%),
+    linear-gradient(150deg, #FFDC85 0%, #F7B23D 45%, #E3830F 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .28),
+    inset 0 -2px 5px rgba(120, 58, 0, .28),
+    0 6px 16px -6px rgba(245, 160, 40, .6);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra .ba-ws-marca svg { width: 20px; height: 20px; filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .35)); }
+
+/* ---- 11. MENOS RISCOS: sem o fio sob o título da página e sob a barra do mês — o espaço separa ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pagina > .ph { border-bottom: 0; padding-bottom: 6px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pn-barra { border-bottom: 0; padding-bottom: 4px; }
+/* subtítulos de cartão um tom mais apagados; o número fala mais alto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.pn-card-cab p, .card-cab p, .d5-sec-sub) { color: var(--txt-3); }
+/* linhas de tabela mais leves */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco :is(tbody tr, .d5-tab tbody tr) { border-color: #F0F0F2; }

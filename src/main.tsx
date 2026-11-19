@@ -17,7 +17,7 @@ import './v2/repaginada.css'; // visual do Atenvo (repaginada 27/10) — age com
 import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua do Atenvo (depois da repaginada)
 import './v2/reviza-sistema.css'; // a régua única da ALFA (crítica de design 12/11) — por último
 import './v2/reviza-linear.css'; // estilo Linear na Reviza (dono 13/11) — só age com [data-linear] + [data-barra-alfa]
-import { aplicarLinearAlfa, lerLinearAlfa } from './v2/lib/linearAlfa';
+import { aplicarLinearAlfa } from './v2/lib/linearAlfa';
 import './v2/reviza-moldura.css'; // moldura preta + conteúdo claro (dono 19/11) — só age com [data-moldura] + [data-barra-alfa]
 import { aplicarMoldura, lerMoldura } from './v2/lib/molduraAlfa';
 import { aplicarRepaginada } from './v2/lib/repaginada';
@@ -153,7 +153,9 @@ if (typeof document !== 'undefined') aplicarInboxPro(true);
 // do primeiro paint — Reviza de verdade e a demo (shell/BarraAlfa.tsx, shell/barra-alfa.css)
 if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) document.documentElement.setAttribute('data-barra-alfa', '');
 // Estilo Linear (dono 13/11): [data-linear] antes do primeiro paint, só na ALFA; padrão ligado.
-if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarLinearAlfa(lerLinearAlfa());
+// 19/11: o Linear é a BASE do visual da ALFA (a moldura preta mora em cima dele) — sempre ligado;
+// a escolha antiga "reviza.linear=0" (do Antes/Depois de 13/11) não vale mais
+if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarLinearAlfa(true);
 // Moldura preta (dono 19/11): [data-moldura] antes do primeiro paint, só na ALFA; padrão ligado.
 if (typeof document !== 'undefined' && (isRevizaMode || isDemoMode)) aplicarMoldura(lerMoldura());
 
