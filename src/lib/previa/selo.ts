@@ -6,7 +6,7 @@
    e a foto ampliada. Em janela estreita ele não cobre a busca: vai para o vão entre a busca e os botões
    do topo e, se nem assim couber, encolhe (só "Prévia · Ver como"). */
 import { ambientesDoPerfil, ROTULO_AMBIENTE } from '@/v2/data/modulos';
-import { lerLinearAlfa, salvarLinearAlfa } from '@/v2/lib/linearAlfa';
+import { lerMoldura, salvarMoldura } from '@/v2/lib/molduraAlfa';
 
 const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom, .ba-veu';
 type PerfilPrevia = { id: string; nome: string; papel: string; ativo: boolean; modulos?: unknown };
@@ -74,17 +74,18 @@ export function montarSeloPrevia(): void {
     menu.className = 'sp-menu';
     menu.setAttribute('role', 'menu');
     menu.hidden = true;
-    // Antes / Depois do estilo Linear (13/11): o dono compara na hora; a escolha fica neste navegador
+    // Antes / Depois da moldura preta (19/11; antes, do estilo Linear): o dono compara na hora; a escolha fica neste navegador
     const ad = document.createElement('span');
     ad.className = 'sp-ad';
     ad.setAttribute('role', 'group');
     ad.setAttribute('aria-label', 'Comparar o visual');
-    const marcarAD = () => ad.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === lerLinearAlfa())));
+    const marcarAD = () => ad.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === lerMoldura())));
     for (const [v, rot] of [['0', 'Antes'], ['1', 'Depois']] as const) {
       const b = document.createElement('button');
       b.type = 'button'; b.dataset.v = v; b.textContent = rot;
-      b.title = v === '1' ? 'Com o estilo Linear' : 'Como estava antes do estilo Linear';
-      b.addEventListener('click', () => { salvarLinearAlfa(v === '1'); marcarAD(); });
+      b.title = v === '1' ? 'Com a moldura preta' : 'Como estava antes da moldura preta';
+      // recarrega: quem não escolheu tema abre no claro com a moldura e no escuro sem ela
+      b.addEventListener('click', () => { if ((v === '1') === lerMoldura()) return; salvarMoldura(v === '1'); marcarAD(); location.reload(); });
       ad.append(b);
     }
     marcarAD();
