@@ -236,3 +236,75 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26), inset 0 -2px 4px rgba(120, 58, 0, .25);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-barra .ba-ws-marca svg { width: 18px; height: 18px; }
+
+/* =====================================================================
+   21/11 (4) — WHATSAPP (Atendimento) e CONVERSAS (Cobrança)
+   As telas em que a equipe passa o dia, na mesma régua: sem papel de
+   parede, balões limpos, etiquetas neutras (cor só para o que pede
+   atenção), nomes sem negrito pesado e o celular das Conversas sem o verde.
+   ===================================================================== */
+
+/* ---- A. a conversa: fundo liso, balões com fio fino ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs { background-image: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs { background-color: #F6F6F7; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs { background-color: #0C0C0E; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha { border-radius: 12px; box-shadow: none; }
+/* recebida: branca; enviada (atendente ou IA): um dourado bem claro — o lado da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs .bolha.rec { background: #FFFFFF; border: 1px solid #E9E9EC; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs .bolha.env2 { background: #FCF4E4; border: 1px solid #F2DFB8; color: #18181B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs .bolha.rec { background: #17171A; border: 1px solid rgba(255, 255, 255, .07); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs .bolha.env2 { background: rgba(245, 168, 46, .1); border: 1px solid rgba(245, 168, 46, .2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha.env2.bot { border-left-width: 1px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha .bt-tag { font-size: 10.5px; font-weight: 500; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha .hh { font-size: 10.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .dia { font-size: 10.5px; font-weight: 500; color: var(--txt-3); background: transparent; border-color: transparent; }
+
+/* ---- B. nomes e etiquetas: nada de negrito pesado; etiqueta neutra em caixa alta miúda ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .nm-tx { font-size: 12.5px; font-weight: 550; letter-spacing: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-ctopo .idw .nm { font-size: 14px; font-weight: 600; letter-spacing: -.005em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ctx-topo .n2 { font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.av2, .zp-av) { font-weight: 550; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.cchip, .wa-hchip) {
+  font-size: 10px; font-weight: 500; letter-spacing: .04em; border-radius: 5px;
+  color: var(--txt-2); background: transparent; border: 1px solid var(--lin-fio, var(--linha)); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.cchip, .wa-hchip) i.pt { background: currentColor !important; opacity: .5; }
+/* o que pede atenção (Humano, Espera 33 min): dourado, sem moldura */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .cchip:is(.alerta, .espera) {
+  color: var(--cor-alerta-txt); background: var(--cor-alerta-suave); border-color: transparent;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip { border-radius: 5px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip .etqchip-nm { font-weight: 500; }
+
+/* ---- C. a lista: a conversa aberta em cinza leve com o filete dourado; hora e contador contidos ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2.ativa {
+  background: rgba(var(--tint), .045); border-left-color: var(--azul);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .h2 { font-weight: 450; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .nl { font-weight: 600; color: #1B1206; background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-scr-btn span { font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-scr-btn span.ct { font-weight: 600; }
+
+/* ---- D. a ficha (painel da direita): títulos de bloco sem caixa alta, pequenos e apagados ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.ctx-b .ctx-t, .fjb .fjb-h) {
+  font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-3);
+}
+
+/* ---- E. o celular das Conversas: a paleta do aparelho sai do verde do WhatsApp para a da casa ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .zp-tel {
+  --zp-verde: #18181B; --zp-acao: #18181B; --zp-badge: #EE9A1C; --zp-badge-txt: #1B1206;
+  --zp-chip-on: #18181B; --zp-chip-on-txt: #FFFFFF;
+  --zp-conv-fundo: #F4F4F5; --zp-papel: none; --zp-in: #FFFFFF; --zp-out: #FCF1DC;
+  --zp-tique-lida: #B8730E; --zp-ia: #71717A; --zp-cit-cliente: #52525B;
+  --zp-onda-on: #EE9A1C; --zp-onda-ponto: #EE9A1C; --zp-ambar: #C77A0A; --zp-rubro: #B4532A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .zp-tel {
+  --zp-verde: #F5A82E; --zp-acao: #F5A82E; --zp-badge: #F5A82E; --zp-badge-txt: #1B1206;
+  --zp-chip-on: #2A2A2E; --zp-chip-on-txt: #FFFFFF;
+  --zp-conv-fundo: #0C0C0E; --zp-papel: none; --zp-in: #1C1C1F; --zp-out: #3A2A0E;
+  --zp-tique-lida: #F5A82E; --zp-ia: #A1A1AA; --zp-cit-cliente: #D4D4D8;
+  --zp-onda-on: #F5A82E; --zp-onda-ponto: #F5A82E; --zp-rubro: #E27B52;
+}
+/* os avatares de iniciais (cada um tinha uma cor): todos no cinza da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .zp-tel .zp-av { background: #E9E9EC !important; color: #3F3F46; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .zp-tel .zp-av { background: #2A2A2E !important; color: #D4D4D8; }
