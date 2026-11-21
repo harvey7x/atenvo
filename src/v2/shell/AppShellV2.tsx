@@ -16,6 +16,7 @@ import { instalarSpotlight } from '../lib/spotlight';
 import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
+import { ICONES_ALFA } from './iconesAlfa';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
@@ -235,6 +236,8 @@ const COB_ICONES: Record<string, ReactNode> = {
   envios: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 3L10.5 13.5M21 3l-6.8 17.4a.35.35 0 0 1-.65.02L10.5 13.5 3.6 10.45a.35.35 0 0 1 .02-.65L21 3z" /></svg>,
 };
 function iconeDoItem(slug: string): ReactNode {
+  // ALFA (21/11): a família nova, uma só para os dois ambientes; o que ela não cobre segue o de antes
+  if (ALFA) { const novo = ICONES_ALFA[slug.split('/').pop() ?? slug]; if (novo) return novo; }
   if (slug.startsWith('cobrancas/')) return COB_ICONES[slug.split('/')[1]] ?? ICONES.cobrancas;
   if (slug.startsWith('ferramentas/')) return FERR_ICONES[slug.split('/')[1]] ?? FERR_ICONES.unificador;
   return ICONES[slug];

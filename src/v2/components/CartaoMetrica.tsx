@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { MetricChart, type ChartView, type SeriesPoint } from '@/components/ui/metric-chart';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { MetricChart, monotonePath, type ChartView, type SeriesPoint } from '@/components/ui/metric-chart';
 import { Icon, PeriodSelect, ViewToggle, type PeriodOption } from '@/components/ui/metric-controls';
 import { PmcStyles } from '@/components/ui/progress-metric-card';
 import { useTemaAtual } from '@/v2/lib/temaAtual';
@@ -7,40 +7,43 @@ import { useMoldura } from '@/v2/lib/molduraAlfa';
 import './cartaoMetrica.css';
 
 /* ------------------------------------------------------------------
-   Card de métrica da Reviza — a versão COMPACTA do Progress Metric Card
-   (dono 14/11: "ficou muito grande … deixa otimizado pro sistema da Reviza,
-   bem encaixado"). Mesmo motor (o gráfico, a troca curva/barras e o menu do
-   período vêm de components/ui, sem mudar), na medida e na cara da casa:
-   4 por linha como os indicadores de antes, fonte e cantos da Reviza, cores
-   verde/vermelho da régua da ALFA, e o card cresce um pouco ao passar o mouse.
+   Cards de métrica da Reviza (v2/components). Mesmo motor do Progress
+   Metric Card (o gráfico pequeno, a troca curva/barras e o menu do período
+   vêm de components/ui), na medida e na cara da casa.
 
-     [Título ....................... 6 meses ⌄]
-     [R$ 32.580,00  ↑ 25,1%                  ]
-     [~~~~~~~~ gráfico (curva ou barras) ~~~~~]
-     [+R$ 0 vs out/26 ............ curva|barras]
+   21/11 (dono: "deixar as métricas mais bonitas, mudar o formato"; "azul,
+   vermelho, verde poluem"; "Ondas com umas linhas finas é horrível"):
+   - FORMATO: ícone + título em cima; o número à esquerda e o gráfico pequeno
+     à direita, na mesma linha; embaixo, a variação num selo discreto.
+   - COR: a paleta é a da casa — dourado, grafite e cinzas; só a queda/atraso
+     usa um ferrugem (laranja queimado). Nada de azul, verde ou vermelho.
+   - ONDAS: gráfico próprio (GraficoSeries) com área preenchida, linhas mais
+     firmes, grade discreta e balão com todas as séries.
 
-   O SENTIDO de cada indicador decide a cor:
-     maior  = subir é bom (verde quando sobe);
-     menor  = subir é ruim (Em atraso: vermelho quando sobe);
-     neutro = nem bom nem ruim (Não elegíveis): cinza.
-   "Subiu ou desceu" é a conta do card original: o último ponto da janela
-   contra o primeiro, com a faixa neutra de 0,5%.
+   O SENTIDO de cada indicador decide o tom:
+     maior  = subir é bom · menor = subir é ruim (Em atraso) · neutro = nem um nem outro.
+   "Subiu ou desceu" = o último ponto da janela contra o primeiro (faixa neutra de 0,5%).
    ------------------------------------------------------------------ */
 
 export type SentidoMetrica = 'maior' | 'menor' | 'neutro';
 export type { PeriodOption, SeriesPoint };
+type Tom = 'bom' | 'ruim' | 'neutro';
 
-// a régua de cores da ALFA (reviza-sistema.css): o verde e o vermelho de cada tema
+// cor do gráfico pequeno: sem a moldura, a régua antiga (verde/vermelho); com ela, sempre o dourado da casa
 const CORES = {
   dark: { bom: '#3FAA79', ruim: '#E0504F', neutro: '#8A8F98' },
   light: { bom: '#2A7352', ruim: '#A23F33', neutro: '#666C76' },
 } as const;
+const DOURADO = { dark: '#F5A82E', light: '#EE9A1C' } as const;
 const FAIXA_NEUTRA = 0.5;
-/* moldura preta (dono 19/11, referência "Sales Dashboard"): o gráfico de cada card é sempre LARANJA;
-   o verde/vermelho fica só na variação (o número diz se foi bom ou ruim, a cor do desenho é a da casa) */
-const LARANJA = { dark: '#F5A524', light: '#F0921C' } as const;
+const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
+export function diaDoBalao(dia: string, hoje?: string): string {
+  const [y, m, d] = dia.split('-');
+  return `${d} ${MES_ABREV[Number(m) - 1] ?? m} ${y}${hoje && dia === hoje ? ' · até agora' : ''}`;
+}
 
-/* o ícone de cada indicador (quadradinho laranja ao lado do título, só com a moldura) */
+/* o ícone de cada indicador (quadradinho ao lado do título, só com a moldura) */
 const ICONES = {
   repete: <><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></>,
   carteira: <><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></>,
@@ -55,26 +58,19 @@ const ICONES = {
 };
 export type IconeMetrica = keyof typeof ICONES;
 const Selo = ({ icone }: { icone?: IconeMetrica }) => (icone
-  ? <span className="rvm-ico" aria-hidden><Icon size={15} strokeWidth={2}>{ICONES[icone]}</Icon></span>
+  ? <span className="rvm-ico" aria-hidden><Icon size={14} strokeWidth={1.75}>{ICONES[icone]}</Icon></span>
   : null);
-const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-/** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
-export function diaDoBalao(dia: string, hoje?: string): string {
-  const [y, m, d] = dia.split('-');
-  return `${d} ${MES_ABREV[Number(m) - 1] ?? m} ${y}${hoje && dia === hoje ? ' · até agora' : ''}`;
-}
-const pctTexto = (n: number) => `${Math.abs(n).toFixed(1).replace('.', ',')}%`;
 
 const SETAS = {
   flat: <><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>,
   down: <><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></>,
   up: <><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></>,
 };
+const pctTexto = (n: number) => `${Math.abs(n).toFixed(1).replace('.', ',')}%`;
 
-/* O número que CONTA até o valor (dono 21/11: "as métricas animadas"). Recebe o texto pronto
-   ("R$ 32.580,00", "69%", "1,4 dia", "918"), acha o número em formato brasileiro e anima do valor
-   mostrado até o novo em ~0,7 s, mantendo o que vem antes e depois. Sem movimento no sistema
-   (ou texto sem número), mostra direto. */
+/* O número que CONTA até o valor. Recebe o texto pronto ("R$ 32.580,00", "69%", "1,4 dia"),
+   acha o número em formato brasileiro e anima do valor mostrado até o novo em ~0,7 s, mantendo
+   o que vem antes e depois. Sem movimento no sistema (ou texto sem número), mostra direto. */
 const RE_NUMERO = /\d[\d.]*(?:,\d+)?/;
 function Contagem({ texto }: { texto: string }) {
   const [mostrado, setMostrado] = useState(texto);
@@ -107,7 +103,7 @@ const comContagem = (v: ReactNode): ReactNode => (typeof v === 'string' ? <Conta
 
 export function CartaoMetrica({
   titulo, data, total, sentido = 'maior', periodos, periodo, formatar, formatarData, rotuloDelta, carregando,
-  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, extra, className, graficoCarregando, icone,
+  cabEsquerda, cabDireita, unidade, numSub, variacao, tom, rodape, className, graficoCarregando, icone,
 }: {
   titulo: string;
   /** a série, do mais antigo ao mais novo */
@@ -122,33 +118,31 @@ export function CartaoMetrica({
   /** valor do balão e da variação ("R$ 4.066", "22 fechados") */
   formatar: (v: number) => string;
   formatarData: (d: string) => string;
-  /** o que vem depois da variação do último ponto ("vs set/26", "hoje vs ontem") */
+  /** o que vem depois da variação do último ponto ("vs set/26") */
   rotuloDelta?: string;
   carregando?: boolean;
-  /** cabeçalho próprio no lugar do título (avatar + nome, por exemplo); o título fica para o leitor de tela */
+  /** cabeçalho próprio no lugar do título; o título fica para o leitor de tela */
   cabEsquerda?: ReactNode;
-  /** à direita do cabeçalho quando não há menu de período (a campanha, o placar…) */
+  /** à direita do cabeçalho quando não há menu de período (a campanha, o selo…) */
   cabDireita?: ReactNode;
   /** palavra pequena depois do número ("fechados") */
   unidade?: string;
-  /** texto pequeno na linha do número, à direita ("16 fechados · 29 NE") */
+  /** texto pequeno embaixo do número ("16 fechados · 29 NE") */
   numSub?: ReactNode;
-  /** a variação pronta no lugar da conta do card (ou false para esconder) */
-  variacao?: ReactNode | false;
-  /** a cor do gráfico decidida fora (melhor campanha, atendente: contra o período anterior) */
-  tom?: 'bom' | 'ruim' | 'neutro';
-  /** o rodapé pronto no lugar de "+N vs …" */
+  /** false = sem o selo da variação calculada (o rodapé traz a comparação pronta) */
+  variacao?: false;
+  /** o tom decidido fora (contra o período anterior) */
+  tom?: Tom;
+  /** o rodapé pronto no lugar de "↑ 25% · +N vs …" */
   rodape?: ReactNode;
-  /** bloco entre o gráfico e o rodapé (os números do atendente) */
-  extra?: ReactNode;
   className?: string;
-  /** só o gráfico ainda carregando (o número já chegou): a faixa pulsa, sem texto */
+  /** só o gráfico ainda carregando (o número já chegou) */
   graficoCarregando?: boolean;
   /** o ícone do indicador (aparece com a moldura preta) */
   icone?: IconeMetrica;
 }) {
   const tema = useTemaAtual();
-  const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
+  const moldura = useMoldura();
   const [rotulo, setRotulo] = useState(periodo ?? '');
   const [view, setView] = useState<ChartView>('curve');
   const opcao = periodos?.find((p) => p.label === rotulo) ?? periodos?.[periodos.length - 1];
@@ -164,81 +158,69 @@ export function CartaoMetrica({
   const penultimo = janela[n - 2]?.value ?? primeiro;
   const pct = primeiro ? ((ultimo - primeiro) / primeiro) * 100 : 0;
   const rumo: 'up' | 'down' | 'flat' = Math.abs(pct) < FAIXA_NEUTRA ? 'flat' : ultimo >= primeiro ? 'up' : 'down';
-  const pal = CORES[tema];
-  const cor = tom ? pal[tom]
-    : sentido === 'neutro' || rumo === 'flat' ? pal.neutro : (rumo === 'up') === (sentido === 'maior') ? pal.bom : pal.ruim;
-  const moldura = useMoldura();
-  const corGraf = moldura ? LARANJA[tema] : cor;
+  const tomFinal: Tom = tom ?? (sentido === 'neutro' || rumo === 'flat' ? 'neutro' : (rumo === 'up') === (sentido === 'maior') ? 'bom' : 'ruim');
+  const corGraf = moldura ? DOURADO[tema] : CORES[tema][tomFinal];
   const passo = ultimo - penultimo;
   const delta = (passo >= 0 ? '+' : '−') + formatar(Math.abs(passo));
   const series = useMemo(() => [{ name: titulo, data: janela, color: corGraf }], [titulo, janela, corGraf]);
   const valor = typeof total === 'function' ? total(janela) : total;
+  const mostraGraf = temGrafico && !carregando && !graficoCarregando;
 
   return (
     <article className={`pmc-root rvm${carregando ? ' rvm-carregando' : ''}${className ? ` ${className}` : ''}`} aria-busy={carregando || undefined}>
       <PmcStyles />
       <header className="rvm-cab">
-        {cabEsquerda
-          ? <div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-sr">{titulo}</h3>{cabEsquerda}</div>
-          : <div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-tit">{titulo}</h3></div>}
+        <div className="rvm-cab-esq">
+          <Selo icone={icone} />
+          {cabEsquerda ? <><h3 className="rvm-sr">{titulo}</h3>{cabEsquerda}</> : <h3 className="rvm-tit">{titulo}</h3>}
+        </div>
         {periodos
-          ? <PeriodSelect value={rotulo} options={periodos} onChange={(o) => setRotulo(o.label)} accentText={cor} />
+          ? <PeriodSelect value={rotulo} options={periodos} onChange={(o) => setRotulo(o.label)} accentText={corGraf} />
           : cabDireita}
       </header>
-      <div className="rvm-num">
-        <span className="rvm-val">{carregando ? '—' : comContagem(valor)}</span>
-        {unidade && !carregando && <span className="rvm-un">{unidade}</span>}
-        {variacao !== undefined
-          ? (variacao !== false && !carregando && variacao)
-          : temGrafico && !carregando && (
-            <span className="rvm-var" style={{ color: cor }} title={`Do primeiro ao último ponto (${(rotulo || 'período').toLowerCase()})`}>
-              <Icon size={13} strokeWidth={2.5}>{SETAS[rumo]}</Icon>
-              {pctTexto(pct)}
-            </span>
-          )}
-        {numSub && !carregando && <span className="rvm-numsub">{numSub}</span>}
-      </div>
-      <div className={'rvm-graf' + (graficoCarregando ? ' rvm-graf-carregando' : '')}>
-        {temGrafico && !carregando && !graficoCarregando ? (
-          <>
-            <div className="pmc-fill" style={{ background: `linear-gradient(to left, ${corGraf}1c, transparent 80%)` }} />
-            <div className="pmc-fill pmc-dots">
-              <svg aria-hidden="true">
-                <defs>
-                  <pattern id={grade} width="12" height="12" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="1" fill="currentColor" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#${grade})`} />
-              </svg>
-            </div>
+      <div className="rvm-meio">
+        <div className="rvm-num">
+          <span className="rvm-linha">
+            <span className="rvm-val">{carregando ? '—' : comContagem(valor)}</span>
+            {unidade && !carregando && <span className="rvm-un">{unidade}</span>}
+          </span>
+          {numSub && !carregando && <span className="rvm-numsub">{numSub}</span>}
+        </div>
+        <div className={'rvm-graf' + (graficoCarregando || carregando ? ' rvm-graf-carregando' : '')}>
+          {mostraGraf && (
             <MetricChart
               series={series}
               view={view}
               valueFormatter={formatar}
               dateFormatter={formatarData}
-              padTop={6}
+              padTop={4}
               tipAuto
               label={`${titulo}: gráfico de ${view === 'curve' ? 'curva' : 'barras'}${rotulo ? `, ${rotulo}` : ''}. Use as setas para percorrer os pontos.`}
             />
-          </>
-        ) : (
-          <span className="rvm-vazio">{carregando || graficoCarregando ? '' : 'Ainda sem histórico para desenhar'}</span>
-        )}
+          )}
+        </div>
       </div>
-      {extra && !carregando && <div className="rvm-extra">{extra}</div>}
       <footer className="rvm-pe">
         <span className="rvm-delta">
-          {rodape !== undefined ? rodape : <>{temGrafico && !carregando && <b style={{ color: cor }}>{delta}</b>} {rotuloDelta}</>}
+          {rodape !== undefined ? rodape : temGrafico && !carregando ? (
+            <>
+              {variacao !== false && (
+                <span className={`rvm-var rvm-t-${tomFinal}`} title={`Do primeiro ao último ponto (${(rotulo || 'período').toLowerCase()})`}>
+                  <Icon size={11} strokeWidth={2.5}>{SETAS[rumo]}</Icon>
+                  {pctTexto(pct)}
+                </span>
+              )}
+              {delta} {rotuloDelta}
+            </>
+          ) : rotuloDelta}
         </span>
-        {temGrafico && <ViewToggle value={view} onChange={setView} />}
+        {mostraGraf && <ViewToggle value={view} onChange={setView} />}
       </footer>
     </article>
   );
 }
 
-/** Indicador SEM série dia a dia (Tempo para fechar): a mesma moldura, a mesma altura,
- *  com a explicação no lugar do gráfico. */
+/** Indicador SEM série dia a dia (Tempo para fechar): a mesma moldura, sem gráfico. */
 export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape, icone }: {
   titulo: string; valor: ReactNode; detalhe?: ReactNode; rodape?: ReactNode; icone?: IconeMetrica;
 }) {
@@ -246,14 +228,18 @@ export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape, icone }: {
     <article className="pmc-root rvm rvm-fixo">
       <PmcStyles />
       <header className="rvm-cab"><div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-tit">{titulo}</h3></div></header>
-      <div className="rvm-num"><span className="rvm-val">{comContagem(valor)}</span></div>
-      <div className="rvm-graf rvm-graf-texto">{detalhe}</div>
+      <div className="rvm-meio">
+        <div className="rvm-num">
+          <span className="rvm-linha"><span className="rvm-val">{comContagem(valor)}</span></span>
+          {detalhe && <span className="rvm-numsub">{detalhe}</span>}
+        </div>
+      </div>
       <footer className="rvm-pe"><span className="rvm-delta">{rodape}</span></footer>
     </article>
   );
 }
 
-/** Grade dos cards: 4 por linha (como os indicadores de antes); 2 em tela média; 1 no celular. */
+/** Grade dos cards: 4 por linha (ou 3); 2 em tela média; 1 no celular. */
 export function GradeMetricas({ children, rotulo, colunas = 4 }: { children: ReactNode; rotulo: string; colunas?: 3 | 4 }) {
   return (
     <section className="pmc-grade-caixa" aria-label={rotulo}>
@@ -262,8 +248,7 @@ export function GradeMetricas({ children, rotulo, colunas = 4 }: { children: Rea
   );
 }
 
-/** O título de um bloco de cards (no lugar do cartão grande em volta: card dentro de card
- *  pesava). Título + ajuda + subtítulo à esquerda; controles à direita. */
+/** O título de um bloco de cards (por fora, sem cartão em volta de cartão). */
 export function TituloBloco({ titulo, ajuda, sub, acao }: { titulo: string; ajuda?: ReactNode; sub?: ReactNode; acao?: ReactNode }) {
   return (
     <div className="rvm-bloco-cab">
@@ -276,26 +261,24 @@ export function TituloBloco({ titulo, ajuda, sub, acao }: { titulo: string; ajud
   );
 }
 
-/* ------------------------------------------------------------------
-   Card de VÁRIAS SÉRIES (dono 14/11: as ondas — "Ondas por campanha" e
-   "Fechados da equipe" — no formato do card de métrica). É o modo "series"
-   do Progress Metric Card na medida da casa: as linhas juntas sem área (ou
-   barras lado a lado), a troca curva/barras, o fundo de pontos, o balão com
-   todas as séries no ponto marcado, a legenda que esconde/mostra cada linha
-   (com o total dela e o cresceu/caiu), o total do que está visível e, no
-   rodapé, o máximo, o mínimo e a média por ponto.
-   ------------------------------------------------------------------ */
+/* ==================================================================
+   CARD DE VÁRIAS SÉRIES (as ondas: "Ondas por campanha", "Fechados da equipe").
+   ================================================================== */
 
-/** a cor de série da casa (--dado-1…5) em hex: o gráfico desenha em atributo SVG, onde var() não vale.
- *  Os mesmos tons das bolinhas e dos selos (dashboardV5.css). */
+/* a paleta das séries: com a moldura, a da casa (dourado · grafite · cinza · bronze · cinza claro);
+   sem ela, as cores de série de antes. O gráfico desenha em SVG/estilo, então em hex. */
 const CORES_SERIE = {
   dark: ['#7C83F2', '#4CB0D9', '#3FB868', '#D1789B', '#8496AB'],
   light: ['#4F46E5', '#1F7E95', '#1E8A44', '#A14A77', '#5E7183'],
 } as const;
-const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number): string => {
+const CORES_SERIE_CASA = {
+  dark: ['#F5A82E', '#E4E4E7', '#8A8A93', '#C69A5E', '#52525B'],
+  light: ['#EE9A1C', '#27272A', '#A1A1AA', '#9A6A2B', '#D4D4D8'],
+} as const;
+const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number, casa: boolean): string => {
+  const pal = (casa ? CORES_SERIE_CASA : CORES_SERIE)[tema];
   const n = Number(/--dado-(\d)/.exec(cor)?.[1] ?? 0);
-  const pal = CORES_SERIE[tema];
-  return n >= 1 && n <= pal.length ? pal[n - 1] : /^#/.test(cor) ? cor : pal[i % pal.length];
+  return n >= 1 && n <= pal.length ? pal[n - 1] : !casa && /^#/.test(cor) ? cor : pal[i % pal.length];
 };
 
 export interface SerieCartao {
@@ -306,6 +289,124 @@ export interface SerieCartao {
   /** valor por chave do ponto (ausente = 0) */
   valores: ReadonlyMap<string, number>;
   notas?: { texto: string; tom: 'ok' | 'er' | 'am' }[];
+}
+
+/** teto "redondo" da escala (a metade também é inteira): 4, 6, 8, 10, 20, 40… */
+function tetoBonito(max: number): number {
+  if (max <= 4) return 4;
+  const pot = Math.pow(10, Math.floor(Math.log10(max)));
+  for (const m of [1, 2, 4, 6, 8, 10]) if (m * pot >= max) return m * pot;
+  return 10 * pot;
+}
+
+/* O gráfico das ondas: curvas suaves com a área preenchida (ou barras empilhadas), grade discreta
+   com a escala à esquerda, os dias embaixo, linha-guia e balão com todas as séries no ponto. As
+   curvas esticam com o cartão (SVG sem proporção fixa); pontos, guia, rótulos e balão são HTML por
+   cima, para não deformar. */
+const VB_W = 1000; const VB_H = 300;
+function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
+  series: { nome: string; cor: string; valores: number[] }[];
+  /** o texto de cada ponto no balão */
+  rotulos: string[];
+  /** o texto curto de cada ponto no eixo de baixo */
+  eixo: string[];
+  view: ChartView;
+  titulo: string;
+}) {
+  const uid = useId().replace(/:/g, '');
+  const [ativo, setAtivo] = useState<number | null>(null);
+  const n = rotulos.length;
+  const totais = rotulos.map((_, i) => series.reduce((t, s) => t + (s.valores[i] ?? 0), 0));
+  const teto = tetoBonito(view === 'bar' ? Math.max(0, ...totais) : Math.max(0, ...series.flatMap((s) => s.valores)));
+  const xPct = (i: number) => (view === 'bar' ? ((i + 0.5) / n) * 100 : n > 1 ? (i / (n - 1)) * 100 : 50);
+  const yPct = (v: number) => (1 - v / teto) * 100;
+  const fmt = (v: number) => v.toLocaleString('pt-BR');
+  const passoEixo = Math.ceil(n / 8);
+
+  const aoMover = (e: PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const f = (e.clientX - r.left) / r.width;
+    const i = view === 'bar' ? Math.floor(f * n) : Math.round(f * (n - 1));
+    setAtivo(Math.max(0, Math.min(n - 1, i)));
+  };
+  const aoTeclar = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') { if (ativo != null) { e.preventDefault(); setAtivo(null); } return; }
+    const para: Record<string, number> = { ArrowLeft: (ativo ?? n) - 1, ArrowRight: (ativo ?? -1) + 1, Home: 0, End: n - 1 };
+    if (!(e.key in para)) return;
+    e.preventDefault();
+    setAtivo(Math.max(0, Math.min(n - 1, para[e.key])));
+  };
+
+  return (
+    <div className="rvo">
+      <div className="rvo-escala" aria-hidden>
+        {[teto, teto / 2, 0].map((v) => <span key={v} style={{ top: `${yPct(v)}%` }}>{fmt(v)}</span>)}
+      </div>
+      <div className="rvo-plot" role="application" tabIndex={0} aria-label={`${titulo}. Use as setas para percorrer os pontos.`}
+        onPointerMove={aoMover} onPointerDown={aoMover} onPointerLeave={() => setAtivo(null)} onKeyDown={aoTeclar}>
+        {[teto, teto / 2, 0].map((v) => <i key={v} className={'rvo-grade' + (v === 0 ? ' rvo-base' : '')} style={{ top: `${yPct(v)}%` }} />)}
+
+        {view === 'curve' ? (
+          <svg key={`c-${n}-${series.length}`} className="rvo-svg" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" aria-hidden>
+            <defs>
+              {series.map((s, k) => (
+                <linearGradient key={k} id={`rvo-${uid}-${k}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={s.cor} stopOpacity={k === 0 ? 0.3 : 0.14} />
+                  <stop offset="100%" stopColor={s.cor} stopOpacity={0} />
+                </linearGradient>
+              ))}
+            </defs>
+            {/* de trás para a frente: a primeira série (a principal) fica por cima */}
+            {[...series.keys()].reverse().map((k) => {
+              const s = series[k];
+              const pts = s.valores.map((v, i) => ({ x: n > 1 ? (i / (n - 1)) * VB_W : VB_W / 2, y: (1 - v / teto) * VB_H }));
+              const linha = monotonePath(pts);
+              if (!linha) return null;
+              return (
+                <g key={k}>
+                  <path d={`${linha}L${VB_W},${VB_H}L0,${VB_H}Z`} fill={`url(#rvo-${uid}-${k})`} />
+                  <path d={linha} fill="none" stroke={s.cor} strokeWidth={k === 0 ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                </g>
+              );
+            })}
+          </svg>
+        ) : (
+          <div key={`b-${n}-${series.length}`} className="rvo-barras" aria-hidden>
+            {rotulos.map((_, i) => (
+              <div key={i} className={'rvo-col' + (ativo === i ? ' on' : '')}>
+                <div className="rvo-pilha" style={{ height: `${(totais[i] / teto) * 100}%`, animationDelay: `${Math.min(i, 12) * 25}ms` }}>
+                  {series.map((s, k) => (s.valores[i] ?? 0) > 0 && (
+                    <i key={k} style={{ flex: `${s.valores[i]} 0 0`, background: s.cor }} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {ativo != null && (
+          <>
+            <i className="rvo-guia" style={{ left: `${xPct(ativo)}%` }} />
+            {view === 'curve' && series.map((s, k) => (
+              <i key={k} className="rvo-ponto" style={{ left: `${xPct(ativo)}%`, top: `${yPct(s.valores[ativo] ?? 0)}%`, background: s.cor }} />
+            ))}
+            <div className={'rvo-balao' + (xPct(ativo) > 55 ? ' esq' : '')} style={{ left: `${xPct(ativo)}%` }}>
+              <b className="rvo-balao-t">{rotulos[ativo]}</b>
+              {series.map((s, k) => (
+                <span key={k} className="rvo-balao-l"><i style={{ background: s.cor }} /><span>{s.nome}</span><b>{fmt(s.valores[ativo] ?? 0)}</b></span>
+              ))}
+              {series.length > 1 && <span className="rvo-balao-l rvo-balao-tot"><span>Total</span><b>{fmt(totais[ativo])}</b></span>}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="rvo-eixo" aria-hidden>
+        {eixo.map((t, i) => ((i % passoEixo === 0 || i === n - 1) && (i === n - 1 || n - 1 - i >= passoEixo) ? (
+          <span key={i} data-lado={view === 'curve' ? (i === 0 ? 'ini' : i === n - 1 ? 'fim' : 'meio') : 'meio'} style={{ left: `${xPct(i)}%` }}>{t}</span>
+        ) : null))}
+      </div>
+    </div>
+  );
 }
 
 export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade, rodape, vazio, eixo }: {
@@ -322,11 +423,11 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
   /** nota pequena no rodapé, à esquerda */
   rodape?: ReactNode;
   vazio: string;
-  /** o texto curto de cada ponto no eixo de baixo ('08/11', 'sem 03/11'); sem ele, sem eixo */
+  /** o texto curto de cada ponto no eixo de baixo ('08/11', 'sem 03/11') */
   eixo?: string[];
 }) {
   const tema = useTemaAtual();
-  const grade = `rvm-pt-${useId().replace(/:/g, '')}`;
+  const moldura = useMoldura();
   const [view, setView] = useState<ChartView>('curve');
   const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
   const alternar = (id: string) => setOcultas((prev) => {
@@ -338,14 +439,12 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
 
   const comCor = useMemo(() => series.map((s, i) => ({
     ...s,
-    hex: corDaSerie(s.cor, tema, i),
+    hex: corDaSerie(s.cor, tema, i, moldura),
     total: pontos.reduce((t, p) => t + (s.valores.get(p.chave) ?? 0), 0),
-  })), [series, pontos, tema]);
+  })), [series, pontos, tema, moldura]);
   const visiveis = comCor.filter((s) => !ocultas.has(s.id));
-  const chart = useMemo(() => visiveis.map((s) => ({
-    name: s.rotulo,
-    color: s.hex,
-    data: pontos.map((p) => ({ value: s.valores.get(p.chave) ?? 0, date: p.rotulo })),
+  const grafico = useMemo(() => visiveis.map((s) => ({
+    nome: s.rotulo, cor: s.hex, valores: pontos.map((p) => s.valores.get(p.chave) ?? 0),
   })), [visiveis, pontos]);
   const porPonto = pontos.map((p) => visiveis.reduce((t, s) => t + (s.valores.get(p.chave) ?? 0), 0));
   const total = porPonto.reduce((a, b) => a + b, 0);
@@ -368,63 +467,31 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
           {temDado && <ViewToggle value={view} onChange={setView} />}
         </div>
       </header>
-      <div className="rvm-num">
-        <span className="rvm-val"><Contagem texto={n(total)} /></span>
-        <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas linhas visíveis' : ''}</span>
-      </div>
-      <ul className="rvm-leg" aria-label="Linhas do gráfico (clique para esconder ou mostrar)">
-        {comCor.map((s) => {
-          const ligada = !ocultas.has(s.id);
-          return (
-            <li key={s.id}>
-              <button type="button" className="rvm-leg-bt" aria-pressed={ligada} onClick={() => alternar(s.id)}
-                title={ligada ? `Esconder ${s.rotulo}` : `Mostrar ${s.rotulo}`}>
-                <i style={{ background: s.hex }} />
-                <span className="rvm-leg-nome">{s.rotulo}</span>
-                <b className="num">{n(s.total)}</b>
-                {s.notas?.map((nt) => <span key={nt.texto} className={`rvm-leg-nota rvm-leg-${nt.tom}`}>{nt.texto}</span>)}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="rvm-graf rvm-graf-g">
-        {temDado ? (
-          <>
-            <div className="pmc-fill pmc-dots">
-              <svg aria-hidden="true">
-                <defs>
-                  <pattern id={grade} width="14" height="14" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="1" fill="currentColor" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#${grade})`} />
-              </svg>
-            </div>
-            <MetricChart
-              series={chart}
-              view={view}
-              valueFormatter={n}
-              dateFormatter={(d) => d}
-              padTop={14}
-              tipAuto
-              label={`${titulo}: gráfico de ${view === 'curve' ? 'curvas' : 'barras'}. Use as setas para percorrer os pontos.`}
-            />
-          </>
-        ) : <span className="rvm-vazio">{vazio}</span>}
-      </div>
-      {temDado && eixo && eixo.length === pontos.length && (
-        <div className="rvm-eixo" aria-hidden>
-          {eixo.map((t, i) => {
-            // no máximo ~8 rótulos; a posição segue o desenho (curva: nas pontas; barras: no meio da barra)
-            const passo = Math.ceil(eixo.length / 8);
-            if (i % passo !== 0 && i !== eixo.length - 1) return null;
-            const x = view === 'curve' ? (eixo.length > 1 ? (i / (eixo.length - 1)) * 100 : 50) : ((i + 0.5) / eixo.length) * 100;
-            const lado = view === 'curve' && i === 0 ? 'ini' : view === 'curve' && i === eixo.length - 1 ? 'fim' : 'meio';
-            return <span key={i} data-lado={lado} style={{ left: `${x}%` }}>{t}</span>;
-          })}
+      <div className="rvm-series-topo">
+        <div className="rvm-linha">
+          <span className="rvm-val"><Contagem texto={n(total)} /></span>
+          <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas linhas visíveis' : ''}</span>
         </div>
-      )}
+        <ul className="rvm-leg" aria-label="Linhas do gráfico (clique para esconder ou mostrar)">
+          {comCor.map((s) => {
+            const ligada = !ocultas.has(s.id);
+            return (
+              <li key={s.id}>
+                <button type="button" className="rvm-leg-bt" aria-pressed={ligada} onClick={() => alternar(s.id)}
+                  title={ligada ? `Esconder ${s.rotulo}` : `Mostrar ${s.rotulo}`}>
+                  <i style={{ background: s.hex }} />
+                  <span className="rvm-leg-nome">{s.rotulo}</span>
+                  <b className="num">{n(s.total)}</b>
+                  {s.notas?.map((nt) => <span key={nt.texto} className={`rvm-leg-nota rvm-leg-${nt.tom}`}>{nt.texto}</span>)}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {temDado
+        ? <GraficoSeries series={grafico} rotulos={pontos.map((p) => p.rotulo)} eixo={eixo ?? pontos.map((p) => p.rotulo)} view={view} titulo={titulo} />
+        : <div className="rvo rvo-vazio">{vazio}</div>}
       <footer className="rvm-pe">
         <span className="rvm-delta">{rodape}</span>
         {temDado && (

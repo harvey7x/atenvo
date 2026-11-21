@@ -46,7 +46,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv) { font-size: 12.5px; font-weight: 500; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-btn.btn-pri:not(.btn-mini) { font-weight: 550; }
 /* o ícone do card de métrica: menor e mais discreto */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { width: 26px; height: 26px; margin-right: 9px; border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { display: inline-flex; width: 26px; height: 26px; margin-right: 9px; border-radius: 8px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico svg { width: 14px; height: 14px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-cab { min-height: 26px; }
 /* cantos um pouco mais contidos */
@@ -62,11 +62,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(3) { animation-delay: .12s; }
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(4) { animation-delay: .18s; }
 
-  /* passar o mouse numa métrica: o ícone responde e o brilho do gráfico acende */
+  /* passar o mouse numa métrica: o ícone responde */
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { transition: transform .25s var(--rvf-ease); }
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm:hover .rvm-ico { transform: scale(1.1) rotate(-5deg); }
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-graf > .pmc-fill:first-child { opacity: .75; transition: opacity .25s ease; }
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm:hover .rvm-graf > .pmc-fill:first-child { opacity: 1.6; filter: saturate(1.4) brightness(1.15); }
   /* o balão surge (não pisca) e o ponto marcado "pousa" */
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip { animation: rvf-balao .16s var(--rvf-ease) backwards; }
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip-wrap { transition: transform .12s ease-out; }
@@ -106,3 +104,83 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
 @keyframes rvf-ponto { from { opacity: 0; transform: scale(.3); } }
 @keyframes rvf-cresce { from { transform: scaleY(0); } }
 @keyframes rvf-estica { from { transform: scaleX(0); } }
+
+/* =====================================================================
+   21/11 (2) — PALETA DA CASA, ÍCONES E BOTÕES
+   Dono: "é um sistema dourado e preto; quando entra azul, vermelho, verde,
+   parece que polui". A cor passa a ser EXCEÇÃO:
+     · tudo bem / normal  → grafite e cinzas (sem cor)
+     · atenção / destaque → o dourado da casa
+     · queda / atraso     → ferrugem (laranja queimado, da mesma família quente)
+   Nada de azul, verde ou vermelho no sistema.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 {
+  --verde: #3F3F46; --verde-rgb: 63, 63, 70; --verde-bg: rgba(24, 24, 27, .06);
+  --rubro: #B4532A; --rubro-rgb: 180, 83, 42; --rubro-bg: rgba(180, 83, 42, .1);
+  --ambar: #C77A0A; --ambar-rgb: 199, 122, 10; --ambar-bg: rgba(238, 154, 28, .12);
+  --cor-ok-txt: #3F3F46; --cor-alerta-txt: #A8650A; --cor-erro-txt: #A84A24;
+  --cor-ok-suave: rgba(24, 24, 27, .06); --cor-alerta-suave: rgba(238, 154, 28, .13); --cor-erro-suave: rgba(180, 83, 42, .1);
+  --dado-1: #52525B; --dado-1-rgb: 82, 82, 91;
+  --cor-info: #52525B; --cor-info-suave: rgba(24, 24, 27, .06);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 {
+  --verde: #D4D4D8; --verde-rgb: 212, 212, 216; --verde-bg: rgba(255, 255, 255, .08);
+  --rubro: #E27B52; --rubro-rgb: 226, 123, 82; --rubro-bg: rgba(226, 123, 82, .14);
+  --ambar: #F5A82E; --ambar-rgb: 245, 168, 46; --ambar-bg: rgba(245, 168, 46, .13);
+  --cor-ok-txt: #D4D4D8; --cor-alerta-txt: #F5A82E; --cor-erro-txt: #EE9B78;
+  --cor-ok-suave: rgba(255, 255, 255, .08); --cor-alerta-suave: rgba(245, 168, 46, .14); --cor-erro-suave: rgba(226, 123, 82, .16);
+  --dado-1: #A1A1AA; --dado-1-rgb: 161, 161, 170;
+  --cor-info: #A1A1AA; --cor-info-suave: rgba(255, 255, 255, .08);
+}
+/* séries de gráfico e bolinhas de campanha: dourado · grafite · cinza · bronze · cinza claro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .d5-pg { --dado-2: #27272A; --dado-3: #A1A1AA; --dado-4: #9A6A2B; --dado-5: #D4D4D8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .d5-pg { --dado-2: #E4E4E7; --dado-3: #8A8A93; --dado-4: #C69A5E; --dado-5: #52525B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-pg :is(.pmc-root.rvm, .d5-sec:has(.d5-graf-leg li + li)) { --dado-1: var(--azul); --dado-1-rgb: var(--azul-rgb); }
+/* a variação (▲ +27% / ▼ −26%): subir em grafite, cair em ferrugem */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-var-ok { color: var(--cor-ok-txt); background: var(--cor-ok-suave); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-var-er { color: var(--cor-erro-txt); background: var(--cor-erro-suave); }
+/* "Ao vivo": o ponto no dourado da casa, o texto neutro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo { color: var(--txt-2); background: transparent; border-color: var(--lin-fio, var(--linha)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo .selo-vivo-dot { background: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .18); }
+/* o card PRETO (o primeiro de cada grade, no claro): os tons acendem para ler sobre o preto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child {
+  --cor-ok-txt: #E4E4E7; --cor-erro-txt: #EE9B78; --cor-ok-suave: rgba(255, 255, 255, .1); --cor-erro-suave: rgba(226, 123, 82, .18);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child :is(.rvm-var, .rvm-delta > b) { filter: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ok { color: #E4E4E7; background: rgba(255, 255, 255, .1); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-er { color: #EE9B78; background: rgba(226, 123, 82, .18); }
+
+/* ---- ÍCONES do menu: traço 1,6, 16px, cantos redondos (a família nova está em shell/iconesAlfa.tsx) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ico, .ba-ico svg) { width: 16px; height: 16px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-ico svg { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item.on .ba-ico svg { stroke-width: 1.8; }
+
+/* ---- BOTÕES: uma régua só — 32px, canto 8, fio fino, sem degradê ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .gp-sc-ger, .fjb-btn) { border-radius: 8px; letter-spacing: 0; }
+/* secundário no claro: branco, fio cinza, sombra de 1px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: #18181B; background: #FFFFFF; border: 1px solid #E4E4E7; box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  color: #09090B; background: #FAFAFA; border-color: #D4D4D8;
+}
+/* secundário no escuro: transparente, fio claro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: #E4E4E7; background: transparent; border: 1px solid rgba(255, 255, 255, .12); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .2);
+}
+/* principal (claro): preto, canto 8, um fio de luz no alto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(0, 0, 0, .16);
+}
+/* botões de ícone e campos: canto 8; o foco é um anel dourado suave */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.ib, .ib2, .tool, .d5-ib) { border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(input.inp, select.inp, textarea.inp, .wa-busca, .kb-busca, .d5-sel select) { border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(input.inp, select.inp, textarea.inp, .d5-sel select):focus-visible {
+  outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .18);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .ib, .ib2):focus-visible { outline: 2px solid rgba(var(--azul-rgb), .55); outline-offset: 2px; }
+/* "Voltou a pagar" (Saúde da carteira): era azul-petróleo — vira o cinza médio da paleta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #A1A1AA; }
