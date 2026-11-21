@@ -274,7 +274,9 @@ html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.st, .ev-ch
 html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 {
   --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
-html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(
+/* (21/11: com a fundação nova — [data-moldura] — os identificadores voltam para a fonte da casa,
+   com algarismos alinhados; a mono lia como "tela de programador") */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin):not([data-moldura]) .v2 :is(
   .conv2 .h2,                 /* WhatsApp: horário na lista */
   .conv2 .cr,                 /* WhatsApp: tempo aguardando */
   .hh.num,                    /* WhatsApp: hora das mensagens */

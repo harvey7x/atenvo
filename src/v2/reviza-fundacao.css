@@ -311,3 +311,53 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 /* etiquetas do cliente (Urgente, Revisão de contrato…): a bolinha colorida de cada uma vira neutra — o nome já diz qual é */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip > i { background: var(--txt-3) !important; opacity: .7; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip { color: var(--txt-2); background: transparent; border: 1px solid var(--lin-fio, var(--linha)); }
+
+/* =====================================================================
+   21/11 (5) — TABELAS e números
+   - sai a fonte "de máquina" (mono) dos telefones, datas e horários: tudo na
+     Inter, com algarismos alinhados em coluna;
+   - os botões de cada linha ficam discretos (sem moldura) e só ganham
+     contorno quando o mouse passa na linha — menos ruído em tabela longa;
+   - avatares de iniciais menores e mais leves.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 { --mono: var(--fonte); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.num, td, time, .d5-tel, .zp-hora) { font-variant-numeric: tabular-nums; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.d5-tel, .ct-tel, td.d.num, .reg-quando, .pn-fin-mes) { font-family: var(--fonte); letter-spacing: 0; }
+@media (hover: hover) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr:not(:hover):not(:focus-within) td :is(.p-btn, .pn-link, .fin-btn, .ev-st-acao, .ev-btn-conv, .pn-fin-ok, .pn-fin-nao):not(.btn-perigo) {
+    border-color: transparent; background: transparent; box-shadow: none; color: var(--txt-2);
+  }
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody td :is(.av, .av2, .pn-av, .ev-av, .d5-av) {
+  width: 26px; height: 26px; min-width: 26px; font-size: 10px; font-weight: 550; letter-spacing: .02em;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 0; box-shadow: none;
+}
+/* Dashboard: o nome de cada número sem negrito pesado */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-pg .d5-tab :is(.d5-pessoa, .d5-nome b) { font-weight: 550; letter-spacing: 0; }
+
+/* =====================================================================
+   21/11 (6) — LOGIN: a primeira impressão na identidade da casa — página
+   preta, o cartão no centro, o dourado só na marca e no botão de entrar.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2:has(> .lg-card, .lg-card) {
+  background: radial-gradient(900px 420px at 50% -10%, rgba(245, 168, 46, .09), transparent 70%), #09090B !important;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2:has(.lg-card) > :is(.luz2, .grao) { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo-nome { color: #F4F4F5; font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-rodape { color: #6F6F78; font-size: 11.5px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card {
+  border-radius: 18px; box-shadow: 0 30px 70px -28px rgba(0, 0, 0, .8);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .lg-card { background: #FFFFFF; border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .lg-card { background: #111113; border-color: rgba(255, 255, 255, .08); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .caps { font-size: 10.5px; font-weight: 500; letter-spacing: .14em; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .p-display { font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .sub { font-size: 12.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .campo > label { font-size: 12px; font-weight: 500; color: var(--txt-2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card :is(input.inp, .controle input) { height: 40px; border-radius: 9px; font-size: 13.5px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .entrar {
+  height: 40px; border-radius: 9px; font-size: 13.5px; font-weight: 550; letter-spacing: 0;
+  color: #1B1206; background: var(--azul); border: 0; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 12%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .lg-pe { font-size: 11.5px; color: var(--txt-3); }
