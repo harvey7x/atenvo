@@ -18,7 +18,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { BadgeStatus, CardVidro } from '../../components';
 import { SeloAoVivo } from '../../components/SeloAoVivo';
 import { ROTULO_COMP, type AtendSerie, type CicloSerie, type Comportamento, type HistoricoMes, type ResumoCarteira, type TipoMsg } from '../cobrancaAnalytics';
-import { CartaoMetrica, GradeMetricas, type PeriodOption, type SeriesPoint } from '../../components/CartaoMetrica';
+import { CartaoMetrica, GradeMetricas, IconeTile, type IconeMetrica, type PeriodOption, type SeriesPoint } from '../../components/CartaoMetrica';
 import { cobrancaDoCiclo } from '../cicloCalendario';
 import type { Dados } from '../../data/cobranca/types';
 import './painel.css';
@@ -88,12 +88,12 @@ export const DESC_COMP: Record<Comportamento, string> = {
 const ROTULO_TIPO_ENG: Record<TipoMsg, string> = { antes: 'Lembrete (antes)', cobranca: 'Cobrança', depois: 'Aviso de atraso', remarketing: 'Remarketing' };
 
 /* ---------------- peças ---------------- */
-export function Indicador({ rotulo, valor, tom, pe, visual, extra }: {
-  rotulo: string; valor: ReactNode; tom?: 'ok' | 'at' | 'er'; pe: ReactNode; visual?: ReactNode; extra?: ReactNode;
+export function Indicador({ rotulo, valor, tom, pe, visual, extra, icone }: {
+  rotulo: string; valor: ReactNode; tom?: 'ok' | 'at' | 'er'; pe: ReactNode; visual?: ReactNode; extra?: ReactNode; icone?: IconeMetrica;
 }) {
   return (
     <CardVidro spot className="pn-kpi">
-      <div className="pn-kpi-cab"><span className="pn-kpi-rot">{rotulo}</span>{extra}</div>
+      <div className="pn-kpi-cab"><span className="pn-kpi-rot">{icone && <span className="kpi-ic" aria-hidden><IconeTile nome={icone} /></span>}{rotulo}</span>{extra}</div>
       <div className={`pn-kpi-val num${tom ? ` ${tom}` : ''}`}>{valor}</div>
       <div className="pn-kpi-pe">{pe}</div>
       {visual && <div className="pn-kpi-vis">{visual}</div>}

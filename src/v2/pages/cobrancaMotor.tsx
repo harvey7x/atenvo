@@ -43,6 +43,7 @@ import {
 import { comissoesDe } from './RevizaComissoes';
 import { EquipeVista } from './painel/EquipeVista';
 import { Dinheiro, Indicador, Proporcao } from './painel/PainelResumo';
+import { IconeTile } from '../components/CartaoMetrica';
 import { NumerosVista, type ComercialCobertura, type NumeroItem } from './painel/NumerosVista';
 import { clientesReais } from './revizaAnalytics';
 import { cobrancaDoCiclo, feriadosDoAno, proximaCobrancaDoCiclo } from './cicloCalendario';
@@ -2905,16 +2906,16 @@ export function AbaFinanceiro({ gestor, papel, admin = false }: { demo: boolean;
 
       {/* indicadores */}
       <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
-        <Indicador rotulo="Aguardando conferência" valor={<Dinheiro v={aConfV} />} tom={abertas.length ? 'at' : undefined}
+        <Indicador rotulo="Aguardando conferência" icone="relogio" valor={<Dinheiro v={aConfV} />} tom={abertas.length ? 'at' : undefined}
           pe={abertas.length ? <><b className="num">{abertas.length}</b> pagamento{abertas.length === 1 ? '' : 's'} · o mais antigo de <b className="num">{quandoBR(maisAntiga).slice(0, 5)}</b></> : 'nada para conferir'}
           visual={<div className="pn-trilho"><i className="at" style={{ width: `${pctVol(aConfV)}%` }} /></div>} />
-        <Indicador rotulo="Confirmado" valor={<Dinheiro v={confV} />} tom={confV ? 'ok' : undefined}
+        <Indicador rotulo="Confirmado" icone="certo" valor={<Dinheiro v={confV} />} tom={confV ? 'ok' : undefined}
           pe={<><b className="num">{conf.length}</b> confirmaç{conf.length === 1 ? 'ão' : 'ões'} no histórico</>}
           visual={<div className="pn-trilho"><i className="ok" style={{ width: `${pctVol(confV)}%` }} /></div>} />
-        <Indicador rotulo="Não caiu" valor={<Dinheiro v={recV} />} tom={recV ? 'er' : undefined}
+        <Indicador rotulo="Não caiu" icone="alerta" valor={<Dinheiro v={recV} />} tom={recV ? 'er' : undefined}
           pe={<><b className="num">{rec.length}</b> recusa{rec.length === 1 ? '' : 's'} no histórico</>}
           visual={<div className="pn-trilho"><i className="er" style={{ width: `${pctVol(recV)}%` }} /></div>} />
-        <Indicador rotulo="Taxa de confirmação" valor={taxa == null ? '—' : <>{taxa}<span className="pn-cent">%</span></>}
+        <Indicador rotulo="Taxa de confirmação" icone="porcento" valor={taxa == null ? '—' : <>{taxa}<span className="pn-cent">%</span></>}
           tom={taxa == null ? undefined : taxa >= 80 ? 'ok' : taxa >= 60 ? 'at' : 'er'}
           pe={nDecididas ? <><b className="num">{conf.length}</b> de {nDecididas} conferências caíram na conta</> : 'nenhuma conferência ainda'}
           visual={<div className="pn-trilho"><i className={taxa == null ? 'neutro' : taxa >= 80 ? 'ok' : taxa >= 60 ? 'at' : 'er'} style={{ width: `${taxa ?? 0}%` }} /></div>} />
@@ -4336,11 +4337,11 @@ export function AbaNovos({ gestor, papel }: { demo: boolean; gestor: boolean; pa
     <div className="fin-raiz">
       {aviso && <div className="gs-aviso" role="status"><span>{aviso}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso('')} aria-label="Fechar">×</button></div>}
       <div className="kpis sobe">
-        <Kpi rotulo="Novos (débito ativo)" valor={normais.length} formato="mil" nota="clientes ainda com o desconto no benefício" />
-        <Kpi rotulo="Aguardando aprovação" valor={pendentes.length} formato="mil" nota={pendentes.length > 0 ? (podeAprovar ? 'defina o ciclo e o valor' : 'com o financeiro') : 'nada pendente'} />
-        <Kpi rotulo="Em parcelas/mês" valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " sufixo={`,${String(Math.round((emParcelas % 1) * 100)).padStart(2, '0')}`}
+        <Kpi rotulo="Novos (débito ativo)" icone={<IconeTile nome="entra" />} valor={normais.length} formato="mil" nota="clientes ainda com o desconto no benefício" />
+        <Kpi rotulo="Aguardando aprovação" icone={<IconeTile nome="relogio" />} valor={pendentes.length} formato="mil" nota={pendentes.length > 0 ? (podeAprovar ? 'defina o ciclo e o valor' : 'com o financeiro') : 'nada pendente'} />
+        <Kpi rotulo="Em parcelas/mês" icone={<IconeTile nome="moeda" />} valor={Math.trunc(emParcelas)} formato="mil" prefixo="R$ " sufixo={`,${String(Math.round((emParcelas % 1) * 100)).padStart(2, '0')}`}
           nota={`${ativos.length} parcela${ativos.length === 1 ? '' : 's'} ativa${ativos.length === 1 ? '' : 's'}`} />
-        <Kpi rotulo="Total de clientes" valor={linhas.length} formato="mil" nota="na planilha de cobranças" />
+        <Kpi rotulo="Total de clientes" icone={<IconeTile nome="pessoas" />} valor={linhas.length} formato="mil" nota="na planilha de cobranças" />
       </div>
       {pendentes.length > 0 && (
         <CardVidro spot className="fin-panel nv-pend sobe" style={{ animationDelay: '.08s' }}>

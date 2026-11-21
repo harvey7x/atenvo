@@ -186,16 +186,16 @@ export function EquipeVista({ linhas, comissoes, podeEditarPct, salvando, aoSalv
         const tomDe = (v: number) => (v >= 80 ? 'ok' : v >= 60 ? 'at' : 'er') as 'ok' | 'at' | 'er';
         return (
           <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
-            <Indicador rotulo="Comissões previstas" valor={<Dinheiro v={comPrevista} />}
+            <Indicador rotulo="Comissões previstas" icone="moeda" valor={<Dinheiro v={comPrevista} />}
               pe={<>por mês · {pct1(tot.recorrencia ? (comPrevista / tot.recorrencia) * 100 : 0)}% da recorrência mensal</>}
               visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${tot.recorrencia ? Math.min(100, (comPrevista / tot.recorrencia) * 100) : 0}%` }} /></div>} />
-            <Indicador rotulo="Melhor adimplência" valor={melhor ? <>{melhor.adimplencia}<span className="pn-cent">%</span></> : '—'} tom={melhor ? tomDe(melhor.adimplencia ?? 0) : undefined}
+            <Indicador rotulo="Melhor adimplência" icone="trofeu" valor={melhor ? <>{melhor.adimplencia}<span className="pn-cent">%</span></> : '—'} tom={melhor ? tomDe(melhor.adimplencia ?? 0) : undefined}
               pe={melhor ? <><b>{melhor.nome}</b> · {melhor.brk.em_dia + melhor.brk.voltou} de {melhor.emCobranca} em dia · equipe {tot.adimplencia}%</> : 'nenhuma carteira em cobrança'}
               visual={melhor ? <div className="pn-trilho"><i className={tomDe(melhor.adimplencia ?? 0)} style={{ width: `${melhor.adimplencia}%` }} /></div> : undefined} />
-            <Indicador rotulo="Maior atraso" valor={pior ? <Dinheiro v={pior.atrasoValor} /> : '—'} tom={pior ? 'er' : undefined}
+            <Indicador rotulo="Maior atraso" icone="alerta" valor={pior ? <Dinheiro v={pior.atrasoValor} /> : '—'} tom={pior ? 'er' : undefined}
               pe={pior ? <><b>{pior.nome}</b> · {pior.atrasoN} cliente{pior.atrasoN === 1 ? '' : 's'} em atraso, por mês</> : 'ninguém com cliente em atraso'}
               visual={pior ? <div className="pn-trilho"><i className="er" style={{ width: `${tot.atrasoValor ? Math.min(100, (pior.atrasoValor / tot.atrasoValor) * 100) : 0}%` }} /></div> : undefined} />
-            <Indicador rotulo="Clientes sem WhatsApp" valor={semWa.toLocaleString('pt-BR')} tom={semWa > 0 ? 'at' : undefined}
+            <Indicador rotulo="Clientes sem WhatsApp" icone="balao" valor={semWa.toLocaleString('pt-BR')} tom={semWa > 0 ? 'at' : undefined}
               pe={maisSemWa ? <>mais na carteira de <b>{maisSemWa.nome}</b> ({maisSemWa.semWa})</> : 'todos com número cadastrado'}
               visual={<div className="pn-trilho"><i className={semWa > 0 ? 'at' : 'ok'} style={{ width: `${tot.emCobranca ? Math.min(100, (semWa / tot.emCobranca) * 100) : 0}%` }} /></div>} />
           </div>

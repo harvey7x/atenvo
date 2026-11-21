@@ -79,9 +79,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-topo { padding-left: 14px; }
 
 /* grupos: título em caixa alta com a seta; clicar abre e fecha */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupos { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupos { gap: 8px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo-rot {
-  height: 26px; margin: 0; padding: 0 6px 0 10px; border-radius: 7px;
+  height: 24px; margin: 0; padding: 0 6px 0 10px; border-radius: 7px;
   font-size: 10.5px; font-weight: 500; line-height: 1; letter-spacing: .09em; text-transform: uppercase;
   color: var(--ba-rotulo); transition: color .16s ease, opacity .15s;
 }
@@ -104,7 +104,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="trilho"] .ba-barra .ba-item::before { content: none; }
 
 /* o item: 32px, canto 9; o ativo é a pílula com o laranja entrando pela direita */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item { padding: 6px 8px 6px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 450; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item { padding: 5px 8px 5px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 450; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo { gap: 2px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
   color: #FFFFFF; font-weight: 500;
@@ -160,8 +160,8 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 
 /* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(var(--azul-rgb), .1); border: 1px solid rgba(var(--azul-rgb), .2); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --zp-verde: #FC8F15; --zp-acao: #FC8F15; --zp-badge: #FC8F15; --zp-tique-lida: #FC8F15; --zp-onda-on: #FC8F15; --zp-onda-ponto: #FC8F15; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --zp-badge: #EE7F0A; --zp-onda-on: #EE7F0A; --zp-onda-ponto: #EE7F0A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #FC8F15; --zp-acao: #FC8F15; --zp-badge: #FC8F15; --zp-tique-lida: #FC8F15; --zp-onda-on: #FC8F15; --zp-onda-ponto: #FC8F15; --zp-out: #3A2408; --zp-rubro: #D9643C; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-badge: #EE7F0A; --zp-onda-on: #EE7F0A; --zp-onda-ponto: #EE7F0A; --zp-tique-lida: #C96A04; --zp-ambar: #C96A04; --zp-out: #FDEFD9; }
 
 /* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }
@@ -182,3 +182,51 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 @media (prefers-reduced-motion: no-preference) {
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo { animation: rvf-arte 1s ease backwards; }
 }
+
+/* =====================================================================
+   9. VARREDURA DAS TELAS (dono 21/11: "faz uma varredura nas abas para
+   deixar mais profissional, atraente e organizado") — 27 telas, nos dois temas.
+   ===================================================================== */
+/* 9.1 UM DOURADO SÓ: o tom de "atenção" era o dourado antigo (#F5A82E) e convivia com o da logo em 8 telas */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #FC8F15; --ambar-rgb: 252, 143, 21; --ambar-bg: rgba(252, 143, 21, .13); --cor-alerta-txt: #FC8F15; --cor-alerta-suave: rgba(252, 143, 21, .14); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --ambar: #C96A04; --ambar-rgb: 201, 106, 4; --ambar-bg: rgba(238, 127, 10, .12); --cor-alerta-suave: rgba(238, 127, 10, .13); }
+/* 9.2 cartões: um raio só (as Ferramentas usavam 12 e o resto 14) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
+/* 9.3 título da página: o do Dashboard era maior (23px) que o das outras telas (19px) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .d5-cab-tits h2 { font-size: 19px; font-weight: 600; letter-spacing: -.015em; }
+/* 9.4 Kanban: a bolinha de cada coluna vinha em azul, roxo, verde e rosa — fica neutra */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kb-pro .kb-cab-ic { border-color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ctx-tag { border-color: var(--lin-fio, var(--linha)) !important; }
+/* 9.5 nada menor que 10px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-graf-x small, .calx-ag-dia i, .wa-grupo .seta) { font-size: 10px; }
+/* 9.6 nada cortado com "…" onde é informação (prévia de mensagem e nome em lista continuam cortando) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-num-meta, .ev-fx-meta, .cv2-kpi > i) { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; }
+/* 9.7 pesos: o teto é 600 também nestes números */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-saude-n, .pn-eq-adim-v, .rl-acao, .cm-num-av, .calx-mes-rot, .calx-daynum, .pr-dia-n) { font-weight: 600; }
+/* 9.8 indicadores das outras telas na família do Painel: o ícone num quadradinho dourado ao lado do rótulo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpi-ic {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(var(--azul-rgb), .14); color: var(--azul);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpi-cab { display: flex; align-items: center; gap: 9px; min-height: 26px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-kpi-rot:has(> .kpi-ic) { display: inline-flex; align-items: center; gap: 9px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-kpi-cab:has(.kpi-ic) { min-height: 26px; align-items: center; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi) .kpi-ic { transition: transform .2s var(--rvf-ease), background-color .2s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi):hover .kpi-ic { transform: scale(1.06); background: rgba(var(--azul-rgb), .2); }
+}
+/* 9.9 Registros: os indicadores sem altura sobrando e os filtros numa linha só */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpis > .kpi { min-height: 0; }
+@media (min-width: 1380px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-filtros { flex-wrap: nowrap; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir { flex: none; flex-wrap: nowrap; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir select.inp { width: 108px; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-busca { width: 168px; }
+}
+/* 9.10 formulários: um rótulo só — 12px, médio, sem caixa alta ("Novo cliente" usava caixa alta miúda) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal :is(.nc-rot, .pn-us-campo > label, .pn-us-rot) { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal { border-radius: 14px; }
+/* 9.11 a conta no pé da barra: o avatar no dourado da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta { border-color: var(--gf-barra-fio); background: rgba(var(--tint), .025); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta-av { background: rgba(var(--azul-rgb), .16); color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-barra .ba-pe { margin-top: 6px; padding-top: 6px; }

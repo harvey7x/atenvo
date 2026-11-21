@@ -97,16 +97,16 @@ export function NumerosVista({ numeros, comerciais, gestor, meuId, meuNome, ocup
       {!gestor && <p className="cm-hint" style={{ margin: '0 0 2px' }}>Os números da equipe ficam visíveis para todos; cada pessoa conecta e gerencia só o <b>próprio</b> WhatsApp.</p>}
 
       <div className="pn-kpis sobe" style={{ animationDelay: '.04s' }}>
-        <Indicador rotulo="Números conectados" valor={<>{conectados}<span className="pn-cent"> de {numeros.length}</span></>} tom={numeros.length && conectados === numeros.length ? 'ok' : conectados ? 'at' : 'er'}
+        <Indicador rotulo="Números conectados" icone="sinal" valor={<>{conectados}<span className="pn-cent"> de {numeros.length}</span></>} tom={numeros.length && conectados === numeros.length ? 'ok' : conectados ? 'at' : 'er'}
           pe={numeros.length - conectados > 0 ? <><b className="num">{numeros.length - conectados}</b> sem conexão agora</> : numeros.length ? 'Todos enviando e recebendo' : 'Nenhum número ainda'}
           visual={<div className="pn-trilho"><i className="ok" style={{ width: `${pct(conectados, numeros.length)}%` }} /></div>} />
-        <Indicador rotulo="Clientes com comercial conectado" valor={<>{pct1(pct(alcanceN, totalCob))}<span className="pn-cent">%</span></>} tom={alcanceN === totalCob && totalCob ? 'ok' : alcanceN ? 'at' : 'er'}
+        <Indicador rotulo="Clientes com comercial conectado" icone="pessoas" valor={<>{pct1(pct(alcanceN, totalCob))}<span className="pn-cent">%</span></>} tom={alcanceN === totalCob && totalCob ? 'ok' : alcanceN ? 'at' : 'er'}
           pe={<><b className="num">{alcanceN.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} em cobrança</>}
           visual={<div className="pn-trilho"><i className={alcanceN ? 'at' : 'er'} style={{ width: `${pct(alcanceN, totalCob)}%` }} /></div>} />
-        <Indicador rotulo="Com telefone cadastrado" valor={<>{pct1(pct(totalTel, totalCob))}<span className="pn-cent">%</span></>}
+        <Indicador rotulo="Com telefone cadastrado" icone="telefone" valor={<>{pct1(pct(totalTel, totalCob))}<span className="pn-cent">%</span></>}
           pe={<><b className="num">{totalTel.toLocaleString('pt-BR')}</b> de {totalCob.toLocaleString('pt-BR')} · {alcanceTel.toLocaleString('pt-BR')} alcançados pela régua</>}
           visual={<div className="pn-trilho"><i className="neutro" style={{ width: `${pct(totalTel, totalCob)}%` }} /></div>} />
-        <Indicador rotulo="Comerciais sem número" valor={<>{semNumero.length}<span className="pn-cent"> de {cobertura.filter((c) => c.emCobranca > 0).length}</span></>} tom={semNumero.length ? 'er' : 'ok'}
+        <Indicador rotulo="Comerciais sem número" icone="alerta" valor={<>{semNumero.length}<span className="pn-cent"> de {cobertura.filter((c) => c.emCobranca > 0).length}</span></>} tom={semNumero.length ? 'er' : 'ok'}
           pe={semNumero.length ? <><b className="num">{semNumero.reduce((s, c) => s + c.emCobranca, 0).toLocaleString('pt-BR')}</b> clientes aguardando um número</> : 'Todos cobrindo a própria carteira'}
           visual={<div className="pn-trilho"><i className={semNumero.length ? 'er' : 'ok'} style={{ width: `${pct(semNumero.length, cobertura.filter((c) => c.emCobranca > 0).length)}%` }} /></div>} />
       </div>

@@ -2,6 +2,7 @@
    detalhe. Cada linha abre mostrando exatamente o que mudou (de → para).
    Filtros por período, tipo, pessoa e busca. */
 import { useMemo, useState } from 'react';
+import { IconeTile } from '../components/CartaoMetrica';
 import { BotaoSec, CardVidro, Chip, Chips, EstadoErro, EstadoVazio, Input, Kpi } from '../components';
 import { useRegistros, type Mudanca, type PeriodoRegistros, type Registro } from '../data/cobranca/registros';
 
@@ -66,9 +67,9 @@ export function RevizaRegistros() {
     <>
       <div className="kpis kpis-3 sobe">
         {/* totais vêm de count no servidor — a lista abaixo é paginada */}
-        <Kpi rotulo="Ações registradas" valor={q.total ?? 0} />
-        <Kpi rotulo="Hoje" valor={q.totalHoje ?? 0} />
-        <Kpi rotulo="Pessoas na lista" valor={pessoas.length} />
+        <Kpi rotulo="Ações registradas" icone={<IconeTile nome="pulso" />} valor={q.total ?? 0} />
+        <Kpi rotulo="Hoje" icone={<IconeTile nome="calendario" />} valor={q.totalHoje ?? 0} />
+        <Kpi rotulo="Pessoas na lista" icone={<IconeTile nome="pessoas" />} valor={pessoas.length} />
       </div>
 
       {/* filtros: período e pessoa como seletores com rótulo; área como chips com o nome do grupo */}

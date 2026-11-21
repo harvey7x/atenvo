@@ -178,6 +178,8 @@ export type BarraAlfaProps = {
   aoBuscar: () => void;
   buscaAberta: boolean;
   aoSair: () => void;
+  /** quem está logado: vira o cartão da conta no pé da barra (nome, cargo e o botão de sair) */
+  conta?: { nome: string; cargo: string; iniciais: string } | null;
   versao?: string | null;
 };
 
@@ -296,9 +298,17 @@ export function BarraAlfa(p: BarraAlfaProps) {
 
           <div className="ba-pe">
             {!p.carregando && p.rodape.map((i) => <ItemLink key={i.slug} item={i} aoEscolher={escolher} />)}
-            <button type="button" className="ba-item" onClick={p.aoSair}>
+            {/* com a conta à vista, o Sair mora no cartão dela; no trilho de ícones volta a ser o item */}
+            <button type="button" className={p.conta ? 'ba-item ba-sair' : 'ba-item'} onClick={p.aoSair}>
               <span className="ba-item-pri"><span className="ba-ico"><IcSair /></span><span className="ba-item-tx">Sair</span></span>
             </button>
+            {p.conta && (
+              <div className="ba-conta">
+                <span className="ba-conta-av" aria-hidden>{p.conta.iniciais}</span>
+                <span className="ba-conta-tx"><b>{p.conta.nome}</b><small>{p.conta.cargo}</small></span>
+                <button type="button" className="ba-conta-sair" onClick={p.aoSair} aria-label="Sair" title="Sair"><IcSair /></button>
+              </div>
+            )}
             {p.versao && (
               <div className="ba-versao num" title="Versão do painel que você está usando agora. Se estiver diferente da mais nova, atualize a página.">
                 Painel v{p.versao}

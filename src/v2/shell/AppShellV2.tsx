@@ -957,6 +957,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
             grupos={gruposBarra} rodape={rodapeBarra}
             aoBuscar={() => setPaletaAberta(true)} buscaAberta={paletaAberta}
             aoSair={sair}
+            conta={acessoCarregando ? null : { nome, cargo, iniciais: iniciaisDe(nome) }}
             versao={isRevizaMode && import.meta.env.VITE_BUILD_TS ? String(import.meta.env.VITE_BUILD_TS) : null}
           />
         ) : (<>

@@ -8,6 +8,7 @@
    ===================================================================== */
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { IconeTile } from '../components/CartaoMetrica';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2, EstadoVazio, Input, Kpi, ModalV2, TabelaPadrao, type Coluna, type TomStatus } from '../components';
 import { EditorMsg, IcT, IC_PATH, quandoCurto, rid, type Bloco, type MsgDef } from './cobrancaMotor';
 import { Checks, aplicarVarsCliente, fmtTel, soDigitos, textoPreviaWa } from './RevizaWhatsApp';
@@ -178,10 +179,10 @@ export function EnviosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: 
         aoIr={(rota) => navigate(rota)} aoVerQuem={() => setAba('proximos', true)} />
 
       <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
-        <Kpi rotulo="Enviadas hoje" valor={r?.enviadas ?? 0} nota={r ? `${r.entregues} entregues · ${r.lidas} lidas` : '—'} />
-        <Kpi rotulo="Responderam hoje" valor={r?.responderam ?? 0} nota={r && r.enviadas ? `${pct(r.responderam, r.enviadas)}% de quem recebeu` : 'Nenhuma resposta ainda'} />
-        <Kpi rotulo="Na fila agora" valor={r?.na_fila ?? 0} nota={`${(r?.na_fila ?? 0) > 0 ? (!cx.reguaLigada || foraDaJanela(cx) ? `Régua parada (desligada ou fora das ${cx.ini}h–${cx.fim}h); só os envios manuais saem` : 'Saindo com intervalo de segurança') : 'Fila vazia'}${r?.agendados ? ` · ${plural(r.agendados, 'agendada', 'agendadas')}` : ''}`} />
-        <Kpi rotulo="Com erro hoje" valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={(r?.pulados ?? 0) > 0 ? `${plural(r?.pulados ?? 0, 'não enviada', 'não enviadas')} por regra` : 'Nenhuma deixada de fora'} />
+        <Kpi rotulo="Enviadas hoje" icone={<IconeTile nome="envia" />} valor={r?.enviadas ?? 0} nota={r ? `${r.entregues} entregues · ${r.lidas} lidas` : '—'} />
+        <Kpi rotulo="Responderam hoje" icone={<IconeTile nome="balao" />} valor={r?.responderam ?? 0} nota={r && r.enviadas ? `${pct(r.responderam, r.enviadas)}% de quem recebeu` : 'Nenhuma resposta ainda'} />
+        <Kpi rotulo="Na fila agora" icone={<IconeTile nome="lista" />} valor={r?.na_fila ?? 0} nota={`${(r?.na_fila ?? 0) > 0 ? (!cx.reguaLigada || foraDaJanela(cx) ? `Régua parada (desligada ou fora das ${cx.ini}h–${cx.fim}h); só os envios manuais saem` : 'Saindo com intervalo de segurança') : 'Fila vazia'}${r?.agendados ? ` · ${plural(r.agendados, 'agendada', 'agendadas')}` : ''}`} />
+        <Kpi rotulo="Com erro hoje" icone={<IconeTile nome="alerta" />} valor={r?.erros ?? 0} tomValor={(r?.erros ?? 0) > 0 ? 'erro' : undefined} nota={(r?.pulados ?? 0) > 0 ? `${plural(r?.pulados ?? 0, 'não enviada', 'não enviadas')} por regra` : 'Nenhuma deixada de fora'} />
       </div>
 
       <ReguaDeHoje prog={progQ.data ?? []} itens={previaHojeQ.data?.itens ?? []} passos={passosAtivos.map((p) => ({ nome: p.nome, quando: p.quando }))}
