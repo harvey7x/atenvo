@@ -184,3 +184,55 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .ib, .ib2):focus-visible { outline: 2px solid rgba(var(--azul-rgb), .55); outline-offset: 2px; }
 /* "Voltou a pagar" (Saúde da carteira): era azul-petróleo — vira o cinza médio da paleta */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #A1A1AA; }
+
+/* =====================================================================
+   21/11 (3) — BARRA LATERAL mais profissional (dono: "tem como deixar essa
+   aba mais profissional"): menos elementos gritando, mais ordem.
+   - rótulos dos grupos sem caixa alta, pequenos e apagados;
+   - item ativo NEUTRO (texto branco sobre um cinza leve) com só o ícone no
+     dourado e um filete dourado à esquerda — sai a pílula marrom com texto dourado;
+   - busca sem moldura, contador neutro, mais respiro entre os grupos;
+   - quando abre por cima do conteúdo, um fio e uma sombra limpa na borda.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app {
+  --ba-mudo: #9C9CA6;
+  --ba-rotulo: #62626B;
+  --ba-hover: rgba(255, 255, 255, .045);
+  --ba-ativo: rgba(255, 255, 255, .075);
+  --ba-ativo-tx: #FFFFFF;
+  --ba-ativo-ico: var(--azul);
+  --ba-badge-bg: rgba(255, 255, 255, .09);
+  --ba-badge-tx: #D4D4D8;
+  --ba-badge-on-tx: #FFFFFF;
+  --ba-sombra-trilho: 1px 0 0 rgba(255, 255, 255, .06), 24px 0 48px -12px rgba(0, 0, 0, .55);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra {
+  /* grupos: mais respiro; o rótulo em minúsculas, pequeno e apagado */
+  & .ba-grupos { gap: 14px; }
+  & .ba-grupo-rot { margin-bottom: 3px; padding: 0 9px; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ba-rotulo); }
+  /* itens: texto médio; o ativo é neutro, com o filete dourado */
+  & .ba-item { position: relative; font-weight: 450; letter-spacing: 0; }
+  & .ba-item-tx { letter-spacing: 0; }
+  & .ba-item.on { font-weight: 550; }
+  & .ba-item.on::before {
+    content: ''; position: absolute; left: 0; top: 50%; width: 2.5px; height: 14px; margin-top: -7px;
+    border-radius: 0 2px 2px 0; background: var(--azul);
+  }
+  /* busca: um campo discreto, sem moldura; o atalho apagado */
+  & .ba-item.ba-busca { border-color: transparent; background: rgba(255, 255, 255, .05); color: #8A8A93; }
+  & .ba-item.ba-busca:hover { background: rgba(255, 255, 255, .075); color: #D4D4D8; }
+  & .ba-item.ba-busca .ba-kbd { border-color: transparent; background: rgba(255, 255, 255, .06); color: #7C7C86; box-shadow: none; }
+  /* contador: pílula neutra, menor */
+  & .ba-badge { min-width: 18px; height: 17px; font-size: 10px; font-weight: 600; }
+  /* cabeçalho: nome e ambiente mais contidos; a seta e o botão de fixar apagados */
+  & .ba-ws-nome { font-size: 12.5px; font-weight: 600; letter-spacing: .005em; }
+  & .ba-ws-amb { font-size: 11px; color: #7C7C86; }
+  & .ba-ws-seta, & .ba-cab-bt { color: #62626B; }
+  & .ba-pe { border-top-color: rgba(255, 255, 255, .06); }
+}
+/* a marca: sem o halo em volta (o brilho no alto do quadrado fica) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-barra .ba-ws-marca {
+  width: 30px; height: 30px; border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26), inset 0 -2px 4px rgba(120, 58, 0, .25);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-barra .ba-ws-marca svg { width: 18px; height: 18px; }
