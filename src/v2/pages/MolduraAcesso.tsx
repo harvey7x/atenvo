@@ -24,10 +24,7 @@ export function MolduraAcesso({ children }: { children: ReactNode }) {
           lateral), à direita o painel claro com o formulário (como o palco). Sem a moldura, o painel
           da marca não aparece e o palco não existe para o layout (display: contents). */}
       <aside className="lg-painel">
-        <svg className="lg-painel-arte" viewBox="12 8 82 84" fill="none" aria-hidden focusable="false">
-          <path d="M20 24 L28 16 H64 L80 32 V45 L68 57 H40 V84 H20 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          <path d="M49 63 H72 L86 84 H63 Z M40 30 H58 L64 36 V38 L58 44 H40 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        </svg>
+        <IconeReviza className="lg-painel-logo" />
         <div className="lg-painel-txt">
           <i className="lg-painel-fio" aria-hidden />
           <p className="lg-painel-tit">Plataforma de Atendimento e Gestão</p>

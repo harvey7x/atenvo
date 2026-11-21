@@ -24,7 +24,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
   --lin-branco: #FAFAFA; --lin-nevoa: #D6D6DA; --lin-fio: #232327; --lin-fio-hover: #36363C;
   --lin-grafite: #232327; --lin-obsidiana: #1C1C1F; --lin-tinta-botao: #0A0A0B;
   --d5-fio: #202024; --d5-fio-forte: #2D2D32;
-  --azul: #F4821F; --azul-rgb: 244, 130, 31; --platina-a: #F4821F; --platina-b: #F4821F;
+  --azul: #FC8F15; --azul-rgb: 252, 143, 21; --platina-a: #FC8F15; --platina-b: #FC8F15;
   /* a queda (ferrugem) um tom mais fundo, para não se confundir com o laranja do destaque */
   --rubro: #D9643C; --rubro-rgb: 217, 100, 60; --rubro-bg: rgba(217, 100, 60, .14);
   --cor-erro-txt: #E98A66; --cor-erro-suave: rgba(217, 100, 60, .16);
@@ -34,7 +34,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
   --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #F6F6F7;
   --linha: #E7E7EA; --fio-a: #DEDEE2; --fio-b: #DEDEE2;
   --txt: #111113; --txt-2: #4A4A52; --txt-3: #73737C;
-  --azul: #EB740F; --azul-rgb: 235, 116, 15; --platina-a: #EB740F; --platina-b: #EB740F; --rv-tinta: #B4530A;
+  --azul: #EE7F0A; --azul-rgb: 238, 127, 10; --platina-a: #EE7F0A; --platina-b: #EE7F0A; --rv-tinta: #AE5A06;
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco { --lin-fio: #E4E4E8; --linha: #E9E9EC; --d5-fio: #E9E9EC; }
 
@@ -42,7 +42,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 { background: var(--base) !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-app {
   --ba-fundo: #0A0A0B; --ba-menu: #18181B; --ba-mudo: #9A9AA3; --ba-rotulo: #6E6E77;
-  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(244, 130, 31, .75);
+  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(252, 143, 21, .75);
   --gf-barra: #131315; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app {
@@ -52,7 +52,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
   --ba-kbd-fio: rgba(17, 17, 19, .1); --ba-kbd-bg: rgba(17, 17, 19, .04); --ba-kbd-tx: #73737C;
   --ba-menu: #FFFFFF; --ba-sombra-menu: 0 20px 40px -14px rgba(17, 17, 19, .22);
   --ba-sombra-trilho: 1px 0 0 rgba(17, 17, 19, .08), 24px 0 48px -16px rgba(17, 17, 19, .18);
-  --ba-foco: rgba(235, 116, 15, .7);
+  --ba-foco: rgba(238, 127, 10, .7);
   --gf-barra: #FFFFFF; --gf-barra-fio: rgba(17, 17, 19, .08); --gf-arvore: rgba(17, 17, 19, .17);
 }
 /* no claro, o texto da barra e do topo é escuro (a moldura de antes era preta nos dois temas) */
@@ -108,12 +108,12 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo { gap: 2px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
   color: #FFFFFF; font-weight: 500;
-  background: linear-gradient(90deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .055) 42%, rgba(244, 130, 31, .46) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), inset 0 -1px 0 rgba(244, 130, 31, .28);
+  background: linear-gradient(90deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .055) 42%, rgba(var(--azul-rgb), .46) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), inset 0 -1px 0 rgba(var(--azul-rgb), .28);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
   color: #111113; font-weight: 500;
-  background: linear-gradient(90deg, rgba(17, 17, 19, .055) 0%, rgba(17, 17, 19, .04) 42%, rgba(235, 116, 15, .34) 100%);
+  background: linear-gradient(90deg, rgba(17, 17, 19, .055) 0%, rgba(17, 17, 19, .04) 42%, rgba(var(--azul-rgb), .34) 100%);
   box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .05);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
@@ -143,31 +143,42 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { --pmc-card: var(--vidro-a); --pmc-border: var(--lin-fio); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico { background: rgba(var(--azul-rgb), .14); color: var(--azul); }
 
-/* ---- 4. BOTÃO PRINCIPAL: laranja com o texto branco, nos dois temas ---- */
+/* ---- 4. BOTÃO PRINCIPAL: o dourado da logo com o texto escuro (branco sobre ele não dá leitura), nos dois temas ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
-  color: #FFFFFF; background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none;
+  color: #1A0F02; background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none; font-weight: 550;
 }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 12%); border-color: transparent; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: #1A0F02; }
 
 /* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa, do laranja ao claro ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col .pn-graf-bar { border-radius: 8px 8px 3px 3px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2A2A2F; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar {
-  background: linear-gradient(180deg, #FFE9D4 0%, #FBB274 28%, var(--azul) 100%);
+  background: linear-gradient(180deg, #FFEDB8 0%, #FFC95C 30%, var(--azul) 100%);
   box-shadow: 0 0 26px -6px rgba(var(--azul-rgb), .6);
 }
 
 /* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(244, 130, 31, .1); border: 1px solid rgba(244, 130, 31, .2); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --zp-verde: #F4821F; --zp-acao: #F4821F; --zp-badge: #F4821F; --zp-tique-lida: #F4821F; --zp-onda-on: #F4821F; --zp-onda-ponto: #F4821F; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --zp-badge: #EB740F; --zp-onda-on: #EB740F; --zp-onda-ponto: #EB740F; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(var(--azul-rgb), .1); border: 1px solid rgba(var(--azul-rgb), .2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --zp-verde: #FC8F15; --zp-acao: #FC8F15; --zp-badge: #FC8F15; --zp-tique-lida: #FC8F15; --zp-onda-on: #FC8F15; --zp-onda-ponto: #FC8F15; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --zp-badge: #EE7F0A; --zp-onda-on: #EE7F0A; --zp-onda-ponto: #EE7F0A; }
 
 /* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }
 
-/* ---- 8. A MARCA (Reviza CRM, 21/11): o ícone já traz o próprio fundo — o quadro dourado de antes sai ---- */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca { width: 32px; height: 32px; border-radius: 0; background: none; box-shadow: none; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca svg { width: 32px; height: 32px; filter: drop-shadow(0 3px 8px rgba(242, 140, 27, .28)); }
+/* ---- 8. A MARCA (logo do dono, 21/11): a imagem já traz o próprio fundo e o próprio brilho ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca { width: 34px; height: 34px; border-radius: 0; background: none; box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca :is(svg, img) { width: 34px; height: 34px; filter: drop-shadow(0 3px 9px rgba(var(--azul-rgb), .30)); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-topo-marca { width: 32px; height: 32px; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-arte { right: -6%; width: min(520px, 84%); }
+/* no painel da marca (telas de acesso): a logo grande, com o clarão dourado atrás */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo {
+  display: block; position: absolute; left: 50%; top: 44%; width: clamp(120px, 15vw, 176px); height: auto; aspect-ratio: 1;
+  transform: translate(-50%, -50%); filter: drop-shadow(0 26px 60px rgba(var(--azul-rgb), .42)); pointer-events: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel { background: radial-gradient(520px 420px at 50% 46%, rgba(var(--azul-rgb), .16), transparent 70%), radial-gradient(640px 440px at 0% 100%, rgba(var(--azul-rgb), .10), transparent 72%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { color: #1A0F02; background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar-seta { color: #1A0F02; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo { animation: rvf-arte 1s ease backwards; }
+}

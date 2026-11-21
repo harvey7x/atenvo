@@ -34,7 +34,7 @@ const CORES = {
   dark: { bom: '#3FAA79', ruim: '#E0504F', neutro: '#8A8F98' },
   light: { bom: '#2A7352', ruim: '#A23F33', neutro: '#666C76' },
 } as const;
-const DOURADO = { dark: '#F4821F', light: '#EB740F' } as const; // o destaque da casa (laranja desde 21/11)
+const DOURADO = { dark: '#FC8F15', light: '#EE7F0A' } as const; // o dourado da logo (cor principal desde 21/11)
 const FAIXA_NEUTRA = 0.5;
 const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 /** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
@@ -272,8 +272,8 @@ const CORES_SERIE = {
   light: ['#4F46E5', '#1F7E95', '#1E8A44', '#A14A77', '#5E7183'],
 } as const;
 const CORES_SERIE_CASA = {
-  dark: ['#F4821F', '#E4E4E7', '#8A8A93', '#C69A5E', '#52525B'],
-  light: ['#EB740F', '#27272A', '#A1A1AA', '#9A6A2B', '#D4D4D8'],
+  dark: ['#FC8F15', '#E4E4E7', '#8A8A93', '#C69A5E', '#52525B'],
+  light: ['#EE7F0A', '#27272A', '#A1A1AA', '#9A6A2B', '#D4D4D8'],
 } as const;
 const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number, casa: boolean): string => {
   const pal = (casa ? CORES_SERIE_CASA : CORES_SERIE)[tema];
