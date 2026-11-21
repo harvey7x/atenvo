@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MetricChart, type ChartView, type SeriesPoint } from '@/components/ui/metric-chart';
 import { Icon, PeriodSelect, ViewToggle, type PeriodOption } from '@/components/ui/metric-controls';
 import { PmcStyles } from '@/components/ui/progress-metric-card';
@@ -70,6 +70,40 @@ const SETAS = {
   down: <><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></>,
   up: <><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></>,
 };
+
+/* O número que CONTA até o valor (dono 21/11: "as métricas animadas"). Recebe o texto pronto
+   ("R$ 32.580,00", "69%", "1,4 dia", "918"), acha o número em formato brasileiro e anima do valor
+   mostrado até o novo em ~0,7 s, mantendo o que vem antes e depois. Sem movimento no sistema
+   (ou texto sem número), mostra direto. */
+const RE_NUMERO = /\d[\d.]*(?:,\d+)?/;
+function Contagem({ texto }: { texto: string }) {
+  const [mostrado, setMostrado] = useState(texto);
+  const atual = useRef(0);
+  useEffect(() => {
+    const m = RE_NUMERO.exec(texto);
+    if (!m || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setMostrado(texto); return; }
+    const [inteiro, dec = ''] = m[0].split(',');
+    const alvo = Number(`${inteiro.replace(/\./g, '')}.${dec || '0'}`);
+    const casas = dec.length;
+    const antes = texto.slice(0, m.index);
+    const depois = texto.slice(m.index + m[0].length);
+    const de = atual.current;
+    if (!Number.isFinite(alvo) || de === alvo) { atual.current = alvo; setMostrado(texto); return; }
+    let quadro = 0; let t0 = 0;
+    const passo = (ts: number) => {
+      if (!t0) t0 = ts;
+      const p = Math.min(1, (ts - t0) / 700);
+      const v = de + (alvo - de) * (1 - Math.pow(1 - p, 3));
+      atual.current = v;
+      setMostrado(p >= 1 ? texto : antes + v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }) + depois);
+      if (p < 1) quadro = requestAnimationFrame(passo);
+    };
+    quadro = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(quadro);
+  }, [texto]);
+  return <>{mostrado}</>;
+}
+const comContagem = (v: ReactNode): ReactNode => (typeof v === 'string' ? <Contagem texto={v} /> : v);
 
 export function CartaoMetrica({
   titulo, data, total, sentido = 'maior', periodos, periodo, formatar, formatarData, rotuloDelta, carregando,
@@ -152,7 +186,7 @@ export function CartaoMetrica({
           : cabDireita}
       </header>
       <div className="rvm-num">
-        <span className="rvm-val">{carregando ? '—' : valor}</span>
+        <span className="rvm-val">{carregando ? '—' : comContagem(valor)}</span>
         {unidade && !carregando && <span className="rvm-un">{unidade}</span>}
         {variacao !== undefined
           ? (variacao !== false && !carregando && variacao)
@@ -212,7 +246,7 @@ export function CartaoMetricaFixo({ titulo, valor, detalhe, rodape, icone }: {
     <article className="pmc-root rvm rvm-fixo">
       <PmcStyles />
       <header className="rvm-cab"><div className="rvm-cab-esq"><Selo icone={icone} /><h3 className="rvm-tit">{titulo}</h3></div></header>
-      <div className="rvm-num"><span className="rvm-val">{valor}</span></div>
+      <div className="rvm-num"><span className="rvm-val">{comContagem(valor)}</span></div>
       <div className="rvm-graf rvm-graf-texto">{detalhe}</div>
       <footer className="rvm-pe"><span className="rvm-delta">{rodape}</span></footer>
     </article>
@@ -335,7 +369,7 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
         </div>
       </header>
       <div className="rvm-num">
-        <span className="rvm-val">{n(total)}</span>
+        <span className="rvm-val"><Contagem texto={n(total)} /></span>
         <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas linhas visíveis' : ''}</span>
       </div>
       <ul className="rvm-leg" aria-label="Linhas do gráfico (clique para esconder ou mostrar)">

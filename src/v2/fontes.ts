@@ -6,3 +6,5 @@ import '@fontsource-variable/instrument-sans';
 // Mono SÓ para identificadores pequenos (telefone, hora, código) no estilo Linear
 // da Reviza (reviza-linear.css) — o arquivo da fonte só baixa quando a página a usa.
 import '@fontsource-variable/jetbrains-mono';
+// Inter: a fonte NEUTRA da Reviza (dono 21/11: "fontes profissionais, neutras") — reviza-fundacao.css
+import '@fontsource-variable/inter';

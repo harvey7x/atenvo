@@ -83,17 +83,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
   box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 
-/* ---- 3. títulos e números fortes (a referência) ---- */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ph :is(h1, h2) {
-  font-size: 26px; font-weight: 700; letter-spacing: -.025em;
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.pmc-root.rvm .rvm-val, .kpi .val, .pn-kpi-val, .cv2-kpi > b, .d5-kpi-val) {
-  font-weight: 700; letter-spacing: -.025em;
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .rvm-bloco-tit, .pmc-root.rvm .rvm-series-tit) {
-  font-weight: 650;
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-tit { font-weight: 550; color: var(--txt-2); }
+/* ---- 3. (títulos e números: a medida e o peso moram em reviza-fundacao.css — 21/11, "nada grande, nada grosso") ---- */
 
 /* ---- 4. o ícone de cada card: quadradinho laranja ao lado do título ---- */
 .v2 .pmc-root.rvm .rvm-ico { display: none; }

@@ -1,0 +1,108 @@
+/* =====================================================================
+   FUNDAÇÃO do visual novo da Reviza — etapa 1 (dono 21/11):
+   "minimalista = profissional; nada grande, nada grosso; fonte neutra;
+   animações breves; as métricas animadas ao passar o mouse".
+   Vale com [data-moldura] (o mesmo liga/desliga da moldura preta) e mexe
+   SÓ na base — fonte, medidas, pesos e movimento — para as telas dos dois
+   ambientes mudarem juntas. Tela por tela vem depois, se precisar.
+   Importado por último (depois de reviza-moldura.css): mesmo peso de
+   seletor, ganha pela ordem.
+   ===================================================================== */
+
+/* ---- 1. FONTE NEUTRA (Inter) e a régua de medidas, um degrau abaixo ----
+   Os nomes dos tokens são os da régua da ALFA (reviza-sistema.css); o valor encolhe:
+   título de página 23 → 19 · número de KPI 26 → 21 · título de cartão 16 → 14.
+   Pesos: 400 texto · 500 rótulo/botão · 550 destaque · 600 o MAIS forte (título e número). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 {
+  --fonte: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-14: 13.5px; --fs-16: 14px; --fs-23: 19px; --fs-26: 21px;
+  --fw-normal: 400; --fw-medio: 500; --fw-forte: 550; --fw-titulo: 600;
+  --rvf-ease: cubic-bezier(.2, .8, .2, 1);
+  font-family: var(--fonte);
+  font-optical-sizing: auto;
+}
+/* nada de negrito pesado em lugar nenhum: h1–h6, b, strong e th no peso de destaque */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :where(h1, h2, h3, h4, h5, h6, b, strong, th):not(:where(.pmc-root:not(.rvm) *)) {
+  font-weight: 550;
+}
+
+/* ---- 2. TÍTULOS E NÚMEROS: pequenos e firmes, sem gritar ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ph :is(h1, h2) {
+  font-size: 19px; font-weight: 600; letter-spacing: -.018em; line-height: 1.25;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ph p { font-size: 12.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pmc-root.rvm .rvm-val, .kpi .val, .pn-kpi-val, .cv2-kpi > b, .d5-kpi-val, .rg-tile-v b, .d5-robo-val) {
+  font-size: 21px; font-weight: 600; letter-spacing: -.02em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .an-cartao-tit, .ev-card-tit, .vidro > h3, .rvm-bloco-tit, .pmc-root.rvm .rvm-series-tit, .p-modal-cab) {
+  font-size: 14px; font-weight: 600; letter-spacing: -.008em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-tit { font-size: 12.5px; font-weight: 500; color: var(--txt-2); }
+/* cabeçalho de tabela e rótulos em caixa alta: menores, médios, mais arejados */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(thead th, .rt-tab-h > *, .pn-ord, .d5-ord, .d5-ord-tx, .pn-vh, .pn-barra-rot, .ev-rot, .gp-sc-tit, .gp-sc-gt) {
+  font-size: 10.5px; font-weight: 500; letter-spacing: .055em; color: var(--txt-3);
+}
+/* botões: 12,5 / médio; o principal no destaque */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv) { font-size: 12.5px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-btn.btn-pri:not(.btn-mini) { font-weight: 550; }
+/* o ícone do card de métrica: menor e mais discreto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { width: 26px; height: 26px; margin-right: 9px; border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico svg { width: 14px; height: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-cab { min-height: 26px; }
+/* cantos um pouco mais contidos */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
+
+/* ---- 3. MOVIMENTO — curto e discreto; nada disso com "reduzir movimento" ligado ---- */
+@media (prefers-reduced-motion: no-preference) {
+  /* os cards de métrica entram em sequência: sobem 8px e acendem */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm {
+    animation: rvf-sobe .45s var(--rvf-ease) backwards;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(2) { animation-delay: .06s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(3) { animation-delay: .12s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(4) { animation-delay: .18s; }
+
+  /* passar o mouse numa métrica: o ícone responde e o brilho do gráfico acende */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { transition: transform .25s var(--rvf-ease); }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm:hover .rvm-ico { transform: scale(1.1) rotate(-5deg); }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-graf > .pmc-fill:first-child { opacity: .75; transition: opacity .25s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm:hover .rvm-graf > .pmc-fill:first-child { opacity: 1.6; filter: saturate(1.4) brightness(1.15); }
+  /* o balão surge (não pisca) e o ponto marcado "pousa" */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip { animation: rvf-balao .16s var(--rvf-ease) backwards; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip-wrap { transition: transform .12s ease-out; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-chart__svg circle {
+    transform-box: fill-box; transform-origin: center; animation: rvf-ponto .28s var(--rvf-ease) backwards;
+    transition: cx .12s ease-out, cy .12s ease-out;
+  }
+
+  /* barras que crescem ao abrir: "Recebido por mês" e as faixas de proporção */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-bar {
+    transform-origin: bottom; animation: rvf-cresce .6s var(--rvf-ease) backwards;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(2) .pn-graf-bar { animation-delay: .04s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(3) .pn-graf-bar { animation-delay: .08s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(4) .pn-graf-bar { animation-delay: .12s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(5) .pn-graf-bar { animation-delay: .16s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(n+6) .pn-graf-bar { animation-delay: .2s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pn-prop > i, .pn-trilho > i, .d5-trilho > i, .rvm-barra > i) {
+    transform-origin: left; animation: rvf-estica .7s var(--rvf-ease) backwards;
+  }
+
+  /* linhas de tabela e itens clicáveis: a cor entra suave; o botão afunda um nada ao clicar */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr { transition: background-color .15s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .chip, .segm > button) {
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn):active:not(:disabled) { transform: scale(.975); }
+  /* menu lateral: o ícone do item desliza 1px ao passar o mouse */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item .ba-ico { transition: transform .2s var(--rvf-ease), color .2s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item:not(.on):hover .ba-ico { transform: translateX(1.5px); }
+}
+/* hover das linhas de tabela (vale também sem movimento: é cor, não deslocamento) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr:hover { background-color: rgba(var(--tint), .025); }
+
+@keyframes rvf-sobe { from { opacity: 0; transform: translateY(8px); } }
+@keyframes rvf-balao { from { opacity: 0; scale: .96; } }
+@keyframes rvf-ponto { from { opacity: 0; transform: scale(.3); } }
+@keyframes rvf-cresce { from { transform: scaleY(0); } }
+@keyframes rvf-estica { from { transform: scaleX(0); } }

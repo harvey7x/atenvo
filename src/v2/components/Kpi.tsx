@@ -22,7 +22,8 @@ export function useContador(alvo: number, formato: FormatoContador = 'int'): str
     // Corporativo cai na mesma via do reduced-motion: valor final direto
     // (número é dado de livro-caixa; contador subindo lê como marketing).
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      || document.documentElement.getAttribute('data-visual') === 'corp') {
+      // (21/11: na Reviza com a fundação nova o dono pediu as métricas animadas — o contador volta)
+      || (document.documentElement.getAttribute('data-visual') === 'corp' && !document.documentElement.hasAttribute('data-moldura'))) {
       exibido.current = alvo;
       setTexto(formata(alvo, formato));
       return;

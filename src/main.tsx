@@ -20,6 +20,7 @@ import './v2/reviza-linear.css'; // estilo Linear na Reviza (dono 13/11) — só
 import { aplicarLinearAlfa } from './v2/lib/linearAlfa';
 import './v2/reviza-moldura.css'; // moldura preta + conteúdo claro (dono 19/11) — só age com [data-moldura] + [data-barra-alfa]
 import { aplicarMoldura, lerMoldura } from './v2/lib/molduraAlfa';
+import './v2/reviza-fundacao.css'; // a fundação do visual novo (21/11): fonte neutra, medidas menores, pesos finos e movimento
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
