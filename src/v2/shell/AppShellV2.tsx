@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -21,6 +21,7 @@ import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoRespost
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { lerMoldura } from '../lib/molduraAlfa';
+import { instalarNumerosSobem } from '../lib/numerosSobem';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { LicencaGate } from '../components/LicencaGate';
 import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
@@ -557,6 +558,18 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const { user, signOut } = useAuth();
   const { currentOrg } = useOrg();
   const location = useLocation();
+  // NÚMEROS QUE SOBEM ao entrar em cada tela (dono 21/11: "faz em tudo que tenha número") — antes de pintar,
+  // para o valor final não piscar; a peça ignora telefone, data, planilha e conversas (lib/numerosSobem.ts)
+  const numerosRef = useRef<ReturnType<typeof instalarNumerosSobem> | null>(null);
+  useLayoutEffect(() => {
+    if (!ALFA || typeof document === 'undefined') return;
+    if (!numerosRef.current) {
+      const palco = document.querySelector<HTMLElement>('.v2 .palco');
+      if (palco) numerosRef.current = instalarNumerosSobem(palco);
+    }
+    numerosRef.current?.navegou(location.pathname);
+  }, [location.pathname, location.search]);
+  useEffect(() => () => { numerosRef.current?.parar(); numerosRef.current = null; }, []);
   const navigate = useNavigate();
 
   useEffect(() => instalarSpotlight(), []);

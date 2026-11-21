@@ -230,3 +230,40 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta { border-color: var(--gf-barra-fio); background: rgba(var(--tint), .025); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta-av { background: rgba(var(--azul-rgb), .16); color: var(--azul); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-barra .ba-pe { margin-top: 6px; padding-top: 6px; }
+
+/* =====================================================================
+   10. ACABAMENTO (dono 21/11: "se tiver como deixar a cara mais bonita,
+   aquele detalhe de profissional, eu quero que tu faça"). Tudo discreto.
+   ===================================================================== */
+/* 10.1 o clarão da marca: um dourado muito leve no alto à direita do chão (o mesmo ambiente da logo) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: radial-gradient(1100px 540px at 90% -180px, rgba(var(--azul-rgb), .085), transparent 62%), var(--base); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: radial-gradient(1100px 540px at 90% -180px, rgba(var(--azul-rgb), .06), transparent 62%), var(--base); }
+/* 10.2 cartões: um fio de luz no alto (profundidade) e a borda acende no dourado ao passar o mouse nos indicadores */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { transition: border-color .2s ease, transform .2s var(--rvf-ease), box-shadow .2s ease; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover { border-color: rgba(var(--azul-rgb), .32); }
+/* 10.3 botão principal: degradê suave, fio de luz no alto, sombra dourada curta; afunda 1px ao clicar */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 1px 2px rgba(0, 0, 0, .22), 0 8px 18px -10px rgba(var(--azul-rgb), .7);
+  transition: filter .16s ease, transform .12s ease, box-shadow .16s ease;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
+  filter: brightness(1.07);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .25); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 8px 18px -10px rgba(var(--azul-rgb), .7);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { filter: brightness(1.07); }
+/* 10.4 "Ao vivo": o ponto pulsa devagar */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .selo-vivo .selo-vivo-dot { animation: gf-pulso 2.6s ease-out infinite; }
+}
+@keyframes gf-pulso { 0% { box-shadow: 0 0 0 0 rgba(var(--azul-rgb), .5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(var(--azul-rgb), 0); } }
+/* 10.5 barras de rolagem finas, na cor do tema */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco * { scrollbar-width: thin; scrollbar-color: rgba(var(--tint), .2) transparent; }
+/* 10.6 o avatar do topo na mesma linha do cartão da conta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { background: rgba(var(--azul-rgb), .16); color: var(--azul); border: 1px solid rgba(var(--azul-rgb), .28); font-weight: 600; }
