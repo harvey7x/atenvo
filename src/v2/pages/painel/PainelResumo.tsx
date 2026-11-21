@@ -227,6 +227,7 @@ export function PainelResumoVista({ r, ciclosM, atendM, historico, ciclosDatas, 
     ].filter((g) => g.itens.length > 0);
   }, [ciclos]);
   const maxCiclo = Math.max(1, ...ciclos.map((c) => Math.max(c.vSel, c.vAnt)));
+  const larguraCli = { minWidth: `${ciclos.reduce((t, c) => t + c.clientes, 0).toLocaleString('pt-BR').length}ch` };
   const largura = (v: number) => `${v > 0 ? Math.max(1.5, (v / maxCiclo) * 100) : 0}%`;
 
   // carteira (a soma dos comportamentos É a carteira em cobrança — bate com a Gestão)
@@ -388,43 +389,85 @@ export function PainelResumoVista({ r, ciclosM, atendM, historico, ciclosDatas, 
                 <h3>Receita por ciclo</h3>
                 <p>Recebido em {mesAno(compSel)}{compAnt ? ` comparado com ${mesAno(compAnt)}` : ''}{parcial ? ` · ${aVencer.length} ciclo${aVencer.length === 1 ? '' : 's'} ainda não ${aVencer.length === 1 ? 'venceu' : 'venceram'}` : ''}</p>
               </div>
-              <div className="pn-leg" aria-hidden>
-                {compAnt && <span><i className="ant" />{mesAno(compAnt)}</span>}
+              <div className="pn-leg pn-rc-leg" aria-hidden>
                 <span><i className="sel" />{mesAno(compSel)}</span>
+                {compAnt && <span><i className="ant" />{mesAno(compAnt)}</span>}
               </div>
             </div>
-            <div className={grupos.length > 1 ? 'pn-grupos dois' : 'pn-grupos'}>
-              {grupos.map((g) => {
-                const soma = g.itens.reduce((s, c) => s + c.vSel, 0);
-                return (
-                  <section className="pn-grupo" key={g.id} aria-label={g.rot}>
-                    <div className="pn-grupo-cab">
-                      <span>{g.rot}</span>
-                      <span className="num">{brl(soma)}</span>
-                    </div>
-                    {g.itens.map((c) => (
-                      <div className="pn-ciclo" key={c.codigo}>
-                        <span className="pn-ciclo-id"><b>{c.dia ? c.codigo : 'Sem ciclo'}</b><small className="num">{c.clientes} cli.</small></span>
-                        <span className="pn-ciclo-barras" aria-hidden>
-                          {compAnt && <i className="ant" style={{ width: largura(c.vAnt) }} />}
-                          <i className={c.aVencer ? 'sel previsto' : 'sel'} style={{ width: largura(c.vSel) }} />
-                        </span>
-                        <span className="pn-ciclo-v num">{c.aVencer && c.vSel === 0 ? '—' : brl(c.vSel)}</span>
-                        <span className="pn-ciclo-st">
-                          {c.aVencer
-                            ? <span className="pn-tag suave" title={`Cobrança do ciclo em ${ddmm(c.vence)}`}>{c.vence === hoje.iso ? 'vence hoje' : `vence ${ddmm(c.vence)}`}</span>
-                            : <Delta d={compAnt ? deltaPct(c.vSel, c.vAnt) : null} />}
-                        </span>
-                      </div>
-                    ))}
-                  </section>
-                );
-              })}
-            </div>
-            <div className="pn-rodape num">
-              <span>Total em {mesAno(compSel)}</span>
-              <b>{brl(recSel)}</b>
-              {compAnt && <><Delta d={deltaMes} chip /><span className="pn-rodape-mut">vs {mesAno(compAnt)}{parcial ? ' nos ciclos já vencidos' : ''}</span></>}
+            {/* UMA tabela: cada dado na sua coluna, do cabeçalho ao total (dono 21/11: "tudo alinhado,
+                tudo retinho"). Título no meio da coluna e a 1ª à esquerda (regra das tabelas, 29/10);
+                os valores ficam num bloco de largura fixa alinhado pela direita — a vírgula cai sempre
+                na mesma linha vertical. */}
+            <div className="pn-rc-rolo">
+              <table className="pn-rc">
+                <colgroup>
+                  <col className="c-ciclo" />
+                  <col className="c-cli" />
+                  {compAnt && <col className="c-v c-ant" />}
+                  <col className="c-v" />
+                  <col className="c-bar" />
+                  <col className="c-var" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" className="ini">Ciclo</th>
+                    <th scope="col">Clientes</th>
+                    {compAnt && <th scope="col">{mesAno(compAnt)}</th>}
+                    <th scope="col">{mesAno(compSel)}</th>
+                    <th scope="col" className="pn-rc-cbar"><span className="pn-so">Comparativo</span></th>
+                    <th scope="col">Variação</th>
+                  </tr>
+                </thead>
+                {grupos.map((g) => {
+                  const somaSel = g.itens.reduce((s, c) => s + c.vSel, 0);
+                  const somaAnt = g.itens.reduce((s, c) => s + c.vAnt, 0);
+                  const somaCli = g.itens.reduce((s, c) => s + c.clientes, 0);
+                  const comFaixa = grupos.length > 1 && g.id !== 'sem';
+                  return (
+                    <tbody key={g.id} className={g.id === 'sem' && grupos.length > 1 ? 'pn-rc-solto' : undefined}>
+                      {comFaixa && (
+                        <tr className="pn-rc-grupo">
+                          <th scope="rowgroup" className="ini">{g.rot}</th>
+                          <td><span className="pn-rc-n" style={larguraCli}>{somaCli.toLocaleString('pt-BR')}</span></td>
+                          {compAnt && <td className="ant"><span className="pn-rc-v">{brl(somaAnt)}</span></td>}
+                          <td><span className="pn-rc-v">{brl(somaSel)}</span></td>
+                          <td className="pn-rc-cbar" />
+                          <td />
+                        </tr>
+                      )}
+                      {g.itens.map((c) => (
+                        <tr key={c.codigo}>
+                          <th scope="row" className="ini">{c.dia ? c.codigo : 'Sem ciclo'}</th>
+                          <td><span className="pn-rc-n" style={larguraCli}>{c.clientes.toLocaleString('pt-BR')}</span></td>
+                          {compAnt && <td className="ant"><span className="pn-rc-v">{brl(c.vAnt)}</span></td>}
+                          <td className="sel"><span className="pn-rc-v">{c.aVencer && c.vSel === 0 ? '—' : brl(c.vSel)}</span></td>
+                          <td className="pn-rc-cbar" aria-hidden>
+                            <span className="pn-rc-trilho">
+                              <i className={c.aVencer ? 'sel previsto' : 'sel'} style={{ width: largura(c.vSel) }} />
+                              {compAnt && c.vAnt > 0 && <b className="ant" style={{ left: largura(c.vAnt) }} />}
+                            </span>
+                          </td>
+                          <td>
+                            {c.aVencer
+                              ? <span className="pn-tag suave" title={`Cobrança do ciclo em ${ddmm(c.vence)}`}>{c.vence === hoje.iso ? 'vence hoje' : `vence ${ddmm(c.vence)}`}</span>
+                              : <Delta d={compAnt ? deltaPct(c.vSel, c.vAnt) : null} chip />}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  );
+                })}
+                <tfoot>
+                  <tr>
+                    <th scope="row" className="ini">Total</th>
+                    <td><span className="pn-rc-n" style={larguraCli}>{ciclos.reduce((s, c) => s + c.clientes, 0).toLocaleString('pt-BR')}</span></td>
+                    {compAnt && <td className="ant"><span className="pn-rc-v">{brl(recAnt)}</span></td>}
+                    <td className="sel"><span className="pn-rc-v">{brl(recSel)}</span></td>
+                    <td className="pn-rc-cbar pn-rc-nota">{compAnt ? `vs ${mesAno(compAnt)}${parcial ? ' nos ciclos já vencidos' : ''}` : ''}</td>
+                    <td>{compAnt ? <Delta d={deltaMes} chip /> : null}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </CardVidro>
 

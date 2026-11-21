@@ -131,3 +131,8 @@
 }
 .v2 .lg-link:hover { color: var(--txt); }
 .v2 a.entrar { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* 21/11 — peças do acesso em duas metades: só aparecem com a moldura (reviza-fundacao.css) */
+.v2 .lg-painel { display: none; }
+.v2 .lg-palco { display: contents; }
+.v2 .entrar-seta { display: none; }

@@ -119,6 +119,8 @@
 .v2 .pmc-root.rvm .pmc-toggle__btn svg { width: 13px; height: 13px; }
 @media (hover: hover) {
   .v2 .pmc-root.rvm:not(.rvm-series) .rvm-pe .pmc-toggle { opacity: 0; transition: opacity .18s ease; }
+  /* parado, o seletor de vista sai do fluxo: o texto da variação usa a linha inteira (não corta) */
+  .v2 .pmc-root.rvm:not(.rvm-series):not(:hover):not(:focus-within) .rvm-pe .pmc-toggle { position: absolute; pointer-events: none; }
   .v2 .pmc-root.rvm:not(.rvm-series):is(:hover, :focus-within) .rvm-pe .pmc-toggle { opacity: 1; }
 }
 

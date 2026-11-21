@@ -759,3 +759,21 @@ html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab th.d5-nome { min-width: 176
    linha dela nas ondas — dentro dos cards o --dado-1 é o da série, não o cinza das barras */
 html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #7C83F2; --dado-1-rgb: 124, 131, 242; }
 html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }
+
+/* ============================================================
+   21/11 — TUDO NA RÉGUA (dono: "tudo bem alinhado, tudo retinho, nada torto")
+   ============================================================ */
+/* o título da 1ª coluna começava 4px antes do texto das linhas e do título do cartão (a regra geral
+   de cabeçalho de tabela ganhava do recuo do painel); o da última terminava 4px depois */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab thead tr > :first-child { padding-left: var(--d5-px); }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab thead tr > :last-child { padding-right: var(--d5-px); }
+/* variação em duas linhas (etiqueta + "vs anterior"): as duas no meio da coluna, como o resto da célula */
+.v2 .d5-tab .d5-cel2-dir .d5-var { justify-content: center; }
+/* linha Total das entradas: mesmo desenho da linha (barra + número), com a barra invisível */
+.v2 .d5-tab .d5-trilho-vago { visibility: hidden; }
+/* com a barra lateral fixa o painel tem ~1146px num monitor de 1440: os títulos compridos da tabela de
+   atendentes quebram em duas linhas, para a última coluna não ficar cortada */
+@container d5pg (max-width: 1280px) {
+  html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
+  html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord { line-height: 1.35; }
+}

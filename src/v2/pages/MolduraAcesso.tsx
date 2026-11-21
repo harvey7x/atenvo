@@ -26,7 +26,21 @@ export function MolduraAcesso({ children }: { children: ReactNode }) {
         <MarcaQuadro />
         <span className="lg-topo-nome">ALFA GROUP</span>
       </header>
-      {children}
+      {/* 21/11 — o acesso com a MESMA cara do sistema: à esquerda a marca sobre o preto (como a barra
+          lateral), à direita o painel claro com o formulário (como o palco). Sem a moldura, o painel
+          da marca não aparece e o palco não existe para o layout (display: contents). */}
+      <aside className="lg-painel">
+        <svg className="lg-painel-arte" viewBox="0 0 256 256" fill="none" aria-hidden focusable="false">
+          <path d="M128 30 L228 216 L28 216 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <path d="M128 82 L184 202 L112 202 L144 142 L106 142 L72 202" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <div className="lg-painel-txt">
+          <i className="lg-painel-fio" aria-hidden />
+          <p className="lg-painel-tit">Plataforma de Atendimento e Gestão</p>
+          <p className="lg-painel-amb"><span>Cobranças</span><span>Atendimento</span></p>
+        </div>
+      </aside>
+      <main className="lg-palco">{children}</main>
       <footer className="lg-rodape">
         © {new Date().getFullYear()} ALFA GROUP{versao ? <> · <span className="num">versão {versao}</span></> : null}
       </footer>

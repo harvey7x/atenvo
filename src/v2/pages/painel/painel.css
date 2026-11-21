@@ -183,32 +183,70 @@
 .v2 .pn-leg i { width: 14px; height: 6px; border-radius: 2px; display: inline-block; }
 .v2 .pn-leg i.ant { background: rgba(var(--tint), .22); }
 .v2 .pn-leg i.sel { background: var(--azul, #F0BC4E); }
-.v2 .pn-grupos { display: grid; gap: 18px 32px; }
-.v2 .pn-grupos.dois { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.v2 .pn-grupo { display: flex; flex-direction: column; min-width: 0; }
-.v2 .pn-grupo-cab {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 2px 8px; margin-bottom: 2px;
-  border-bottom: 1px solid var(--linha);
-  font-size: 10.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3);
+/* 21/11 — UMA tabela (dono: "tudo bem alinhado, tudo retinho"): ciclo · clientes · mês anterior ·
+   mês escolhido · comparativo · variação, com as faixas de grupo e o total nas MESMAS colunas.
+   A tabela vai de borda a borda do cartão (o texto continua na régua do título, a 19px).
+   Prefixo com :not(#id) só para vencer as regras gerais de tabela das camadas de cima. */
+.v2 .pn-rc-rolo { overflow-x: auto; margin: 2px -19px 0; }
+.v2 .pn-so { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc { width: 100%; min-width: 640px; table-layout: auto; border-collapse: collapse; font-size: 12.5px; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(th, td) { width: 1%; text-align: center; padding: 0 22px; white-space: nowrap; vertical-align: middle; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(th, td).pn-rc-cbar { width: auto; padding: 0 10px; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(th, td).ini { text-align: left; padding-left: 19px; padding-right: 44px; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tr > :last-child { padding-right: 19px; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc thead th { height: 34px; background: none; border-bottom: 1px solid var(--linha); }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody :is(th, td) { height: 38px; border-bottom: 1px solid rgba(var(--tint), .05); color: var(--txt-2); font-weight: 400; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody th.ini { font-size: 12.5px; font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody tr:last-child :is(th, td) { border-bottom: 0; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody tr { transition: background-color .16s; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody tr:hover { background: rgba(var(--tint), .028); }
+/* os números: bloco de largura fixa, alinhado pela direita, no MEIO da coluna */
+.v2 .pn-rc :is(.pn-rc-v, .pn-rc-n) { display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc td:has(> .pn-rc-v) { text-align: right; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody td.sel { color: var(--txt); font-weight: 550; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody td.ant { color: var(--txt-3); }
+/* faixa do grupo (Fim do mês / Início do mês) com a soma do grupo em cada coluna */
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tr.pn-rc-grupo :is(th, td) {
+  height: 30px; border-bottom: 0; background: rgba(var(--tint), .035);
+  font-size: 11.5px; font-weight: 500; color: var(--txt-3);
 }
-.v2 .pn-grupo-cab .num { letter-spacing: 0; text-transform: none; font-size: 12px; color: var(--txt-2); }
-.v2 .pn-ciclo {
-  display: grid; grid-template-columns: 78px minmax(0, 1fr) 104px 74px; align-items: center; gap: 12px;
-  padding: 9px 2px; border-bottom: 1px solid rgba(var(--tint), .05);
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tr.pn-rc-grupo th.ini { font-size: 11.5px; font-weight: 500; color: var(--txt-2); }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tr.pn-rc-grupo:hover { background: none; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tbody.pn-rc-solto tr:first-child :is(th, td) { border-top: 1px solid var(--linha); }
+/* comparativo: um trilho só — o preenchido é o mês escolhido, o risco marca o mês anterior */
+.v2 .pn-rc .pn-rc-trilho { position: relative; display: block; height: 6px; border-radius: 3px; background: rgba(var(--tint), .07); }
+.v2 .pn-rc .pn-rc-trilho i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--azul, #F0BC4E); }
+.v2 .pn-rc .pn-rc-trilho i.previsto {
+  background: repeating-linear-gradient(135deg, rgba(var(--azul-rgb, 240, 188, 78), .95) 0 6px, rgba(var(--azul-rgb, 240, 188, 78), .5) 6px 11px);
 }
-.v2 .pn-ciclo:last-child { border-bottom: 0; }
-.v2 .pn-ciclo-id { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.v2 .pn-ciclo-id b { font-size: 13px; font-weight: 700; color: var(--txt); font-variant-numeric: tabular-nums; }
-.v2 .pn-ciclo-id small { font-size: 11px; color: var(--txt-3); white-space: nowrap; }
-.v2 .pn-ciclo-barras { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.v2 .pn-ciclo-barras i { display: block; height: 6px; border-radius: 3px; }
-.v2 .pn-ciclo-barras i.ant { background: rgba(var(--tint), .16); }
-.v2 .pn-ciclo-barras i.sel { background: var(--azul, #F0BC4E); }
-.v2 .pn-ciclo-barras i.sel.previsto {
-  background: repeating-linear-gradient(135deg, rgba(var(--azul-rgb, 240, 188, 78), .95) 0 6px, rgba(var(--azul-rgb, 240, 188, 78), .55) 6px 11px);
+.v2 .pn-rc .pn-rc-trilho b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--txt-2); }
+.v2 .pn-rc-leg i.ant { width: 2px; height: 12px; border-radius: 1px; background: var(--txt-2); }
+/* total: mesma régua, linha mais firme em cima */
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tfoot :is(th, td) { height: 44px; border-top: 1px solid var(--linha); font-size: 12.5px; color: var(--txt-2); font-weight: 400; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tfoot th.ini { font-weight: 600; color: var(--txt); }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tfoot td.sel { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tfoot td.ant { color: var(--txt-3); }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc tfoot td.pn-rc-nota { text-align: right; font-size: 11.5px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; }
+.v2 .pn-card:has(> .pn-rc-rolo) { padding-bottom: 4px !important; }
+/* 21/11 — tabela dentro de cartão: a 1ª coluna na MESMA régua do título do cartão (o texto começava
+   16px para dentro) e a última termina na borda de dentro do cartão */
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-card table:not(.pn-rc):not(.pn-mapa) tr > :first-child { padding-left: 0; }
+html[data-barra-alfa]:not(#rv-pn) .v2 .pn-card table:not(.pn-rc):not(.pn-mapa) tr > :last-child { padding-right: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .v2 .pn-rc .pn-rc-trilho i { transform-origin: left; animation: pn-rc-estica .7s cubic-bezier(.2, .7, .2, 1) backwards; }
+  .v2 .pn-rc .pn-rc-trilho b { animation: pn-rc-surge .4s ease .45s backwards; }
 }
-.v2 .pn-ciclo-v { text-align: right; font-size: 12.5px; font-weight: 600; color: var(--txt); white-space: nowrap; }
-.v2 .pn-ciclo-st { display: flex; justify-content: flex-end; }
+@keyframes pn-rc-estica { from { transform: scaleX(0); } }
+@keyframes pn-rc-surge { from { opacity: 0; } }
+@media (max-width: 760px) {
+  html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc { min-width: 0; }
+  html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(.pn-rc-cbar, col.c-bar) { display: none; }
+  html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(th, td) { width: auto; padding: 0 8px; }
+  html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(th, td).ini { padding-right: 8px; }
+}
+@media (max-width: 520px) {
+  html[data-barra-alfa]:not(#rv-pn) .v2 .pn-rc :is(td.ant, col.c-ant, thead th:nth-child(3):not(:nth-last-child(3))) { display: none; }
+}
 .v2 .pn-rodape {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
   margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linha); font-size: 12.5px; color: var(--txt-2);
@@ -221,7 +259,7 @@
 .v2 .pn-mapa { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
 .v2 .pn-mapa thead th {
   padding: 0 0 8px; background: none; border: 0; text-align: center;
-  font-size: 10.5px; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--txt-3); white-space: nowrap;
+  font-size: 10.5px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); white-space: nowrap;
 }
 .v2 .pn-mapa thead th button {
   padding: 3px 6px; border: 0; border-radius: 6px; background: transparent; color: inherit;
@@ -231,7 +269,7 @@
 .v2 .pn-mapa thead th.on button { background: rgba(var(--azul-rgb, 240, 188, 78), .16); color: var(--txt); }
 /* 1ª coluna (ciclo) — não é sticky: o cartão é vidro translúcido e uma coluna
    opaca por cima ficaria remendada; 14 meses cabem sem rolar a partir de ~1100px */
-.v2 .pn-mapa-fixa { text-align: left !important; padding: 0 12px 0 2px !important; white-space: nowrap; }
+.v2 .pn-mapa-fixa { text-align: left !important; padding: 0 12px 0 0 !important; white-space: nowrap; }
 .v2 .pn-mapa tbody th, .v2 .pn-mapa tfoot th { font-weight: 400; height: 32px; }
 .v2 .pn-mapa tbody th b { font-size: 12.5px; font-weight: 700; color: var(--txt); }
 .v2 .pn-mapa tbody th small { margin-left: 6px; font-size: 10.5px; color: var(--txt-3); }
@@ -625,7 +663,6 @@
 @media (max-width: 1180px) {
   .v2 .pn-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2 .pn-duas { grid-template-columns: minmax(0, 1fr); }
-  .v2 .pn-grupos.dois { grid-template-columns: minmax(0, 1fr); }
   .v2 .pn-eng { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
@@ -634,8 +671,6 @@
   .v2 .pn-barra-dir { justify-content: space-between; }
   .v2 .pn-saude li { grid-template-columns: 10px minmax(0, 1fr) 40px 44px; }
   .v2 .pn-saude-v { display: none; }
-  .v2 .pn-ciclo { grid-template-columns: 64px minmax(0, 1fr) auto; }
-  .v2 .pn-ciclo-barras { display: none; }
   .v2 .pn-graf { grid-template-columns: 36px minmax(0, 1fr); }
   .v2 .pn-graf-x span small { display: none; }
 }

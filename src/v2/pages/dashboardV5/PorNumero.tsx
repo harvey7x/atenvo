@@ -115,7 +115,8 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
                   )}
                 </span>
               </th>
-              <td className="d5-dir"><b className="num">{fmtInt(totEnt)}</b></td>
+              {/* o total na MESMA coluna dos números das linhas (o trilho vazio guarda o lugar da barra) */}
+              <td className="d5-dir"><span className="d5-ent"><span className="d5-trilho d5-trilho-vago" aria-hidden /><b className="num">{fmtInt(totEnt)}</b></span></td>
               <td className="d5-dir"><b className="num">{fmtInt(totNe)}</b></td>
               <td className="d5-dir"><b className="num">{fmtInt(totGan)}</b></td>
               <td className="d5-dir"><TempoFechar med={kpis.fechMedianaH} media={kpis.fechMediaH} n={kpis.fechN} /></td>
