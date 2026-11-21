@@ -1,0 +1,167 @@
+/* =====================================================================
+   GRAFITE (dono 21/11, referência de painel financeiro escuro): "vamos
+   deixar o nosso sistema nessa pegada".
+   - a barra lateral FIXA, num painel de cantos arredondados, com os grupos
+     em caixa alta (abrem e fecham) e os itens INTERLIGADOS por uma linha;
+   - ESCURO: chão preto + cartões em cinza grafite;
+   - CLARO: chão em branco mais escuro + cartões brancos (a barra também
+     fica clara);
+   - o destaque puxa para o laranja da referência; o item ativo do menu é
+     uma pílula com o laranja entrando pela direita; botão principal laranja.
+   Mesma chave das camadas anteriores ([data-moldura] + [data-barra-alfa]).
+   Importado por ÚLTIMO; o prefixo leva DOIS :not(#id) — vence todas as
+   camadas de antes (um id cada) sem depender da ordem.
+   ===================================================================== */
+
+/* ---- 0. CORES ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 {
+  --base: #0A0A0B;
+  --vidro-a: #151517; --vidro-b: #151517; --surface: #1C1C1F;
+  --linha: #222226; --fio-a: #27272B; --fio-b: #27272B; --line-2: #27272B;
+  --txt: #F2F2F3; --txt-2: #A8A8AF; --txt-3: #7D7D86;
+  --rp-elev: #232327; --rp-menu: #18181B; --rp-campo: #101012; --rp-campo-fio: #2A2A2F; --rp-campo-fio-hover: #3B3B41;
+  --rp-trilho: #101012; --rp-cartao-solido: #151517;
+  --lin-branco: #FAFAFA; --lin-nevoa: #D6D6DA; --lin-fio: #232327; --lin-fio-hover: #36363C;
+  --lin-grafite: #232327; --lin-obsidiana: #1C1C1F; --lin-tinta-botao: #0A0A0B;
+  --d5-fio: #202024; --d5-fio-forte: #2D2D32;
+  --azul: #F4821F; --azul-rgb: 244, 130, 31; --platina-a: #F4821F; --platina-b: #F4821F;
+  /* a queda (ferrugem) um tom mais fundo, para não se confundir com o laranja do destaque */
+  --rubro: #D9643C; --rubro-rgb: 217, 100, 60; --rubro-bg: rgba(217, 100, 60, .14);
+  --cor-erro-txt: #E98A66; --cor-erro-suave: rgba(217, 100, 60, .16);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 {
+  --base: #EDEDEF;
+  --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #F6F6F7;
+  --linha: #E7E7EA; --fio-a: #DEDEE2; --fio-b: #DEDEE2;
+  --txt: #111113; --txt-2: #4A4A52; --txt-3: #73737C;
+  --azul: #EB740F; --azul-rgb: 235, 116, 15; --platina-a: #EB740F; --platina-b: #EB740F; --rv-tinta: #B4530A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco { --lin-fio: #E4E4E8; --linha: #E9E9EC; --d5-fio: #E9E9EC; }
+
+/* ---- 1. O CHÃO: uma cor só de ponta a ponta; barra e topo acompanham o tema ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 { background: var(--base) !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-app {
+  --ba-fundo: #0A0A0B; --ba-menu: #18181B; --ba-mudo: #9A9AA3; --ba-rotulo: #6E6E77;
+  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(244, 130, 31, .75);
+  --gf-barra: #131315; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app {
+  --ba-fundo: #EDEDEF; --ba-fio: rgba(17, 17, 19, .08); --ba-txt: #111113; --ba-mudo: #55555E; --ba-rotulo: #8A8A93;
+  --ba-hover: rgba(17, 17, 19, .05); --ba-ativo: rgba(17, 17, 19, .06); --ba-ativo-tx: #111113; --ba-ativo-ico: #111113;
+  --ba-badge-bg: rgba(17, 17, 19, .07); --ba-badge-tx: #4A4A52; --ba-badge-on-tx: #111113;
+  --ba-kbd-fio: rgba(17, 17, 19, .1); --ba-kbd-bg: rgba(17, 17, 19, .04); --ba-kbd-tx: #73737C;
+  --ba-menu: #FFFFFF; --ba-sombra-menu: 0 20px 40px -14px rgba(17, 17, 19, .22);
+  --ba-sombra-trilho: 1px 0 0 rgba(17, 17, 19, .08), 24px 0 48px -16px rgba(17, 17, 19, .18);
+  --ba-foco: rgba(235, 116, 15, .7);
+  --gf-barra: #FFFFFF; --gf-barra-fio: rgba(17, 17, 19, .08); --gf-arvore: rgba(17, 17, 19, .17);
+}
+/* no claro, o texto da barra e do topo é escuro (a moldura de antes era preta nos dois temas) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 :is(.ba-barra, .p-topbar) {
+  --txt: #111113; --txt-2: #4A4A52; --txt-3: #73737C; --tint: 22, 25, 31;
+  --linha: #E7E7EA; --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #FFFFFF;
+  --rp-menu: #FFFFFF; --rp-elev: #F3F3F5; --rp-campo: #FFFFFF; --rp-campo-fio: #DEDEE2;
+  --lin-fio: #E4E4E8; --lin-branco: #111113;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 .p-topbar { background: var(--ba-fundo); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra { background: var(--gf-barra); border-right: 1px solid var(--gf-barra-fio); }
+
+/* ---- 2. A BARRA FIXA: um painel arredondado sobre o chão ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 { --ba-cheia: 252px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-barra {
+  box-sizing: border-box; padding: 10px 0 10px 10px; overflow: visible; background: transparent; border-right: 0; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-in {
+  box-sizing: border-box; width: 100%; padding: 12px 10px 10px;
+  border: 1px solid var(--gf-barra-fio); border-radius: 18px; background: var(--gf-barra);
+}
+/* fixa: o botão de recolher sai do topo; a trilha começa na régua do conteúdo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-alternar { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-topo { padding-left: 14px; }
+
+/* grupos: título em caixa alta com a seta; clicar abre e fecha */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupos { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo-rot {
+  height: 26px; margin: 0; padding: 0 6px 0 10px; border-radius: 7px;
+  font-size: 10.5px; font-weight: 500; line-height: 1; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ba-rotulo); transition: color .16s ease, opacity .15s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra button.ba-grupo-rot:hover:not(:disabled) { color: var(--ba-txt); }
+
+/* itens interligados: um tronco que desce do título e um ramo curvo até cada item */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item {
+  position: relative; width: auto; margin-left: 24px;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item::before {
+  content: ''; position: absolute; left: -13px; top: -3px; width: 10px; height: calc(50% + 3px); margin: 0;
+  border: solid var(--gf-arvore); border-width: 0 0 1px 1px; border-radius: 0 0 0 8px; background: none; pointer-events: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item:not(:last-child)::after {
+  content: ''; position: absolute; left: -13px; top: -3px; bottom: -3px; width: 0;
+  border-left: 1px solid var(--gf-arvore); pointer-events: none;
+}
+/* (fora dos grupos — Configurações e Sair — não há ramo nem o filete de antes) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra :is(.ba-pe, .ba-grupo:not([role="group"])) .ba-item::before { content: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="trilho"] .ba-barra .ba-item::before { content: none; }
+
+/* o item: 32px, canto 9; o ativo é a pílula com o laranja entrando pela direita */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item { padding: 6px 8px 6px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 450; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo { gap: 2px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
+  color: #FFFFFF; font-weight: 500;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .055) 42%, rgba(244, 130, 31, .46) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), inset 0 -1px 0 rgba(244, 130, 31, .28);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
+  color: #111113; font-weight: 500;
+  background: linear-gradient(90deg, rgba(17, 17, 19, .055) 0%, rgba(17, 17, 19, .04) 42%, rgba(235, 116, 15, .34) 100%);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
+/* peças da barra que tinham cor fixa de fundo preto: seguem o tema */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ws-amb, .ba-ws-seta, .ba-cab-bt) { color: var(--ba-rotulo); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-pe { border-top-color: var(--gf-barra-fio); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca { background: rgba(17, 17, 19, .045); color: #73737C; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca:hover { background: rgba(17, 17, 19, .07); color: #111113; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca .ba-kbd { background: rgba(17, 17, 19, .06); color: #73737C; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo[role="group"]::before { background: rgba(17, 17, 19, .12); }
+
+/* ---- 3. O CONTEÚDO: sem painel em volta — os cartões ficam direto sobre o chão ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco { margin: 0; border-radius: 0; background: transparent; box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina { background: var(--base); }
+/* telas de trabalho (WhatsApp, Pós-venda, Kanban): a tela inteira é UM painel */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco:has(> .pagina.cheia) { margin: 0 12px 12px; border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--gf-barra-fio); }
+@media (max-width: 760px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco:has(> .pagina.cheia) { margin: 0 8px 8px; border-radius: 14px; }
+}
+/* cartões: cinza grafite sobre o preto, sem risco forte em volta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  background: var(--vidro-a); border-color: rgba(255, 255, 255, .055); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  background: #FFFFFF; border-color: #E4E4E8; box-shadow: 0 1px 2px rgba(17, 17, 19, .04);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { --pmc-card: var(--vidro-a); --pmc-border: var(--lin-fio); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico { background: rgba(var(--azul-rgb), .14); color: var(--azul); }
+
+/* ---- 4. BOTÃO PRINCIPAL: laranja com o texto branco, nos dois temas ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  color: #FFFFFF; background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 12%); border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: #FFFFFF; }
+
+/* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa, do laranja ao claro ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col .pn-graf-bar { border-radius: 8px 8px 3px 3px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2A2A2F; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar {
+  background: linear-gradient(180deg, #FFE9D4 0%, #FBB274 28%, var(--azul) 100%);
+  box-shadow: 0 0 26px -6px rgba(var(--azul-rgb), .6);
+}
+
+/* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(244, 130, 31, .1); border: 1px solid rgba(244, 130, 31, .2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --zp-verde: #F4821F; --zp-acao: #F4821F; --zp-badge: #F4821F; --zp-tique-lida: #F4821F; --zp-onda-on: #F4821F; --zp-onda-ponto: #F4821F; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --zp-badge: #EB740F; --zp-onda-on: #EB740F; --zp-onda-ponto: #EB740F; }
+
+/* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }

@@ -97,28 +97,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-cab { min-height: 30px; }
 
-/* ---- 5. o PRIMEIRO card de cada grade em preto (o destaque da referência) — no claro ---- */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child {
-  --txt: #F4F4F5; --txt-2: #B4B4BC; --txt-3: #8A8A93; --tint: 255, 255, 255;
-  --linha: rgba(255, 255, 255, .08); --lin-fio: rgba(255, 255, 255, .08); --lin-fio-hover: rgba(255, 255, 255, .16);
-  --lin-branco: #FFFFFF; --vidro-a: #111113;
-  --pmc-card: #111113; --pmc-border: rgba(255, 255, 255, .08); --pmc-muted: rgba(255, 255, 255, .08); --pmc-muted-text: #8A8A93;
-  --rp-menu: #1A1A1D; --surface: #1A1A1D;
-  --verde: #3FAA79; --verde-rgb: 63, 170, 121; --rubro: #E0504F; --rubro-rgb: 224, 80, 79;
-  --cor-ok-txt: #4CC38A; --cor-erro-txt: #F07170; --cor-ok-suave: rgba(63, 170, 121, .16); --cor-erro-suave: rgba(224, 80, 79, .16);
-  color: var(--txt); background: #111113; border-color: #111113;
-  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, .45);
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .rvm-ico {
-  background: rgba(245, 165, 36, .16); color: #F5A524;
-}
-/* as cores que o card calcula para o claro (verde/vermelho escuros) acendem um tom sobre o preto */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child :is(.rvm-var, .rvm-delta > b) {
-  filter: brightness(1.7) saturate(1.1);
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ok { color: #4CC38A; background: rgba(63, 170, 121, .16); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-er { color: #F07170; background: rgba(224, 80, 79, .16); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ne { color: #B4B4BC; background: rgba(255, 255, 255, .08); }
+/* ---- 5. (o primeiro card em preto saiu em 21/11: na referência nova os cartões são todos iguais) ---- */
 
 /* ---- 6. botão principal: preto com o ícone dourado (no claro); no escuro segue o dourado ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini):not(:disabled) {

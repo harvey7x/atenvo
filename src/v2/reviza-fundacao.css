@@ -142,14 +142,6 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
 /* "Ao vivo": o ponto no dourado da casa, o texto neutro */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo { color: var(--txt-2); background: transparent; border-color: var(--lin-fio, var(--linha)); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo .selo-vivo-dot { background: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .18); }
-/* o card PRETO (o primeiro de cada grade, no claro): os tons acendem para ler sobre o preto */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child {
-  --cor-ok-txt: #E4E4E7; --cor-erro-txt: #EE9B78; --cor-ok-suave: rgba(255, 255, 255, .1); --cor-erro-suave: rgba(226, 123, 82, .18);
-}
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child :is(.rvm-var, .rvm-delta > b) { filter: none; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-ok { color: #E4E4E7; background: rgba(255, 255, 255, .1); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:first-child .d5-var-chip.d5-var-er { color: #EE9B78; background: rgba(226, 123, 82, .18); }
-
 /* ---- ÍCONES do menu: traço 1,6, 16px, cantos redondos (a família nova está em shell/iconesAlfa.tsx) ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ico, .ba-ico svg) { width: 16px; height: 16px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-ico svg { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }

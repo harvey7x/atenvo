@@ -193,6 +193,15 @@ html[data-barra-alfa] .v2 .ba-grupo-rot {
   font-size: 11px; font-weight: 600; line-height: 16px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--ba-rotulo); white-space: nowrap; transition: opacity .15s;
 }
+/* o título do grupo é um botão (abre e fecha o grupo): sem a cara de botão do navegador */
+html[data-barra-alfa] .v2 button.ba-grupo-rot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  border: 0; background: none; font-family: inherit; text-align: left; cursor: pointer; appearance: none;
+}
+html[data-barra-alfa] .v2 button.ba-grupo-rot:disabled { cursor: default; }
+html[data-barra-alfa] .v2 .ba-grupo-seta { flex: none; opacity: .7; transition: transform .2s var(--ba-e); }
+html[data-barra-alfa] .v2 .ba-grupo[data-fechado] .ba-grupo-seta { transform: rotate(-90deg); }
+html[data-barra-alfa] .v2 button.ba-grupo-rot:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 1px; border-radius: 5px; }
 
 /* ---- um item ---- */
 html[data-barra-alfa] .v2 .ba-item {

@@ -55,6 +55,7 @@ const lerPrefBarra = (): 'aberta' | 'trilho' | null => {
    do topo abre por cima; larga (≥1440px) = a escolha da pessoa, aberta de saída */
 const LARGURA_CELULAR = 760;
 const LARGURA_ENCAIXE = 1440;
+const LARGURA_FIXA = 1100; // com a barra fixa (moldura): aberta a partir daqui
 const zonaDaLargura = (w: number): 'gaveta' | 'media' | 'larga' => (w <= LARGURA_CELULAR ? 'gaveta' : w < LARGURA_ENCAIXE ? 'media' : 'larga');
 /* telas que precisam de toda a largura: a barra começa recolhida nelas em qualquer tela (crítica 12/11) */
 const TELAS_DE_TRABALHO = /^\/(whatsapp|pos-venda|kanban|cobrancas\/planilha)(\/|$)/;
@@ -585,7 +586,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // Tema dual: escolha explícita do usuário, persistida por usuário; padrão dark.
   const escopoTema = user?.id ?? undefined;
   // moldura preta (dono 19/11): quem ainda não escolheu o tema abre no CLARO (o conteúdo branco da referência)
-  const temaPadrao: Tema = ALFA && lerMoldura() ? 'light' : 'dark';
+  // 21/11: a referência nova é escura (preto + cinza grafite) — quem ainda não escolheu abre no escuro; o claro
+  // (branco + branco mais escuro) fica a um clique, e a escolha gravada continua valendo
+  const temaPadrao: Tema = 'dark';
   const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema, temaPadrao));
   useEffect(() => { setTema(lerTema(escopoTema, temaPadrao)); }, [escopoTema]); // eslint-disable-line react-hooks/exhaustive-deps // recarrega a preferência quando o usuário resolve
 
@@ -818,12 +821,18 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // recolhida (trilho), como na tela média — a tela precisa da largura; a preferência salva não muda e vale
   // nas outras telas. O botão do topo abre a barra por cima do conteúdo.
   const telaDeTrabalho = TELAS_DE_TRABALHO.test(location.pathname);
-  const zonaTela = zonaDaLargura(largura);
-  const zonaBarra = zonaTela === 'larga' && telaDeTrabalho ? 'media' : zonaTela;
+  // BARRA FIXA (dono 21/11: "agora a barra do lado vai ser fixa"): com a moldura ela fica sempre aberta a partir
+  // de 1100px, em todas as telas (inclusive WhatsApp, Kanban e Gestão); abaixo disso segue o trilho de ícones e,
+  // no celular, a gaveta
+  const barraFixa = ALFA && lerMoldura();
+  const zonaTela = barraFixa
+    ? (largura <= LARGURA_CELULAR ? 'gaveta' : largura < LARGURA_FIXA ? 'media' : 'larga')
+    : zonaDaLargura(largura);
+  const zonaBarra = !barraFixa && zonaTela === 'larga' && telaDeTrabalho ? 'media' : zonaTela;
   // por cima do conteúdo: a gaveta do celular ou o trilho aberto pelo botão (tela média). Fecha ao navegar.
   const [sobreposta, setSobreposta] = useState(false);
   useEffect(() => { setSobreposta(false); }, [location.pathname, zonaBarra]);
-  const modoBarra: ModoBarra = zonaBarra === 'gaveta' ? 'gaveta' : zonaBarra === 'media' ? 'trilho' : prefBarra;
+  const modoBarra: ModoBarra = zonaBarra === 'gaveta' ? 'gaveta' : zonaBarra === 'media' ? 'trilho' : barraFixa ? 'aberta' : prefBarra;
   const guardarPref = useCallback((prox: 'aberta' | 'trilho') => {
     setPrefBarra(prox);
     try { localStorage.setItem(CHAVE_BARRA, prox); } catch { /* sem storage: vale só nesta aba */ }

@@ -158,6 +158,11 @@ function ItemLink({ item, aoEscolher }: { item: ItemBarra; aoEscolher?: () => vo
   );
 }
 
+const CHAVE_GRUPOS = 'reviza.barra.grupos';
+const lerGruposFechados = (): string[] => {
+  try { const v: unknown = JSON.parse(localStorage.getItem(CHAVE_GRUPOS) || '[]'); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []; } catch { return []; }
+};
+
 export type AcaoTopoBarra = { rotulo: string; tipo: 'fixar' | 'recolher' | 'fechar'; aoClicar: () => void };
 
 export type BarraAlfaProps = {
@@ -191,6 +196,13 @@ export function BarraAlfa(p: BarraAlfaProps) {
   const nav = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
+  // grupos fechados pelo título — a escolha fica salva neste aparelho
+  const [fechados, setFechados] = useState<string[]>(lerGruposFechados);
+  const alternarGrupo = useCallback((rot: string) => setFechados((at) => {
+    const prox = at.includes(rot) ? at.filter((x) => x !== rot) : [...at, rot];
+    try { localStorage.setItem(CHAVE_GRUPOS, JSON.stringify(prox)); } catch { /* sem storage: vale só nesta aba */ }
+    return prox;
+  }), []);
   const [rolagem, setRolagem] = useState<'' | 'abaixo' | 'acima' | 'ambos'>('');
   const gavetaFechada = p.modo === 'gaveta' && !p.sobreposta;
 
@@ -271,12 +283,21 @@ export function BarraAlfa(p: BarraAlfaProps) {
                 </button>
               </div>
             )}
-            {!p.carregando && p.grupos.map((g) => (
-              <div className="ba-grupo" key={g.rotulo} role="group" aria-labelledby={idGrupo(g.rotulo)}>
-                <span className="ba-grupo-rot" id={idGrupo(g.rotulo)}>{g.rotulo}</span>
-                {g.itens.map((i) => <ItemLink key={i.slug} item={i} aoEscolher={escolher} />)}
-              </div>
-            ))}
+            {/* cada grupo abre e fecha pelo título (dono 21/11, referência com a barra fixa e os itens
+                interligados); no trilho de ícones todos ficam abertos */}
+            {!p.carregando && p.grupos.map((g) => {
+              const fechado = p.modo !== 'trilho' && fechados.includes(g.rotulo);
+              return (
+                <div className="ba-grupo" key={g.rotulo} role="group" aria-labelledby={idGrupo(g.rotulo)} data-fechado={fechado ? '' : undefined}>
+                  <button type="button" className="ba-grupo-rot" id={idGrupo(g.rotulo)} aria-expanded={!fechado}
+                    disabled={p.modo === 'trilho'} onClick={() => alternarGrupo(g.rotulo)}>
+                    <span>{g.rotulo}</span>
+                    <svg className="ba-grupo-seta" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m6 9 6 6 6-6" /></svg>
+                  </button>
+                  {!fechado && g.itens.map((i) => <ItemLink key={i.slug} item={i} aoEscolher={escolher} />)}
+                </div>
+              );
+            })}
           </nav>
 
           <div className="ba-pe">
