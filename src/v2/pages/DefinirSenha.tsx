@@ -42,7 +42,7 @@ export default function DefinirSenhaV2() {
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
         <div className="caps">Ativação de acesso</div>
-        <h1 className="p-display">Bem-vindo(a) à ALFA GROUP.</h1>
+        <h1 className="p-display">Bem-vindo(a) ao Reviza CRM.</h1>
 
         {fase === 'carregando' ? (
           <div className="sub">Validando seu convite…</div>

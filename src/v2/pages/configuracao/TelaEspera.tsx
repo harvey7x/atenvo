@@ -93,7 +93,7 @@ export function TopoConfig({ children, identidade = true }: { children?: ReactNo
       <div className="cini-topo-marca">
         <LogoAtenvo className="cini-logo" />
         {/* o logo já se anuncia como "ALFA GROUP" */}
-        <span className="cini-wordmark" aria-hidden>ALFA GROUP</span>
+        <span className="cini-wordmark" aria-hidden>Reviza CRM</span>
         <span className="cini-topo-div" aria-hidden />
         <span className="cini-topo-rot">Configuração inicial</span>
       </div>
@@ -118,7 +118,7 @@ export function TelaEspera({ idTitulo, etapas, mostrarEtapas = false }: {
     <div className="cini-espera">
       <div className="vidro cini-espera-card">
         <LogoAtenvo className="cini-espera-logo" />
-        <p className="cini-eyebrow" aria-hidden>ALFA GROUP</p>
+        <p className="cini-eyebrow" aria-hidden>Reviza CRM</p>
         {/* ilustração serena do que está acontecendo (decorativa: o texto abaixo já diz tudo) */}
         <div className="cini-espera-fig" aria-hidden>
           <FigEsperaEquipe />

@@ -165,3 +165,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 
 /* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* ---- 8. A MARCA (Reviza CRM, 21/11): o ícone já traz o próprio fundo — o quadro dourado de antes sai ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca { width: 32px; height: 32px; border-radius: 0; background: none; box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca svg { width: 32px; height: 32px; filter: drop-shadow(0 3px 8px rgba(242, 140, 27, .28)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-topo-marca { width: 32px; height: 32px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-arte { right: -6%; width: min(520px, 84%); }

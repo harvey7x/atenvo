@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { IconeReviza } from '../components/LogoReviza';
 import './login.css';
 
 /* Moldura das telas de ACESSO (login, senha, convite, criar organização, configuração ausente e a
@@ -6,14 +7,7 @@ import './login.css';
    rodapé discreto — a primeira tela da equipe todo dia não fica solta numa tela vazia (crítica 12/11).
    A marca do canto é a MESMA do topo da barra lateral: o triângulo em uma cor dentro do quadrado dourado. */
 function MarcaQuadro() {
-  return (
-    <span className="lg-topo-marca" aria-hidden>
-      <svg viewBox="0 0 256 256" width="18" height="18" fill="none" focusable="false">
-        <path d="M128 30 L228 216 L28 216 Z" stroke="currentColor" strokeWidth="20" strokeLinejoin="round" />
-        <path d="M128 82 L184 202 L112 202 L144 142 L106 142 L72 202" stroke="currentColor" strokeWidth="17" strokeLinejoin="round" strokeLinecap="round" />
-      </svg>
-    </span>
-  );
+  return <span className="lg-topo-marca" aria-hidden><IconeReviza /></span>;
 }
 
 export function MolduraAcesso({ children }: { children: ReactNode }) {
@@ -24,15 +18,15 @@ export function MolduraAcesso({ children }: { children: ReactNode }) {
       <div className="grao" />
       <header className="lg-topo">
         <MarcaQuadro />
-        <span className="lg-topo-nome">ALFA GROUP</span>
+        <span className="lg-topo-nome">Reviza CRM</span>
       </header>
       {/* 21/11 — o acesso com a MESMA cara do sistema: à esquerda a marca sobre o preto (como a barra
           lateral), à direita o painel claro com o formulário (como o palco). Sem a moldura, o painel
           da marca não aparece e o palco não existe para o layout (display: contents). */}
       <aside className="lg-painel">
-        <svg className="lg-painel-arte" viewBox="0 0 256 256" fill="none" aria-hidden focusable="false">
-          <path d="M128 30 L228 216 L28 216 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          <path d="M128 82 L184 202 L112 202 L144 142 L106 142 L72 202" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <svg className="lg-painel-arte" viewBox="12 8 82 84" fill="none" aria-hidden focusable="false">
+          <path d="M20 24 L28 16 H64 L80 32 V45 L68 57 H40 V84 H20 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <path d="M49 63 H72 L86 84 H63 Z M40 30 H58 L64 36 V38 L58 44 H40 Z" stroke="currentColor" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
         <div className="lg-painel-txt">
           <i className="lg-painel-fio" aria-hidden />
@@ -42,7 +36,7 @@ export function MolduraAcesso({ children }: { children: ReactNode }) {
       </aside>
       <main className="lg-palco">{children}</main>
       <footer className="lg-rodape">
-        © {new Date().getFullYear()} ALFA GROUP{versao ? <> · <span className="num">versão {versao}</span></> : null}
+        © {new Date().getFullYear()} Reviza CRM{versao ? <> · <span className="num">versão {versao}</span></> : null}
       </footer>
     </div>
   );

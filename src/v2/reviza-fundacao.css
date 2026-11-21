@@ -342,13 +342,6 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2.tela-login > :is(.luz2, .grao) { display: none; }
 /* a marca no canto, igual ao topo da barra lateral */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo { position: absolute; top: 38px; left: 44px; gap: 10px; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo-marca {
-  width: 30px; height: 30px; border-radius: 8px; color: #1B1206;
-  background:
-    radial-gradient(120% 75% at 28% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 58%),
-    linear-gradient(150deg, #FFDC85 0%, #F7B23D 45%, #E3830F 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26), inset 0 -2px 4px rgba(120, 58, 0, .25);
-}
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo-nome { color: #F4F4F5; font-size: 13px; font-weight: 600; letter-spacing: .02em; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-rodape { position: absolute; left: 44px; right: auto; bottom: 36px; margin: 0; text-align: left; color: #6F6F78; font-size: 11.5px; letter-spacing: 0; }
 /* metade da marca */

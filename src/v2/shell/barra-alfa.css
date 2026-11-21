@@ -147,11 +147,9 @@ html[data-barra-alfa] .v2 .ba-ws-gat {
 }
 html[data-barra-alfa] .v2 .ba-ws-gat.estatico { cursor: default; }
 html[data-barra-alfa] .v2 .ba-ws-marca {
-  display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px;
-  color: #2A1E06;
-  background: linear-gradient(140deg, #F9E3A1 0%, #E6B84F 50%, #B98322 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 -1px 0 rgba(90, 60, 8, .25), 0 1px 2px rgba(0, 0, 0, .3);
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px;
 }
+html[data-barra-alfa] .v2 .ba-ws-marca svg { display: block; width: 100%; height: 100%; }
 html[data-barra-alfa] .v2 .ba-ws-tx { display: flex; flex-direction: column; flex: 1; min-width: 0; transition: opacity .15s; }
 html[data-barra-alfa] .v2 .ba-ws-nome,
 html[data-barra-alfa] .v2 .ba-ws-amb { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

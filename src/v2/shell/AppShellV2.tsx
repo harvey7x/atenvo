@@ -949,7 +949,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         {ALFA ? (
           <BarraAlfa
             modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
-            org="ALFA GROUP"
+            org="Reviza CRM"
             ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: DESCRICAO_AMBIENTE[m.id] }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
             aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}

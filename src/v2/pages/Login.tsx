@@ -114,7 +114,7 @@ export default function LoginV2() {
     <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
-        <div className="caps">Bem-vindo à ALFA GROUP</div>
+        <div className="caps">Bem-vindo ao Reviza CRM</div>
         <h1 className="p-display">Acesse sua operação.</h1>
         <div className="sub">Entre com suas credenciais para continuar.</div>
 

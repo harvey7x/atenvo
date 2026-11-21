@@ -19,6 +19,7 @@
                  botão do topo também abre por cima;
    - 'gaveta'  — no celular (≤760px) ela some; o botão do topo abre por cima, com um véu atrás.
    ===================================================================== */
+import { IconeReviza } from '../components/LogoReviza';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import './barra-alfa.css';
@@ -45,15 +46,8 @@ export const IcPainel = ({ aberto }: { aberto: boolean }) => svg(
   <><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" />{aberto ? <path d="m16 15-3-3 3-3" /> : <path d="m14 9 3 3-3 3" />}</>, 18);
 
 /* a marca da ALFA (o triângulo do LogoAtenvo) em uma cor só — vai dentro do quadrado dourado */
-function MarcaAlfa() {
-  return (
-    <svg viewBox="0 0 256 256" width="20" height="20" fill="none" aria-hidden focusable="false">
-      {/* 19/11: o mesmo desenho, traço mais firme e cantos redondos — lê melhor no quadrado pequeno */}
-      <path d="M128 34 L226 214 L30 214 Z" stroke="currentColor" strokeWidth="22" strokeLinejoin="round" />
-      <path d="M128 88 L180 198 L114 198 L143 144 L108 144 L76 198" stroke="currentColor" strokeWidth="19" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
+/* a marca no topo da barra: o ícone do Reviza CRM (21/11) */
+function MarcaAlfa() { return <IconeReviza />; }
 
 /* ícone de cada ambiente no menu de troca (quadro de 28px): Cobranças = recibo; Atendimento = balão */
 export const ICONE_AMBIENTE: Record<string, ReactNode> = {

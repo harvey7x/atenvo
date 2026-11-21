@@ -30,7 +30,7 @@ export default function NaoEncontrada() {
     <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
-        <div className="caps">ALFA GROUP</div>
+        <div className="caps">Reviza CRM</div>
         <h1 className="p-display">Página não encontrada.</h1>
         <div className="sub">O endereço acessado não existe ou foi movido.</div>
         <Link to={user ? INICIO : '/login'} className="entrar">

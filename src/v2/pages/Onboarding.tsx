@@ -38,7 +38,7 @@ export default function OnboardingV2({ onProvision }: { onProvision: (nome: stri
     <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
-        <div className="caps">Bem-vindo à ALFA GROUP</div>
+        <div className="caps">Bem-vindo ao Reviza CRM</div>
         <h1 className="p-display">Crie sua organização.</h1>
         <div className="sub">Para começar, informe o nome da empresa que você vai gerenciar.</div>
 

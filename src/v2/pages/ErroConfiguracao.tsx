@@ -22,7 +22,7 @@ export default function ErroConfiguracao() {
     <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
-        <div className="caps">ALFA GROUP</div>
+        <div className="caps">Reviza CRM</div>
         <h1 className="p-display">Configuração ausente.</h1>
         <div className="sub">
           O acesso está indisponível porque a configuração do servidor está incompleta.
