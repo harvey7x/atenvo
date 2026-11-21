@@ -57,7 +57,7 @@ const LARGURA_CELULAR = 760;
 const LARGURA_ENCAIXE = 1440;
 const zonaDaLargura = (w: number): 'gaveta' | 'media' | 'larga' => (w <= LARGURA_CELULAR ? 'gaveta' : w < LARGURA_ENCAIXE ? 'media' : 'larga');
 /* telas que precisam de toda a largura: a barra começa recolhida nelas em qualquer tela (crítica 12/11) */
-const TELAS_DE_TRABALHO = /^\/(whatsapp|kanban|cobrancas\/planilha)(\/|$)/;
+const TELAS_DE_TRABALHO = /^\/(whatsapp|pos-venda|kanban|cobrancas\/planilha)(\/|$)/;
 /* atalho de teclado não age com o foco num campo de texto (Ctrl+, apagava o rascunho do WhatsApp) */
 const ehEditavel = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
@@ -89,6 +89,8 @@ const GRUPOS: GrupoNav[] = [
     rotulo: 'Operação',
     itens: [
       { slug: 'whatsapp', rotulo: 'WhatsApp' }, // o nome que o dono usou ao pedir o Atendimento (11/11)
+      // Pós-venda (dono 21/11): os clientes FECHADOS num atendimento próprio, fora da lista do WhatsApp
+      { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
       { slug: 'scripts', rotulo: 'Scripts' },
     ],
@@ -1158,7 +1160,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 a cada troca de rota e quando a intro abre o palco */}
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
-            <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
+            <div className={/^\/(kanban|whatsapp|pos-venda)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               {acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
                 : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar ao WhatsApp'} />
                 : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />

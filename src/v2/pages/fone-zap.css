@@ -837,15 +837,6 @@
 }
 @keyframes zp-pisca { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 
-/* ===== crítica 12/11 — cob_comunicacao =====
-   Com uma conversa aberta, a TELA do aparelho fica mais larga (390 → 450 pontos): as mensagens
-   longas quebram em menos linhas e a resposta deixa de ficar espremida. O desenho do iPhone
-   (moldura, ilha, barra de status — pedido do dono) continua igual; só a largura acompanha. */
-html[data-barra-alfa] .v2 .zp-tel { transition: width .22s ease; }
-html[data-barra-alfa] .v2 .zp-tela { transition: width .22s ease; }
-/* só com a moldura desenhada (> 640px); no celular o aparelho já ocupa a largura da tela */
-@media (min-width: 641px) {
-  html[data-barra-alfa] .v2 .zp-tel.zp-tel-conv { width: 478px; }
-  html[data-barra-alfa] .v2 .zp-tel.zp-tel-conv .zp-tela { width: 450px; }
-}
+/* (21/11, dono: "o celular expande quando abro uma conversa, eu não quero — tem que se manter intacto":
+   saiu a regra de 12/11 que alargava o aparelho com a conversa aberta; ele fica sempre do mesmo tamanho) */
 @media (prefers-reduced-motion: reduce) { html[data-barra-alfa] .v2 :is(.zp-tel, .zp-tela) { transition: none; } }

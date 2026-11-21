@@ -199,6 +199,8 @@ export function useInboxWhatsApp(opts: {
     selecaoUsuarioRef.current = id;
     setCurrentId(id);
   }, []);
+  /** seleção programática (NÃO marca lida): a tela Pós-venda abre numa conversa da PRÓPRIA lista */
+  const selecionarSemMarcar = useCallback((id: string) => { setCurrentId(id); }, []);
   /** deep-link: conta como seleção do usuário (marca lida) — v1 L369 */
   const selecionarPorDeepLink = useCallback((id: string) => {
     selecaoUsuarioRef.current = id;
@@ -649,7 +651,7 @@ export function useInboxWhatsApp(opts: {
 
   return {
     demo, contacts, setContacts, current, currentId,
-    selectContact, selecionarPorDeepLink,
+    selectContact, selecionarPorDeepLink, selecionarSemMarcar,
     live, msgsQ, relogioMs,
     realCanais, canalSel, replyCanalId, replyChip, onReplyCanal, onReplyChip,
     canalConectado, canalIndisponivel, canalRestrito, semDestino, optout, bloqueados,

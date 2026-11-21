@@ -308,3 +308,6 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 /* os avatares de iniciais (cada um tinha uma cor): todos no cinza da casa */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .zp-tel .zp-av { background: #E9E9EC !important; color: #3F3F46; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .zp-tel .zp-av { background: #2A2A2E !important; color: #D4D4D8; }
+/* etiquetas do cliente (Urgente, Revisão de contrato…): a bolinha colorida de cada uma vira neutra — o nome já diz qual é */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip > i { background: var(--txt-3) !important; opacity: .7; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip { color: var(--txt-2); background: transparent; border: 1px solid var(--lin-fio, var(--linha)); }

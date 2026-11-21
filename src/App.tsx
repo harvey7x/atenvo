@@ -143,7 +143,9 @@ const routes: RouteObject[] = [
           { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
           // Pós-venda SAIU (dono 29/10): o fechado sem resposta é avisado pelo Radar. Página
           // PosVenda.tsx preservada (não deletada) — link antigo cai no WhatsApp.
-          { path: 'pos-venda', element: <Navigate to="/whatsapp" replace /> },
+          // Pós-venda (Atenvo 19/11; Reviza 21/11): atendimento separado só dos clientes FECHADOS —
+          // o mesmo inbox do WhatsApp em modo 'posvenda'
+          { path: 'pos-venda', element: <Lz><GateWhatsApp modo="posvenda" /></Lz> },
           // Remarketing fora do painel (aba removida a pedido do dono). Página Remarketing.tsx
           // preservada (não deletada), só fora do menu/rota — reversível. Link antigo cai no WhatsApp.
           { path: 'remarketing', element: <Navigate to="/whatsapp" replace /> },

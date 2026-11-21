@@ -42,6 +42,6 @@ export function alternarAmbiente(atual: readonly Ambiente[], a: Ambiente): Ambie
    volta ao WhatsApp (Pendências, Painel da Equipe e Central de Avisos inclusive — "não vou querer").
    Integrações fica sem item no menu: é por ela que Configurações → Canais e o "Conectar número…" do
    WhatsApp ligam os números. A raiz ('/') passa: ela mesma manda para o início do ambiente. */
-export const ROTAS_ATENDIMENTO = ['/whatsapp', '/presenciais', '/scripts', '/kanban', '/dashboard', '/ferramentas', '/configuracoes', '/integracoes'] as const;
+export const ROTAS_ATENDIMENTO = ['/whatsapp', '/pos-venda', '/presenciais', '/scripts', '/kanban', '/dashboard', '/ferramentas', '/configuracoes', '/integracoes'] as const;
 export const rotaAtendimentoPermitida = (pathname: string) =>
   pathname === '/' || ROTAS_ATENDIMENTO.some((r) => pathname === r || pathname.startsWith(`${r}/`));
