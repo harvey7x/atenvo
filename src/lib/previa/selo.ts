@@ -18,13 +18,13 @@ const ambientesTxt = (p: PerfilPrevia) => ambientesDoPerfil(p.papel, p.modulos).
 const CSS = `
 #selo-previa{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:8px;
   white-space:nowrap;padding:4px 5px 4px 12px;border-radius:999px;font:500 11px/1.2 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif;
-  letter-spacing:.02em;color:rgba(240,188,78,.95);background:rgba(10,11,13,.78);border:1px solid rgba(240,188,78,.35);
+  letter-spacing:.02em;color:rgba(244,131,73,.95);background:rgba(10,11,13,.78);border:1px solid rgba(244,131,73,.35);
   backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .15s ease,visibility .15s}
 body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 #selo-previa .sp-ver{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;
   color:#f3f4f6;background:rgba(255,255,255,.08);font:inherit;letter-spacing:.01em}
 #selo-previa .sp-ver:hover{background:rgba(255,255,255,.14)}
-#selo-previa .sp-ver:focus-visible{outline:2px solid rgba(240,188,78,.8);outline-offset:2px}
+#selo-previa .sp-ver:focus-visible{outline:2px solid rgba(244,131,73,.8);outline-offset:2px}
 #selo-previa .sp-ver b{font-weight:650;color:#fff}
 #selo-previa .sp-seta{width:10px;height:10px;opacity:.75}
 #selo-previa .sp-menu{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);min-width:300px;max-height:min(70vh,520px);overflow:auto;
@@ -35,15 +35,15 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
   padding:8px 10px;border-radius:9px;color:#f3f4f6;font:500 12.5px/1.3 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
 #selo-previa .sp-item:hover,#selo-previa .sp-item:focus-visible{background:rgba(255,255,255,.07)}
 #selo-previa .sp-item i{grid-column:1;font-style:normal;font-size:11px;color:rgba(255,255,255,.5)}
-#selo-previa .sp-item .sp-ok{grid-row:1/3;grid-column:2;align-self:center;color:rgba(240,188,78,.95);font-size:12px}
+#selo-previa .sp-item .sp-ok{grid-row:1/3;grid-column:2;align-self:center;color:rgba(244,131,73,.95);font-size:12px}
 #selo-previa .sp-rodape{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;margin-top:4px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);
   color:rgba(255,255,255,.6);font:500 11.5px/1.3 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
 #selo-previa .sp-rodape:hover{color:#fff}
 #selo-previa .sp-ad{display:inline-flex;padding:2px;gap:2px;border-radius:999px;background:rgba(255,255,255,.06)}
 #selo-previa .sp-ad button{all:unset;cursor:pointer;padding:3px 9px;border-radius:999px;color:rgba(255,255,255,.62);font:inherit;letter-spacing:.01em}
 #selo-previa .sp-ad button:hover{color:#fff}
-#selo-previa .sp-ad button[aria-pressed="true"]{color:#08090a;background:rgba(240,188,78,.95)}
-#selo-previa .sp-ad button:focus-visible{outline:2px solid rgba(240,188,78,.8);outline-offset:2px}
+#selo-previa .sp-ad button[aria-pressed="true"]{color:#08090a;background:rgba(244,131,73,.95)}
+#selo-previa .sp-ad button:focus-visible{outline:2px solid rgba(244,131,73,.8);outline-offset:2px}
 #selo-previa.sp-curto .sp-ad{display:none}
 #selo-previa.sp-curto .sp-fict,#selo-previa.sp-curto .sp-ver b{display:none}
 @media (max-width:640px){#selo-previa .sp-fict,#selo-previa .sp-ver b,#selo-previa .sp-ad{display:none}#selo-previa{top:12px}#selo-previa .sp-menu{min-width:260px}}

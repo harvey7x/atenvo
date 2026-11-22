@@ -11,56 +11,70 @@
    Mesma chave das camadas anteriores ([data-moldura] + [data-barra-alfa]).
    Importado por ÚLTIMO; o prefixo leva DOIS :not(#id) — vence todas as
    camadas de antes (um id cada) sem depender da ordem.
+
+   22/11 — LOGO NOVA DO DONO ("a outra tava muito escura, muito laranja…
+   coloca as cores do sistema para algo mais assim"): a cor principal sai
+   da própria letra da logo, que vai do creme ao laranja:
+     creme #FCEBDB · pêssego #FAB882 · principal #F48349 · brasa #ED642E
+   O destaque fica mais claro e mais suave que o dourado de antes; o
+   degradê creme→laranja é a assinatura (botão principal, coluna acesa do
+   gráfico, painel das telas de acesso). Os cinzas ganham um fio de calor
+   (o preto da logo puxa para o marrom) e a queda/atraso vai para o
+   tijolo, para não se confundir com o laranja.
    ===================================================================== */
 
 /* ---- 0. CORES ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 {
-  --base: #0A0A0B;
-  --vidro-a: #151517; --vidro-b: #151517; --surface: #1C1C1F;
-  --linha: #222226; --fio-a: #27272B; --fio-b: #27272B; --line-2: #27272B;
-  --txt: #F2F2F3; --txt-2: #A8A8AF; --txt-3: #7D7D86;
-  --rp-elev: #232327; --rp-menu: #18181B; --rp-campo: #101012; --rp-campo-fio: #2A2A2F; --rp-campo-fio-hover: #3B3B41;
-  --rp-trilho: #101012; --rp-cartao-solido: #151517;
-  --lin-branco: #FAFAFA; --lin-nevoa: #D6D6DA; --lin-fio: #232327; --lin-fio-hover: #36363C;
-  --lin-grafite: #232327; --lin-obsidiana: #1C1C1F; --lin-tinta-botao: #0A0A0B;
-  --d5-fio: #202024; --d5-fio-forte: #2D2D32;
-  --azul: #FC8F15; --azul-rgb: 252, 143, 21; --platina-a: #FC8F15; --platina-b: #FC8F15;
-  /* a queda (ferrugem) um tom mais fundo, para não se confundir com o laranja do destaque */
-  --rubro: #D9643C; --rubro-rgb: 217, 100, 60; --rubro-bg: rgba(217, 100, 60, .14);
-  --cor-erro-txt: #E98A66; --cor-erro-suave: rgba(217, 100, 60, .16);
+  --base: #0A0908;
+  --vidro-a: #151312; --vidro-b: #151312; --surface: #1C1917;
+  --linha: #23201E; --fio-a: #282522; --fio-b: #282522; --line-2: #282522;
+  --txt: #F5F2EF; --txt-2: #ABA5A0; --txt-3: #807973;
+  --rp-elev: #24211F; --rp-menu: #191716; --rp-campo: #100E0D; --rp-campo-fio: #2B2825; --rp-campo-fio-hover: #3D3834;
+  --rp-trilho: #100E0D; --rp-cartao-solido: #151312;
+  --lin-branco: #FBF9F7; --lin-nevoa: #D9D4CF; --lin-fio: #24211F; --lin-fio-hover: #373330;
+  --lin-grafite: #24211F; --lin-obsidiana: #1C1917; --lin-tinta-botao: #0A0908;
+  --d5-fio: #211E1C; --d5-fio-forte: #2E2A27;
+  --azul: #F48349; --azul-rgb: 244, 131, 73; --platina-a: #F48349; --platina-b: #F48349;
+  --gf-creme: #FCEBDB; --gf-pessego: #FAB882; --gf-brasa: #ED642E; --gf-tinta-bt: #2B1205;
+  /* a queda/atraso em tijolo (vermelho queimado): o laranja agora é a cor do destaque */
+  --rubro: #CC5345; --rubro-rgb: 204, 83, 69; --rubro-bg: rgba(204, 83, 69, .14);
+  --cor-erro-txt: #E27467; --cor-erro-suave: rgba(204, 83, 69, .16);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 {
-  --base: #EDEDEF;
-  --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #F6F6F7;
-  --linha: #E7E7EA; --fio-a: #DEDEE2; --fio-b: #DEDEE2;
-  --txt: #111113; --txt-2: #4A4A52; --txt-3: #73737C;
-  --azul: #EE7F0A; --azul-rgb: 238, 127, 10; --platina-a: #EE7F0A; --platina-b: #EE7F0A; --rv-tinta: #AE5A06;
+  --base: #EFEDEA;
+  --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #F8F6F4;
+  --linha: #E9E6E2; --fio-a: #E0DCD7; --fio-b: #E0DCD7;
+  --txt: #141210; --txt-2: #4E4944; --txt-3: #777069;
+  --azul: #ED642E; --azul-rgb: 237, 100, 46; --platina-a: #ED642E; --platina-b: #ED642E; --rv-tinta: #B84A1C;
+  --gf-creme: #FCEBDB; --gf-pessego: #FAB882; --gf-brasa: #D9541F; --gf-tinta-bt: #2B1205;
+  --rubro: #B03A2E; --rubro-rgb: 176, 58, 46; --rubro-bg: rgba(176, 58, 46, .09);
+  --cor-erro-txt: #A23226; --cor-erro-suave: rgba(176, 58, 46, .09);
 }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco { --lin-fio: #E4E4E8; --linha: #E9E9EC; --d5-fio: #E9E9EC; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco { --lin-fio: #E6E2DD; --linha: #EBE8E4; --d5-fio: #EBE8E4; }
 
 /* ---- 1. O CHÃO: uma cor só de ponta a ponta; barra e topo acompanham o tema ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 { background: var(--base) !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-app {
-  --ba-fundo: #0A0A0B; --ba-menu: #18181B; --ba-mudo: #9A9AA3; --ba-rotulo: #6E6E77;
-  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(252, 143, 21, .75);
-  --gf-barra: #131315; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
+  --ba-fundo: #0A0908; --ba-menu: #191716; --ba-mudo: #9E9892; --ba-rotulo: #736D67;
+  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(244, 131, 73, .75);
+  --gf-barra: #141211; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app {
-  --ba-fundo: #EDEDEF; --ba-fio: rgba(17, 17, 19, .08); --ba-txt: #111113; --ba-mudo: #55555E; --ba-rotulo: #8A8A93;
-  --ba-hover: rgba(17, 17, 19, .05); --ba-ativo: rgba(17, 17, 19, .06); --ba-ativo-tx: #111113; --ba-ativo-ico: #111113;
-  --ba-badge-bg: rgba(17, 17, 19, .07); --ba-badge-tx: #4A4A52; --ba-badge-on-tx: #111113;
-  --ba-kbd-fio: rgba(17, 17, 19, .1); --ba-kbd-bg: rgba(17, 17, 19, .04); --ba-kbd-tx: #73737C;
-  --ba-menu: #FFFFFF; --ba-sombra-menu: 0 20px 40px -14px rgba(17, 17, 19, .22);
-  --ba-sombra-trilho: 1px 0 0 rgba(17, 17, 19, .08), 24px 0 48px -16px rgba(17, 17, 19, .18);
-  --ba-foco: rgba(238, 127, 10, .7);
-  --gf-barra: #FFFFFF; --gf-barra-fio: rgba(17, 17, 19, .08); --gf-arvore: rgba(17, 17, 19, .17);
+  --ba-fundo: #EFEDEA; --ba-fio: rgba(20, 18, 16, .08); --ba-txt: #141210; --ba-mudo: #59534D; --ba-rotulo: #8D8780;
+  --ba-hover: rgba(20, 18, 16, .05); --ba-ativo: rgba(20, 18, 16, .06); --ba-ativo-tx: #141210; --ba-ativo-ico: #141210;
+  --ba-badge-bg: rgba(20, 18, 16, .07); --ba-badge-tx: #4E4944; --ba-badge-on-tx: #141210;
+  --ba-kbd-fio: rgba(20, 18, 16, .1); --ba-kbd-bg: rgba(20, 18, 16, .04); --ba-kbd-tx: #777069;
+  --ba-menu: #FFFFFF; --ba-sombra-menu: 0 20px 40px -14px rgba(20, 18, 16, .22);
+  --ba-sombra-trilho: 1px 0 0 rgba(20, 18, 16, .08), 24px 0 48px -16px rgba(20, 18, 16, .18);
+  --ba-foco: rgba(237, 100, 46, .7);
+  --gf-barra: #FFFFFF; --gf-barra-fio: rgba(20, 18, 16, .08); --gf-arvore: rgba(20, 18, 16, .17);
 }
 /* no claro, o texto da barra e do topo é escuro (a moldura de antes era preta nos dois temas) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 :is(.ba-barra, .p-topbar) {
-  --txt: #111113; --txt-2: #4A4A52; --txt-3: #73737C; --tint: 22, 25, 31;
-  --linha: #E7E7EA; --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #FFFFFF;
-  --rp-menu: #FFFFFF; --rp-elev: #F3F3F5; --rp-campo: #FFFFFF; --rp-campo-fio: #DEDEE2;
-  --lin-fio: #E4E4E8; --lin-branco: #111113;
+  --txt: #141210; --txt-2: #4E4944; --txt-3: #777069; --tint: 22, 25, 31;
+  --linha: #E9E6E2; --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #FFFFFF;
+  --rp-menu: #FFFFFF; --rp-elev: #F5F2EF; --rp-campo: #FFFFFF; --rp-campo-fio: #E0DCD7;
+  --lin-fio: #E6E2DD; --lin-branco: #141210;
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 .p-topbar { background: var(--ba-fundo); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra { background: var(--gf-barra); border-right: 1px solid var(--gf-barra-fio); }
@@ -112,18 +126,18 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), inset 0 -1px 0 rgba(var(--azul-rgb), .28);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
-  color: #111113; font-weight: 500;
-  background: linear-gradient(90deg, rgba(17, 17, 19, .055) 0%, rgba(17, 17, 19, .04) 42%, rgba(var(--azul-rgb), .34) 100%);
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .05);
+  color: #141210; font-weight: 500;
+  background: linear-gradient(90deg, rgba(20, 18, 16, .055) 0%, rgba(20, 18, 16, .04) 42%, rgba(var(--azul-rgb), .34) 100%);
+  box-shadow: inset 0 0 0 1px rgba(20, 18, 16, .05);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
 /* peças da barra que tinham cor fixa de fundo preto: seguem o tema */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ws-amb, .ba-ws-seta, .ba-cab-bt) { color: var(--ba-rotulo); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-pe { border-top-color: var(--gf-barra-fio); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca { background: rgba(17, 17, 19, .045); color: #73737C; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca:hover { background: rgba(17, 17, 19, .07); color: #111113; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca .ba-kbd { background: rgba(17, 17, 19, .06); color: #73737C; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo[role="group"]::before { background: rgba(17, 17, 19, .12); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca { background: rgba(20, 18, 16, .045); color: #777069; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca:hover { background: rgba(20, 18, 16, .07); color: #141210; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca .ba-kbd { background: rgba(20, 18, 16, .06); color: #777069; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo[role="group"]::before { background: rgba(20, 18, 16, .12); }
 
 /* ---- 3. O CONTEÚDO: sem painel em volta — os cartões ficam direto sobre o chão ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco { margin: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -138,47 +152,53 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
   background: var(--vidro-a); border-color: rgba(255, 255, 255, .055); box-shadow: none;
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
-  background: #FFFFFF; border-color: #E4E4E8; box-shadow: 0 1px 2px rgba(17, 17, 19, .04);
+  background: #FFFFFF; border-color: #E6E2DD; box-shadow: 0 1px 2px rgba(20, 18, 16, .04);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { --pmc-card: var(--vidro-a); --pmc-border: var(--lin-fio); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico { background: rgba(var(--azul-rgb), .14); color: var(--azul); }
 
-/* ---- 4. BOTÃO PRINCIPAL: o dourado da logo com o texto escuro (branco sobre ele não dá leitura), nos dois temas ---- */
+/* ---- 4. BOTÃO PRINCIPAL: o laranja da logo com o texto escuro (branco sobre ele não dá leitura), nos dois temas ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
-  color: #1A0F02; background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none; font-weight: 550;
+  color: var(--gf-tinta-bt); background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none; font-weight: 550;
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); border-color: transparent; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: #1A0F02; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: var(--gf-tinta-bt); }
 
-/* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa, do laranja ao claro ---- */
+/* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa com o degradê da logo (creme → pêssego → laranja) ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col .pn-graf-bar { border-radius: 8px 8px 3px 3px; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2A2A2F; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2B2825; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar {
-  background: linear-gradient(180deg, #FFEDB8 0%, #FFC95C 30%, var(--azul) 100%);
+  background: linear-gradient(180deg, var(--gf-creme) 0%, var(--gf-pessego) 32%, var(--azul) 100%);
   box-shadow: 0 0 26px -6px rgba(var(--azul-rgb), .6);
 }
 
 /* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(var(--azul-rgb), .1); border: 1px solid rgba(var(--azul-rgb), .2); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #FC8F15; --zp-acao: #FC8F15; --zp-badge: #FC8F15; --zp-tique-lida: #FC8F15; --zp-onda-on: #FC8F15; --zp-onda-ponto: #FC8F15; --zp-out: #3A2408; --zp-rubro: #D9643C; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-badge: #EE7F0A; --zp-onda-on: #EE7F0A; --zp-onda-ponto: #EE7F0A; --zp-tique-lida: #C96A04; --zp-ambar: #C96A04; --zp-out: #FDEFD9; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #F48349; --zp-acao: #F48349; --zp-badge: #F48349; --zp-tique-lida: #F48349; --zp-onda-on: #F48349; --zp-onda-ponto: #F48349; --zp-out: #3A1D10; --zp-rubro: #CC5345; --zp-ambar: #F48349; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-badge: #ED642E; --zp-onda-on: #ED642E; --zp-onda-ponto: #ED642E; --zp-tique-lida: #D9591F; --zp-ambar: #D9591F; --zp-out: #FDEBDD; --zp-rubro: #B03A2E; }
 
 /* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }
 
-/* ---- 8. A MARCA (logo do dono, 21/11): a imagem já traz o próprio fundo e o próprio brilho ---- */
+/* ---- 8. A MARCA (logo do dono; a de 22/11 é a peça de vidro com o R do creme ao laranja): a imagem já traz o próprio fundo e o próprio brilho ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca { width: 34px; height: 34px; border-radius: 0; background: none; box-shadow: none; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca :is(svg, img) { width: 34px; height: 34px; filter: drop-shadow(0 3px 9px rgba(var(--azul-rgb), .30)); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-topo-marca { width: 32px; height: 32px; }
-/* no painel da marca (telas de acesso): a logo grande, com o clarão dourado atrás */
+/* no painel da marca (telas de acesso): a logo grande, com o clarão quente atrás */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo {
   display: block; position: absolute; left: 50%; top: 44%; width: clamp(120px, 15vw, 176px); height: auto; aspect-ratio: 1;
   transform: translate(-50%, -50%); filter: drop-shadow(0 26px 60px rgba(var(--azul-rgb), .42)); pointer-events: none;
 }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel { background: radial-gradient(520px 420px at 50% 46%, rgba(var(--azul-rgb), .16), transparent 70%), radial-gradient(640px 440px at 0% 100%, rgba(var(--azul-rgb), .10), transparent 72%); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { color: #1A0F02; background: var(--azul); }
+/* o painel da marca repete o ambiente da imagem da logo: preto, com a luz quente subindo do canto de baixo à direita */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.tela-login { background: #070605 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel {
+  background:
+    radial-gradient(82% 64% at 106% 110%, rgba(252, 235, 219, .46) 0%, rgba(250, 184, 130, .32) 15%, rgba(244, 131, 73, .21) 33%, rgba(150, 70, 32, .12) 54%, transparent 78%),
+    radial-gradient(520px 420px at 50% 44%, rgba(244, 131, 73, .10), transparent 70%);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { color: var(--gf-tinta-bt); background: var(--azul); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar-seta { color: #1A0F02; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar-seta { color: var(--gf-tinta-bt); }
 @media (prefers-reduced-motion: no-preference) {
   html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo { animation: rvf-arte 1s ease backwards; }
 }
@@ -187,9 +207,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
    9. VARREDURA DAS TELAS (dono 21/11: "faz uma varredura nas abas para
    deixar mais profissional, atraente e organizado") — 27 telas, nos dois temas.
    ===================================================================== */
-/* 9.1 UM DOURADO SÓ: o tom de "atenção" era o dourado antigo (#F5A82E) e convivia com o da logo em 8 telas */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #FC8F15; --ambar-rgb: 252, 143, 21; --ambar-bg: rgba(252, 143, 21, .13); --cor-alerta-txt: #FC8F15; --cor-alerta-suave: rgba(252, 143, 21, .14); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --ambar: #C96A04; --ambar-rgb: 201, 106, 4; --ambar-bg: rgba(238, 127, 10, .12); --cor-alerta-suave: rgba(238, 127, 10, .13); }
+/* 9.1 UMA COR DE DESTAQUE SÓ: o tom de "atenção" é o mesmo laranja da logo (antes convivia com um dourado antigo em 8 telas) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #F48349; --ambar-rgb: 244, 131, 73; --ambar-bg: rgba(244, 131, 73, .13); --cor-alerta-txt: #F48349; --cor-alerta-suave: rgba(244, 131, 73, .14); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --ambar: #D9591F; --ambar-rgb: 217, 89, 31; --ambar-bg: rgba(237, 100, 46, .12); --cor-alerta-txt: #B84A1C; --cor-alerta-suave: rgba(237, 100, 46, .13); }
 /* 9.2 cartões: um raio só (as Ferramentas usavam 12 e o resto 14) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
 /* 9.3 título da página: o do Dashboard era maior (23px) que o das outras telas (19px) */
@@ -242,19 +262,19 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { transition: border-color .2s ease, transform .2s var(--rvf-ease), box-shadow .2s ease; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover { border-color: rgba(var(--azul-rgb), .32); }
-/* 10.3 botão principal: degradê suave, fio de luz no alto, sombra dourada curta; afunda 1px ao clicar */
+/* 10.3 botão principal: o degradê da letra da logo (claro em cima, laranja embaixo), fio de luz no alto, sombra curta; afunda 1px ao clicar */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 1px 2px rgba(0, 0, 0, .22), 0 8px 18px -10px rgba(var(--azul-rgb), .7);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 1px 2px rgba(0, 0, 0, .22), 0 8px 18px -10px rgba(var(--azul-rgb), .6);
   transition: filter .16s ease, transform .12s ease, box-shadow .16s ease;
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
   filter: brightness(1.07);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .25); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), #fff 14%) 0%, var(--azul) 58%, color-mix(in srgb, var(--azul), #6B3200 12%) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 8px 18px -10px rgba(var(--azul-rgb), .7);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { filter: brightness(1.07); }
@@ -267,3 +287,11 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco * { scrollbar-width: thin; scrollbar-color: rgba(var(--tint), .2) transparent; }
 /* 10.6 o avatar do topo na mesma linha do cartão da conta */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { background: rgba(var(--azul-rgb), .16); color: var(--azul); border: 1px solid rgba(var(--azul-rgb), .28); font-weight: 600; }
+
+/* =====================================================================
+   11. LOGO NOVA (dono 22/11): o que ainda guardava o dourado de antes
+   ===================================================================== */
+/* o texto de realce no claro (estrela de favorito, "hoje" do calendário, marca de escolhido) descia para um marrom-dourado */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --cor-acento-txt: #B84A1C; }
+/* o balão enviado no claro era um creme amarelado: vai para o creme da logo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: #FDF0E6; border-color: #F5D9C4; }
