@@ -32,7 +32,7 @@ const quando = (iso: string | null) => {
   const d = new Date(iso); if (isNaN(d.getTime())) return '—';
   return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 };
-const limiteTexto = (n: number | null) => (n == null ? 'Sem limite' : `${n.toLocaleString('pt-BR')} clientes diferentes`);
+const limiteTexto = (n: number | null) => (n == null ? 'Sem limite' : n === 0 ? 'Não informado pela Meta' : `${n.toLocaleString('pt-BR')} clientes diferentes`);
 const DESC_AMBIENTE: Record<Ambiente, string> = {
   cobrancas: 'A régua e as Conversas de Cobranças podem enviar por este número, usando os modelos aprovados.',
   atendimento: 'Recebe quem chama a empresa. As conversas entram no WhatsApp e no Kanban do Atendimento.',
@@ -59,7 +59,7 @@ export function ConfigWhatsAppOficial() {
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
       {q.carregando ? <p className="pn-vazio">Consultando a conta na Meta…</p>
         : q.falhou ? <EstadoErro titulo="Não foi possível consultar o WhatsApp oficial" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={q.recarregar} />
-        : conta.numeros.length === 0 ? <SemNumero aoConectar={() => setJanela({ tipo: 'conectar' })} />
+        : conta.numeros.length === 0 ? <SemNumero facebook={conta.facebook} aoConectar={() => setJanela({ tipo: 'conectar' })} />
         : <ComNumero conta={conta} aoAvisar={avisar} aoAbrir={setJanela} />}
       {!q.carregando && !q.falhou && <Modelos conta={conta} aoAvisar={avisar} aoNovo={() => setJanela({ tipo: 'modelo' })} />}
 
@@ -74,13 +74,15 @@ export function ConfigWhatsAppOficial() {
 }
 
 /* ---------------- nenhum número ainda ---------------- */
-function SemNumero({ aoConectar }: { aoConectar: () => void }) {
+function SemNumero({ aoConectar, facebook }: { aoConectar: () => void; facebook: boolean }) {
   return (
     <div className="cfgi-duas">
       <CardVidro spot className="pn-card sobe">
         <div className="pn-card-cab"><div><h3>Conectar um número pela API oficial</h3><p>São três passos, na mesma janela.</p></div></div>
         <ol className="cfgw-passos">
-          <li><b>Entrar com o Facebook</b> e escolher a empresa e o número, na janela da Meta.</li>
+          {facebook
+            ? <li><b>Entrar com o Facebook</b> e escolher a empresa e o número, na janela da Meta.</li>
+            : <li>Colar o <b>código de acesso da Meta</b>: o sistema acha os números da conta sozinho.</li>}
           <li>Dizer se o número trabalha para as <b>Cobranças</b> ou para o <b>Atendimento</b>.</li>
           <li>O sistema <b>confere tudo sozinho</b> e mostra o que ficou certo e o que falta.</li>
         </ol>
@@ -129,7 +131,7 @@ function ComNumero({ conta, aoAvisar, aoAbrir }: { conta: ContaOficial; aoAvisar
             <div><dt>Nome que o cliente vê</dt><dd>{n.nomeExibicao} · {ROTULO_NOME[n.nomeSituacao]}</dd></div>
             <div><dt>Qualidade do número</dt><dd>{ROTULO_QUALIDADE[n.qualidade]}</dd></div>
             <div><dt>Limite por dia, fora das 24 horas</dt><dd className="num">{limiteTexto(conta.limiteDia)}</dd></div>
-            <div><dt>Recebimento de mensagens</dt><dd>{n.recebimento ? 'Ativo' : 'Parado: as respostas não estão chegando'}</dd></div>
+            <div><dt>Recebimento das conversas</dt><dd>{n.recebimento ? 'Ativo' : 'Ainda não ligado: receber e responder entra na próxima etapa'}</dd></div>
             <div><dt>Onde o número funciona</dt><dd>{n.noCelular ? 'No sistema e no aplicativo do celular' : 'Só pelo sistema'}</dd></div>
             <div><dt>Conectado em</dt><dd className="num">{quando(n.conectadoEm)}{n.conectadoPor ? ` · por ${n.conectadoPor}` : ''}</dd></div>
           </dl>
@@ -191,6 +193,8 @@ function JanelaConectar({ conta, aoFechar, aoAvisar }: { conta: ContaOficial; ao
   const [noCelular, setNoCelular] = useState(false);
   const [comToken, setComToken] = useState(!conta.facebook);
   const [token, setToken] = useState('');
+  const [waba, setWaba] = useState('');
+  const [pedeWaba, setPedeWaba] = useState(false);
   const [achados, setAchados] = useState<Achados | null>(null);
   const [escolhido, setEscolhido] = useState('');
   const [ambiente, setAmbiente] = useState<Ambiente | null>(null);
@@ -212,7 +216,8 @@ function JanelaConectar({ conta, aoFechar, aoAvisar }: { conta: ContaOficial; ao
     if (noCelular) { setErro('Para continuar usando o número no celular, a conexão precisa ser pela entrada com o Facebook.'); return; }
     const e = tokenInvalido(token); if (e) { setErro(e); return; }
     setErro('');
-    try { receber(await buscar.mutateAsync(token)); } catch (x) { setErro((x as Error)?.message || 'Não foi possível conferir o código. Tente de novo.'); }
+    try { receber(await buscar.mutateAsync({ token, wabaId: pedeWaba ? waba : undefined })); }
+    catch (x) { const m = (x as Error)?.message || 'Não foi possível conferir o código. Tente de novo.'; if (/de qual conta do WhatsApp/.test(m)) setPedeWaba(true); setErro(m); }
   };
   const finalizar = async () => {
     if (!achados || !escolhido) return;
@@ -235,7 +240,8 @@ function JanelaConectar({ conta, aoFechar, aoAvisar }: { conta: ContaOficial; ao
           : <BotaoPrimario onClick={fechar}>Concluir</BotaoPrimario>}>
       {fase === 'entrar' && (
         <div className="pn-us-form">
-          <div className="pn-us-campo">
+          {!conta.facebook && <p className="cfgi-nota" role="note">A entrada pelo Facebook ainda depende de a Meta aprovar o aplicativo deste sistema. Até lá, a conexão é pelo código de acesso, e o número funciona só pelo sistema.</p>}
+          {conta.facebook && <div className="pn-us-campo">
             <span className="pn-us-rot">Onde este número vai funcionar?</span>
             <div className="pn-us-opcoes" role="radiogroup" aria-label="Onde o número vai funcionar">
               <button type="button" role="radio" aria-checked={!noCelular} className={!noCelular ? 'on' : undefined} onClick={() => { setNoCelular(false); setErro(''); }}>
@@ -245,7 +251,7 @@ function JanelaConectar({ conta, aoFechar, aoAvisar }: { conta: ContaOficial; ao
                 <b>No sistema e no celular</b><span>Continua no aplicativo WhatsApp Business do celular e também funciona aqui.</span>
               </button>
             </div>
-          </div>
+          </div>}
           {!comToken ? (
             <div className="pn-us-campo">
               <BotaoPrimario disabled={ocupado} onClick={() => void peloFacebook()}>{entrar.isPending ? 'Aguardando a janela da Meta…' : 'Entrar com o Facebook'}</BotaoPrimario>
@@ -260,6 +266,11 @@ function JanelaConectar({ conta, aoFechar, aoAvisar }: { conta: ContaOficial; ao
                 <BotaoPrimario disabled={ocupado} onClick={() => void peloToken()}>{buscar.isPending ? 'Conferindo…' : 'Buscar os números'}</BotaoPrimario>
               </div>
               <span className="pn-us-dica">É o código permanente de um usuário do sistema, gerado no Gerenciador de Negócios da Meta com as permissões do WhatsApp. Ele fica guardado só no servidor.</span>
+              {pedeWaba && (<>
+                <label htmlFor="of-waba">Número da conta do WhatsApp na Meta</label>
+                <input id="of-waba" className="inp" inputMode="numeric" value={waba} placeholder="só números" onChange={(e) => { setWaba(e.target.value.replace(/\D/g, '')); setErro(''); }} />
+                <span className="pn-us-dica">Aparece no Gerenciador do WhatsApp como "Identificação da conta do WhatsApp Business".</span>
+              </>)}
               <span className="cfgo-linha-links">
                 {isPrevia && <button type="button" className="cfgi-link" onClick={() => { setToken('EAAexemplo-da-previa-0000000000000000000000000000000000'); setErro(''); }}>Usar um código de exemplo</button>}
                 {conta.facebook && <button type="button" className="cfgi-link" onClick={() => { setComToken(false); setErro(''); }}>Voltar para a entrada com o Facebook</button>}

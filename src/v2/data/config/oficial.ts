@@ -7,7 +7,8 @@
      situacao                         a conta, os números conectados e os modelos de mensagem
      entrar_facebook {code, waba_id, phone_number_id, no_celular}
                                       troca o código do cadastro da Meta pelo acesso da empresa
-     buscar_numeros {token}           confere o código de acesso e lista os números da conta
+     buscar_numeros {token, waba_id?} confere o código de acesso e lista os números da conta (se a Meta não
+                                      disser qual é a conta, devolve o erro informe_waba e a tela pede o número dela)
        → as duas devolvem { sessao, empresa, numeros } (a sessão guarda o acesso no servidor)
      conectar {sessao, phone_number_id, ambiente, nome, no_celular}
                                       registra o número, liga o recebimento, traz os modelos e
@@ -54,7 +55,7 @@ export const ROTULO_SIT_MODELO: Record<SituacaoModelo, string> = { aprovado: 'Ap
 export interface ModeloOficial { id: string; nome: string; categoria: CategoriaModelo; idioma: string; situacao: SituacaoModelo; texto: string; motivo: string | null }
 export interface ContaOficial {
   empresa: { nome: string; verificada: boolean } | null;
-  /** clientes diferentes por dia fora das 24 h (null = sem limite) */
+  /** clientes diferentes por dia fora das 24 h (null = sem limite; 0 = a Meta não informou) */
   limiteDia: number | null;
   /** há forma de pagamento cadastrada na Meta (null = não deu para conferir) */
   pagamento: boolean | null;
@@ -125,6 +126,7 @@ export function modeloInvalido(nome: string, texto: string, existentes: readonly
 const CHAVE = ['reviza', 'wa-oficial'] as const;
 const MSG: Record<string, string> = {
   token_invalido: 'A Meta não reconheceu este código de acesso. Confira se ele tem as permissões do WhatsApp e foi copiado inteiro.',
+  informe_waba: 'A Meta não informou de qual conta do WhatsApp é este código. Preencha o número da conta logo abaixo e busque de novo.',
   sem_numeros: 'Esta conta da Meta ainda não tem número de WhatsApp. Cadastre um no Gerenciador do WhatsApp e tente de novo.',
   sessao_vencida: 'A conexão com a Meta venceu. Comece de novo.',
   ja_conectado: 'Este número já está conectado ao sistema.',
@@ -161,7 +163,8 @@ export function useEntrarFacebook() {
   });
 }
 export function useBuscarNumeros() {
-  return useMutation({ mutationFn: async (token: string): Promise<Achados> => lerAchados(await chamar({ acao: 'buscar_numeros', token: token.trim() })) });
+  return useMutation({ mutationFn: async (v: { token: string; wabaId?: string }): Promise<Achados> =>
+    lerAchados(await chamar({ acao: 'buscar_numeros', token: v.token.trim(), ...(v.wabaId?.trim() ? { waba_id: v.wabaId.trim() } : {}) })) });
 }
 function useAcao<V>(montar: (v: V) => Record<string, unknown>) {
   const qc = useQueryClient();

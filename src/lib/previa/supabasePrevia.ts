@@ -188,7 +188,7 @@ export function criarSupabasePrevia() {
   // WhatsApp oficial (API da Meta): a conta de demonstração, os números conectados e os modelos de mensagem
   const LS_OFICIAL = 'previa-oficial-v1';
   T.wa_oficial = [{
-    empresa: { nome: 'Reviza (empresa de demonstração)', verificada: false }, limite_dia: 250, pagamento: true, facebook: true, numeros: [],
+    empresa: { nome: 'Reviza (empresa de demonstração)', verificada: false }, limite_dia: 250, pagamento: null, facebook: false, numeros: [],
     modelos: [
       { id: 'md-1', nome: 'lembrete_da_parcela', categoria: 'utilidade', idioma: 'pt_BR', situacao: 'aprovado', motivo: null, texto: 'Olá, {nome}. Passando para lembrar que a sua parcela de {meia parcela} vence em {vencimento}. Qualquer dúvida, é só responder esta mensagem.' },
       { id: 'md-2', nome: 'parcela_vence_hoje', categoria: 'utilidade', idioma: 'pt_BR', situacao: 'aprovado', motivo: null, texto: 'Olá, {nome}. A sua parcela de {meia parcela} vence hoje. Para pagar, use este link: {link de pagamento} Obrigado.' },
@@ -418,7 +418,7 @@ export function criarSupabasePrevia() {
       const achar = () => k.numeros.find((n) => n.id === b.id);
       const tel = (n: unknown) => { const d = String(n ?? ''); return d.length >= 12 ? `(${d.slice(2, 4)}) ${d.slice(4, -4)}-${d.slice(-4)}` : d; };
       if (b.acao === 'situacao') return k;
-      if (b.acao === 'entrar_facebook') return { sessao: 'sessao-demo', empresa: (k.empresa as Linha).nome, numeros: marcar(ACHADOS.slice(0, 1)) };
+      if (b.acao === 'entrar_facebook') return { error: 'facebook_indisponivel' };   // igual ao servidor: depende de a Meta aprovar o aplicativo
       if (b.acao === 'buscar_numeros') {
         const t = String(b.token ?? '').trim();
         if (t.length < 40 || /\s/.test(t)) return { error: 'token_invalido' };
@@ -429,7 +429,7 @@ export function criarSupabasePrevia() {
         if (!a || b.sessao !== 'sessao-demo') return { error: 'sessao_vencida' };
         if (k.numeros.some((n) => n.phone_number_id === a.phone_number_id)) return { error: 'ja_conectado' };
         const amb = b.ambiente === 'atendimento' ? 'atendimento' : 'cobrancas';
-        k.numeros.push({ ...a, id: id(), nome: String(b.nome || a.nome_exibicao), ambiente: amb, no_celular: !!b.no_celular, recebimento: true, bloqueado: false, conectado_em: agoraIso(), conectado_por: quemFaz().ator_nome });
+        k.numeros.push({ ...a, id: id(), nome: String(b.nome || a.nome_exibicao), ambiente: amb, no_celular: false, recebimento: false, bloqueado: false, conectado_em: agoraIso(), conectado_por: quemFaz().ator_nome });
         salvarOficial();
         registrar('conectou', 'integração', 'WhatsApp oficial', `número ${tel(a.numero)} conectado pela API oficial em ${amb === 'atendimento' ? 'Atendimento' : 'Cobranças'}`);
         const ap = k.modelos.filter((m) => m.situacao === 'aprovado').length, an = k.modelos.filter((m) => m.situacao === 'analise').length;
@@ -437,10 +437,10 @@ export function criarSupabasePrevia() {
         return { conferencia: [
           { rotulo: 'Acesso à conta da Meta', ok: true, nota: String(emp.nome) },
           { rotulo: 'Número registrado na API oficial', ok: true, nota: tel(a.numero) },
-          { rotulo: 'Recebimento de mensagens ligado', ok: true, nota: null },
           { rotulo: 'Modelos de mensagem trazidos da Meta', ok: true, nota: `${ap} ${ap === 1 ? 'aprovado' : 'aprovados'}${an ? `, ${an} em análise` : ''}` },
           { rotulo: 'Nome de exibição aprovado', ok: a.nome_situacao === 'aprovado', nota: a.nome_situacao === 'aprovado' ? String(a.nome_exibicao) : 'A Meta ainda está analisando o nome. Até aprovar, o número envia com limite reduzido.' },
           { rotulo: 'Empresa verificada na Meta', ok: !!emp.verificada, nota: emp.verificada ? null : 'Sem a verificação, o limite é de 250 clientes diferentes por dia. Ela é feita no Gerenciador de Negócios da Meta.' },
+          { rotulo: 'Recebimento das conversas', ok: false, nota: 'Receber e responder por este número entra na próxima etapa. Por enquanto ele envia mensagem de teste e cuida dos modelos.' },
         ] };
       }
       if (b.acao === 'testar') return achar() ? { ok: true } : { error: 'Número não encontrado.' };
