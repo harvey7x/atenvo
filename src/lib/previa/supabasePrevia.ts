@@ -398,7 +398,7 @@ export function criarSupabasePrevia() {
     // de demonstração; a chave não é guardada (só os 4 últimos caracteres, como no servidor de verdade).
     'reviza-asaas': (b) => {
       const k = T.integracoes.find((x) => x.servico === 'asaas')!;
-      const ROT_FORMA: Record<string, string> = { pix: 'Pix', boleto: 'Boleto', cartao: 'Cartão de crédito' };
+      const ROT_FORMA: Record<string, string> = { escolhe: 'o cliente escolhe', pix: 'Pix', boleto: 'Boleto', cartao: 'Cartão de crédito' };
       const simNao = (v: unknown) => (v ? 'ligado' : 'desligado');
       const pct = (v: unknown) => `${String(Number(v) || 0).replace('.', ',')}%`;
       if (b.acao === 'conectar') {
@@ -408,7 +408,7 @@ export function criarSupabasePrevia() {
         const dela = chave.startsWith('$aact_prod_') ? 'producao' : chave.startsWith('$aact_hmlg_') ? 'testes' : null;
         if (dela && dela !== b.ambiente) return { error: 'invalid_environment' };
         const troca = !!k.conectado;
-        const conta = { nome: 'Reviza (conta de demonstração)', documento: '00.000.000/0001-00', email: 'financeiro@reviza.exemplo' };
+        const conta = { nome: 'Reviza (conta de demonstração)', documento: '00.000.000/0001-00', email: 'financeiro@reviza.exemplo', chave_pix: true };
         Object.assign(k, { conectado: true, ambiente: b.ambiente === 'testes' ? 'testes' : 'producao', conta, chave_final: chave.slice(-4), conectado_em: agoraIso(), conectado_por: quemFaz().ator_nome, retorno_ativo: true, ultimo_retorno: null });
         salvarInteg();
         registrar(troca ? 'alterou' : 'conectou', 'integração', 'Asaas', troca ? `trocou a chave de API (ambiente de ${k.ambiente === 'testes' ? 'testes' : 'produção'})` : `conta do Asaas conectada no ambiente de ${k.ambiente === 'testes' ? 'testes' : 'produção'}`);
@@ -416,16 +416,19 @@ export function criarSupabasePrevia() {
       }
       if (!k.conectado) return { error: 'nao_conectado' };
       if (b.acao === 'testar') return { conta: k.conta };
+      if (b.acao === 'reativar_retorno') { k.retorno_ativo = true; salvarInteg(); registrar('alterou', 'integração', 'Asaas', 'religou o retorno dos pagamentos'); return { ok: true }; }
       if (b.acao === 'salvar') {
         const de = (k.config ?? {}) as Linha, para = (b.config ?? {}) as Linha;
-        const formas = (v: unknown) => (Array.isArray(v) ? v.map((f) => ROT_FORMA[String(f)] ?? String(f)).join(', ') : '');
+        const forma = (v: unknown) => ROT_FORMA[String(v ?? 'escolhe')] ?? String(v);
+        const atraso = (v: unknown) => (v === 'aqui' ? 'definido no sistema' : 'o da conta do Asaas');
         const mud: Linha[] = [];
         const nota = (c: string, a: string, d: string) => { if (a !== d) mud.push({ c, de: a, para: d }); };
-        nota('formas', formas(de.formas ?? ['pix', 'boleto']), formas(para.formas));
+        nota('forma', forma(de.forma), forma(para.forma));
         nota('gerarSozinho', simNao(de.gerarSozinho ?? true), simNao(para.gerarSozinho));
         nota('baixaAutomatica', simNao(de.baixaAutomatica ?? true), simNao(para.baixaAutomatica));
         nota('baixaQuando', de.baixaQuando === 'disponivel' ? 'dinheiro disponível' : 'pagamento confirmado', para.baixaQuando === 'disponivel' ? 'dinheiro disponível' : 'pagamento confirmado');
         nota('avisarComercial', simNao(de.avisarComercial ?? true), simNao(para.avisarComercial));
+        nota('atraso', atraso(de.atraso), atraso(para.atraso));
         nota('multa', pct(de.multa), pct(para.multa));
         nota('juros', pct(de.juros), pct(para.juros));
         nota('avisosAsaas', simNao(de.avisosAsaas), simNao(para.avisosAsaas));

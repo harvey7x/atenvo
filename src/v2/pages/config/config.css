@@ -98,17 +98,11 @@
 .v2 .cfgi-link.perigo:hover { text-decoration: underline; }
 .v2 .cfgi-sep { height: 1px; background: var(--lin-fio, var(--linha)); }
 .v2 .cfgi-lista { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
-/* formas de pagamento: três caixas marcáveis, lado a lado */
-.v2 .cfgi-formas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.v2 .cfgi-forma { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .025); }
-.v2 .cfgi-forma:hover { border-color: rgba(var(--tint), .25); }
-.v2 .cfgi-forma.on { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
-.v2 .cfgi-forma input { flex: none; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--azul); }
-.v2 .cfgi-forma:has(input:focus-visible) { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
-.v2 .cfgi-forma span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.v2 .cfgi-forma b { font-size: 13px; font-weight: 600; color: var(--txt); }
-.v2 .cfgi-forma small { font-size: 11.5px; line-height: 1.4; color: var(--txt-3); }
+/* a forma de pagamento: no Asaas é uma por cobrança — quatro opções, duas por linha (família pn-us-opcoes) */
+.v2 .cfgi .pn-us-opcoes button { align-items: flex-start; height: 100%; }
+/* aviso que pede uma ação (retorno pausado): o texto e o botão na mesma linha */
+.v2 .cfgi-nota-acao { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .cfgi-nota-acao > span { flex: 1 1 320px; min-width: 0; }
 /* as linhas de liga/desliga: o botão no alto, o texto ocupando a largura */
 .v2 .cfgi .tgl-l { align-items: flex-start; padding: 0; gap: 12px; font-size: 13px; color: var(--txt); }
 .v2 .cfgi .tgl-l > .tgl { flex: none; margin-top: 1px; }
@@ -120,7 +114,7 @@
 .v2 .cfgi-pct i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 12.5px; color: var(--txt-3); pointer-events: none; }
 @media (max-width: 1180px) { .v2 .cfgi-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .v2 .cfgi-duas { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 640px) { .v2 .cfgi-grade, .v2 .cfgi-formas { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-recuo { padding-left: 0; } }
+@media (max-width: 640px) { .v2 .cfgi-grade { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-recuo { padding-left: 0; } }
 /* o aviso e a faixa de salvar acompanham a rolagem: a resposta do sistema fica sempre à vista */
 .v2 .cfgi > .gs-aviso { position: sticky; top: 8px; z-index: 3; margin-bottom: 0; background: var(--rp-menu, var(--surface)); }
 .v2 .cfgi-salvar { position: sticky; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px 10px 16px; border-radius: 12px;

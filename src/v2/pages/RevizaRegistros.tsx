@@ -21,7 +21,7 @@ const GRUPOS = ['Clientes', 'Financeiro', 'Comissões', 'Régua e envios', 'Avis
 const PERIODOS = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['tudo', 'Tudo']] as const;
 
 const CAMPO_ROT: Record<string, string> = {
-  formas: 'Formas de pagamento', gerarSozinho: 'Gerar a cobrança sozinho', baixaAutomatica: 'Baixa automática', baixaQuando: 'No cartão, dar baixa',
+  forma: 'Forma de pagamento', atraso: 'Multa e juros', gerarSozinho: 'Gerar a cobrança sozinho', baixaAutomatica: 'Baixa automática', baixaQuando: 'No cartão, dar baixa',
   avisarComercial: 'Avisar o comercial', multa: 'Multa por atraso', juros: 'Juros ao mês', avisosAsaas: 'Avisos do Asaas',
   nome: 'Nome', comercial: 'Comercial', dia: 'Ciclo (dia)', valor: 'Valor da parcela',
   banco: 'Banco', nb: 'Nº do benefício', cpf: 'CPF', telefone: 'Telefone',

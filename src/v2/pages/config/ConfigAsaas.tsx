@@ -2,15 +2,16 @@
    Asaas de pagamento".
    Sem conta conectada: a chave de API (e o ambiente — produção ou testes) e o passo a passo de onde
    pegar a chave. Com a conta conectada: a ficha da conexão (testar, trocar a chave, desconectar) e as
-   regras — como o cliente paga, o que acontece quando ele paga, atraso e os avisos do próprio Asaas.
+   regras — como o cliente paga, o que acontece quando ele paga, multa e juros e os avisos do próprio Asaas.
+   Cada regra espelha como o Asaas funciona (conferido na documentação em 22/11 — ver data/config/integracoes.ts).
    As regras são um rascunho na tela até "Salvar alterações" (a faixa que aparece no pé quando algo muda). Os dados e as chamadas vêm de
    data/config/integracoes.ts; a chave de API nunca volta do servidor (só os 4 últimos caracteres). */
 import { useEffect, useState } from 'react';
 import { isPrevia } from '@/lib/supabase';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, ConfirmDialogV2, EstadoErro, LinhaToggle, ModalV2, Segmentado } from '../../components';
 import {
-  FORMAS, ROTULO_AMBIENTE_ASAAS, ambienteDaChave, chaveInvalida, useAsaas, useConectarAsaas, useDesconectarAsaas, useSalvarAsaas, useTestarAsaas,
-  type AmbienteAsaas, type ConfigAsaas, type FormaPagamento, type IntegracaoAsaas,
+  FORMAS, ROTULO_AMBIENTE_ASAAS, ambienteDaChave, chaveInvalida, useAsaas, useConectarAsaas, useDesconectarAsaas, useReativarRetornoAsaas, useSalvarAsaas, useTestarAsaas,
+  type AmbienteAsaas, type ConfigAsaas, type IntegracaoAsaas,
 } from '../../data/config/integracoes';
 import { IcPagamentos } from './ConfigIntegracoes';
 import '../painel/painel.css';
@@ -107,15 +108,15 @@ function Conectar({ aoAvisar }: { aoAvisar: Avisar }) {
         <div className="pn-card-cab"><div><h3>Onde pegar a chave</h3><p>É feito uma vez, no site do Asaas.</p></div></div>
         <ol className="cfgw-passos">
           <li>Entre no <b>Asaas pelo computador</b>, com um usuário administrador. Pelo aplicativo não dá para gerar a chave.</li>
-          <li>Abra <b>Integrações</b> e depois <b>Chaves de API</b>, e gere uma chave.</li>
+          <li>Abra <b>Integrações</b> e depois <b>Chaves de API</b>, e gere uma chave só para este sistema. Se colocar data de validade, a integração para nesse dia.</li>
           <li>Copie a chave inteira, com o cifrão do começo, e cole no campo ao lado.</li>
         </ol>
         <div className="cfgi-sep" />
-        <div className="pn-card-cab"><div><h3>O que passa a funcionar</h3></div></div>
+        <div className="pn-card-cab"><div><h3>O que precisa estar pronto</h3></div></div>
         <ul className="cfgi-lista">
-          <li>A cobrança de cada parcela nasce no Asaas, com Pix, boleto ou cartão.</li>
-          <li>Quando o cliente paga, a parcela recebe baixa sozinha no Financeiro.</li>
-          <li>O comercial dono do cliente é avisado na hora.</li>
+          <li>Uma <b>chave Pix cadastrada</b> na conta do Asaas, se for cobrar por Pix.</li>
+          <li>As formas de pagamento que você quer oferecer <b>ligadas na conta</b> do Asaas.</li>
+          <li>O <b>CPF dos clientes</b> preenchido na Gestão: o Asaas não gera cobrança sem CPF.</li>
         </ul>
       </CardVidro>
     </div>
@@ -125,11 +126,16 @@ function Conectar({ aoAvisar }: { aoAvisar: Avisar }) {
 /* ---------------- conta conectada: ficha + regras ---------------- */
 const pctTexto = (n: number) => String(n).replace('.', ',');
 const lerPct = (t: string) => { const n = Number(t.replace(',', '.').replace(/[^\d.]/g, '')); return Number.isFinite(n) ? Math.min(10, Math.max(0, Math.round(n * 100) / 100)) : 0; };
+const ATRASO: readonly { id: ConfigAsaas['atraso']; rotulo: string; dica: string }[] = [
+  { id: 'asaas', rotulo: 'Usar o que está no Asaas', dica: 'Vale a multa e os juros configurados na sua conta do Asaas. O sistema não manda nada por cima.' },
+  { id: 'aqui', rotulo: 'Definir aqui', dica: 'O sistema manda a multa e os juros abaixo em cada cobrança que gerar.' },
+];
 
 function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avisar }) {
   const salvar = useSalvarAsaas();
   const testar = useTestarAsaas();
   const desconectar = useDesconectarAsaas();
+  const reativar = useReativarRetornoAsaas();
   const [cfg, setCfg] = useState<ConfigAsaas>(dados.config);
   const [multaTx, setMultaTx] = useState(pctTexto(dados.config.multa));
   const [jurosTx, setJurosTx] = useState(pctTexto(dados.config.juros));
@@ -140,17 +146,20 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
   useEffect(repor, [gravado]); // eslint-disable-line react-hooks/exhaustive-deps
   const mudou = JSON.stringify(cfg) !== gravado;
   const set = <K extends keyof ConfigAsaas>(k: K, v: ConfigAsaas[K]) => setCfg((c) => ({ ...c, [k]: v }));
-  const alternar = (f: FormaPagamento) => set('formas', FORMAS.map((x) => x.id).filter((x) => (x === f ? !cfg.formas.includes(f) : cfg.formas.includes(x))));
-  const semForma = cfg.formas.length === 0;
+  const temCartao = cfg.forma === 'cartao' || cfg.forma === 'escolhe';
+  const pix = dados.conta?.chavePix ?? null;
 
   const gravar = async () => {
-    if (semForma) return;
     try { await salvar.mutateAsync(cfg); aoAvisar('Regras de pagamento salvas.'); }
     catch (x) { aoAvisar((x as Error)?.message || 'Não foi possível salvar. Tente de novo.', 'erro'); }
   };
   const conferir = async () => {
     try { const r = await testar.mutateAsync(); const c = r.conta as { nome?: string } | undefined; aoAvisar(`Conexão com o Asaas funcionando${c?.nome ? ` · ${c.nome}` : ''}.`); }
     catch (x) { aoAvisar((x as Error)?.message || 'O Asaas não respondeu. Tente de novo.', 'erro'); }
+  };
+  const religar = async () => {
+    try { await reativar.mutateAsync(); aoAvisar('Retorno dos pagamentos religado. Os avisos pendentes voltam a chegar.'); }
+    catch (x) { aoAvisar((x as Error)?.message || 'Não foi possível religar o retorno.', 'erro'); }
   };
   const sair = async () => {
     try { await desconectar.mutateAsync(); setJanela(null); aoAvisar('Asaas desconectado.'); }
@@ -162,16 +171,25 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
       <CardVidro spot className="pn-card sobe">
         <div className="cfgi-conta">
           <span className="cfgi-ic on"><IcPagamentos /></span>
-          <div className="cfgi-conta-nm"><b>{dados.conta?.nome || 'Conta do Asaas'}</b><span>{dados.conta?.email ?? 'Conta conectada'}</span></div>
+          <div className="cfgi-conta-nm">
+            <b>{dados.conta?.nome || 'Conta do Asaas'}</b>
+            <span>{[dados.conta?.email, `Ambiente de ${dados.ambiente === 'testes' ? 'testes' : 'produção'}`].filter(Boolean).join(' · ')}</span>
+          </div>
           <BadgeStatus tom="ok">Conectado</BadgeStatus>
         </div>
         {dados.ambiente === 'testes' && <p className="cfgi-nota" role="note">Ambiente de testes: as cobranças são de mentira e nenhum dinheiro circula. Para valer, troque a chave pela de produção.</p>}
+        {!dados.retornoAtivo && (
+          <p className="cfgi-nota cfgi-nota-acao" role="alert">
+            <span>O Asaas pausou o retorno dos pagamentos depois de várias falhas seguidas. Enquanto estiver pausado, as baixas não chegam.</span>
+            <BotaoSec mini disabled={reativar.isPending} onClick={() => void religar()}>{reativar.isPending ? 'Religando…' : 'Religar o retorno'}</BotaoSec>
+          </p>
+        )}
         <dl className="cfgw-ficha">
-          <div><dt>Ambiente</dt><dd>{ROTULO_AMBIENTE_ASAAS[dados.ambiente ?? 'producao']}</dd></div>
           <div><dt>CNPJ ou CPF da conta</dt><dd className="num">{dados.conta?.documento ?? '—'}</dd></div>
           <div><dt>Chave de API</dt><dd className="num">{dados.chaveFinal ? `termina em ••••${dados.chaveFinal}` : 'guardada no servidor'}</dd></div>
           <div><dt>Conectada em</dt><dd className="num">{quando(dados.conectadoEm)}{dados.conectadoPor ? ` · por ${dados.conectadoPor}` : ''}</dd></div>
-          <div><dt>Retorno dos pagamentos</dt><dd>{dados.retornoAtivo ? 'Ativo: o Asaas avisa o sistema a cada pagamento' : 'Parado: os pagamentos não estão chegando'}</dd></div>
+          <div><dt>Chave Pix da conta</dt><dd>{pix === true ? 'Cadastrada' : pix === false ? 'Não encontrada: cadastre uma no Asaas para cobrar por Pix' : 'Não conferida'}</dd></div>
+          <div><dt>Retorno dos pagamentos</dt><dd>{dados.retornoAtivo ? 'Ativo: o Asaas avisa o sistema a cada pagamento' : 'Pausado pelo Asaas'}</dd></div>
           <div><dt>Último pagamento avisado</dt><dd className="num">{dados.ultimoRetorno ? quando(dados.ultimoRetorno) : 'Nenhum ainda'}</dd></div>
         </dl>
         <div className="cfgi-acoes">
@@ -184,34 +202,29 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
 
       <div className="cfgi-duas">
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.04s' }}>
-          <div className="pn-card-cab"><div><h3>Como o cliente paga</h3><p>As formas que aparecem para o cliente na cobrança.</p></div></div>
-          <div className="cfgi-formas" role="group" aria-label="Formas de pagamento">
-            {FORMAS.map((f) => {
-              const on = cfg.formas.includes(f.id);
-              return (
-                <label key={f.id} className={`cfgi-forma${on ? ' on' : ''}`}>
-                  <input type="checkbox" checked={on} onChange={() => alternar(f.id)} />
-                  <span><b>{f.rotulo}</b><small>{f.dica}</small></span>
-                </label>
-              );
-            })}
+          <div className="pn-card-cab"><div><h3>Como o cliente paga</h3><p>Cada cobrança sai com uma forma de pagamento.</p></div></div>
+          <div className="pn-us-opcoes cfgi-formas" role="radiogroup" aria-label="Forma de pagamento">
+            {FORMAS.map((f) => (
+              <button key={f.id} type="button" role="radio" aria-checked={cfg.forma === f.id} className={cfg.forma === f.id ? 'on' : undefined} onClick={() => set('forma', f.id)}>
+                <b>{f.rotulo}</b><span>{f.dica}</span>
+              </button>
+            ))}
           </div>
-          {semForma && <span className="pn-us-erro" role="alert">Deixe pelo menos uma forma de pagamento marcada.</span>}
           <div className="cfgi-sep" />
           <LinhaToggle ligado={cfg.gerarSozinho} aoMudar={(v) => set('gerarSozinho', v)} titulo="Gerar a cobrança de cada parcela sozinho"
-            descricao="Quando a régua vai avisar o cliente, o sistema cria a cobrança no Asaas com o valor e o vencimento da parcela. O link entra na mensagem onde você colocar a variável {link de pagamento}. Desligado, a cobrança é gerada à mão, cliente por cliente." />
+            descricao="Quando a régua vai avisar o cliente, o sistema cria a cobrança no Asaas com o valor e o vencimento da parcela. O link entra na mensagem onde você colocar a variável {link de pagamento}. Cliente sem CPF na Gestão fica sem cobrança até o CPF ser preenchido. Desligado, a cobrança é gerada à mão, cliente por cliente." />
         </CardVidro>
 
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.08s' }}>
           <div className="pn-card-cab"><div><h3>Quando o cliente paga</h3><p>O que o sistema faz ao receber o aviso de pagamento do Asaas.</p></div></div>
           <LinhaToggle ligado={cfg.baixaAutomatica} aoMudar={(v) => set('baixaAutomatica', v)} titulo="Dar baixa na parcela sozinho"
             descricao="O pagamento entra no Financeiro já confirmado, na parcela certa, sem comprovante nem conferência. Desligado, ele chega como pendente para o financeiro confirmar." />
-          {cfg.baixaAutomatica && cfg.formas.includes('cartao') && (
+          {cfg.baixaAutomatica && temCartao && (
             <div className="pn-us-campo cfgi-recuo">
               <span className="pn-us-rot">No cartão, dar baixa</span>
               <Segmentado rotulo="No cartão, dar baixa" valor={cfg.baixaQuando} aoMudar={(v) => set('baixaQuando', v)}
                 opcoes={[{ valor: 'confirmado', rotulo: 'Quando o Asaas confirmar' }, { valor: 'disponivel', rotulo: 'Quando o dinheiro estiver disponível' }]} />
-              <span className="pn-us-dica">No cartão o Asaas confirma o pagamento na hora, mas o dinheiro só fica disponível na conta cerca de um mês depois.</span>
+              <span className="pn-us-dica">No cartão o Asaas confirma o pagamento na hora, mas o dinheiro só fica disponível na conta 32 dias depois. Pix e boleto não têm essa espera.</span>
             </div>
           )}
           <div className="cfgi-sep" />
@@ -220,36 +233,45 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
         </CardVidro>
 
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.12s' }}>
-          <div className="pn-card-cab"><div><h3>Atraso</h3><p>O que é somado à cobrança paga depois do vencimento. Zero deixa sem acréscimo.</p></div></div>
-          <div className="pn-us-duas">
-            <div className="pn-us-campo">
-              <label htmlFor="asaas-multa">Multa por atraso</label>
-              <span className="cfgi-pct"><input id="asaas-multa" className="inp" inputMode="decimal" value={multaTx} maxLength={5}
-                onChange={(e) => { setMultaTx(e.target.value); set('multa', lerPct(e.target.value)); }} onBlur={() => setMultaTx(pctTexto(cfg.multa))} /><i aria-hidden>%</i></span>
-              <span className="pn-us-dica">Cobrada uma vez, sobre o valor da parcela.</span>
-            </div>
-            <div className="pn-us-campo">
-              <label htmlFor="asaas-juros">Juros ao mês</label>
-              <span className="cfgi-pct"><input id="asaas-juros" className="inp" inputMode="decimal" value={jurosTx} maxLength={5}
-                onChange={(e) => { setJurosTx(e.target.value); set('juros', lerPct(e.target.value)); }} onBlur={() => setJurosTx(pctTexto(cfg.juros))} /><i aria-hidden>%</i></span>
-              <span className="pn-us-dica">Proporcional aos dias de atraso.</span>
-            </div>
+          <div className="pn-card-cab"><div><h3>Multa e juros por atraso</h3><p>O que é somado à cobrança paga depois do vencimento.</p></div></div>
+          <div className="pn-us-opcoes" role="radiogroup" aria-label="De onde vêm a multa e os juros">
+            {ATRASO.map((a) => (
+              <button key={a.id} type="button" role="radio" aria-checked={cfg.atraso === a.id} className={cfg.atraso === a.id ? 'on' : undefined} onClick={() => set('atraso', a.id)}>
+                <b>{a.rotulo}</b><span>{a.dica}</span>
+              </button>
+            ))}
           </div>
+          {cfg.atraso === 'aqui' && (
+            <div className="pn-us-duas">
+              <div className="pn-us-campo">
+                <label htmlFor="asaas-multa">Multa por atraso</label>
+                <span className="cfgi-pct"><input id="asaas-multa" className="inp" inputMode="decimal" value={multaTx} maxLength={5}
+                  onChange={(e) => { setMultaTx(e.target.value); set('multa', lerPct(e.target.value)); }} onBlur={() => setMultaTx(pctTexto(cfg.multa))} /><i aria-hidden>%</i></span>
+                <span className="pn-us-dica">Cobrada uma vez, sobre o valor da parcela. Zero deixa sem multa.</span>
+              </div>
+              <div className="pn-us-campo">
+                <label htmlFor="asaas-juros">Juros ao mês</label>
+                <span className="cfgi-pct"><input id="asaas-juros" className="inp" inputMode="decimal" value={jurosTx} maxLength={5}
+                  onChange={(e) => { setJurosTx(e.target.value); set('juros', lerPct(e.target.value)); }} onBlur={() => setJurosTx(pctTexto(cfg.juros))} /><i aria-hidden>%</i></span>
+                <span className="pn-us-dica">Proporcional aos dias de atraso. Zero deixa sem juros.</span>
+              </div>
+            </div>
+          )}
         </CardVidro>
 
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.16s' }}>
           <div className="pn-card-cab"><div><h3>Avisos do Asaas</h3><p>Quem fala com o cliente sobre a cobrança.</p></div></div>
-          <LinhaToggle ligado={cfg.avisosAsaas} aoMudar={(v) => set('avisosAsaas', v)} titulo="Deixar o Asaas avisar o cliente por e-mail e SMS"
-            descricao="Desligado, só a régua do sistema fala com o cliente, pelo WhatsApp. Ligado, o Asaas também manda os avisos dele, e alguns podem ter custo à parte na sua conta do Asaas." />
+          <LinhaToggle ligado={cfg.avisosAsaas} aoMudar={(v) => set('avisosAsaas', v)} titulo="Deixar o Asaas mandar os avisos dele ao cliente"
+            descricao="Desligado, só a régua do sistema fala com o cliente, pelo WhatsApp. Ligado, o Asaas também manda e-mail, SMS e outros avisos, e cobra uma taxa por isso. O valor está em Taxas, na sua conta do Asaas." />
         </CardVidro>
       </div>
 
       {/* as regras mudaram: a faixa de salvar fica presa ao pé da tela, à vista em qualquer altura da página */}
       {mudou && (
         <div className="cfgi-salvar" role="region" aria-label="Alterações não salvas">
-          <span>{semForma ? 'Marque pelo menos uma forma de pagamento para salvar.' : 'Você mudou as regras de pagamento. Elas só valem depois de salvar.'}</span>
+          <span>Você mudou as regras de pagamento. Elas só valem depois de salvar.</span>
           <BotaoSec disabled={salvar.isPending} onClick={repor}>Descartar</BotaoSec>
-          <BotaoPrimario disabled={semForma || salvar.isPending} onClick={() => void gravar()}>{salvar.isPending ? 'Salvando…' : 'Salvar alterações'}</BotaoPrimario>
+          <BotaoPrimario disabled={salvar.isPending} onClick={() => void gravar()}>{salvar.isPending ? 'Salvando…' : 'Salvar alterações'}</BotaoPrimario>
         </div>
       )}
 

@@ -13,24 +13,42 @@
        testar                       consulta a conta de novo com a chave guardada
        salvar {config}              grava as regras
        desconectar                  apaga a chave e remove o retorno dos pagamentos
+       reativar_retorno             religa o retorno dos pagamentos quando o Asaas o pausou
    A CHAVE DE API nunca volta para a tela nem fica na tabela: só os 4 últimos caracteres, para a
    pessoa reconhecer qual chave está em uso.
+
+   COMO CADA REGRA VIRA CHAMADA NO ASAAS (conferido na documentação deles em 22/11):
+   · a chave vai no cabeçalho `access_token`; produção e testes são contas e endereços separados
+     (api.asaas.com × api-sandbox.asaas.com); contas novas exigem também o cabeçalho User-Agent
+   · o cliente é criado com nome e CPF/CNPJ (os dois obrigatórios) — sem CPF não há cobrança; a API
+     aceita cliente repetido, então o servidor procura pelo CPF antes de criar
+   · `forma` → billingType da cobrança, que é UM só: PIX, BOLETO, CREDIT_CARD ou UNDEFINED (o
+     cliente escolhe entre as formas ligadas na conta do Asaas). O link da mensagem é o invoiceUrl
+   · Pix exige uma chave Pix cadastrada na conta do Asaas
+   · `atraso` 'asaas' → não manda multa nem juros (vale o que está configurado na conta do Asaas;
+     mandar vazio apagaria essa configuração); 'aqui' → fine.value e interest.value, em %
+   · `avisosAsaas` desligado → cliente criado com notificationDisabled (o Asaas cobra pelos avisos)
+   · baixa: PAYMENT_CONFIRMED = pago; PAYMENT_RECEIVED = dinheiro disponível (cartão: 32 dias depois)
+   · o retorno (webhook) leva um authToken próprio, conferido no cabeçalho asaas-access-token; o
+     mesmo evento pode chegar mais de uma vez (usar o id); 15 falhas seguidas pausam a fila
    ===================================================================== */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
 export type AmbienteAsaas = 'producao' | 'testes';
-export type FormaPagamento = 'pix' | 'boleto' | 'cartao';
+/** a forma de pagamento da cobrança — no Asaas é UMA por cobrança ('escolhe' = o cliente decide na hora) */
+export type FormaPagamento = 'escolhe' | 'pix' | 'boleto' | 'cartao';
 export const FORMAS: readonly { id: FormaPagamento; rotulo: string; dica: string }[] = [
-  { id: 'pix', rotulo: 'Pix', dica: 'QR Code e copia e cola.' },
-  { id: 'boleto', rotulo: 'Boleto', dica: 'Para pagar no banco ou na lotérica.' },
-  { id: 'cartao', rotulo: 'Cartão de crédito', dica: 'O cliente paga com o cartão dele.' },
+  { id: 'escolhe', rotulo: 'O cliente escolhe', dica: 'Na página de pagamento ele vê as formas que estão ligadas na sua conta do Asaas.' },
+  { id: 'pix', rotulo: 'Pix', dica: 'QR Code e copia e cola. Precisa de uma chave Pix cadastrada na conta do Asaas.' },
+  { id: 'boleto', rotulo: 'Boleto', dica: 'Para pagar no banco ou na lotérica. Com o Pix disponível na conta, o boleto também aceita Pix.' },
+  { id: 'cartao', rotulo: 'Cartão de crédito', dica: 'O cliente paga com o cartão dele. O dinheiro fica disponível 32 dias depois.' },
 ];
 export const ROTULO_AMBIENTE_ASAAS: Record<AmbienteAsaas, string> = { producao: 'Produção', testes: 'Testes' };
 
 export interface ConfigAsaas {
-  /** como o cliente pode pagar (pelo menos uma) */
-  formas: FormaPagamento[];
+  /** como o cliente paga */
+  forma: FormaPagamento;
   /** o sistema cria a cobrança de cada parcela quando a régua vai avisar o cliente */
   gerarSozinho: boolean;
   /** pagamento que entra pelo Asaas já chega confirmado no Financeiro (sem comprovante) */
@@ -39,6 +57,8 @@ export interface ConfigAsaas {
   baixaQuando: 'confirmado' | 'disponivel';
   /** avisa o comercial dono do cliente no sino quando o pagamento entra */
   avisarComercial: boolean;
+  /** multa e juros: 'asaas' = vale o que está configurado na conta do Asaas; 'aqui' = os dois campos abaixo */
+  atraso: 'asaas' | 'aqui';
   /** % cobrado uma vez depois do vencimento (0 = sem multa) */
   multa: number;
   /** % ao mês depois do vencimento (0 = sem juros) */
@@ -47,10 +67,14 @@ export interface ConfigAsaas {
   avisosAsaas: boolean;
 }
 export const CONFIG_ASAAS_PADRAO: ConfigAsaas = {
-  formas: ['pix', 'boleto'], gerarSozinho: true, baixaAutomatica: true, baixaQuando: 'confirmado',
-  avisarComercial: true, multa: 0, juros: 0, avisosAsaas: false,
+  forma: 'escolhe', gerarSozinho: true, baixaAutomatica: true, baixaQuando: 'confirmado',
+  avisarComercial: true, atraso: 'asaas', multa: 0, juros: 0, avisosAsaas: false,
 };
-export interface ContaAsaas { nome: string; documento: string | null; email: string | null }
+export interface ContaAsaas {
+  nome: string; documento: string | null; email: string | null;
+  /** a conta tem chave Pix cadastrada? (null = o servidor não conseguiu conferir) */
+  chavePix: boolean | null;
+}
 export interface IntegracaoAsaas {
   conectado: boolean;
   ambiente: AmbienteAsaas | null;
@@ -71,13 +95,12 @@ const ASAAS_VAZIO: IntegracaoAsaas = {
 const num = (v: unknown, teto: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(teto, Math.max(0, Math.round(n * 100) / 100)) : 0; };
 export function lerConfigAsaas(bruto: unknown): ConfigAsaas {
   const b = (bruto && typeof bruto === 'object' ? bruto : {}) as Record<string, unknown>;
-  const formas = Array.isArray(b.formas) ? FORMAS.map((f) => f.id).filter((f) => (b.formas as unknown[]).includes(f)) : [];
   const liga = (c: keyof ConfigAsaas) => (typeof b[c] === 'boolean' ? (b[c] as boolean) : (CONFIG_ASAAS_PADRAO[c] as boolean));
   return {
-    formas: formas.length ? formas : CONFIG_ASAAS_PADRAO.formas,
+    forma: FORMAS.some((f) => f.id === b.forma) ? (b.forma as FormaPagamento) : CONFIG_ASAAS_PADRAO.forma,
     gerarSozinho: liga('gerarSozinho'), baixaAutomatica: liga('baixaAutomatica'),
     baixaQuando: b.baixaQuando === 'disponivel' ? 'disponivel' : 'confirmado',
-    avisarComercial: liga('avisarComercial'), multa: num(b.multa, 10), juros: num(b.juros, 10), avisosAsaas: liga('avisosAsaas'),
+    avisarComercial: liga('avisarComercial'), atraso: b.atraso === 'aqui' ? 'aqui' : 'asaas', multa: num(b.multa, 10), juros: num(b.juros, 10), avisosAsaas: liga('avisosAsaas'),
   };
 }
 function lerAsaas(l: Record<string, unknown> | undefined): IntegracaoAsaas {
@@ -87,7 +110,7 @@ function lerAsaas(l: Record<string, unknown> | undefined): IntegracaoAsaas {
   return {
     conectado: !!l.conectado,
     ambiente: l.ambiente === 'testes' ? 'testes' : l.ambiente === 'producao' ? 'producao' : null,
-    conta: c ? { nome: String(c.nome ?? ''), documento: txt(c.documento), email: txt(c.email) } : null,
+    conta: c ? { nome: String(c.nome ?? ''), documento: txt(c.documento), email: txt(c.email), chavePix: typeof c.chave_pix === 'boolean' ? c.chave_pix : null } : null,
     chaveFinal: txt(l.chave_final), conectadoEm: txt(l.conectado_em), conectadoPor: txt(l.conectado_por),
     retornoAtivo: !!l.retorno_ativo, ultimoRetorno: txt(l.ultimo_retorno), config: lerConfigAsaas(l.config),
   };
@@ -135,6 +158,7 @@ const MSG: Record<string, string> = {
   invalid_environment: 'Esta chave é de outro ambiente. Troque entre Produção e Testes e tente de novo.',
   access_token_not_found: 'A chave não chegou ao Asaas. Tente de novo.',
   nao_conectado: 'O Asaas não está conectado.',
+  forbidden: 'O Asaas recusou o acesso do sistema. Confira no Asaas se a chave está ativa e sem restrição de IP.',
 };
 async function chamar(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!supabase) throw new Error('Sem conexão com o servidor.');
@@ -158,3 +182,5 @@ export const useConectarAsaas = () => useAcao((v: { ambiente: AmbienteAsaas; cha
 export const useTestarAsaas = () => useAcao((_: void) => ({ acao: 'testar' }));
 export const useSalvarAsaas = () => useAcao((config: ConfigAsaas) => ({ acao: 'salvar', config }));
 export const useDesconectarAsaas = () => useAcao((_: void) => ({ acao: 'desconectar' }));
+/** o Asaas pausa o retorno depois de 15 falhas seguidas; isto religa e os avisos pendentes voltam a chegar */
+export const useReativarRetornoAsaas = () => useAcao((_: void) => ({ acao: 'reativar_retorno' }));
