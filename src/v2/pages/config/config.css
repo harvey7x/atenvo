@@ -172,3 +172,37 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 .v2 .ia-pagina .ph { align-items: flex-start; gap: 16px; }
 .v2 .ia-pagina .ph > div:first-child { flex: 1 1 0; min-width: 0; }
 .v2 .ia-pagina .ph .fx-topo-acoes { flex: none; flex-wrap: nowrap; }
+
+/* ---- Iris: importar a configuração e os passos para ela atender (22/11) ---- */
+.v2 .cfgr-passos { gap: 14px; }
+.v2 .cfgr-passos-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.v2 .cfgr-passos-cab h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .cfgr-passos-cab span { font-size: 12px; color: var(--txt-3); }
+.v2 .cfgr-passos-lista { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.v2 .cfgr-passos-lista li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-content: start; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgr-passos-lista i { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .14); }
+.v2 .cfgr-passos-lista li.falta i { color: var(--txt-2); background: rgba(var(--tint), .1); }
+.v2 .cfgr-passos-lista i svg { width: 12px; height: 12px; }
+.v2 .cfgr-passos-lista span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .cfgr-passos-lista b { font-size: 13px; font-weight: 500; line-height: 20px; color: var(--txt); }
+.v2 .cfgr-passos-lista small { font-size: 12px; line-height: 1.4; color: var(--txt-3); }
+.v2 .cfgr-passos-lista .cfgi-link { grid-column: 2; justify-self: start; }
+.v2 .cfgr-do-zero { margin: 0; text-align: center; }
+/* a área de soltar o arquivo */
+.v2 .cfgr-solta { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 22px 16px; border-radius: 12px; text-align: center;
+  border: 1px dashed rgba(var(--tint), .28); background: rgba(var(--tint), .025); }
+.v2 .cfgr-solta:hover, .v2 .cfgr-solta.sobre { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgr-solta:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+.v2 .cfgr-solta i { display: inline-flex; color: var(--txt-2); }
+.v2 .cfgr-solta i svg { width: 22px; height: 22px; }
+.v2 .cfgr-solta b { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.v2 .cfgr-solta span { font-size: 12px; color: var(--txt-3); }
+/* o resumo do que veio no arquivo: rótulo à esquerda, valor à direita, uma linha por item */
+.v2 .cfgr-resumo { margin: 0; display: flex; flex-direction: column; }
+.v2 .cfgr-resumo > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgr-resumo > div:first-child { border-top: 0; padding-top: 0; }
+.v2 .cfgr-resumo dt { font-size: 12.5px; color: var(--txt-2); }
+.v2 .cfgr-resumo dd { margin: 0; font-size: 12.5px; color: var(--txt); text-align: right; }
+.v2 .cfgr-resumo > div.vazio dd { color: var(--cor-erro-txt, var(--rubro)); }
+@media (max-width: 900px) { .v2 .cfgr-passos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .v2 .cfgr-passos-lista { grid-template-columns: minmax(0, 1fr); } }
