@@ -14,13 +14,15 @@ const GRUPO: Record<string, string> = {
   aviso: 'Avisos',
   // 22/11: os Registros foram para o ambiente Configurações e cobrem também o que se faz nele
   // (logins, acessos e números de WhatsApp) e no Atendimento
-  usuário: 'Configurações', whatsapp: 'Configurações',
+  usuário: 'Configurações', whatsapp: 'Configurações', integração: 'Configurações',
   conversa: 'Atendimento', 'card do Kanban': 'Atendimento',
 };
 const GRUPOS = ['Clientes', 'Financeiro', 'Comissões', 'Régua e envios', 'Avisos', 'Atendimento', 'Configurações'] as const;
 const PERIODOS = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['tudo', 'Tudo']] as const;
 
 const CAMPO_ROT: Record<string, string> = {
+  formas: 'Formas de pagamento', gerarSozinho: 'Gerar a cobrança sozinho', baixaAutomatica: 'Baixa automática', baixaQuando: 'No cartão, dar baixa',
+  avisarComercial: 'Avisar o comercial', multa: 'Multa por atraso', juros: 'Juros ao mês', avisosAsaas: 'Avisos do Asaas',
   nome: 'Nome', comercial: 'Comercial', dia: 'Ciclo (dia)', valor: 'Valor da parcela',
   banco: 'Banco', nb: 'Nº do benefício', cpf: 'CPF', telefone: 'Telefone',
   reclame_login: 'Login Reclame Aqui', situacao: 'Situação', salario: 'Renda / Salário',

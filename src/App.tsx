@@ -184,6 +184,7 @@ const routes: RouteObject[] = [
           // AMBIENTE CONFIGURAÇÕES da Reviza (22/11): /config/<seção> — WhatsApp, Usuários e acessos, Registros, Minha conta
           { path: 'config', element: <Lz><ConfigAmbienteV2 /></Lz> },
           { path: 'config/:secao', element: <Lz><ConfigAmbienteV2 /></Lz> },
+          { path: 'config/:secao/:servico', element: <Lz><ConfigAmbienteV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
           // Coexistência (Embedded Signup da Meta): rota escondida, sem link no menu.
           { path: 'coexistencia', element: <Lz><RequireRoleV2 role="admin"><CoexistenciaV2 /></RequireRoleV2></Lz> },

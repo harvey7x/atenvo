@@ -46,3 +46,85 @@
 .v2 .p-modal .num-remover:disabled { opacity: .5; cursor: default; }
 .v2 .p-modal .num-rodape-esp { flex: 1; }
 @media (max-width: 560px) { .v2 .cfgw-ficha, .v2 .cfgw-explica { grid-template-columns: 1fr; } }
+
+/* ---- Integrações (22/11): um quadradinho por serviço de fora ---- */
+.v2 .cfgi { display: flex; flex-direction: column; gap: 14px; }
+/* voltar à tela de cima (a trilha do topo não é clicável): um link discreto sobre o título */
+.v2 .cfga-volta { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 12px; color: var(--txt-3); text-decoration: none; }
+.v2 .cfga-volta svg { width: 13px; height: 13px; margin-left: -3px; }
+.v2 .cfga-volta:hover { color: var(--txt); }
+.v2 .cfga-volta:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 4px; }
+.v2 .cfgi-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.v2 .cfgi-quadro { display: flex; flex-direction: column; gap: 14px; min-height: 218px; }
+.v2 .cfgi-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* o ícone do serviço: neutro; na cor da casa quando está conectado */
+.v2 .cfgi-ic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-ic svg { width: 19px; height: 19px; }
+.v2 .cfgi-ic.on { color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .12); border-color: rgba(var(--azul-rgb), .24); }
+.v2 .cfgi-breve { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; white-space: nowrap;
+  color: var(--txt-3); border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-tx { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.v2 .cfgi-tx small { font-size: 11px; color: var(--txt-3); }
+.v2 .cfgi-tx h3 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+.v2 .cfgi-tx p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgi-pe { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding-top: 12px; box-sizing: border-box;
+  border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-det { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--txt-2); }
+.v2 .cfgi-pe > .p-btn { margin-left: auto; flex: none; }
+/* em breve: lugar guardado, sem botão — mais apagado para não parecer que funciona */
+.v2 .cfgi-quadro.breve .cfgi-tx h3 { color: var(--txt-2); }
+.v2 .cfgi-quadro.breve .cfgi-tx p { color: var(--txt-3); }
+.v2 .cfgi-quadro.breve .cfgi-ic { color: var(--txt-3); }
+.v2 .cfgi-quadro.breve .cfgi-pe::before { content: 'Ainda não disponível'; font-size: 12px; color: var(--txt-3); }
+
+/* ---- Asaas ---- */
+.v2 .cfgi-duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.v2 .cfgi-duas > .pn-card { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cfgi-duas > .pn-card > .pn-card-cab { margin-bottom: 2px; }
+.v2 .cfgi > .pn-card { display: flex; flex-direction: column; gap: 14px; }
+.v2 .cfgi-conta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .cfgi-conta-nm { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cfgi-conta-nm b { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .cfgi-conta-nm span { font-size: 12px; color: var(--txt-3); }
+.v2 .cfgi-nota { margin: 0; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2);
+  background: rgba(var(--azul-rgb), .07); border: 1px solid rgba(var(--azul-rgb), .2); }
+.v2 .cfgi-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .cfgi-esp { flex: 1; }
+.v2 .cfgi-link { all: unset; cursor: pointer; font-size: 12.5px; color: var(--txt-2); text-decoration: underline; text-underline-offset: 3px; }
+.v2 .cfgi-link:hover { color: var(--txt); }
+.v2 .cfgi-link:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 4px; }
+.v2 .cfgi-link.perigo { color: var(--cor-erro-txt, var(--rubro)); text-decoration: none; }
+.v2 .cfgi-link.perigo:hover { text-decoration: underline; }
+.v2 .cfgi-sep { height: 1px; background: var(--lin-fio, var(--linha)); }
+.v2 .cfgi-lista { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+/* formas de pagamento: três caixas marcáveis, lado a lado */
+.v2 .cfgi-formas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.v2 .cfgi-forma { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .025); }
+.v2 .cfgi-forma:hover { border-color: rgba(var(--tint), .25); }
+.v2 .cfgi-forma.on { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgi-forma input { flex: none; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--azul); }
+.v2 .cfgi-forma:has(input:focus-visible) { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+.v2 .cfgi-forma span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .cfgi-forma b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgi-forma small { font-size: 11.5px; line-height: 1.4; color: var(--txt-3); }
+/* as linhas de liga/desliga: o botão no alto, o texto ocupando a largura */
+.v2 .cfgi .tgl-l { align-items: flex-start; padding: 0; gap: 12px; font-size: 13px; color: var(--txt); }
+.v2 .cfgi .tgl-l > .tgl { flex: none; margin-top: 1px; }
+.v2 .cfgi .tgl-l .d { margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--txt-3); }
+.v2 .cfgi-recuo { padding-left: 46px; }
+/* percentual: campo curto com o % dentro */
+.v2 .cfgi-pct { position: relative; display: block; max-width: 132px; }
+.v2 .cfgi-pct .inp { width: 100%; padding-right: 30px; box-sizing: border-box; font-variant-numeric: tabular-nums; }
+.v2 .cfgi-pct i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 12.5px; color: var(--txt-3); pointer-events: none; }
+@media (max-width: 1180px) { .v2 .cfgi-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .v2 .cfgi-duas { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .v2 .cfgi-grade, .v2 .cfgi-formas { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-recuo { padding-left: 0; } }
+/* o aviso e a faixa de salvar acompanham a rolagem: a resposta do sistema fica sempre à vista */
+.v2 .cfgi > .gs-aviso { position: sticky; top: 8px; z-index: 3; margin-bottom: 0; background: var(--rp-menu, var(--surface)); }
+.v2 .cfgi-salvar { position: sticky; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px 10px 16px; border-radius: 12px;
+  background: var(--rp-menu, var(--surface)); border: 1px solid var(--cor-acento-fio); box-shadow: var(--ba-sombra-menu, 0 16px 40px -14px rgba(0, 0, 0, .5)); }
+.v2 .cfgi-salvar > span { flex: 1 1 260px; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--txt); }
+@media (prefers-reduced-motion: no-preference) { .v2 .cfgi-salvar { animation: cfgi-sobe .18s ease-out; } }
+@keyframes cfgi-sobe { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

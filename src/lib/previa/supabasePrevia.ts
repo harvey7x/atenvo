@@ -180,6 +180,11 @@ export function criarSupabasePrevia() {
   const LS_VER = 'previa-ver-como';
   try { const salvo = JSON.parse(localStorage.getItem(LS_PERFIS) || 'null'); if (Array.isArray(salvo) && salvo.length) T.profiles = salvo; } catch { /* sem armazenamento: só a memória */ }
   const salvarPerfis = () => { try { localStorage.setItem(LS_PERFIS, JSON.stringify(T.profiles)); } catch { /* idem */ } };
+  // integrações (Asaas): a situação sobrevive ao recarregar; a chave de API NÃO é guardada — só o final
+  const LS_INTEG = 'previa-integracoes-v1';
+  T.integracoes = [{ servico: 'asaas', conectado: false, ambiente: null, conta: null, chave_final: null, conectado_em: null, conectado_por: null, retorno_ativo: false, ultimo_retorno: null, config: null }];
+  try { const salvo = JSON.parse(localStorage.getItem(LS_INTEG) || 'null'); if (Array.isArray(salvo) && salvo.length) T.integracoes = salvo; } catch { /* sem armazenamento: só a memória */ }
+  const salvarInteg = () => { try { localStorage.setItem(LS_INTEG, JSON.stringify(T.integracoes)); } catch { /* idem */ } };
   db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); };
   try {
     const ver = localStorage.getItem(LS_VER);
@@ -190,7 +195,7 @@ export function criarSupabasePrevia() {
     perfis: () => T.profiles.map((p) => ({ ...p })),
     eu: () => db.usuario.id,
     verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
-    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); } catch { /* idem */ } location.reload(); },
   };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;
@@ -389,6 +394,52 @@ export function criarSupabasePrevia() {
       return { hoje: dia(0), de: b.de, ate: b.ate, itens, cobertura: coberturaRegua(), config: cfg };
     },
     'reviza-wa-instancia': (b) => instanciaWa(b),
+    // Asaas na prévia: nenhuma chamada sai daqui. Qualquer chave no formato do Asaas "conecta" uma conta
+    // de demonstração; a chave não é guardada (só os 4 últimos caracteres, como no servidor de verdade).
+    'reviza-asaas': (b) => {
+      const k = T.integracoes.find((x) => x.servico === 'asaas')!;
+      const ROT_FORMA: Record<string, string> = { pix: 'Pix', boleto: 'Boleto', cartao: 'Cartão de crédito' };
+      const simNao = (v: unknown) => (v ? 'ligado' : 'desligado');
+      const pct = (v: unknown) => `${String(Number(v) || 0).replace('.', ',')}%`;
+      if (b.acao === 'conectar') {
+        const chave = String(b.chave ?? '').trim();
+        if (!chave) return { error: 'access_token_not_found' };
+        if (!chave.startsWith('$aact_') || chave.length < 24) return { error: 'invalid_access_token' };
+        const dela = chave.startsWith('$aact_prod_') ? 'producao' : chave.startsWith('$aact_hmlg_') ? 'testes' : null;
+        if (dela && dela !== b.ambiente) return { error: 'invalid_environment' };
+        const troca = !!k.conectado;
+        const conta = { nome: 'Reviza (conta de demonstração)', documento: '00.000.000/0001-00', email: 'financeiro@reviza.exemplo' };
+        Object.assign(k, { conectado: true, ambiente: b.ambiente === 'testes' ? 'testes' : 'producao', conta, chave_final: chave.slice(-4), conectado_em: agoraIso(), conectado_por: quemFaz().ator_nome, retorno_ativo: true, ultimo_retorno: null });
+        salvarInteg();
+        registrar(troca ? 'alterou' : 'conectou', 'integração', 'Asaas', troca ? `trocou a chave de API (ambiente de ${k.ambiente === 'testes' ? 'testes' : 'produção'})` : `conta do Asaas conectada no ambiente de ${k.ambiente === 'testes' ? 'testes' : 'produção'}`);
+        return { conta };
+      }
+      if (!k.conectado) return { error: 'nao_conectado' };
+      if (b.acao === 'testar') return { conta: k.conta };
+      if (b.acao === 'salvar') {
+        const de = (k.config ?? {}) as Linha, para = (b.config ?? {}) as Linha;
+        const formas = (v: unknown) => (Array.isArray(v) ? v.map((f) => ROT_FORMA[String(f)] ?? String(f)).join(', ') : '');
+        const mud: Linha[] = [];
+        const nota = (c: string, a: string, d: string) => { if (a !== d) mud.push({ c, de: a, para: d }); };
+        nota('formas', formas(de.formas ?? ['pix', 'boleto']), formas(para.formas));
+        nota('gerarSozinho', simNao(de.gerarSozinho ?? true), simNao(para.gerarSozinho));
+        nota('baixaAutomatica', simNao(de.baixaAutomatica ?? true), simNao(para.baixaAutomatica));
+        nota('baixaQuando', de.baixaQuando === 'disponivel' ? 'dinheiro disponível' : 'pagamento confirmado', para.baixaQuando === 'disponivel' ? 'dinheiro disponível' : 'pagamento confirmado');
+        nota('avisarComercial', simNao(de.avisarComercial ?? true), simNao(para.avisarComercial));
+        nota('multa', pct(de.multa), pct(para.multa));
+        nota('juros', pct(de.juros), pct(para.juros));
+        nota('avisosAsaas', simNao(de.avisosAsaas), simNao(para.avisosAsaas));
+        k.config = para; salvarInteg();
+        if (mud.length) registrar('alterou', 'integração', 'Asaas', `regras de pagamento (${mud.length} ${mud.length === 1 ? 'mudança' : 'mudanças'})`, mud);
+        return { ok: true };
+      }
+      if (b.acao === 'desconectar') {
+        Object.assign(k, { conectado: false, conta: null, chave_final: null, conectado_em: null, conectado_por: null, retorno_ativo: false, ultimo_retorno: null });
+        salvarInteg(); registrar('desconectou', 'integração', 'Asaas', 'conta do Asaas desconectada');
+        return { ok: true };
+      }
+      return { ok: true };
+    },
     'reviza-admin': (b) => {
       const loginDe = (e: unknown) => String(e ?? '').replace(/@reviza\.local$/i, '');
       const gerar = () => `Rv-${Math.random().toString(36).slice(2, 11)}`;

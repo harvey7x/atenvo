@@ -187,7 +187,7 @@ const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equi
 const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
   cobrancas: 'Carteira e pagamentos',
   atendimento: 'Conversas e Kanban',
-  configuracoes: 'WhatsApp, acessos e registros',
+  configuracoes: 'WhatsApp, integrações e acessos',
 };
 /* AMBIENTE CONFIGURAÇÕES (dono 22/11: "um ambiente de configuração — tudo que a gente for configurar
    precisa estar nesse ambiente"): conectar o WhatsApp (e dizer se é das Cobranças ou do Atendimento),
@@ -195,7 +195,7 @@ const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
    própria pessoa (conta, notificações, preferências) fica no grupo "Minha conta", para todos.
    Rotas em /config/* (o /configuracoes de antes leva para cá). */
 const CFG_GRUPOS: GrupoNav[] = [
-  { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }] },
+  { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }, { slug: 'config/integracoes', rotulo: 'Integrações', admin: true }] },
   { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
   { rotulo: 'Atendimento', itens: [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] },
   { rotulo: 'Minha conta', itens: [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] },
@@ -210,6 +210,7 @@ const MODULOS: Modulo[] = isRevizaMode ? [MOD_COBRANCAS, MOD_ATENDIMENTO, MOD_CO
 /* o nome da página na trilha do topo ("Cobranças / Painel"): o do item do menu (o da instância ganha) */
 const TITULOS_PAGINA: Record<string, string> = {
   integracoes: 'Integrações',
+  'config/integracoes/asaas': 'Integrações',
   ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES, ...CFG_GRUPOS.flatMap((g) => g.itens)].map((i) => [i.slug, i.rotulo])),
 };
 const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';
