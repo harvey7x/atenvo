@@ -54,7 +54,7 @@
 .v2 .cfga-volta svg { width: 13px; height: 13px; margin-left: -3px; }
 .v2 .cfga-volta:hover { color: var(--txt); }
 .v2 .cfga-volta:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 4px; }
-.v2 .cfgi-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.v2 .cfgi-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; }
 .v2 .cfgi-quadro { display: flex; flex-direction: column; gap: 14px; min-height: 218px; }
 .v2 .cfgi-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 /* o ícone do serviço: neutro; na cor da casa quando está conectado */
@@ -122,3 +122,44 @@
 .v2 .cfgi-salvar > span { flex: 1 1 260px; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--txt); }
 @media (prefers-reduced-motion: no-preference) { .v2 .cfgi-salvar { animation: cfgi-sobe .18s ease-out; } }
 @keyframes cfgi-sobe { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- WhatsApp oficial (22/11) ---- */
+/* a lista de números achados na conta da Meta: um por linha, marcável */
+.v2 .cfgo-numeros { display: flex; flex-direction: column; gap: 8px; }
+.v2 .cfgo-numeros button { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: left; cursor: pointer; font: inherit; font-size: 11.5px; line-height: 1.4;
+  color: var(--txt-3); border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .025); }
+.v2 .cfgo-numeros button b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgo-numeros button:hover:not(:disabled) { border-color: rgba(var(--tint), .25); }
+.v2 .cfgo-numeros button.on { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgo-numeros button:disabled { opacity: .55; cursor: default; }
+.v2 .cfgo-numeros button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+.v2 .cfgo-linha-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+/* a conferência do passo 3: o que ficou certo e o que falta */
+.v2 .cfgo-conf { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.v2 .cfgo-conf li { display: flex; align-items: flex-start; gap: 11px; padding: 10px 0; border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgo-conf li:first-child { border-top: 0; padding-top: 2px; }
+.v2 .cfgo-conf i { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
+  color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .14); }
+.v2 .cfgo-conf li.falta i { color: var(--txt-2); background: rgba(var(--tint), .1); }
+.v2 .cfgo-conf i svg { width: 12px; height: 12px; }
+.v2 .cfgo-conf span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .cfgo-conf b { font-size: 13px; font-weight: 500; color: var(--txt); }
+.v2 .cfgo-conf small { font-size: 12px; line-height: 1.45; color: var(--txt-3); }
+/* modelos de mensagem: o nome técnico, o texto inteiro (nada cortado) e o motivo da recusa */
+.v2 .cfgo-mod { display: flex; flex-direction: column; gap: 4px; padding: 3px 0; text-align: left; white-space: normal; }
+.v2 .cfgo-mod b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgo-mod span { font-size: 12px; line-height: 1.5; color: var(--txt-2); max-width: 760px; }
+.v2 .cfgo-mod small { font-size: 12px; line-height: 1.45; color: var(--cor-erro-txt, var(--rubro)); max-width: 760px; }
+.v2 .cfgo-tab td { vertical-align: top; }
+.v2 .cfgo-tab td:not(:first-child) { padding-top: 12px; white-space: nowrap; }
+.v2 .pn-card-cab > .cfgi-acoes { flex: none; }
+.v2 .cfgo-texto { height: auto !important; min-height: 116px; padding: 10px 12px; line-height: 1.5; resize: vertical; font: inherit; font-size: 13px; }
+.v2 .cfgo-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.v2 .cfgo-vars small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfgo-vars button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 11.5px; color: var(--txt-2); border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .04); }
+.v2 .cfgo-vars button:hover { color: var(--txt); border-color: rgba(var(--tint), .28); }
+.v2 .cfgo-vars button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+/* o tipo e a situação na mesma régua (a etiqueta tem 22px de altura; o texto ganha a mesma linha) */
+.v2 .cfgo-tab td:not(:first-child) .pn-us-amb-tx { display: inline-block; line-height: 22px; }
+/* botão sozinho num campo da janela: do tamanho do texto, não esticado de ponta a ponta */
+.v2 .p-modal .pn-us-campo > .p-btn { align-self: flex-start; }

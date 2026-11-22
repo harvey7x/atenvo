@@ -2,7 +2,8 @@
    integrar; um deles vai ser o Asaas".
    Cada quadradinho é um serviço de fora: o que é, para que serve, se está conectado e o botão.
    · Asaas     → /config/integracoes/asaas (conectar e configurar os pagamentos)
-   · WhatsApp  → /config/whatsapp (os números já são conectados lá)
+   · WhatsApp por QR Code → /config/whatsapp (os números já são conectados lá)
+   · WhatsApp oficial     → /config/integracoes/whatsapp-oficial (a API oficial, da Meta)
    · "Em breve" são lugares guardados — sem botão, para ninguém achar que funciona.
    Sem logomarca de terceiros: cada serviço tem um ícone da família do sistema. */
 import type { ReactNode } from 'react';
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro } from '../../components';
 import { ROTULO_AMBIENTE_ASAAS, useAsaas } from '../../data/config/integracoes';
 import { useConexoesWA } from '../../data/config/conexoes';
+import { useOficial } from '../../data/config/oficial';
 import '../painel/painel.css';
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -51,6 +53,9 @@ export function ConfigIntegracoes() {
   const ir = useNavigate();
   const asaas = useAsaas();
   const wa = useConexoesWA();
+  const oficial = useOficial();
+  const ofN = oficial.dados.numeros.length;
+  const ofModelos = oficial.dados.modelos.filter((m) => m.situacao === 'aprovado').length;
   const a = asaas.dados;
   const waOn = wa.lista.filter((c) => c.estado === 'conectado').length;
   const waTot = wa.lista.length;
@@ -65,17 +70,22 @@ export function ConfigIntegracoes() {
           acao={a.conectado
             ? <BotaoSec mini onClick={() => ir('/config/integracoes/asaas')}>Configurar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/integracoes/asaas')}>Conectar</BotaoPrimario>} />
-        <Quadro atraso={0.04} icone={<IcMensagem />} nome="WhatsApp" categoria="Mensagens"
+        <Quadro atraso={0.04} icone={<IcMensagem />} nome="WhatsApp por QR Code" categoria="Mensagens"
           descricao="Os números conectados por QR Code: os da régua de Cobranças e os que recebem o Atendimento."
           estado={waOn > 0 ? 'conectado' : 'desconectado'}
           detalhe={wa.carregando ? 'Consultando…' : waTot ? `${waOn} de ${waTot} ${waTot === 1 ? 'número conectado' : 'números conectados'}` : undefined}
           acao={waTot
             ? <BotaoSec mini onClick={() => ir('/config/whatsapp')}>Gerenciar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/whatsapp')}>Conectar</BotaoPrimario>} />
-        <Quadro atraso={0.08} icone={<IcAnuncio />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"
+        <Quadro atraso={0.08} icone={<IcOficial />} nome="WhatsApp oficial" categoria="Mensagens"
+          descricao="A API oficial do WhatsApp, da Meta: o número não depende de celular ligado e envia por modelos de mensagem aprovados."
+          estado={ofN > 0 ? 'conectado' : 'desconectado'}
+          detalhe={oficial.carregando ? 'Consultando…' : ofN ? `${ofN} ${ofN === 1 ? 'número conectado' : 'números conectados'} · ${ofModelos} ${ofModelos === 1 ? 'modelo aprovado' : 'modelos aprovados'}` : undefined}
+          acao={ofN
+            ? <BotaoSec mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Configurar</BotaoSec>
+            : <BotaoPrimario mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Conectar</BotaoPrimario>} />
+        <Quadro atraso={0.12} icone={<IcAnuncio />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"
           descricao="Receber no Atendimento as mensagens e os contatos que chegam pelos anúncios e pelas páginas." />
-        <Quadro atraso={0.12} icone={<IcOficial />} nome="WhatsApp oficial" categoria="Mensagens" estado="breve"
-          descricao="A API oficial do WhatsApp, para volumes maiores e modelos de mensagem aprovados." />
         <Quadro atraso={0.16} icone={<IcPlanilha />} nome="Google Planilhas" categoria="Dados" estado="breve"
           descricao="Levar a carteira e os pagamentos para uma planilha que se atualiza sozinha." />
         <Quadro atraso={0.2} icone={<IcTomada />} nome="Outros sistemas" categoria="Dados" estado="breve"

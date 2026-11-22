@@ -185,6 +185,18 @@ export function criarSupabasePrevia() {
   T.integracoes = [{ servico: 'asaas', conectado: false, ambiente: null, conta: null, chave_final: null, conectado_em: null, conectado_por: null, retorno_ativo: false, ultimo_retorno: null, config: null }];
   try { const salvo = JSON.parse(localStorage.getItem(LS_INTEG) || 'null'); if (Array.isArray(salvo) && salvo.length) T.integracoes = salvo; } catch { /* sem armazenamento: só a memória */ }
   const salvarInteg = () => { try { localStorage.setItem(LS_INTEG, JSON.stringify(T.integracoes)); } catch { /* idem */ } };
+  // WhatsApp oficial (API da Meta): a conta de demonstração, os números conectados e os modelos de mensagem
+  const LS_OFICIAL = 'previa-oficial-v1';
+  T.wa_oficial = [{
+    empresa: { nome: 'Reviza (empresa de demonstração)', verificada: false }, limite_dia: 250, pagamento: true, facebook: true, numeros: [],
+    modelos: [
+      { id: 'md-1', nome: 'lembrete_da_parcela', categoria: 'utilidade', idioma: 'pt_BR', situacao: 'aprovado', motivo: null, texto: 'Olá, {nome}. Passando para lembrar que a sua parcela de {meia parcela} vence em {vencimento}. Qualquer dúvida, é só responder esta mensagem.' },
+      { id: 'md-2', nome: 'parcela_vence_hoje', categoria: 'utilidade', idioma: 'pt_BR', situacao: 'aprovado', motivo: null, texto: 'Olá, {nome}. A sua parcela de {meia parcela} vence hoje. Para pagar, use este link: {link de pagamento} Obrigado.' },
+      { id: 'md-3', nome: 'novidades_do_mes', categoria: 'marketing', idioma: 'pt_BR', situacao: 'recusado', motivo: 'A Meta recusou: o texto promete resultado. Reescreva sem promessa e mande de novo.', texto: 'Olá, {nome}. Temos novidades para você este mês. Fale com a gente.' },
+    ],
+  }];
+  try { const salvo = JSON.parse(localStorage.getItem(LS_OFICIAL) || 'null'); if (Array.isArray(salvo) && salvo.length) T.wa_oficial = salvo; } catch { /* sem armazenamento: só a memória */ }
+  const salvarOficial = () => { try { localStorage.setItem(LS_OFICIAL, JSON.stringify(T.wa_oficial)); } catch { /* idem */ } };
   db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); };
   try {
     const ver = localStorage.getItem(LS_VER);
@@ -195,7 +207,7 @@ export function criarSupabasePrevia() {
     perfis: () => T.profiles.map((p) => ({ ...p })),
     eu: () => db.usuario.id,
     verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
-    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); } catch { /* idem */ } location.reload(); },
   };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;
@@ -394,6 +406,55 @@ export function criarSupabasePrevia() {
       return { hoje: dia(0), de: b.de, ate: b.ate, itens, cobertura: coberturaRegua(), config: cfg };
     },
     'reviza-wa-instancia': (b) => instanciaWa(b),
+    // WhatsApp oficial na prévia: nada vai à Meta. "Entrar com o Facebook" e o código de acesso devolvem
+    // números de demonstração; "Sincronizar" faz de conta que a Meta aprovou o que estava em análise.
+    'reviza-wa-oficial': (b) => {
+      const k = T.wa_oficial[0] as Linha & { numeros: Linha[]; modelos: Linha[] };
+      const ACHADOS: Linha[] = [
+        { phone_number_id: 'pn-demo-1', numero: '5551999990100', nome_exibicao: 'Reviza Assessoria', nome_situacao: 'aprovado', qualidade: 'alta' },
+        { phone_number_id: 'pn-demo-2', numero: '5551999990200', nome_exibicao: 'Reviza Atendimento', nome_situacao: 'analise', qualidade: 'desconhecida' },
+      ];
+      const marcar = (l: Linha[]) => l.map((n) => ({ ...n, ja_conectado: k.numeros.some((x) => x.phone_number_id === n.phone_number_id) }));
+      const achar = () => k.numeros.find((n) => n.id === b.id);
+      const tel = (n: unknown) => { const d = String(n ?? ''); return d.length >= 12 ? `(${d.slice(2, 4)}) ${d.slice(4, -4)}-${d.slice(-4)}` : d; };
+      if (b.acao === 'situacao') return k;
+      if (b.acao === 'entrar_facebook') return { sessao: 'sessao-demo', empresa: (k.empresa as Linha).nome, numeros: marcar(ACHADOS.slice(0, 1)) };
+      if (b.acao === 'buscar_numeros') {
+        const t = String(b.token ?? '').trim();
+        if (t.length < 40 || /\s/.test(t)) return { error: 'token_invalido' };
+        return { sessao: 'sessao-demo', empresa: (k.empresa as Linha).nome, numeros: marcar(ACHADOS) };
+      }
+      if (b.acao === 'conectar') {
+        const a = ACHADOS.find((n) => n.phone_number_id === b.phone_number_id);
+        if (!a || b.sessao !== 'sessao-demo') return { error: 'sessao_vencida' };
+        if (k.numeros.some((n) => n.phone_number_id === a.phone_number_id)) return { error: 'ja_conectado' };
+        const amb = b.ambiente === 'atendimento' ? 'atendimento' : 'cobrancas';
+        k.numeros.push({ ...a, id: id(), nome: String(b.nome || a.nome_exibicao), ambiente: amb, no_celular: !!b.no_celular, recebimento: true, bloqueado: false, conectado_em: agoraIso(), conectado_por: quemFaz().ator_nome });
+        salvarOficial();
+        registrar('conectou', 'integração', 'WhatsApp oficial', `número ${tel(a.numero)} conectado pela API oficial em ${amb === 'atendimento' ? 'Atendimento' : 'Cobranças'}`);
+        const ap = k.modelos.filter((m) => m.situacao === 'aprovado').length, an = k.modelos.filter((m) => m.situacao === 'analise').length;
+        const emp = k.empresa as Linha;
+        return { conferencia: [
+          { rotulo: 'Acesso à conta da Meta', ok: true, nota: String(emp.nome) },
+          { rotulo: 'Número registrado na API oficial', ok: true, nota: tel(a.numero) },
+          { rotulo: 'Recebimento de mensagens ligado', ok: true, nota: null },
+          { rotulo: 'Modelos de mensagem trazidos da Meta', ok: true, nota: `${ap} ${ap === 1 ? 'aprovado' : 'aprovados'}${an ? `, ${an} em análise` : ''}` },
+          { rotulo: 'Nome de exibição aprovado', ok: a.nome_situacao === 'aprovado', nota: a.nome_situacao === 'aprovado' ? String(a.nome_exibicao) : 'A Meta ainda está analisando o nome. Até aprovar, o número envia com limite reduzido.' },
+          { rotulo: 'Empresa verificada na Meta', ok: !!emp.verificada, nota: emp.verificada ? null : 'Sem a verificação, o limite é de 250 clientes diferentes por dia. Ela é feita no Gerenciador de Negócios da Meta.' },
+        ] };
+      }
+      if (b.acao === 'testar') return achar() ? { ok: true } : { error: 'Número não encontrado.' };
+      if (b.acao === 'enviar_teste') { const n = achar(); if (!n) return { error: 'Número não encontrado.' }; registrar('enviou', 'integração', 'WhatsApp oficial', `mensagem de teste (modelo ${b.modelo}) para ${tel(b.para)}`); return { ok: true }; }
+      if (b.acao === 'desconectar') { const n = achar(); if (!n) return { error: 'Número não encontrado.' }; k.numeros = k.numeros.filter((x) => x !== n); salvarOficial(); registrar('desconectou', 'integração', 'WhatsApp oficial', `número ${tel(n.numero)} desconectado da API oficial`); return { ok: true }; }
+      if (b.acao === 'modelos_sync') { let n = 0; for (const m of k.modelos) if (m.situacao === 'analise') { m.situacao = 'aprovado'; n++; } salvarOficial(); return { ok: true, mudaram: n }; }
+      if (b.acao === 'modelo_criar') {
+        if (k.modelos.some((m) => m.nome === b.nome)) return { error: 'Já existe um modelo com esse nome.' };
+        k.modelos.unshift({ id: id(), nome: String(b.nome), categoria: b.categoria === 'marketing' ? 'marketing' : 'utilidade', idioma: 'pt_BR', situacao: 'analise', motivo: null, texto: String(b.texto ?? '') });
+        salvarOficial(); registrar('criou', 'integração', 'WhatsApp oficial', `modelo de mensagem ${b.nome} enviado para a aprovação da Meta`);
+        return { ok: true };
+      }
+      return { ok: true };
+    },
     // Asaas na prévia: nenhuma chamada sai daqui. Qualquer chave no formato do Asaas "conecta" uma conta
     // de demonstração; a chave não é guardada (só os 4 últimos caracteres, como no servidor de verdade).
     'reviza-asaas': (b) => {

@@ -3,7 +3,8 @@
    das abas:
      whatsapp      conectar por QR Code e dizer se o número é das Cobranças ou do Atendimento   (admin)
      integracoes   os serviços de fora, um quadradinho cada; /config/integracoes/asaas configura
-                   os pagamentos pelo Asaas                                                     (admin)
+                   os pagamentos pelo Asaas e /config/integracoes/whatsapp-oficial a API oficial
+                   do WhatsApp                                                                  (admin)
      usuarios      logins: criar, papel, ambientes, telas liberadas, senha, desativar, excluir  (admin)
      registros     tudo o que cada pessoa fez (a tela que ficava em Cobranças)                  (admin)
      atendimento   regras e etiquetas do Atendimento                                            (admin)
@@ -18,6 +19,7 @@ import { RevizaRegistros } from '../RevizaRegistros';
 import { ConfigWhatsApp } from './ConfigWhatsApp';
 import { ConfigIntegracoes } from './ConfigIntegracoes';
 import { ConfigAsaas } from './ConfigAsaas';
+import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
 import '../cobrancas.css';
 import './config.css';
 
@@ -51,6 +53,7 @@ export default function ConfigAmbiente() {
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub="Os números conectados ao sistema e para qual ambiente cada um trabalha." /><ConfigWhatsApp /></>);
   if (secao === 'integracoes') {
     if (servico === 'asaas') return (<><Cabecalho titulo="Asaas" sub="Pagamentos por Pix, boleto e cartão, com baixa das parcelas quando o cliente paga." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigAsaas /></>);
+    if (servico === 'whatsapp-oficial') return (<><Cabecalho titulo="WhatsApp oficial" sub="A API oficial do WhatsApp, da Meta: conectar o número, acompanhar a saúde dele e cuidar dos modelos de mensagem." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigWhatsAppOficial /></>);
     if (servico) return <Navigate to="/config/integracoes" replace />;
     return (<><Cabecalho titulo="Integrações" sub="Os serviços de fora que trabalham junto com o sistema. Conecte e configure cada um aqui." /><ConfigIntegracoes /></>);
   }
