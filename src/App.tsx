@@ -106,7 +106,7 @@ const routes: RouteObject[] = [
   // ============ ROTAS OFICIAIS = Platina (o corte) ============
   { path: '/login', element: <Lz><LoginV2 /></Lz> },
   // demonstração do card de métrica (dono 14/11), página inteira e só fora da produção (dev e prévia)
-  ...(import.meta.env.DEV || String(import.meta.env.VITE_PREVIA) === 'true'
+  ...(import.meta.env.DEV || import.meta.env.VITE_PREVIA === 'true'
     ? [{ path: '/progress-metric-card', element: <Lz><ProgressMetricCardDemo /></Lz> }]
     : []),
   { path: '/redefinir-senha', element: <Lz><RedefinirSenhaV2 /></Lz> },

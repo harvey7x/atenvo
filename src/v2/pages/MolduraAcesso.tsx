@@ -1,3 +1,4 @@
+import { temRecurso } from '../data/config/recursos';
 import type { ReactNode } from 'react';
 import { IconeReviza } from '../components/LogoReviza';
 import './login.css';
@@ -28,7 +29,8 @@ export function MolduraAcesso({ children }: { children: ReactNode }) {
         <div className="lg-painel-txt">
           <i className="lg-painel-fio" aria-hidden />
           <p className="lg-painel-tit">Plataforma de Atendimento e Gestão</p>
-          <p className="lg-painel-amb"><span>Cobranças</span><span>Atendimento</span></p>
+          {/* a linha dos ambientes só anuncia o que esta instalação tem (config/recursos.ts) */}
+          {temRecurso('atendimento') && <p className="lg-painel-amb"><span>Cobranças</span><span>Atendimento</span></p>}
         </div>
       </aside>
       <main className="lg-palco">{children}</main>

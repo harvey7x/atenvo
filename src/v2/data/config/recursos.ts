@@ -14,7 +14,7 @@ import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
 export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
-const PREVIA_SO_REAL = String(import.meta.env.VITE_PREVIA_SO_REAL) === 'true';
+const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 
 // isPrevia/isRevizaMode são lidos DENTRO da função, nunca na carga do módulo: este arquivo entra no
 // ciclo de imports de lib/supabase (pela prévia) e ler as duas na carga quebrava a abertura do sistema

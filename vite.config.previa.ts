@@ -143,7 +143,9 @@ export default defineConfig({
     'import.meta.env.VITE_SUPABASE_ANON_KEY': '"previa-sem-chave"',
     'import.meta.env.VITE_ENABLE_DEMO_MODE': '"false"',
   },
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  // o pacote do Supabase vira o cliente de mentira da prévia (lib/previa/supabaseJsPrevia.ts): o código do
+  // sistema não importa nada da prévia, então o pacote de produção não leva dados fictícios
+  resolve: { alias: { '@supabase/supabase-js': fileURLToPath(new URL('./src/lib/previa/supabaseJsPrevia.ts', import.meta.url)), '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   build: {
     outDir: process.env.PREVIA_OUT || 'dist-previa',
     emptyOutDir: true,

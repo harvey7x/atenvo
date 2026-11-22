@@ -55,7 +55,7 @@ export interface ClienteAnalise {
   cancelado?: boolean;        // Reviza: está na aba Cancelados (ativo=false, mas NÃO é Novo)
 }
 
-const MESES = String(import.meta.env.VITE_PREVIA) === 'true'
+const MESES = import.meta.env.VITE_PREVIA === 'true'
   ? Array.from({ length: 6 }, (_, k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })
   : ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
 
