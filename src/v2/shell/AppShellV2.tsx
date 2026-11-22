@@ -845,9 +845,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // a tela da rota foi tirada das áreas desta pessoa → volta ao início dela
   const areaBloqueada = !!areasSessao && !areaLiberada(areasSessao, areaDaRota(location.pathname) ?? '');
   // a conta e as preferências: na Reviza moram no ambiente Configurações (todos têm); no Atenvo, nas Configurações do Atendimento
-  const temContaAtendimento = isRevizaMode || modulosDisponiveis.some((m) => m.id === 'atendimento');
-  // ("Minha conta" é uma tela do Atendimento: sem ele no servidor, a pessoa troca a senha na tela de sempre)
-  const rotaDaConta = isRevizaMode ? (temRecurso('atendimento') ? '/config/conta' : '/alterar-senha') : '/configuracoes?tab=conta';
+  // ("Minha conta" é uma tela do Atendimento: sem ele no servidor desta instalação o menu fica como o Reviza de
+  // sempre, só com Sair — a tela de trocar senha do Atenvo chama uma função que o banco do Reviza não tem)
+  const temContaAtendimento = isRevizaMode ? temRecurso('atendimento') : modulosDisponiveis.some((m) => m.id === 'atendimento');
+  const rotaDaConta = isRevizaMode ? '/config/conta' : '/configuracoes?tab=conta';
   // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
   // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
   const acessoCarregando = isRevizaMode && papelQ.isPending;
