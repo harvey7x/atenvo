@@ -214,8 +214,9 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
             ))}
           </div>
           <div className="cfgi-sep" />
-          <LinhaToggle ligado={cfg.gerarSozinho} aoMudar={(v) => set('gerarSozinho', v)} titulo="Gerar a cobrança de cada parcela sozinho"
-            descricao="Quando a régua vai avisar o cliente, o sistema cria a cobrança no Asaas com o valor e o vencimento da parcela. O link entra na mensagem onde você colocar a variável {link de pagamento}. Cliente sem CPF na Gestão fica sem cobrança até o CPF ser preenchido. Desligado, a cobrança é gerada à mão, cliente por cliente." />
+{/* a régua ainda não gera a cobrança sozinha (próxima etapa): o controle fica travado para não prometer o que não faz */}
+          <LinhaToggle ligado={false} aoMudar={() => undefined} disabled titulo="Gerar a cobrança de cada parcela sozinho"
+            descricao="Ainda não disponível. Nesta versão a cobrança é gerada no botão Gerar cobrança, acima, e o link é copiado para o cliente. Na próxima etapa a régua cria a cobrança sozinha e põe o link na mensagem onde você colocar a variável {link de pagamento}." />
         </CardVidro>
 
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.08s' }}>
