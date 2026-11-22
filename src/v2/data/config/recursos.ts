@@ -7,7 +7,8 @@
      telas         telas liberadas por pessoa (coluna profiles.areas + função reviza-admin)
      asaas         integração de pagamentos (tabela integracoes + função reviza-asaas)
      wa-oficial    WhatsApp pela API oficial (função reviza-wa-oficial)
-     iris          a atendente virtual (precisa do Atendimento + motor da Iris)
+     iris          a atendente virtual, nos números de WhatsApp do Reviza (migration 90 + funções
+                   reviza-iris, ia-agente-testar e ia-agente-conversar)
    Na PRÉVIA tudo aparece (é a demonstração do que o sistema vai ter); a prévia "só o que existe"
    (VITE_PREVIA_SO_REAL) mostra o sistema exatamente como iria ao ar hoje. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
@@ -23,5 +24,5 @@ function ligado(r: Recurso): boolean {
   if (isPrevia) return !PREVIA_SO_REAL;
   return LIGADOS.has('tudo') || LIGADOS.has(r);
 }
-/** este recurso existe nesta instalação? (a Iris depende do Atendimento) */
-export const temRecurso = (r: Recurso): boolean => ligado(r) && (r !== 'iris' || ligado('atendimento'));
+/** este recurso existe nesta instalação? */
+export const temRecurso = (r: Recurso): boolean => ligado(r);

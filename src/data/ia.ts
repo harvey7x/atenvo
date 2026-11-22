@@ -7,7 +7,7 @@
    volta pro front — aqui só chega o carimbo chave_definida_em.
    ============================================================================ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 
 export const IA_REAL = isSupabaseConfigured && !!supabase;
@@ -116,6 +116,16 @@ export function useCanaisIa() {
   return useQuery({
     queryKey: ['ia-canais', org], enabled: IA_REAL && !!org,
     queryFn: async (): Promise<CanalIa[]> => {
+      // Reviza: a Iris atende nos números do WhatsApp do Reviza (migration 90: função iris_canais)
+      if (isRevizaMode) {
+        const { data, error } = await supabase!.rpc('iris_canais');
+        if (error) throw new Error(error.message);
+        return ((data as Row[]) || []).map((r) => ({
+          id: r.id as string, nome: (r.nome as string) || 'Número', numero: (r.numero as string) || null,
+          iaEnabled: !!r.ia_enabled, iaModoTeste: r.ia_modo_teste !== false,
+          numerosTeste: Array.isArray(r.numeros_teste) ? (r.numeros_teste as string[]) : [], agenteId: (r.ia_agente_id as string) || null, fluxoId: null,
+        }));
+      }
       const { data, error } = await supabase!
         .from('canais')
         .select('id, nome_interno, numero_conectado, bot_canal_config(ia_enabled, ia_modo_teste, ia_agente_id, ia_fluxo_id, numeros_teste)')

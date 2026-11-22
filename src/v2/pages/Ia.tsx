@@ -43,7 +43,7 @@ const ABAS_IRIS: readonly { id: AbaIris; rotulo: string }[] = [
   { id: 'geral', rotulo: 'Visão geral' },
   { id: 'atende', rotulo: 'Como ela atende' },
   { id: 'sabe', rotulo: 'O que ela sabe' },
-  { id: 'horarios', rotulo: 'Horários e retorno' },
+  { id: 'horarios', rotulo: 'Horários e limite' },
   { id: 'conexao', rotulo: 'Chave e números' },
 ];
 type MsgChat = { de: 'cliente' | 'ia'; texto: string; bloqueada?: boolean };
@@ -779,6 +779,7 @@ export default function Ia() {
                 <Campo rotulo="Fim" type="time" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} />
               </div>
             )}
+            {!isRevizaMode && (<>
             <LinhaToggle
               titulo="Follow-up automático"
               descricao="Se o cliente some, a IA retoma com até 3 toques em horários saudáveis."
@@ -788,6 +789,7 @@ export default function Ia() {
               <Campo rotulo="Contato proativo — a partir de" type="time" value={janelaInicio} onChange={(e) => setJanelaInicio(e.target.value)} />
               <Campo rotulo="Contato proativo — até" type="time" value={janelaFim} onChange={(e) => setJanelaFim(e.target.value)} />
             </div>
+            </>)}
             <div className="ia-2col ia-sub">
               <Campo rotulo="Limite de chamadas de IA por dia (por canal)" type="number" min={1}
                 value={maxDia} onChange={(e) => setMaxDia(e.target.value)} />
@@ -795,7 +797,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Avançado ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.26} data-aba="conexao">
+          <CardVidro sobe className="ia-card" atraso={0.26} data-aba="conexao" data-fora-do-reviza>
             <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">opcional</span>} />
             <p className="ia-hint">
               Vazio = o motor decide (usa o modelo principal e sobe automático em casos complexos). Preencha só
