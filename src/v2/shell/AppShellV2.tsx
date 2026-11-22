@@ -197,7 +197,7 @@ const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
 const CFG_GRUPOS: GrupoNav[] = [
   { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }, { slug: 'config/integracoes', rotulo: 'Integrações', admin: true }] },
   { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
-  { rotulo: 'Atendimento', itens: [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] },
+  { rotulo: 'Atendimento', itens: [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }, { slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] },
   { rotulo: 'Minha conta', itens: [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] },
 ];
 // Reviza: "Configurações" sai do pé do menu do Atendimento — virou o ambiente
@@ -1222,6 +1222,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
                 : areaBloqueada ? <Navigate to={homeDaPessoa} replace />
                 /* Registros e Usuários mudaram de endereço: o link antigo leva ao ambiente Configurações */
+                : isRevizaMode && /^\/ia\/?$/.test(location.pathname) ? <Navigate to="/config/iris" replace />
                 : isRevizaMode && /^\/cobrancas\/(registros|usuarios)\/?$/.test(location.pathname) ? <Navigate to={`/config/${location.pathname.split('/')[2]}`} replace />
                 : moduloAtivo === 'configuracoes' && /^\/config\/?$/.test(location.pathname) ? <Navigate to={inicioDoModulo(MOD_CONFIG)} replace />
                 : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />

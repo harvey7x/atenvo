@@ -7,9 +7,11 @@
                    do WhatsApp                                                                  (admin)
      usuarios      logins: criar, papel, ambientes, telas liberadas, senha, desativar, excluir  (admin)
      registros     tudo o que cada pessoa fez (a tela que ficava em Cobranças)                  (admin)
+     iris          a atendente virtual: chave do Google, personalidade, conhecimento, canais    (admin)
      atendimento   regras e etiquetas do Atendimento                                            (admin)
      conta · notificacoes · preferencias      o que é da própria pessoa                         (todos)
    As quatro últimas são as seções da tela de Configurações de antes, uma por vez (abaFixa). */
+import { lazy, Suspense } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { isRevizaMode } from '@/lib/supabase';
@@ -20,10 +22,12 @@ import { ConfigWhatsApp } from './ConfigWhatsApp';
 import { ConfigIntegracoes } from './ConfigIntegracoes';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
+// a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
+const Iris = lazy(() => import('../Ia'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'registros', 'atendimento']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'registros', 'atendimento', 'iris']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -59,6 +63,7 @@ export default function ConfigAmbiente() {
   }
   if (secao === 'usuarios') return (<><Cabecalho titulo="Usuários e acessos" sub="Quem entra no sistema, em quais ambientes e quais telas cada pessoa vê." /><AbaUsuarios demo={false} gestor={admin} /></>);
   if (secao === 'registros') return (<><Cabecalho titulo="Registros" sub="Tudo o que cada pessoa fez no sistema: quem, o quê, quando e o que mudou." /><RevizaRegistros /></>);
+  if (secao === 'iris') return <Suspense fallback={null}><Iris /></Suspense>;
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={admin ? '/config/whatsapp' : '/config/conta'} replace />;
 }

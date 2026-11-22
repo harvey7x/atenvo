@@ -163,3 +163,8 @@
 .v2 .cfgo-tab td:not(:first-child) .pn-us-amb-tx { display: inline-block; line-height: 22px; }
 /* botão sozinho num campo da janela: do tamanho do texto, não esticado de ponta a ponta */
 .v2 .p-modal .pn-us-campo > .p-btn { align-self: flex-start; }
+
+/* ---- Iris (a tela de atendente de IA dentro do ambiente Configurações, 22/11) ---- */
+/* o título de cada cartão na mesma régua do conteúdo (o cabeçalho tinha um recuo próprio a mais) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ia-pagina .ia-card > .card-cab { padding: 0 0 12px; }
+.v2 .ia-pagina .ph h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }

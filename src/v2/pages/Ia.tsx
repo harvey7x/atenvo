@@ -17,6 +17,7 @@
    Em modo demo (ou sem Supabase) tudo roda em estado local, clicável.
    ============================================================================ */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { isRevizaMode } from '@/lib/supabase';
 import './ia.css';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, Campo, CardVidro, CardCab,
@@ -488,20 +489,21 @@ export default function Ia() {
     <div className="ia-pagina">
       <div className="ph sobe">
         <div>
-          <h1>Atendente de IA</h1>
-          <p>Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.</p>
+          {/* Reviza: a tela mora no ambiente Configurações com o nome da casa (dono 22/11); sem enfeite nos botões */}
+          <h1>{isRevizaMode ? 'Iris, atendente virtual' : 'Atendente de IA'}</h1>
+          <p>{isRevizaMode ? 'A atendente de IA do Atendimento: a chave do Google da empresa, a personalidade, o que ela sabe e em quais números ela atende.' : 'Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.'}</p>
         </div>
         <div className="fx-topo-acoes">
           <input ref={fileRef} type="file" accept=".json,application/json" className="fx-import-inp"
             onChange={aoEscolherArquivo} aria-hidden="true" tabIndex={-1} />
           <BotaoSec onClick={() => fileRef.current?.click()} disabled={importarAgente.isPending}>
-            {importarAgente.isPending ? 'Importando…' : '↧ Importar atendente'}
+            {importarAgente.isPending ? 'Importando…' : isRevizaMode ? 'Importar configuração' : '↧ Importar atendente'}
           </BotaoSec>
-          {agente && <BotaoSec onClick={aoExportar}>↥ Exportar</BotaoSec>}
+          {agente && <BotaoSec onClick={aoExportar}>{isRevizaMode ? 'Exportar configuração' : '↥ Exportar'}</BotaoSec>}
           {agente && (
             <BotaoSec onClick={() => { chatSessaoRef.current++; setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
               title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
-              💬 Experimentar
+              {isRevizaMode ? 'Conversar para testar' : '💬 Experimentar'}
             </BotaoSec>
           )}
         </div>
@@ -544,7 +546,7 @@ export default function Ia() {
                 <span className="ia-agente-nome">{a.nome}</span>
                 <span className="ia-agente-meta">
                   {a.ativo ? <BadgeStatus tom="ok">ativo</BadgeStatus> : <BadgeStatus tom="neutro">pausado</BadgeStatus>}
-                  <span className="ia-hint">{canais.filter((c) => c.agenteId === a.id).length} canal(is)</span>
+                  <span className="ia-hint">{((n) => `${n} ${n === 1 ? 'canal' : 'canais'}`)(canais.filter((c) => c.agenteId === a.id).length)}</span>
                 </span>
               </button>
             ))}
