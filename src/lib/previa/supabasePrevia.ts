@@ -476,6 +476,16 @@ export function criarSupabasePrevia() {
         return { conta };
       }
       if (!k.conectado) return { error: 'nao_conectado' };
+      if (b.acao === 'gerar_cobranca') {
+        // na prévia nenhuma cobrança é criada: devolve um link de demonstração com a meia parcela do cliente
+        const pv = (b.previa ?? {}) as Linha;
+        const [ano, mes] = String(b.comp ?? '').split('-').map(Number);
+        const hoje = new Date(); const venc = new Date(ano || hoje.getFullYear(), (mes || hoje.getMonth() + 1) - 1, 10);
+        const data = (venc < hoje ? hoje : venc).toISOString().slice(0, 10);
+        const valor = Math.round(((Number(pv.valor) || 0) / 2) * 100) / 100;
+        registrar('gerou', 'cobrança', String(pv.nome ?? 'cliente'), `cobrança pelo Asaas de R$ ${valor.toFixed(2).replace('.', ',')}, vencimento ${data.split('-').reverse().join('/')}`);
+        return { link: `https://reviza.exemplo/pagar/${String(b.lead_id).slice(0, 8)}-${b.comp}`, valor, vencimento: data, ja_existia: false };
+      }
       if (b.acao === 'testar') return { conta: k.conta };
       if (b.acao === 'reativar_retorno') { k.retorno_ativo = true; salvarInteg(); registrar('alterou', 'integração', 'Asaas', 'religou o retorno dos pagamentos'); return { ok: true }; }
       if (b.acao === 'salvar') {

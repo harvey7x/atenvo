@@ -10,10 +10,11 @@ import { useEffect, useState } from 'react';
 import { isPrevia } from '@/lib/supabase';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, ConfirmDialogV2, EstadoErro, LinhaToggle, ModalV2, Segmentado } from '../../components';
 import {
-  FORMAS, ROTULO_AMBIENTE_ASAAS, ambienteDaChave, chaveInvalida, useAsaas, useConectarAsaas, useDesconectarAsaas, useReativarRetornoAsaas, useSalvarAsaas, useTestarAsaas,
+  FORMAS, ROTULO_AMBIENTE_ASAAS, ambienteDaChave, chaveInvalida, useAsaas, useConectarAsaas, useDesconectarAsaas, useGerarCobrancaAsaas, useReativarRetornoAsaas, useSalvarAsaas, useTestarAsaas,
   type AmbienteAsaas, type ConfigAsaas, type IntegracaoAsaas,
 } from '../../data/config/integracoes';
 import { IcPagamentos } from './ConfigIntegracoes';
+import { useDadosCobranca } from '../../data/cobranca/hooks';
 import '../painel/painel.css';
 
 const DESC_AMBIENTE: Record<AmbienteAsaas, string> = {
@@ -200,6 +201,8 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
         </div>
       </CardVidro>
 
+      <GerarCobranca aoAvisar={aoAvisar} mudou={mudou} />
+
       <div className="cfgi-duas">
         <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.04s' }}>
           <div className="pn-card-cab"><div><h3>Como o cliente paga</h3><p>Cada cobrança sai com uma forma de pagamento.</p></div></div>
@@ -280,6 +283,78 @@ function Conectado({ dados, aoAvisar }: { dados: IntegracaoAsaas; aoAvisar: Avis
         mensagem="O sistema para de gerar cobranças e de receber os avisos de pagamento. As cobranças que já existem continuam no Asaas, e as regras ficam guardadas para quando você conectar de novo."
         aoConfirmar={() => void sair()} aoCancelar={() => setJanela(null)} />
     </>
+  );
+}
+
+/* ---------------- gerar a cobrança de uma parcela ---------------- */
+const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const rotuloComp = (c: string) => { const [a, m] = c.split('-'); return `${MES[Number(m) - 1] ?? m}/${a}`; };
+const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dataBr = (iso: string) => iso.split('-').reverse().join('/');
+function compsProximos(): string[] {
+  const d = new Date(); const l: string[] = [];
+  for (let k = -1; k <= 2; k++) { const x = new Date(d.getFullYear(), d.getMonth() + k, 1); l.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`); }
+  return l;
+}
+
+function GerarCobranca({ aoAvisar, mudou }: { aoAvisar: Avisar; mudou: boolean }) {
+  const dados = useDadosCobranca();
+  const gerar = useGerarCobrancaAsaas();
+  const comps = compsProximos();
+  const [busca, setBusca] = useState('');
+  const [leadId, setLeadId] = useState('');
+  const [comp, setComp] = useState(comps[1]);
+  const [feita, setFeita] = useState<{ nome: string; link: string | null; valor: number; vencimento: string; jaExistia: boolean } | null>(null);
+  const [erro, setErro] = useState('');
+  const termo = busca.trim().toLowerCase();
+  const clientes = (dados.data?.linhas ?? []).filter((l) => !termo || l.nome.toLowerCase().includes(termo)).slice(0, 40);
+  const escolhido = (dados.data?.linhas ?? []).find((l) => l.id === leadId);
+  const fazer = async () => {
+    if (!escolhido) { setErro('Escolha o cliente.'); return; }
+    setErro(''); setFeita(null);
+    try {
+      const r = await gerar.mutateAsync({ leadId: escolhido.id, comp, previa: { nome: escolhido.nome, valor: escolhido.valor } });
+      setFeita({ nome: escolhido.nome, ...r });
+    } catch (x) { setErro((x as Error)?.message || 'O Asaas não gerou a cobrança. Tente de novo.'); }
+  };
+  const copiar = async () => {
+    if (!feita?.link) return;
+    try { await navigator.clipboard.writeText(feita.link); aoAvisar('Link de pagamento copiado.'); }
+    catch { aoAvisar('Não consegui copiar sozinho. Selecione o link e copie.', 'erro'); }
+  };
+  return (
+    <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.02s' }} data-gerar-cobranca>
+      <div className="pn-card-cab"><div><h3>Gerar uma cobrança</h3><p>Cria no Asaas a cobrança de uma parcela e devolve o link de pagamento. O valor é a meia parcela do cliente.</p></div></div>
+      <div className="cfgi-gerar">
+        <div className="pn-us-campo">
+          <label htmlFor="asaas-busca">Cliente</label>
+          <input id="asaas-busca" className="inp" value={busca} placeholder="Digite o nome para filtrar" onChange={(e) => { setBusca(e.target.value); setErro(''); }} />
+          <select id="asaas-cliente" className="inp" aria-label="Cliente" value={leadId} onChange={(e) => { setLeadId(e.target.value); setErro(''); setFeita(null); }}>
+            <option value="">{dados.isLoading ? 'Carregando os clientes…' : clientes.length ? 'Escolha o cliente' : 'Nenhum cliente com esse nome'}</option>
+            {clientes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+          </select>
+        </div>
+        <div className="pn-us-campo">
+          <label htmlFor="asaas-comp">Parcela de</label>
+          <select id="asaas-comp" className="inp" value={comp} onChange={(e) => { setComp(e.target.value); setFeita(null); }}>
+            {comps.map((c) => <option key={c} value={c}>{rotuloComp(c)}</option>)}
+          </select>
+          <span className="pn-us-dica">{escolhido ? `Vai cobrar ${reais((escolhido.valor || 0) / 2)}, a meia parcela de ${escolhido.nome}.` : 'O vencimento é o do ciclo do cliente nesse mês.'}</span>
+        </div>
+        <div className="cfgi-gerar-acao">
+          <BotaoPrimario disabled={gerar.isPending || mudou} onClick={() => void fazer()}>{gerar.isPending ? 'Gerando…' : 'Gerar cobrança'}</BotaoPrimario>
+        </div>
+      </div>
+      {mudou && <span className="pn-us-dica">Salve as regras antes de gerar: a cobrança sai com as regras salvas.</span>}
+      {erro && <span className="pn-us-erro" role="alert">{erro}</span>}
+      {feita && (
+        <div className="cfgi-feita" role="status">
+          <div><b>{feita.jaExistia ? 'Este cliente já tinha uma cobrança aberta nesse mês' : 'Cobrança gerada'}</b>
+            <span className="num">{feita.nome} · {reais(feita.valor)} · vence em {dataBr(feita.vencimento)}</span></div>
+          {feita.link ? <><code className="cfgi-link-pg">{feita.link}</code><BotaoSec onClick={() => void copiar()}>Copiar link</BotaoSec></> : <span className="pn-us-dica">O Asaas não devolveu o link. Veja a cobrança no painel do Asaas.</span>}
+        </div>
+      )}
+    </CardVidro>
   );
 }
 

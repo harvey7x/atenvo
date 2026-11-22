@@ -14,6 +14,10 @@
        salvar {config}              grava as regras
        desconectar                  apaga a chave e remove o retorno dos pagamentos
        reativar_retorno             religa o retorno dos pagamentos quando o Asaas o pausou
+       gerar_cobranca {lead_id, comp}   cria no Asaas o cliente (pelo CPF) e a cobrança da parcela, com a
+                                    meia parcela e o vencimento do ciclo; devolve o link de pagamento.
+                                    Quem pode: qualquer pessoa ativa que enxergue o cliente
+   · função `reviza-asaas-retorno`: recebe o aviso de pagamento e dá a baixa no Financeiro
    A CHAVE DE API nunca volta para a tela nem fica na tabela: só os 4 últimos caracteres, para a
    pessoa reconhecer qual chave está em uso.
 
@@ -33,7 +37,7 @@
      mesmo evento pode chegar mais de uma vez (usar o id); 15 falhas seguidas pausam a fila
    ===================================================================== */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { isPrevia, supabase } from '@/lib/supabase';
 
 export type AmbienteAsaas = 'producao' | 'testes';
 /** a forma de pagamento da cobrança — no Asaas é UMA por cobrança ('escolhe' = o cliente decide na hora) */
@@ -182,5 +186,15 @@ export const useConectarAsaas = () => useAcao((v: { ambiente: AmbienteAsaas; cha
 export const useTestarAsaas = () => useAcao((_: void) => ({ acao: 'testar' }));
 export const useSalvarAsaas = () => useAcao((config: ConfigAsaas) => ({ acao: 'salvar', config }));
 export const useDesconectarAsaas = () => useAcao((_: void) => ({ acao: 'desconectar' }));
+export interface CobrancaAsaas { link: string | null; valor: number; vencimento: string; jaExistia: boolean }
+/** gera (ou devolve a que já está aberta) a cobrança de uma parcela: cliente + competência 'AAAA-MM' */
+export function useGerarCobrancaAsaas() {
+  return useMutation({
+    mutationFn: async (v: { leadId: string; comp: string; previa?: { nome: string; valor: number } }): Promise<CobrancaAsaas> => {
+      const r = await chamar({ acao: 'gerar_cobranca', lead_id: v.leadId, comp: v.comp, ...(isPrevia && v.previa ? { previa: v.previa } : {}) });
+      return { link: r.link ? String(r.link) : null, valor: Number(r.valor) || 0, vencimento: String(r.vencimento ?? ''), jaExistia: !!r.ja_existia };
+    },
+  });
+}
 /** o Asaas pausa o retorno depois de 15 falhas seguidas; isto religa e os avisos pendentes voltam a chegar */
 export const useReativarRetornoAsaas = () => useAcao((_: void) => ({ acao: 'reativar_retorno' }));

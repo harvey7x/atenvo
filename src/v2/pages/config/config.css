@@ -220,3 +220,14 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 .v2 .ia-wrap[data-aba-ativa="sabe"] > [data-aba="sabe"],
 .v2 .ia-wrap[data-aba-ativa="horarios"] > [data-aba="horarios"],
 .v2 .ia-wrap[data-aba-ativa="conexao"] > [data-aba="conexao"] { display: flex; }
+
+/* ---- Asaas: gerar a cobrança de uma parcela (22/11) ---- */
+.v2 .cfgi-gerar { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.v2 .cfgi-gerar .pn-us-campo .inp + .inp { margin-top: 2px; }
+.v2 .cfgi-gerar-acao { padding-top: 24px; }
+.v2 .cfgi-feita { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgi-feita > div { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2 .cfgi-feita b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgi-feita span { font-size: 12.5px; color: var(--txt-2); }
+.v2 .cfgi-link-pg { flex: 1 1 280px; min-width: 0; padding: 7px 10px; border-radius: 8px; font: inherit; font-size: 12px; color: var(--txt); background: rgba(var(--tint), .06); border: 1px solid var(--lin-fio, var(--linha)); overflow-wrap: anywhere; user-select: all; }
+@media (max-width: 900px) { .v2 .cfgi-gerar { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-gerar-acao { padding-top: 0; } }

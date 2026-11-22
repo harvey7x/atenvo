@@ -68,13 +68,15 @@ Deno.serve(async (req) => {
     const uid = u?.user?.id;
     if (!uid) return json({ error: 'nao autenticado' }, 401);
     const { data: perfil } = await comoPessoa.from('profiles').select('papel, ativo, nome').eq('id', uid).maybeSingle();
-    if (!perfil || !perfil.ativo || perfil.papel !== 'admin') return json({ error: 'sem permissao' }, 403);
+    if (!perfil || !perfil.ativo) return json({ error: 'sem permissao' }, 403);
 
     const body = await req.json().catch(() => ({}));
     const acao = String(body.acao ?? '');
+    // configurar a integração é só do administrador; gerar a cobrança de um cliente é de quem enxerga o cliente
+    if (acao !== 'gerar_cobranca' && perfil.papel !== 'admin') return json({ error: 'sem permissao' }, 403);
     const db = createClient(url, service, { auth: { persistSession: false } });
     const registrar = (acaoReg: string, detalhe: string, mudancas: unknown[] = []) =>
-      db.from('registros').insert({ ator_id: uid, ator_nome: perfil.nome || '—', ator_papel: 'admin', acao: acaoReg, entidade: 'integração', entidade_id: 'asaas', rotulo: 'Asaas', detalhe, mudancas });
+      db.from('registros').insert({ ator_id: uid, ator_nome: perfil.nome || '—', ator_papel: perfil.papel, acao: acaoReg, entidade: 'integração', entidade_id: 'asaas', rotulo: 'Asaas', detalhe, mudancas });
     const segredo = async (nome: string) => { const { data } = await db.rpc('integracao_segredo_ler', { p_nome: nome }); return typeof data === 'string' && data ? data : null; };
     const guardar = (nome: string, valor: string) => db.rpc('integracao_segredo_gravar', { p_nome: nome, p_valor: valor });
     const apagar = (nome: string) => db.rpc('integracao_segredo_apagar', { p_nome: nome });
@@ -127,6 +129,62 @@ Deno.serve(async (req) => {
     if (!linha?.conectado) return json({ error: 'nao_conectado' });
     const chave = await segredo(SEG.chave);
     const amb = (linha.ambiente === 'testes' ? 'testes' : 'producao') as Ambiente;
+
+    if (acao === 'gerar_cobranca') {
+      if (!chave) return json({ error: 'nao_conectado' });
+      const leadId = String(body.lead_id ?? ''), comp = String(body.comp ?? '');
+      if (!leadId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(comp)) return json({ error: 'Informe o cliente e o mês da parcela.' });
+      // o cliente é lido COMO A PESSOA: só gera cobrança de quem ela enxerga
+      const { data: lead } = await comoPessoa.from('leads').select('id, nome, cpf, valor, dia, telefone').eq('id', leadId).maybeSingle();
+      if (!lead) return json({ error: 'Cliente não encontrado.' });
+      const { data: aberta } = await db.from('asaas_cobrancas').select('link, valor, vencimento, forma').eq('lead_id', leadId).eq('comp', comp).eq('status', 'aberta').maybeSingle();
+      if (aberta) return json({ ...aberta, ja_existia: true });
+      const cpf = String(lead.cpf ?? '').replace(/\D/g, '');
+      if (cpf.length !== 11 && cpf.length !== 14) return json({ error: `O Asaas exige o CPF do cliente. Preencha o CPF de ${lead.nome} na Gestão.` });
+      const valor = Math.round((Number(lead.valor) / 2) * 100) / 100;   // dinheiro é sempre a meia parcela
+      if (!(valor > 0)) return json({ error: `${lead.nome} está sem o valor da parcela na Gestão.` });
+      // vencimento: a data de cobrança do ciclo naquele mês; sem ela, o dia do ciclo; nunca no passado
+      const [ano, mes] = comp.split('-').map(Number);
+      const { data: ciclo } = await db.from('ciclos_datas').select('cobranca').eq('dia', lead.dia ?? 0).eq('comp', comp).maybeSingle();
+      const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+      const padrao = `${comp}-${String(Math.min(Math.max(Number(lead.dia) || 1, 1), ultimoDia)).padStart(2, '0')}`;
+      const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);   // dia de Brasília
+      const pedido = ciclo?.cobranca ? String(ciclo.cobranca).slice(0, 10) : padrao;
+      const vencimento = pedido < hoje ? hoje : pedido;
+      const cfg = lerConfig(linha.config);
+
+      // o cliente no Asaas: o que já ligamos; senão procura pelo CPF (a API aceita repetido); senão cria
+      let customer: string | null = null;
+      const { data: ligado } = await db.from('asaas_clientes').select('customer_id').eq('lead_id', leadId).maybeSingle();
+      if (ligado) customer = ligado.customer_id;
+      if (!customer) {
+        const busca = await asaas(amb, chave, 'GET', `/customers?cpfCnpj=${cpf}&limit=1`);
+        if (!busca.ok) return json({ error: ERRO_DA_CHAVE[busca.codigo ?? ''] ?? `O Asaas não respondeu à busca do cliente (${busca.codigo}).` });
+        const achado = Array.isArray(busca.dados.data) ? (busca.dados.data as { id?: string }[])[0] : undefined;
+        customer = achado?.id ?? null;
+        if (!customer) {
+          const tel = String(lead.telefone ?? '').replace(/\D/g, '').replace(/^55/, '');
+          const novo = await asaas(amb, chave, 'POST', '/customers', { name: lead.nome, cpfCnpj: cpf, ...(tel.length >= 10 ? { mobilePhone: tel } : {}), externalReference: leadId, notificationDisabled: !cfg.avisosAsaas });
+          if (!novo.ok || !novo.dados.id) return json({ error: `O Asaas não aceitou o cadastro do cliente (${novo.codigo}).` });
+          customer = String(novo.dados.id);
+        }
+        await db.from('asaas_clientes').upsert({ lead_id: leadId, customer_id: customer });
+      }
+      const TIPO: Record<string, string> = { escolhe: 'UNDEFINED', pix: 'PIX', boleto: 'BOLETO', cartao: 'CREDIT_CARD' };
+      const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+      const pg = await asaas(amb, chave, 'POST', '/payments', {
+        customer, billingType: TIPO[cfg.forma], value: valor, dueDate: vencimento, description: `Parcela de ${MESES[mes - 1]} de ${ano}`,
+        externalReference: `${leadId}:${comp}`,
+        // multa e juros só vão quando definidos aqui; senão vale o que está configurado na conta do Asaas
+        ...(cfg.atraso === 'aqui' ? { fine: { value: cfg.multa }, interest: { value: cfg.juros } } : {}),
+      });
+      if (!pg.ok || !pg.dados.id) return json({ error: `O Asaas não gerou a cobrança (${pg.codigo}).` });
+      const nova = { lead_id: leadId, comp, payment_id: String(pg.dados.id), valor, vencimento, forma: cfg.forma, link: pg.dados.invoiceUrl ? String(pg.dados.invoiceUrl) : null, criado_por: uid, criado_por_nome: perfil.nome || '—' };
+      const { error } = await db.from('asaas_cobrancas').insert(nova);
+      if (error) return json({ error: `A cobrança foi criada no Asaas (${nova.payment_id}), mas não foi gravada no sistema: ${error.message}` }, 400);
+      await db.from('registros').insert({ ator_id: uid, ator_nome: perfil.nome || '—', ator_papel: perfil.papel, acao: 'gerou', entidade: 'cobrança', entidade_id: leadId, rotulo: lead.nome, detalhe: `cobrança pelo Asaas de R$ ${valor.toFixed(2).replace('.', ',')} (${MESES[mes - 1]}/${ano}), vencimento ${vencimento.split('-').reverse().join('/')}` });
+      return json({ link: nova.link, valor, vencimento, forma: cfg.forma, ja_existia: false });
+    }
 
     if (acao === 'testar') {
       if (!chave) return json({ error: 'nao_conectado' });

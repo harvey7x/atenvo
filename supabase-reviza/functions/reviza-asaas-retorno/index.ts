@@ -1,6 +1,6 @@
 // reviza-asaas-retorno — recebe os avisos de pagamento do Asaas (webhook). Etapa 1 (22/11): confere o
 // segredo, guarda o aviso UMA vez (o Asaas pode repetir o mesmo aviso) e responde 200 na hora.
-// A baixa no Financeiro é a etapa 2: ela vai ler public.asaas_eventos onde processado_em é nulo.
+// Depois chama a baixa no banco (asaas_processar_evento, migration 88); aviso que falhar fica com processado_em nulo.
 // Publicar com verify_jwt = false: quem chama é o Asaas, e a prova é o cabeçalho asaas-access-token.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -28,7 +28,12 @@ Deno.serve(async (req) => {
     // "uma vez só": aviso repetido bate na chave primária e é ignorado
     await db.from('asaas_eventos').upsert({ id, tipo, pagamento_id: pagamento?.id ? String(pagamento.id) : null, corpo }, { onConflict: 'id', ignoreDuplicates: true });
     await db.from('integracoes').update({ ultimo_retorno: new Date().toISOString(), retorno_ativo: true }).eq('servico', 'asaas');
-    return ok();
+    // a baixa (etapa 2): uma transação só no banco. Se falhar, o aviso continua guardado sem "processado_em"
+    // e pode ser reprocessado; o Asaas recebe 200 de qualquer jeito, porque o aviso já está conosco.
+    let baixa: string | null = null;
+    try { const { data, error } = await db.rpc('asaas_processar_evento', { p_id: id }); baixa = error ? `falhou: ${error.message}` : String(data); }
+    catch (e) { baixa = `falhou: ${(e as Error)?.message}`; }
+    return ok({ ok: true, baixa });
   } catch (e) {
     // erro nosso: 500 faz o Asaas tentar de novo mais tarde
     return new Response(JSON.stringify({ error: (e as Error)?.message || 'erro' }), { status: 500, headers: { 'Content-Type': 'application/json' } });

@@ -16,6 +16,7 @@ const GRUPO: Record<string, string> = {
   // 22/11: os Registros foram para o ambiente Configurações e cobrem também o que se faz nele
   // (logins, acessos e números de WhatsApp) e no Atendimento
   usuário: 'Configurações', whatsapp: 'Configurações', integração: 'Configurações',
+  cobrança: 'Financeiro',
   conversa: 'Atendimento', 'card do Kanban': 'Atendimento',
 };
 const GRUPOS = ['Clientes', 'Financeiro', 'Comissões', 'Régua e envios', 'Avisos', 'Atendimento', 'Configurações'] as const;
