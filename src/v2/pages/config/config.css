@@ -168,3 +168,7 @@
 /* o título de cada cartão na mesma régua do conteúdo (o cabeçalho tinha um recuo próprio a mais) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ia-pagina .ia-card > .card-cab { padding: 0 0 12px; }
 .v2 .ia-pagina .ph h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+/* os botões do topo numa linha só, à direita; o texto da esquerda é que cede a largura */
+.v2 .ia-pagina .ph { align-items: flex-start; gap: 16px; }
+.v2 .ia-pagina .ph > div:first-child { flex: 1 1 0; min-width: 0; }
+.v2 .ia-pagina .ph .fx-topo-acoes { flex: none; flex-wrap: nowrap; }
