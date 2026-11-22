@@ -8,6 +8,7 @@
    - Gestor, Financeiro, Comercial, Cadastro: o que o administrador marcar — sem nada marcado
      (contas de antes dos ambientes), Cobranças. */
 
+import { temRecurso } from './config/recursos';
 export type Ambiente = 'cobrancas' | 'atendimento';
 export const AMBIENTES: readonly Ambiente[] = ['cobrancas', 'atendimento'];
 export const ROTULO_AMBIENTE: Record<Ambiente, string> = { cobrancas: 'Cobranças', atendimento: 'Atendimento' };
@@ -22,11 +23,17 @@ export function ambientesFixos(papel: string | null | undefined): Ambiente[] | n
 }
 
 /** os ambientes que um usuário enxerga, a partir do papel e da lista gravada no perfil */
+/** sem o Atendimento no servidor desta instalação, ninguém recebe esse ambiente (ver config/recursos.ts) */
+const soOQueExiste = (l: Ambiente[]): Ambiente[] => {
+  if (temRecurso('atendimento')) return l;
+  const f = l.filter((a) => a !== 'atendimento');
+  return f.length ? f : ['cobrancas'];
+};
 export function ambientesDoPerfil(papel: string | null | undefined, modulos: unknown): Ambiente[] {
   const fixos = ambientesFixos(papel);
-  if (fixos) return fixos;
+  if (fixos) return soOQueExiste(fixos);
   const lista = Array.isArray(modulos) ? AMBIENTES.filter((a) => (modulos as unknown[]).some((m) => ehAmbiente(m) && m === a)) : [];
-  return lista.length ? lista : ['cobrancas'];
+  return soOQueExiste(lista.length ? lista : ['cobrancas']);
 }
 
 /** liga/desliga um ambiente na lista (nunca deixa vazia: sem nenhum, a pessoa não entraria em nada) */

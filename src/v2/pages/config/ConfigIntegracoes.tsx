@@ -12,6 +12,7 @@ import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro } from '../../component
 import { ROTULO_AMBIENTE_ASAAS, useAsaas } from '../../data/config/integracoes';
 import { useConexoesWA } from '../../data/config/conexoes';
 import { useOficial } from '../../data/config/oficial';
+import { temRecurso } from '../../data/config/recursos';
 import '../painel/painel.css';
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -51,9 +52,10 @@ function Quadro({ icone, nome, categoria, descricao, estado, detalhe, acao, atra
 
 export function ConfigIntegracoes() {
   const ir = useNavigate();
-  const asaas = useAsaas();
+  const temAsaas = temRecurso('asaas'), temOficial = temRecurso('wa-oficial');
+  const asaas = useAsaas(temAsaas);
   const wa = useConexoesWA();
-  const oficial = useOficial();
+  const oficial = useOficial(temOficial);
   const ofN = oficial.dados.numeros.length;
   const ofModelos = oficial.dados.modelos.filter((m) => m.situacao === 'aprovado').length;
   const a = asaas.dados;
@@ -65,13 +67,13 @@ export function ConfigIntegracoes() {
       <div className="cfgi-grade">
         <Quadro atraso={0} icone={<IcPagamentos />} nome="Asaas" categoria="Pagamentos"
           descricao="Gera a cobrança de cada parcela por Pix, boleto ou cartão e dá baixa sozinho quando o cliente paga."
-          estado={a.conectado ? 'conectado' : 'desconectado'}
-          detalhe={asaas.carregando ? 'Consultando…' : a.conectado ? `${a.conta?.nome ?? 'Conta conectada'} · ${ROTULO_AMBIENTE_ASAAS[a.ambiente ?? 'producao']}` : undefined}
-          acao={a.conectado
+          estado={!temAsaas ? 'breve' : a.conectado ? 'conectado' : 'desconectado'}
+          detalhe={!temAsaas ? undefined : asaas.carregando ? 'Consultando…' : a.conectado ? `${a.conta?.nome ?? 'Conta conectada'} · ${ROTULO_AMBIENTE_ASAAS[a.ambiente ?? 'producao']}` : undefined}
+          acao={!temAsaas ? undefined : a.conectado
             ? <BotaoSec mini onClick={() => ir('/config/integracoes/asaas')}>Configurar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/integracoes/asaas')}>Conectar</BotaoPrimario>} />
         <Quadro atraso={0.04} icone={<IcMensagem />} nome="WhatsApp por QR Code" categoria="Mensagens"
-          descricao="Os números conectados por QR Code: os da régua de Cobranças e os que recebem o Atendimento."
+          descricao={temRecurso('atendimento') ? 'Os números conectados por QR Code: os da régua de Cobranças e os que recebem o Atendimento.' : 'Os números conectados por QR Code, um por comercial: é por eles que a régua de Cobranças envia.'}
           estado={waOn > 0 ? 'conectado' : 'desconectado'}
           detalhe={wa.carregando ? 'Consultando…' : waTot ? `${waOn} de ${waTot} ${waTot === 1 ? 'número conectado' : 'números conectados'}` : undefined}
           acao={waTot
@@ -79,9 +81,9 @@ export function ConfigIntegracoes() {
             : <BotaoPrimario mini onClick={() => ir('/config/whatsapp')}>Conectar</BotaoPrimario>} />
         <Quadro atraso={0.08} icone={<IcOficial />} nome="WhatsApp oficial" categoria="Mensagens"
           descricao="A API oficial do WhatsApp, da Meta: o número não depende de celular ligado e envia por modelos de mensagem aprovados."
-          estado={ofN > 0 ? 'conectado' : 'desconectado'}
-          detalhe={oficial.carregando ? 'Consultando…' : ofN ? `${ofN} ${ofN === 1 ? 'número conectado' : 'números conectados'} · ${ofModelos} ${ofModelos === 1 ? 'modelo aprovado' : 'modelos aprovados'}` : undefined}
-          acao={ofN
+          estado={!temOficial ? 'breve' : ofN > 0 ? 'conectado' : 'desconectado'}
+          detalhe={!temOficial ? undefined : oficial.carregando ? 'Consultando…' : ofN ? `${ofN} ${ofN === 1 ? 'número conectado' : 'números conectados'} · ${ofModelos} ${ofModelos === 1 ? 'modelo aprovado' : 'modelos aprovados'}` : undefined}
+          acao={!temOficial ? undefined : ofN
             ? <BotaoSec mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Configurar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Conectar</BotaoPrimario>} />
         <Quadro atraso={0.12} icone={<IcAnuncio />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"

@@ -15,6 +15,7 @@ import {
   useMeuId, useResetarSenha, useUsuarios, type UsuarioRow,
 } from '../data/cobranca/usuarios';
 import type { Papel } from '../data/cobranca/types';
+import { temRecurso } from '../data/config/recursos';
 import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
 import { AREAS, areasPossiveis, resumoAreas } from '../data/config/areas';
 import { lerDesfazer, useDesfazerEstado } from '../data/desfazer';
@@ -24,7 +25,10 @@ import './painel/painel.css';
 const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
 // papéis por decisão do dono (11/09): comercial/financeiro/admin + cadastro; "gestor" só p/ exibir contas antigas
 // + atendente (11/11): quem trabalha só no Atendimento
-const PAPEIS: Papel[] = ['comercial', 'financeiro', 'cadastro', 'atendente', 'admin'];
+// o que esta instalação tem no servidor (config/recursos.ts): sem o Atendimento não há papel de atendente nem
+// escolha de ambiente; sem as telas por pessoa não há a coluna nem o campo de telas
+const TEM_ATD = temRecurso('atendimento'), TEM_TELAS = temRecurso('telas');
+const PAPEIS: Papel[] = TEM_ATD ? ['comercial', 'financeiro', 'cadastro', 'atendente', 'admin'] : ['comercial', 'financeiro', 'cadastro', 'admin'];
 const PAPEL_DESC: Record<Papel, string> = {
   comercial: 'Painel com os clientes dele, Novos, Gestão, Calendário, Régua, Conversas, Números e Envios. Vê só a própria carteira.',
   financeiro: 'Painel geral, Novos, Financeiro, Gestão, Atendentes e Avisos. Confere pagamentos e aprova o ciclo.',
@@ -213,8 +217,8 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                 <tr>
                   <th scope="col">Pessoa</th>
                   <th scope="col">Papel</th>
-                  <th scope="col">Ambientes</th>
-                  <th scope="col">Telas</th>
+                  {TEM_ATD && <th scope="col">Ambientes</th>}
+                  {TEM_TELAS && <th scope="col">Telas</th>}
                   <th scope="col">Situação</th>
                   <th scope="col"><span className="pn-vh">Ações</span></th>
                 </tr>
@@ -233,8 +237,8 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                         </span>
                       </td>
                       <td><span className="pn-us-papel-tx">{PAPEL_ROTULO[u.papel]}</span></td>
-                      <td><span className="pn-us-amb-tx">{ambientesTexto(u.papel, u.modulos)}</span></td>
-                      <td>{(() => { const r = resumoAreas(u.papel, ambientesDoPerfil(u.papel, u.modulos), u.areas); return <span className={r.restrito ? 'pn-us-amb-tx pn-us-telas-tx restrito' : 'pn-us-amb-tx pn-us-telas-tx'}>{r.texto}</span>; })()}</td>
+                      {TEM_ATD && <td><span className="pn-us-amb-tx">{ambientesTexto(u.papel, u.modulos)}</span></td>}
+                      {TEM_TELAS && <td>{(() => { const r = resumoAreas(u.papel, ambientesDoPerfil(u.papel, u.modulos), u.areas); return <span className={r.restrito ? 'pn-us-amb-tx pn-us-telas-tx restrito' : 'pn-us-amb-tx pn-us-telas-tx'}>{r.texto}</span>; })()}</td>}
                       <td>
                         {u.ativo ? <BadgeStatus tom="ok">Ativo</BadgeStatus> : <BadgeStatus tom="neutro">Desativado</BadgeStatus>}
                         {u.ativo && u.deve_trocar_senha && <span className="pn-us-1a">Aguardando o primeiro acesso</span>}
@@ -379,18 +383,18 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
             ))}
           </div>
         </div>
-        <div className="pn-us-campo">
+        {TEM_ATD && <div className="pn-us-campo">
           <span className="pn-us-rot">Ambientes</span>
           <Ambientes papel={papel} modulos={ambientes} aoMudar={setAmbientes} rotulo="Ambientes do novo usuário" />
           <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Marque onde a pessoa vai trabalhar: Cobranças, Atendimento ou os dois. É possível mudar depois, em Editar.'}</span>
-        </div>
-        <div className="pn-us-campo">
+        </div>}
+        {TEM_TELAS && <div className="pn-us-campo">
           <span className="pn-us-rot">Telas liberadas</span>
           {papel !== 'admin' && !escolherTelas
             ? <span className="pn-us-dica">Todas as telas do papel nos ambientes marcados. <button type="button" className="pn-link" onClick={() => setEscolherTelas(true)}>Escolher as telas</button></span>
             : <Telas papel={papel} ambientes={ambNovo} marcadas={telas} aoMudar={setTelas} />}
           {semTela && <span className="pn-us-erro">Marque pelo menos uma tela — sem nenhuma, a pessoa entra e não vê nada.</span>}
-        </div>
+        </div>}
         <div className="pn-us-campo">
           <span className="pn-us-rot">Senha inicial</span>
           <div className="pn-fin-seg" role="tablist" aria-label="Senha inicial">
@@ -478,18 +482,18 @@ function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
           )}
           {bloqueioPapel && <span className="pn-us-erro">{bloqueioPapel}</span>}
         </div>
-        <div className="pn-us-campo">
+        {TEM_ATD && <div className="pn-us-campo">
           <span className="pn-us-rot">Ambientes</span>
           <Ambientes papel={papel} modulos={ambientes} aoMudar={trocarAmbientes} rotulo={`Ambientes de ${u.nome}`}
             travado={souEu && !ambientesFixos(papel) ? 'Você não pode mudar os seus próprios ambientes' : undefined} />
           <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Onde a pessoa trabalha: Cobranças, Atendimento ou os dois.'}</span>
-        </div>
-        <div className="pn-us-campo">
+        </div>}
+        {TEM_TELAS && <div className="pn-us-campo">
           <span className="pn-us-rot">Telas liberadas</span>
           <Telas papel={papel} ambientes={ambFinal} marcadas={telas} aoMudar={setTelas} />
           {papel !== 'admin' && <span className="pn-us-dica">O papel define até onde a pessoa pode ir; aqui você tira as telas que ela não precisa ver. Vale na hora.</span>}
           {semTela && <span className="pn-us-erro">Marque pelo menos uma tela — sem nenhuma, a pessoa entra e não vê nada.</span>}
-        </div>
+        </div>}
       </div>
     </ModalV2>
   );

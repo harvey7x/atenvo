@@ -7,11 +7,12 @@
      empresa e alimenta o WhatsApp e o Kanban do Atendimento.
    Sem o banco do Atendimento (demonstração/prévia): os números dele ficam num armazém local desta aba.
    Nada aqui envia mensagem: só cria/renova a sessão (QR), desconecta e remove. */
+import { temRecurso } from './recursos';
 import { useMemo, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
 import { isPrevia, supabase } from '@/lib/supabase';
-import { WA_REAL, useWaCanais, waCreateInstance, waOcultar, waQr, waReconnect, waRemove, waStatus } from '@/data/whatsapp';
+import { WA_REAL, useWaCanais, waCreateInstance, waOcultar, waQr, waReconnect, waRemove, waStatus, type WaCanal } from '@/data/whatsapp';
 import { useCanaisWA, type CanalWA } from '../wa/wa';
 import { useUsuarios } from '../cobranca/usuarios';
 import type { Ambiente } from '../modulos';
@@ -78,10 +79,15 @@ const estadoCob = (c: CanalWA): EstadoConexao => (c.estado === 'conectado' ? 'co
 const estadoAtd = (s: string): EstadoConexao => (s === 'conectado' ? 'conectado' : s === 'sincronizando' || s === 'conectando' || s === 'aguardando_qr' ? 'conectando' : 'desconectado');
 
 /** os números dos dois ambientes numa lista só (problema primeiro: desconectado → conectando → conectado) */
+const TEM_ATD = temRecurso('atendimento');
+const SEM_ATD = { data: [] as WaCanal[], isLoading: false, isError: false, refetch: () => Promise.resolve() } as const;
 export function useConexoesWA() {
   const cobQ = useCanaisWA();
   const usuariosQ = useUsuarios(true);
-  const atdQ = useWaCanais();
+  // sem o Atendimento no servidor, a lista é só de Cobranças e a consulta dos números do Atendimento nem roda
+  // (TEM_ATD é fixo da instalação: o ramo nunca muda entre renders)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const atdQ = TEM_ATD ? useWaCanais() : SEM_ATD;
   const local = useSyncExternalStore(assinar, lerLocal, lerLocal);
   const lista = useMemo<ConexaoWA[]>(() => {
     const usuarios = usuariosQ.data ?? [];
@@ -92,7 +98,7 @@ export function useConexoesWA() {
         donoId: c.dono_id, semDono: !c.dono_id, ultimaAtividade: c.ultimo_evento_em ?? c.verificado_em, erro: c.ultimo_erro,
       };
     });
-    const atd: ConexaoWA[] = WA_REAL
+    const atd: ConexaoWA[] = !TEM_ATD ? [] : WA_REAL
       ? (atdQ.data ?? []).filter((c) => c.transporte !== 'cloud_api').map((c) => ({
         chave: `atendimento:${c.id}`, id: c.id, ambiente: 'atendimento', nome: c.alias, numero: c.numero, estado: estadoAtd(c.status),
         donoId: null, semDono: false, ultimaAtividade: c.conectadoEm, erro: null,
@@ -109,9 +115,9 @@ export function useConexoesWA() {
     /** o canal de Cobranças de verdade (com o QR) — a janela de conexão lê dele */
     canaisCob: cobQ.data ?? [],
     usuarios: usuariosQ.data ?? [],
-    carregando: cobQ.isLoading || usuariosQ.isLoading || (WA_REAL && atdQ.isLoading),
-    falhou: cobQ.isError || (WA_REAL && atdQ.isError),
-    recarregar: () => { void cobQ.refetch(); if (WA_REAL) void atdQ.refetch(); },
+    carregando: cobQ.isLoading || usuariosQ.isLoading || (TEM_ATD && WA_REAL && atdQ.isLoading),
+    falhou: cobQ.isError || (TEM_ATD && WA_REAL && atdQ.isError),
+    recarregar: () => { void cobQ.refetch(); if (TEM_ATD && WA_REAL) void atdQ.refetch(); },
   };
 }
 

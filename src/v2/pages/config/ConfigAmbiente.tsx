@@ -15,6 +15,7 @@ import { lazy, Suspense } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { isRevizaMode } from '@/lib/supabase';
+import { temRecurso } from '../../data/config/recursos';
 import ConfiguracoesV2 from '../Configuracoes';
 import { AbaUsuarios } from '../RevizaUsuarios';
 import { RevizaRegistros } from '../RevizaRegistros';
@@ -51,8 +52,16 @@ export default function ConfigAmbiente() {
   const admin = currentOrg.role === 'admin';
   // o ambiente é da Reviza; fora dela este endereço não existe
   if (!isRevizaMode) return <Navigate to="/configuracoes" replace />;
-  if (!secao) return <Navigate to={admin ? '/config/whatsapp' : '/config/conta'} replace />;
-  if (SO_ADMIN.has(secao) && !admin) return <Navigate to="/config/conta" replace />;
+  // "Minha conta" (conta, notificações, preferências) são telas do Atendimento: sem ele no servidor, quem
+  // não é administrador não tem o que fazer neste ambiente e volta para o trabalho
+  const temConta = temRecurso('atendimento');
+  const foraDaqui = admin ? '/config/whatsapp' : temConta ? '/config/conta' : '/cobrancas/painel';
+  if (!secao) return <Navigate to={foraDaqui} replace />;
+  if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
+  if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
+  // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento'))) return <Navigate to="/config/whatsapp" replace />;
+  if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub="Os números conectados ao sistema e para qual ambiente cada um trabalha." /><ConfigWhatsApp /></>);
   if (secao === 'integracoes') {
@@ -65,5 +74,5 @@ export default function ConfigAmbiente() {
   if (secao === 'registros') return (<><Cabecalho titulo="Registros" sub="Tudo o que cada pessoa fez no sistema: quem, o quê, quando e o que mudou." /><RevizaRegistros /></>);
   if (secao === 'iris') return <Suspense fallback={null}><Iris /></Suspense>;
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
-  return <Navigate to={admin ? '/config/whatsapp' : '/config/conta'} replace />;
+  return <Navigate to={foraDaqui} replace />;
 }

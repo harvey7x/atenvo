@@ -142,8 +142,8 @@ async function chamar(body: Record<string, unknown>): Promise<Record<string, unk
   if (corpo.error) throw new Error(MSG[String(corpo.error)] ?? String(corpo.error));
   return corpo;
 }
-export function useOficial() {
-  const q = useQuery({ queryKey: CHAVE, queryFn: async () => lerConta(await chamar({ acao: 'situacao' })), staleTime: 30_000 });
+export function useOficial(ligado = true) {
+  const q = useQuery({ queryKey: CHAVE, enabled: ligado, queryFn: async () => lerConta(await chamar({ acao: 'situacao' })), staleTime: 30_000 });
   return { dados: q.data ?? VAZIA, carregando: q.isLoading, falhou: q.isError, recarregar: () => { void q.refetch(); } };
 }
 const lerAchados = (r: Record<string, unknown>): Achados => ({

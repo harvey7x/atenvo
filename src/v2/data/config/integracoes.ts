@@ -139,9 +139,9 @@ export function chaveInvalida(chave: string, ambiente: AmbienteAsaas): string {
 const CHAVE = ['reviza', 'integracoes'] as const;
 const COLS = 'servico, conectado, ambiente, conta, chave_final, conectado_em, conectado_por, retorno_ativo, ultimo_retorno, config';
 
-export function useAsaas() {
+export function useAsaas(ligado = true) {
   const q = useQuery({
-    queryKey: CHAVE,
+    queryKey: CHAVE, enabled: ligado,
     queryFn: async (): Promise<IntegracaoAsaas> => {
       if (!supabase) throw new Error('Sem conexão com o servidor.');
       const { data, error } = await supabase.from('integracoes').select(COLS);

@@ -30,6 +30,7 @@ import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
 import { secaoDoPapel } from '../data/cobranca/secoes';
 import { rotaAtendimentoPermitida } from '../data/modulos';
+import { temRecurso } from '../data/config/recursos';
 import { areaDaRota, areaLiberada } from '../data/config/areas';
 import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
@@ -194,12 +195,17 @@ const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
    os logins e o que cada pessoa acessa, e os Registros (tudo o que cada pessoa faz). O que é da
    própria pessoa (conta, notificações, preferências) fica no grupo "Minha conta", para todos.
    Rotas em /config/* (o /configuracoes de antes leva para cá). */
+// Iris e Regras do atendimento só entram quando a instalação tem essas peças no servidor (config/recursos.ts)
 const CFG_GRUPOS: GrupoNav[] = [
   { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }, { slug: 'config/integracoes', rotulo: 'Integrações', admin: true }] },
   { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
-  { rotulo: 'Atendimento', itens: [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }, { slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] },
-  { rotulo: 'Minha conta', itens: [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] },
-];
+  { rotulo: 'Atendimento', itens: [
+    ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }] : []),
+    ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
+  ] },
+  // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
+  { rotulo: 'Minha conta', itens: temRecurso('atendimento') ? [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] : [] },
+].filter((g) => g.itens.length > 0);
 // Reviza: "Configurações" sai do pé do menu do Atendimento — virou o ambiente
 const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: isRevizaMode ? GRUPOS.filter((g) => !g.fixo) : GRUPOS };
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
@@ -824,7 +830,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const ambientesSessao = papelSessao?.papel != null ? papelSessao.ambientes : undefined;
   const modulosDisponiveis = isRevizaMode
     // Configurações é de todos (cada um vê nela o que é seu; o resto é só do administrador)
-    ? (ambientesSessao ? MODULOS.filter((m) => m.id === 'configuracoes' || (ambientesSessao as string[]).includes(m.id)) : MODULOS.filter((m) => m.id === moduloAtivo))
+    // (se nesta instalação não sobra nada dela para a pessoa — ver config/recursos.ts —, o ambiente nem aparece)
+    ? (ambientesSessao ? MODULOS.filter((m) => (m.id === 'configuracoes' ? m.grupos.some((g) => filtrarItensNav(g.itens).length > 0) : (ambientesSessao as string[]).includes(m.id))) : MODULOS.filter((m) => m.id === moduloAtivo))
     : isDemoMode ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
   // ambiente da rota que a pessoa NÃO tem → vai pro primeiro que ela tem (ex.: atendente que caiu em /cobrancas)
   const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && moduloAtivo !== 'configuracoes' && !(ambientesSessao as string[]).includes(moduloAtivo);
@@ -834,12 +841,13 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     return itens.some((i) => `/${i.slug}` === m.home) ? m.home : itens[0] ? `/${itens[0].slug}` : m.home;
   };
   const moduloInicial = modulosDisponiveis.find((m) => m.id !== 'configuracoes' && m.grupos.some((g) => filtrarItensNav(g.itens).length > 0));
-  const homeDaPessoa = moduloInicial ? inicioDoModulo(moduloInicial) : isRevizaMode && papelSessao?.papel != null ? '/config/conta' : '/cobrancas/painel';
+  const homeDaPessoa = moduloInicial ? inicioDoModulo(moduloInicial) : isRevizaMode && papelSessao?.papel != null && temRecurso('atendimento') ? '/config/conta' : '/cobrancas/painel';
   // a tela da rota foi tirada das áreas desta pessoa → volta ao início dela
   const areaBloqueada = !!areasSessao && !areaLiberada(areasSessao, areaDaRota(location.pathname) ?? '');
   // a conta e as preferências: na Reviza moram no ambiente Configurações (todos têm); no Atenvo, nas Configurações do Atendimento
   const temContaAtendimento = isRevizaMode || modulosDisponiveis.some((m) => m.id === 'atendimento');
-  const rotaDaConta = isRevizaMode ? '/config/conta' : '/configuracoes?tab=conta';
+  // ("Minha conta" é uma tela do Atendimento: sem ele no servidor, a pessoa troca a senha na tela de sempre)
+  const rotaDaConta = isRevizaMode ? (temRecurso('atendimento') ? '/config/conta' : '/alterar-senha') : '/configuracoes?tab=conta';
   // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
   // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
   const acessoCarregando = isRevizaMode && papelQ.isPending;
@@ -1224,6 +1232,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 /* Registros e Usuários mudaram de endereço: o link antigo leva ao ambiente Configurações */
                 : isRevizaMode && /^\/ia\/?$/.test(location.pathname) ? <Navigate to="/config/iris" replace />
                 : isRevizaMode && /^\/cobrancas\/(registros|usuarios)\/?$/.test(location.pathname) ? <Navigate to={`/config/${location.pathname.split('/')[2]}`} replace />
+                : moduloAtivo === 'configuracoes' && !MOD_CONFIG.grupos.some((g) => filtrarItensNav(g.itens).length > 0) ? <Navigate to={homeDaPessoa} replace />
                 : moduloAtivo === 'configuracoes' && /^\/config\/?$/.test(location.pathname) ? <Navigate to={inicioDoModulo(MOD_CONFIG)} replace />
                 : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />
                 : <Outlet />}

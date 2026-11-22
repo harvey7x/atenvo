@@ -12,6 +12,7 @@ import { AcoesNoTopo } from '../comunicacao/MenuMais';
 import { formatarTelefone } from '../../lib/telefone';
 import { ROTULO_AMBIENTE, ambientesDoPerfil, type Ambiente } from '../../data/modulos';
 import { useConectarWA, useDefinirDonoWA, useDesconectarWA, useNovoQrWA, useRemoverWA, useVerificarCanalWA } from '../../data/wa/wa';
+import { temRecurso } from '../../data/config/recursos';
 import { useAcoesAtendimento, useConexoesWA, type ConexaoWA, type EstadoConexao } from '../../data/config/conexoes';
 import type { UsuarioRow } from '../../data/cobranca/usuarios';
 import '../painel/painel.css';
@@ -35,6 +36,8 @@ function quando(iso: string | null): string {
 }
 const SeloAmbiente = ({ a }: { a: Ambiente }) => <span className={`cfgw-amb ${a}`}>{ROTULO_AMBIENTE[a]}</span>;
 
+/** o Atendimento existe nesta instalação? (config/recursos.ts) Sem ele, esta é a tela dos números de Cobranças */
+const TEM_ATD = temRecurso('atendimento');
 type Filtro = 'todos' | Ambiente;
 type Janela = { tipo: 'conectar'; reconectar?: ConexaoWA } | { tipo: 'gerenciar'; chave: string };
 
@@ -50,6 +53,8 @@ export function ConfigWhatsApp() {
   const conectados = n((c) => c.estado === 'conectado');
   const visiveis = filtro === 'todos' ? lista : lista.filter((c) => c.ambiente === filtro);
   const aberta = janela?.tipo === 'gerenciar' ? lista.find((c) => c.chave === janela.chave) ?? null : null;
+  const comerciaisAtivos = q.usuarios.filter((u) => u.ativo && u.papel === 'comercial');
+  const comNumero = comerciaisAtivos.filter((u) => lista.some((c) => c.ambiente === 'cobrancas' && c.donoId === u.id)).length;
   const notaAmb = (a: Ambiente) => { const t = n((c) => c.ambiente === a); const on = n((c) => c.ambiente === a && c.estado === 'conectado'); return t ? `${on} de ${t} conectado${on === 1 ? '' : 's'}` : 'Nenhum número ainda'; };
 
   return (
@@ -62,24 +67,30 @@ export function ConfigWhatsApp() {
 
       <div className="kpis sobe">
         <Kpi rotulo="Números conectados" icone={<IconeTile nome="sinal" />} valor={conectados} nota={lista.length ? `de ${lista.length} cadastrado${lista.length === 1 ? '' : 's'}` : 'Nenhum número ainda'} />
-        <Kpi rotulo="Cobranças" icone={<IconeTile nome="moeda" />} valor={n((c) => c.ambiente === 'cobrancas')} nota={notaAmb('cobrancas')} />
-        <Kpi rotulo="Atendimento" icone={<IconeTile nome="balao" />} valor={n((c) => c.ambiente === 'atendimento')} nota={notaAmb('atendimento')} />
+        {TEM_ATD ? (<>
+          <Kpi rotulo="Cobranças" icone={<IconeTile nome="moeda" />} valor={n((c) => c.ambiente === 'cobrancas')} nota={notaAmb('cobrancas')} />
+          <Kpi rotulo="Atendimento" icone={<IconeTile nome="balao" />} valor={n((c) => c.ambiente === 'atendimento')} nota={notaAmb('atendimento')} />
+        </>) : (<>
+          <Kpi rotulo="Comerciais com número" icone={<IconeTile nome="moeda" />} valor={comNumero} nota={`de ${comerciaisAtivos.length} ${comerciaisAtivos.length === 1 ? 'comercial ativo' : 'comerciais ativos'}`} />
+          <Kpi rotulo="Comerciais sem número" icone={<IconeTile nome="balao" />} valor={comerciaisAtivos.length - comNumero} nota={comerciaisAtivos.length - comNumero ? 'A régua não alcança os clientes deles' : 'Todos cobertos pela régua'} />
+        </>)}
         <Kpi rotulo="Sem conexão" icone={<IconeTile nome="alerta" />} valor={n((c) => c.estado !== 'conectado')} nota={n((c) => c.estado !== 'conectado') ? 'Não enviam nem recebem agora' : 'Todos enviando e recebendo'} />
       </div>
 
       <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.06s' }}>
         <div className="pn-card-cab pn-us-cab">
-          <div className="pn-us-filtros">
+          {TEM_ATD && <div className="pn-us-filtros">
             <div className="pn-fin-seg" role="tablist" aria-label="Filtrar por ambiente">
               {([['todos', 'Todos', lista.length], ['cobrancas', 'Cobranças', n((c) => c.ambiente === 'cobrancas')], ['atendimento', 'Atendimento', n((c) => c.ambiente === 'atendimento')]] as const).map(([id, rot, tot]) => (
                 <button key={id} type="button" role="tab" aria-selected={filtro === id} className={filtro === id ? 'on' : undefined} onClick={() => setFiltro(id)}>{rot}<span className="num">{tot}</span></button>
               ))}
             </div>
-          </div>
+          </div>}
+          {!TEM_ATD && <div><h3>Números da régua de cobrança</h3><p>Cada número tem um comercial dono: os clientes dele recebem por ele.</p></div>}
         </div>
         {q.carregando ? <p className="pn-vazio">Carregando os números…</p>
           : q.falhou && !lista.length ? <EstadoErro titulo="Não foi possível carregar os números" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={q.recarregar} />
-          : lista.length === 0 ? <EstadoVazio titulo="Nenhum WhatsApp conectado" descricao="Conecte o primeiro número e diga se ele é das Cobranças ou do Atendimento." acao={{ rotulo: '＋ Conectar WhatsApp', onClick: () => setJanela({ tipo: 'conectar' }) }} />
+          : lista.length === 0 ? <EstadoVazio titulo="Nenhum WhatsApp conectado" descricao={TEM_ATD ? 'Conecte o primeiro número e diga se ele é das Cobranças ou do Atendimento.' : 'Conecte o primeiro número e escolha o comercial dono dele.'} acao={{ rotulo: '＋ Conectar WhatsApp', onClick: () => setJanela({ tipo: 'conectar' }) }} />
           : visiveis.length === 0 ? <p className="pn-vazio">Nenhum número neste ambiente.</p>
           : (
             <div className="pn-mapa-rolo">
@@ -87,7 +98,7 @@ export function ConfigWhatsApp() {
                 <thead>
                   <tr>
                     <th scope="col">Número</th>
-                    <th scope="col">Ambiente</th>
+                    {TEM_ATD && <th scope="col">Ambiente</th>}
                     <th scope="col">Quem usa</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Última atividade</th>
@@ -103,7 +114,7 @@ export function ConfigWhatsApp() {
                           <span className="pn-eq-nm"><span>{c.nome}</span><small className="num">{fone(c.numero) ?? 'aguardando o QR Code'}</small></span>
                         </span>
                       </td>
-                      <td><SeloAmbiente a={c.ambiente} /></td>
+                      {TEM_ATD && <td><SeloAmbiente a={c.ambiente} /></td>}
                       <td><span className="pn-us-amb-tx">{c.ambiente === 'cobrancas' ? (c.semDono ? 'Sem dono — só os administradores veem' : `${c.nome} (comercial dono)`) : 'Equipe do Atendimento'}</span></td>
                       <td>
                         <BadgeStatus tom={TOM_ESTADO[c.estado]}>{ROT_ESTADO[c.estado]}</BadgeStatus>
@@ -124,7 +135,7 @@ export function ConfigWhatsApp() {
           )}
       </CardVidro>
 
-      <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.1s' }}>
+      {TEM_ATD && <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.1s' }}>
         <div className="pn-card-cab"><div><h3>Para que serve cada ambiente</h3><p>Ao conectar um número você escolhe onde ele trabalha. Um número trabalha em um ambiente só.</p></div></div>
         <div className="pn-us-papeis cfgw-explica">
           {(['cobrancas', 'atendimento'] as const).map((a) => (
@@ -134,7 +145,7 @@ export function ConfigWhatsApp() {
             </div>
           ))}
         </div>
-      </CardVidro>
+      </CardVidro>}
 
       {janela?.tipo === 'conectar' && (
         <JanelaConectar reconectar={janela.reconectar} usuarios={q.usuarios} conexoes={lista} aoFechar={() => setJanela(null)} aoAvisar={avisar} />
@@ -160,7 +171,7 @@ function JanelaConectar({ reconectar, usuarios, conexoes, aoFechar, aoAvisar }: 
   const { canaisCob } = useConexoesWA();
 
   const [fase, setFase] = useState<'escolha' | 'qr' | 'ok'>(reconectar ? 'qr' : 'escolha');
-  const [ambiente, setAmbiente] = useState<Ambiente | null>(reconectar?.ambiente ?? null);
+  const [ambiente, setAmbiente] = useState<Ambiente | null>(reconectar?.ambiente ?? (TEM_ATD ? null : 'cobrancas'));
   const [donoSel, setDonoSel] = useState('');
   const [nomeAtd, setNomeAtd] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -232,7 +243,7 @@ function JanelaConectar({ reconectar, usuarios, conexoes, aoFechar, aoAvisar }: 
   };
 
   const titulo = fase === 'ok' ? 'WhatsApp conectado' : reconectar ? 'Conectar de novo' : 'Conectar WhatsApp';
-  const sub = fase === 'escolha' ? 'Primeiro, diga para qual ambiente é este número' : `${ROTULO_AMBIENTE[ambiente ?? 'cobrancas']}${nomeFinal ? ` · ${nomeFinal}` : ''}`;
+  const sub = fase === 'escolha' ? (TEM_ATD ? 'Primeiro, diga para qual ambiente é este número' : 'Escolha o comercial dono do número') : `${ROTULO_AMBIENTE[ambiente ?? 'cobrancas']}${nomeFinal ? ` · ${nomeFinal}` : ''}`;
   return (
     <ModalV2 aberto aoFechar={fechar} largura={fase === 'escolha' ? 560 : 440} fecharNoVeu={fase !== 'qr'}
       titulo={<div>{titulo}<div className="mod-sub">{sub}</div></div>}
@@ -243,7 +254,7 @@ function JanelaConectar({ reconectar, usuarios, conexoes, aoFechar, aoAvisar }: 
           : <BotaoPrimario onClick={fechar}>Concluir</BotaoPrimario>}>
       {fase === 'escolha' && (
         <div className="pn-us-form">
-          <div className="pn-us-campo">
+          {TEM_ATD && <div className="pn-us-campo">
             <span className="pn-us-rot">Para qual ambiente é este WhatsApp?</span>
             <div className="pn-us-opcoes" role="radiogroup" aria-label="Ambiente do número">
               {(['cobrancas', 'atendimento'] as const).map((a) => (
@@ -252,7 +263,7 @@ function JanelaConectar({ reconectar, usuarios, conexoes, aoFechar, aoAvisar }: 
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           {ambiente === 'cobrancas' && (
             <div className="pn-us-campo">
               <label htmlFor="cw-dono">Comercial dono do número</label>

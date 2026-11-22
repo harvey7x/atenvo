@@ -1,6 +1,7 @@
 /* Registros — auditoria completa (só admin): tudo o que cada pessoa fez, em
    detalhe. Cada linha abre mostrando exatamente o que mudou (de → para).
    Filtros por período, tipo, pessoa e busca. */
+import { temRecurso } from '../data/config/recursos';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IconeTile } from '../components/CartaoMetrica';
@@ -90,7 +91,7 @@ export function RevizaRegistros() {
           <span className="reg-fil-rot">Área</span>
           <Chips>
             <Chip ativo={grupo === 'todos'} onClick={() => setGrupo('todos')}>Todas</Chip>
-            {GRUPOS.map((g) => <Chip key={g} ativo={grupo === g} onClick={() => setGrupo(g)}>{g}</Chip>)}
+            {GRUPOS.filter((g) => g !== 'Atendimento' || temRecurso('atendimento')).map((g) => <Chip key={g} ativo={grupo === g} onClick={() => setGrupo(g)}>{g}</Chip>)}
           </Chips>
         </div>
         <div className="reg-fil-dir">

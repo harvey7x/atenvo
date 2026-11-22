@@ -206,3 +206,17 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 .v2 .cfgr-resumo > div.vazio dd { color: var(--cor-erro-txt, var(--rubro)); }
 @media (max-width: 900px) { .v2 .cfgr-passos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .v2 .cfgr-passos-lista { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- Iris em abas (22/11): cinco assuntos no lugar de uma tela comprida ---- */
+.v2 .cfgr-abas { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .03); align-self: flex-start; }
+.v2 .cfgr-abas button { all: unset; cursor: pointer; padding: 7px 14px; border-radius: 8px; font-size: 13px; color: var(--txt-2); white-space: nowrap; }
+.v2 .cfgr-abas button:hover { color: var(--txt); }
+.v2 .cfgr-abas button.on { color: var(--txt); background: var(--cor-acento-suave); box-shadow: inset 0 0 0 1px var(--cor-acento-fio); }
+.v2 .cfgr-abas button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+/* cada cartão só aparece na aba do seu assunto (o que não tem assunto, como salvar, aparece sempre) */
+.v2 .ia-wrap[data-aba-ativa] > [data-aba] { display: none; }
+.v2 .ia-wrap[data-aba-ativa="geral"] > [data-aba="geral"],
+.v2 .ia-wrap[data-aba-ativa="atende"] > [data-aba="atende"],
+.v2 .ia-wrap[data-aba-ativa="sabe"] > [data-aba="sabe"],
+.v2 .ia-wrap[data-aba-ativa="horarios"] > [data-aba="horarios"],
+.v2 .ia-wrap[data-aba-ativa="conexao"] > [data-aba="conexao"] { display: flex; }

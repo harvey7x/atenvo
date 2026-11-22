@@ -12,6 +12,7 @@ import { registrarDesfazer, registrarBloqueada } from '../desfazer';
 import type { Papel } from './types';
 import { AMBIENTES, type Ambiente } from '../modulos';
 import { lerAreas } from '../config/areas';
+import { temRecurso } from '../config/recursos';
 
 export interface UsuarioRow {
   id: string; nome: string; email: string; papel: Papel; ativo: boolean;
@@ -148,7 +149,11 @@ export function useCriarUsuario() {
   return useMutation({
     /** senha vazia = gera temporária (troca obrigatória no 1º acesso) */
     mutationFn: async (a: { usuario: string; nome: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[]; areas?: string[] | null }) => {
-      if (real()) return chamarAdmin({ acao: 'criar', ...a });
+      if (real()) {
+        // só manda ambientes e telas quando a instalação tem essas peças no servidor (config/recursos.ts)
+        const { modulos, areas, ...resto } = a;
+        return chamarAdmin({ acao: 'criar', ...resto, ...(temRecurso('atendimento') && modulos ? { modulos } : {}), ...(temRecurso('telas') && areas !== undefined ? { areas } : {}) });
+      }
       const usuario = loginValido(a.usuario);
       if (!usuario) throw new Error('Usuário inválido (use letras, números, ponto, hífen).');
       const l = demoLer();
