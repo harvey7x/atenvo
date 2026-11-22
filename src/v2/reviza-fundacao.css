@@ -320,7 +320,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v
     border-color: transparent; background: transparent; box-shadow: none; color: var(--txt-2);
   }
 }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody td :is(.av, .av2, .pn-av, .ev-av, .d5-av) {
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody td :is(.av2, .pn-av, .ev-av, .d5-av) {
   width: 26px; height: 26px; min-width: 26px; font-size: 10px; font-weight: 550; letter-spacing: .02em;
   color: var(--txt-2); background: rgba(var(--tint), .06); border: 0; box-shadow: none;
 }

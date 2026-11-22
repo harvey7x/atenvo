@@ -7,14 +7,16 @@
    AMBIENTES (11/11): a mesma tela vale para os dois ambientes — fica em Cobranças → Usuários e em
    Atendimento → Configurações → Usuários. Cada pessoa tem os ambientes que enxerga (data/modulos.ts). */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, ModalV2 } from '../components';
 import {
   bloqueioDesativar, bloqueioExclusao, loginValido, senhaFraca,
-  useCriarUsuario, useDefinirAmbientes, useDefinirAtivo, useDefinirPapel, useDefinirSenha, useEditarUsuario, useExcluirUsuario,
+  useCriarUsuario, useDefinirAmbientes, useDefinirAreas, useDefinirAtivo, useDefinirPapel, useDefinirSenha, useEditarUsuario, useExcluirUsuario,
   useMeuId, useResetarSenha, useUsuarios, type UsuarioRow,
 } from '../data/cobranca/usuarios';
 import type { Papel } from '../data/cobranca/types';
 import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
+import { AREAS, areasPossiveis, resumoAreas } from '../data/config/areas';
 import { lerDesfazer, useDesfazerEstado } from '../data/desfazer';
 import { AcoesNoTopo, MenuMais } from './comunicacao/MenuMais';
 import './painel/painel.css';
@@ -63,6 +65,49 @@ function Ambientes({ papel, modulos, aoMudar, travado, rotulo }: {
   );
 }
 
+/* TELAS da pessoa (dono 22/11: "definir o que as pessoas vão poder fazer, quais áreas a pessoa vai
+   poder acessar"). O papel é o teto; dentro dele, e dos ambientes dela, o administrador liga e
+   desliga cada tela. Tudo marcado = sem restrição (grava null: as do papel, inclusive as que vierem). */
+const TODAS_AS_TELAS = AREAS.map((a) => a.slug);
+/** o que gravar: null quando nada foi tirado; senão só as marcadas que o papel alcança */
+function telasParaGravar(papel: Papel, ambientes: readonly Ambiente[], marcadas: readonly string[]): string[] | null {
+  if (papel === 'admin') return null;
+  const possiveis = areasPossiveis(papel, ambientes).map((a) => a.slug);
+  const ficam = possiveis.filter((sl) => marcadas.includes(sl));
+  return ficam.length === possiveis.length ? null : ficam;
+}
+function Telas({ papel, ambientes, marcadas, aoMudar }: {
+  papel: Papel; ambientes: readonly Ambiente[]; marcadas: readonly string[]; aoMudar: (l: string[]) => void;
+}) {
+  if (papel === 'admin') return <span className="pn-us-dica">O administrador vê todas as telas dos dois ambientes e as Configurações.</span>;
+  const possiveis = areasPossiveis(papel, ambientes);
+  return (
+    <div className="pn-us-telas">
+      {ambientes.map((amb) => {
+        const doAmb = possiveis.filter((a) => a.ambiente === amb);
+        if (!doAmb.length) return null;
+        const todas = doAmb.every((a) => marcadas.includes(a.slug));
+        return (
+          <div key={amb} className="pn-us-telas-amb" role="group" aria-label={`Telas de ${ROTULO_AMBIENTE[amb]}`}>
+            <div className="pn-us-telas-cab">
+              <b>{ROTULO_AMBIENTE[amb]}</b>
+              <span className="num">{doAmb.filter((a) => marcadas.includes(a.slug)).length} de {doAmb.length}</span>
+              <button type="button" className="pn-link" onClick={() => aoMudar(todas ? marcadas.filter((sl) => !doAmb.some((a) => a.slug === sl)) : [...new Set([...marcadas, ...doAmb.map((a) => a.slug)])])}>{todas ? 'Desmarcar todas' : 'Marcar todas'}</button>
+            </div>
+            <div className="pn-us-telas-lista">
+              {doAmb.map((a) => (
+                <label key={a.slug} className="pn-us-check">
+                  <input type="checkbox" checked={marcadas.includes(a.slug)} onChange={(e) => aoMudar(e.target.checked ? [...marcadas, a.slug] : marcadas.filter((sl) => sl !== a.slug))} /> {a.rotulo}
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 type Janela =
   | { tipo: 'novo' }
   | { tipo: 'editar'; u: UsuarioRow }
@@ -81,6 +126,8 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
   const setAtivo = useDefinirAtivo();
   const setPapel = useDefinirPapel();
   const setAmbientes = useDefinirAmbientes();
+  const setAreas = useDefinirAreas();
+  const navigate = useNavigate();
 
   const [aviso, setAvisoSt] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
   // a faixa verde descreve a ÚLTIMA ação; se ela for desfeita (botão Desfazer do topo) ou o
@@ -167,6 +214,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                   <th scope="col">Pessoa</th>
                   <th scope="col">Papel</th>
                   <th scope="col">Ambientes</th>
+                  <th scope="col">Telas</th>
                   <th scope="col">Situação</th>
                   <th scope="col"><span className="pn-vh">Ações</span></th>
                 </tr>
@@ -186,6 +234,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                       </td>
                       <td><span className="pn-us-papel-tx">{PAPEL_ROTULO[u.papel]}</span></td>
                       <td><span className="pn-us-amb-tx">{ambientesTexto(u.papel, u.modulos)}</span></td>
+                      <td>{(() => { const r = resumoAreas(u.papel, ambientesDoPerfil(u.papel, u.modulos), u.areas); return <span className={r.restrito ? 'pn-us-amb-tx pn-us-telas-tx restrito' : 'pn-us-amb-tx pn-us-telas-tx'}>{r.texto}</span>; })()}</td>
                       <td>
                         {u.ativo ? <BadgeStatus tom="ok">Ativo</BadgeStatus> : <BadgeStatus tom="neutro">Desativado</BadgeStatus>}
                         {u.ativo && u.deve_trocar_senha && <span className="pn-us-1a">Aguardando o primeiro acesso</span>}
@@ -195,6 +244,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                           <BotaoSec mini onClick={() => setJanela({ tipo: 'editar', u })}>Editar</BotaoSec>
                           <MenuMais rotulo={`Mais ações para ${u.nome}`} itens={[
                             { rotulo: 'Alterar senha', onClick: () => setJanela({ tipo: 'senha', u }) },
+                            { rotulo: 'Ver o que fez', onClick: () => navigate(`/config/registros?pessoa=${encodeURIComponent(u.nome)}`), dica: 'Abre os Registros só com as ações desta pessoa' },
                             { rotulo: u.ativo ? 'Desativar acesso' : 'Reativar acesso', onClick: () => alternarAtivo(u), desabilitado: !!bDes || setAtivo.isPending, dica: bDes || (u.ativo ? 'Tira o acesso; é possível reativar depois' : 'Devolve o acesso') },
                             'sep',
                             { rotulo: 'Excluir do sistema', perigo: true, onClick: () => setJanela({ tipo: 'excluir', u }), desabilitado: !!bExc, dica: bExc || 'Definitivo: pede confirmação' },
@@ -232,19 +282,21 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
       )}
       {janela?.tipo === 'editar' && (
         <JanelaEditar u={janela.u} souEu={janela.u.id === eu} ultimoAdmin={janela.u.papel === 'admin' && !usuarios.some((x) => x.id !== janela.u.id && x.papel === 'admin' && x.ativo)}
-          ocupado={editar.isPending || setPapel.isPending || setAmbientes.isPending} aoFechar={() => setJanela(null)}
+          ocupado={editar.isPending || setPapel.isPending || setAmbientes.isPending || setAreas.isPending} aoFechar={() => setJanela(null)}
           aoSalvar={async (a) => {
             const u = janela.u;
             try {
               if (a.nome !== undefined || a.usuario !== undefined) await editar.mutateAsync({ id: u.id, ...(a.nome !== undefined ? { nome: a.nome } : {}), ...(a.usuario !== undefined ? { usuario: a.usuario } : {}) });
               if (a.papel) await setPapel.mutateAsync({ id: u.id, papel: a.papel });
               if (a.modulos) await setAmbientes.mutateAsync({ id: u.id, modulos: a.modulos });
+              if (a.areas !== undefined) await setAreas.mutateAsync({ id: u.id, areas: a.areas });
               setJanela(null);
               const nome = a.nome ?? u.nome;
               ok([
                 a.usuario ? `o login de ${nome} agora é "${loginValido(a.usuario)}"` : '',
                 a.papel ? `${nome} agora é ${PAPEL_ROTULO[a.papel]}` : '',
                 a.modulos ? `entra em: ${a.modulos.map((x) => ROTULO_AMBIENTE[x]).join(' e ')}` : '',
+                a.areas !== undefined ? (a.areas ? `vê ${a.areas.length} tela${a.areas.length === 1 ? '' : 's'}` : 'vê todas as telas do papel') : '',
               ].filter(Boolean).join(' · ').replace(/^./, (c) => c.toUpperCase()) || 'Dados salvos.');
             } catch (e) { falha(e); }
           }} />
@@ -290,8 +342,10 @@ function CampoSenha({ valor, aoMudar, id }: { valor: string; aoMudar: (v: string
 
 function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
   ocupado: boolean; aoFechar: () => void;
-  aoCriar: (a: { nome: string; usuario: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[] }) => void;
+  aoCriar: (a: { nome: string; usuario: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[]; areas?: string[] | null }) => void;
 }) {
+  const [telas, setTelas] = useState<string[]>(TODAS_AS_TELAS);
+  const [escolherTelas, setEscolherTelas] = useState(false);
   const [nome, setNome] = useState('');
   const [usuario, setUsuario] = useState('');
   const [tocouLogin, setTocouLogin] = useState(false);
@@ -302,11 +356,14 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
   const [troca, setTroca] = useState(true);
   const loginSug = (n: string) => loginValido(n.normalize('NFD').replace(/[̀-ͯ]/g, '').split(/\s+/)[0] ?? '');
   const login = tocouLogin ? usuario : loginSug(nome);
-  const pode = !!nome.trim() && !!loginValido(login) && (modo === 'gerar' || !senhaFraca(senha));
+  const ambNovo = ambientesDoPerfil(papel, ambientes);
+  const areasNovo = telasParaGravar(papel, ambNovo, telas);
+  const semTela = !!areasNovo && areasNovo.length === 0;
+  const pode = !!nome.trim() && !!loginValido(login) && (modo === 'gerar' || !senhaFraca(senha)) && !semTela;
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={560}
       titulo={<div>Novo usuário<div className="mod-sub">A pessoa entra com o login e a senha que aparecem ao criar</div></div>}
-      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => aoCriar({ nome: nome.trim(), usuario: loginValido(login), papel, modulos: ambientesDoPerfil(papel, ambientes), ...(modo === 'definir' ? { senha, exigirTroca: troca } : {}) })}>{ocupado ? 'Criando…' : 'Criar usuário'}</BotaoPrimario></>}>
+      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => aoCriar({ nome: nome.trim(), usuario: loginValido(login), papel, modulos: ambNovo, areas: areasNovo, ...(modo === 'definir' ? { senha, exigirTroca: troca } : {}) })}>{ocupado ? 'Criando…' : 'Criar usuário'}</BotaoPrimario></>}>
       <div className="pn-us-form">
         <div className="pn-us-duas">
           <div className="pn-us-campo"><label htmlFor="us-nome">Nome</label><input id="us-nome" className="inp" value={nome} placeholder="Nome da pessoa" onChange={(e) => setNome(e.target.value)} autoFocus /></div>
@@ -328,6 +385,13 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
           <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Marque onde a pessoa vai trabalhar: Cobranças, Atendimento ou os dois. É possível mudar depois, em Editar.'}</span>
         </div>
         <div className="pn-us-campo">
+          <span className="pn-us-rot">Telas liberadas</span>
+          {papel !== 'admin' && !escolherTelas
+            ? <span className="pn-us-dica">Todas as telas do papel nos ambientes marcados. <button type="button" className="pn-link" onClick={() => setEscolherTelas(true)}>Escolher as telas</button></span>
+            : <Telas papel={papel} ambientes={ambNovo} marcadas={telas} aoMudar={setTelas} />}
+          {semTela && <span className="pn-us-erro">Marque pelo menos uma tela — sem nenhuma, a pessoa entra e não vê nada.</span>}
+        </div>
+        <div className="pn-us-campo">
           <span className="pn-us-rot">Senha inicial</span>
           <div className="pn-fin-seg" role="tablist" aria-label="Senha inicial">
             <button type="button" role="tab" aria-selected={modo === 'gerar'} className={modo === 'gerar' ? 'on' : undefined} onClick={() => setModo('gerar')}>Gerar temporária</button>
@@ -347,8 +411,10 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
 
 function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
   u: UsuarioRow; souEu: boolean; ultimoAdmin: boolean; ocupado: boolean; aoFechar: () => void;
-  aoSalvar: (a: { nome?: string; usuario?: string; papel?: Papel; modulos?: Ambiente[] }) => void;
+  aoSalvar: (a: { nome?: string; usuario?: string; papel?: Papel; modulos?: Ambiente[]; areas?: string[] | null }) => void;
 }) {
+  // sem lista gravada = tudo marcado (as telas do papel, sem restrição)
+  const [telas, setTelas] = useState<string[]>(() => u.areas ?? TODAS_AS_TELAS);
   const [nome, setNome] = useState(u.nome);
   const [login, setLogin] = useState(u.usuario);
   const [papel, setPapel] = useState<Papel>(u.papel);
@@ -362,11 +428,22 @@ function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
   const ambAtual = ambientesDoPerfil(u.papel, u.modulos);
   const mudouAmb = !ambientesFixos(papel) && (ambFinal.length !== ambAtual.length || ambFinal.some((a) => !ambAtual.includes(a)));
   const bloqueioPapel = mudouPapel && ultimoAdmin && papel !== 'admin' ? 'É o último administrador ativo: o papel não pode mudar.' : '';
-  const pode = !!nome.trim() && !!loginValido(login) && (mudouNome || mudouLogin || mudouPapel || mudouAmb) && !bloqueioPapel;
+  const areasFinal = telasParaGravar(papel, ambFinal, telas);
+  const areasAtual = telasParaGravar(u.papel, ambAtual, u.areas ?? TODAS_AS_TELAS);
+  const mudouTelas = JSON.stringify(areasFinal) !== JSON.stringify(areasAtual);
+  const semTela = !!areasFinal && areasFinal.length === 0;
+  const pode = !!nome.trim() && !!loginValido(login) && (mudouNome || mudouLogin || mudouPapel || mudouAmb || mudouTelas) && !bloqueioPapel && !semTela;
   const salvar = () => aoSalvar({
     ...(mudouNome ? { nome: nome.trim() } : {}), ...(mudouLogin ? { usuario: loginValido(login) } : {}),
-    ...(mudouPapel ? { papel } : {}), ...(mudouAmb ? { modulos: ambFinal } : {}),
+    ...(mudouPapel ? { papel } : {}), ...(mudouAmb ? { modulos: ambFinal } : {}), ...(mudouTelas ? { areas: areasFinal } : {}),
   });
+  // papel novo = alcance novo: as telas voltam para "todas as do papel"; ambiente novo entra com as telas dele marcadas
+  const trocarPapel = (p: Papel) => { setPapel(p); if (p !== papel) setTelas(TODAS_AS_TELAS); };
+  const trocarAmbientes = (l: Ambiente[]) => {
+    const novos = l.filter((a) => !ambFinal.includes(a));
+    setAmbientes(l);
+    if (novos.length) setTelas((t) => [...new Set([...t, ...AREAS.filter((a) => novos.includes(a.ambiente)).map((a) => a.slug)])]);
+  };
   if (confirmar) {
     return (
       <ModalV2 aberto aoFechar={() => setConfirmar(false)} largura={460}
@@ -393,7 +470,7 @@ function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
           {souEu ? <span className="pn-us-dica">Você não pode mudar o seu próprio papel ({PAPEL_ROTULO[u.papel]}).</span> : (
             <div className="pn-us-opcoes" role="radiogroup" aria-label="Papel">
               {opcoesPapel(u.papel).map((p) => (
-                <button key={p} type="button" role="radio" aria-checked={papel === p} className={papel === p ? 'on' : undefined} onClick={() => setPapel(p)}>
+                <button key={p} type="button" role="radio" aria-checked={papel === p} className={papel === p ? 'on' : undefined} onClick={() => trocarPapel(p)}>
                   <b>{PAPEL_ROTULO[p]}</b><span>{PAPEL_DESC[p]}</span>
                 </button>
               ))}
@@ -403,9 +480,15 @@ function JanelaEditar({ u, souEu, ultimoAdmin, ocupado, aoSalvar, aoFechar }: {
         </div>
         <div className="pn-us-campo">
           <span className="pn-us-rot">Ambientes</span>
-          <Ambientes papel={papel} modulos={ambientes} aoMudar={setAmbientes} rotulo={`Ambientes de ${u.nome}`}
+          <Ambientes papel={papel} modulos={ambientes} aoMudar={trocarAmbientes} rotulo={`Ambientes de ${u.nome}`}
             travado={souEu && !ambientesFixos(papel) ? 'Você não pode mudar os seus próprios ambientes' : undefined} />
           <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Onde a pessoa trabalha: Cobranças, Atendimento ou os dois.'}</span>
+        </div>
+        <div className="pn-us-campo">
+          <span className="pn-us-rot">Telas liberadas</span>
+          <Telas papel={papel} ambientes={ambFinal} marcadas={telas} aoMudar={setTelas} />
+          {papel !== 'admin' && <span className="pn-us-dica">O papel define até onde a pessoa pode ir; aqui você tira as telas que ela não precisa ver. Vale na hora.</span>}
+          {semTela && <span className="pn-us-erro">Marque pelo menos uma tela — sem nenhuma, a pessoa entra e não vê nada.</span>}
         </div>
       </div>
     </ModalV2>

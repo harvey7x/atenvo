@@ -30,6 +30,7 @@ import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
 import { secaoDoPapel } from '../data/cobranca/secoes';
 import { rotaAtendimentoPermitida } from '../data/modulos';
+import { areaDaRota, areaLiberada } from '../data/config/areas';
 import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
 import { usePapel } from '../data/cobranca/sessao';
@@ -123,7 +124,7 @@ const GRUPOS: GrupoNav[] = [
 /* MÓDULOS do sistema (seletor do topo, 29/08): cada módulo troca o menu
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
-type ModuloId = 'atendimento' | 'cobrancas';
+type ModuloId = 'atendimento' | 'cobrancas' | 'configuracoes';
 type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: GrupoNav[] };
 const COB_SECOES_BASE: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
@@ -152,8 +153,7 @@ const COB_SECOES_REVIZA: ItemNav[] = [
   { slug: 'cobrancas/numeros', rotulo: 'Números' },
   { slug: 'cobrancas/envios', rotulo: 'Envios' },
   { slug: 'cobrancas/analise', rotulo: 'Análise INSS' },
-  { slug: 'cobrancas/registros', rotulo: 'Registros', admin: true },
-  { slug: 'cobrancas/usuarios', rotulo: 'Usuários', admin: true },
+  // Registros e Usuários (só admin) foram para o ambiente Configurações (dono 22/11)
 ];
 const COB_SECOES: ItemNav[] = isRevizaMode
   ? COB_SECOES_REVIZA
@@ -187,15 +187,30 @@ const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equi
 const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
   cobrancas: 'Carteira e pagamentos',
   atendimento: 'Conversas e Kanban',
+  configuracoes: 'WhatsApp, acessos e registros',
 };
-const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS };
+/* AMBIENTE CONFIGURAÇÕES (dono 22/11: "um ambiente de configuração — tudo que a gente for configurar
+   precisa estar nesse ambiente"): conectar o WhatsApp (e dizer se é das Cobranças ou do Atendimento),
+   os logins e o que cada pessoa acessa, e os Registros (tudo o que cada pessoa faz). O que é da
+   própria pessoa (conta, notificações, preferências) fica no grupo "Minha conta", para todos.
+   Rotas em /config/* (o /configuracoes de antes leva para cá). */
+const CFG_GRUPOS: GrupoNav[] = [
+  { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }] },
+  { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
+  { rotulo: 'Atendimento', itens: [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] },
+  { rotulo: 'Minha conta', itens: [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] },
+];
+// Reviza: "Configurações" sai do pé do menu do Atendimento — virou o ambiente
+const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: isRevizaMode ? GRUPOS.filter((g) => !g.fixo) : GRUPOS };
 const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
+const MOD_CONFIG: Modulo = { id: 'configuracoes', rotulo: 'Configurações', home: '/config', grupos: CFG_GRUPOS };
+const ehRotaConfig = (pathname: string) => isRevizaMode && /^\/config(\/|$)/.test(pathname);
 // Reviza: Cobranças vem primeiro — é o início de quem tem os dois ambientes (o coração da Reviza)
-const MODULOS: Modulo[] = isRevizaMode ? [MOD_COBRANCAS, MOD_ATENDIMENTO] : [MOD_ATENDIMENTO, MOD_COBRANCAS];
+const MODULOS: Modulo[] = isRevizaMode ? [MOD_COBRANCAS, MOD_ATENDIMENTO, MOD_CONFIG] : [MOD_ATENDIMENTO, MOD_COBRANCAS];
 /* o nome da página na trilha do topo ("Cobranças / Painel"): o do item do menu (o da instância ganha) */
 const TITULOS_PAGINA: Record<string, string> = {
   integracoes: 'Integrações',
-  ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES].map((i) => [i.slug, i.rotulo])),
+  ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES, ...CFG_GRUPOS.flatMap((g) => g.itens)].map((i) => [i.slug, i.rotulo])),
 };
 const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -762,8 +777,11 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // Atenvo (visibilidade 22/10: as telas da equipe inteira são só do admin) e igual à rota (RequireRoleV2)
   // quem a Reviza sabe que NÃO tem Cobranças (perfil já carregado) não vê nenhum item da Cobrança
   const semCobConfirmado = isRevizaMode && papelSessao?.papel != null && !papelSessao.ambientes.includes('cobrancas');
+  // ÁREAS da pessoa (22/11): dentro do que o papel alcança, o administrador escolhe as telas — menu e rota
+  const areasSessao = isRevizaMode && papelSessao?.papel != null && papelSessao.papel !== 'admin' ? (papelSessao.areas ?? null) : null;
   const filtrarItensNav = (itens: ItemNav[]) => itens
     .filter((i) => !i.admin || admin)
+    .filter((i) => areaLiberada(areasSessao, i.slug))
     .filter((i) => !i.slug.startsWith('cobrancas/') || !semCobConfirmado)
     // Reviza: Financeiro é restrito — comercial não vê o item
     .filter((i) => i.slug !== 'cobrancas/financeiro' || podeVerFinanceiro)
@@ -793,8 +811,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // página não encontrada: o ambiente é o de início da pessoa (o primeiro que ela tem), não o da rota
   const ambientesPerfil = papelSessao?.papel != null ? papelSessao.ambientes : undefined;
   const moduloAtivo: ModuloId = naoEncontrada
-    ? (isRevizaMode ? (MODULOS.find((m) => !ambientesPerfil || ambientesPerfil.includes(m.id))?.id ?? 'cobrancas') : isDemoMode ? 'cobrancas' : MODULOS[0].id)
-    : location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
+    ? (isRevizaMode ? (MODULOS.find((m) => !ambientesPerfil || (ambientesPerfil as string[]).includes(m.id))?.id ?? 'cobrancas') : isDemoMode ? 'cobrancas' : MODULOS[0].id)
+    : location.pathname.startsWith('/cobrancas') ? 'cobrancas' : ehRotaConfig(location.pathname) ? 'configuracoes' : 'atendimento';
   // DEMO da ALFA: Atendimento removido — só Cobranças.
   // AMBIENTES (dono 11/11): na Reviza o seletor mostra só os ambientes do perfil (admin = os dois; atendente =
   // só Atendimento; demais = o que o administrador marcou). Enquanto o perfil carrega, só o ambiente atual
@@ -803,13 +821,23 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // Reviza de antes (a página abre; os dados seguem protegidos pelo banco) — nunca uma tela em branco.
   const ambientesSessao = papelSessao?.papel != null ? papelSessao.ambientes : undefined;
   const modulosDisponiveis = isRevizaMode
-    ? (ambientesSessao ? MODULOS.filter((m) => ambientesSessao.includes(m.id)) : MODULOS.filter((m) => m.id === moduloAtivo))
+    // Configurações é de todos (cada um vê nela o que é seu; o resto é só do administrador)
+    ? (ambientesSessao ? MODULOS.filter((m) => m.id === 'configuracoes' || (ambientesSessao as string[]).includes(m.id)) : MODULOS.filter((m) => m.id === moduloAtivo))
     : isDemoMode ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
   // ambiente da rota que a pessoa NÃO tem → vai pro primeiro que ela tem (ex.: atendente que caiu em /cobrancas)
-  const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && !ambientesSessao.includes(moduloAtivo);
-  const homeDaPessoa = modulosDisponiveis[0]?.home ?? '/cobrancas/painel';
-  // a conta e as preferências moram nas Configurações do Atendimento: o menu da conta só as oferece a quem o tem
-  const temContaAtendimento = modulosDisponiveis.some((m) => m.id === 'atendimento');
+  const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && moduloAtivo !== 'configuracoes' && !(ambientesSessao as string[]).includes(moduloAtivo);
+  // o início de um ambiente para ESTA pessoa: a home dele se ela a vê; senão, a primeira tela liberada
+  const inicioDoModulo = (m: Modulo): string => {
+    const itens = m.grupos.flatMap((g) => filtrarItensNav(g.itens));
+    return itens.some((i) => `/${i.slug}` === m.home) ? m.home : itens[0] ? `/${itens[0].slug}` : m.home;
+  };
+  const moduloInicial = modulosDisponiveis.find((m) => m.id !== 'configuracoes' && m.grupos.some((g) => filtrarItensNav(g.itens).length > 0));
+  const homeDaPessoa = moduloInicial ? inicioDoModulo(moduloInicial) : isRevizaMode && papelSessao?.papel != null ? '/config/conta' : '/cobrancas/painel';
+  // a tela da rota foi tirada das áreas desta pessoa → volta ao início dela
+  const areaBloqueada = !!areasSessao && !areaLiberada(areasSessao, areaDaRota(location.pathname) ?? '');
+  // a conta e as preferências: na Reviza moram no ambiente Configurações (todos têm); no Atenvo, nas Configurações do Atendimento
+  const temContaAtendimento = isRevizaMode || modulosDisponiveis.some((m) => m.id === 'atendimento');
+  const rotaDaConta = isRevizaMode ? '/config/conta' : '/configuracoes?tab=conta';
   // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
   // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
   const acessoCarregando = isRevizaMode && papelQ.isPending;
@@ -880,10 +908,12 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // ⌘, (Ctrl+, no Windows) abre Configurações — só onde o item está no pé (Atendimento), nunca digitando
   // num campo nem com a busca aberta
   const atalhoConfigRef = useRef(false);
-  atalhoConfigRef.current = ALFA && !acessoCarregando && rodapeBarra.some((i) => i.slug === 'configuracoes');
+  atalhoConfigRef.current = ALFA && !acessoCarregando && (isRevizaMode || rodapeBarra.some((i) => i.slug === 'configuracoes'));
+  const inicioRef = useRef(inicioDoModulo);
+  inicioRef.current = inicioDoModulo;
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
-    navigate(m.home);
+    navigate(inicioRef.current(m));
   }, [navigate]);
 
   // Paleta de busca global: a barra do topo abre de verdade (clique ou ⌘K/Ctrl+K)
@@ -896,7 +926,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         e.preventDefault(); setMenuUsuario(false); setPainelNotif(false); setPaletaAberta((v) => !v); return;
       }
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ',' && atalhoConfigRef.current && !e.repeat && !ehEditavel(e.target)) {
-        e.preventDefault(); navigate('/configuracoes');
+        e.preventDefault(); navigate(isRevizaMode ? inicioRef.current(MOD_CONFIG) : '/configuracoes');
       }
     };
     window.addEventListener('keydown', aoTecla);
@@ -963,7 +993,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
           <BarraAlfa
             modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
             org="Reviza CRM"
-            ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: DESCRICAO_AMBIENTE[m.id] }))}
+            ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: m.id === 'configuracoes' && !admin ? 'Sua conta e preferências' : DESCRICAO_AMBIENTE[m.id] }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
             aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}
             carregando={acessoCarregando}
@@ -1137,7 +1167,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                         </span>
                       </div>
                       {temContaAtendimento && (
-                        <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes?tab=conta'); }}>
+                        <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate(rotaDaConta); }}>
                           <IcConta /><span>Minha conta</span>
                         </button>
                       )}
@@ -1188,6 +1218,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar ao WhatsApp'} />
                 : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
                 : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
+                : areaBloqueada ? <Navigate to={homeDaPessoa} replace />
+                /* Registros e Usuários mudaram de endereço: o link antigo leva ao ambiente Configurações */
+                : isRevizaMode && /^\/cobrancas\/(registros|usuarios)\/?$/.test(location.pathname) ? <Navigate to={`/config/${location.pathname.split('/')[2]}`} replace />
+                : moduloAtivo === 'configuracoes' && /^\/config\/?$/.test(location.pathname) ? <Navigate to={inicioDoModulo(MOD_CONFIG)} replace />
                 : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />
                 : <Outlet />}
             </div>

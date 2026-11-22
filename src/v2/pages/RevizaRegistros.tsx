@@ -1,18 +1,23 @@
 /* Registros — auditoria completa (só admin): tudo o que cada pessoa fez, em
    detalhe. Cada linha abre mostrando exatamente o que mudou (de → para).
    Filtros por período, tipo, pessoa e busca. */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { IconeTile } from '../components/CartaoMetrica';
 import { BotaoSec, CardVidro, Chip, Chips, EstadoErro, EstadoVazio, Input, Kpi } from '../components';
 import { useRegistros, type Mudanca, type PeriodoRegistros, type Registro } from '../data/cobranca/registros';
 
-const PAPEL_ROT: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro' };
+const PAPEL_ROT: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
 const GRUPO: Record<string, string> = {
   cliente: 'Clientes', pagamento: 'Financeiro', movimentação: 'Financeiro', grade: 'Financeiro',
   comissão: 'Comissões', régua: 'Régua e envios', 'mensagem da régua': 'Régua e envios', envio: 'Régua e envios',
-  aviso: 'Avisos', usuário: 'Usuários',
+  aviso: 'Avisos',
+  // 22/11: os Registros foram para o ambiente Configurações e cobrem também o que se faz nele
+  // (logins, acessos e números de WhatsApp) e no Atendimento
+  usuário: 'Configurações', whatsapp: 'Configurações',
+  conversa: 'Atendimento', 'card do Kanban': 'Atendimento',
 };
-const GRUPOS = ['Clientes', 'Financeiro', 'Comissões', 'Régua e envios', 'Avisos'] as const;
+const GRUPOS = ['Clientes', 'Financeiro', 'Comissões', 'Régua e envios', 'Avisos', 'Atendimento', 'Configurações'] as const;
 const PERIODOS = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['tudo', 'Tudo']] as const;
 
 const CAMPO_ROT: Record<string, string> = {
@@ -24,6 +29,7 @@ const CAMPO_ROT: Record<string, string> = {
   data_parou: 'Data que parou', parou: 'Parou', pct: 'Comissão (%)', ativa: 'Régua ativa',
   hora_envio: 'Horário do disparo', estado: 'Estado', nome_contato: 'Contato',
   parado_pendente: 'Aguardando aprovação', parado_solicitado_nome: 'Pedido por', parado_aprovado_nome: 'Aprovado por',
+  papel: 'Papel', ativo: 'Acesso ao sistema', modulos: 'Ambientes', areas: 'Telas liberadas', login: 'Login', dono: 'Comercial dono', etapa: 'Etapa',
 };
 const rotCampo = (c: string) => CAMPO_ROT[c] ?? (c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' '));
 function valCampo(campo: string, v: string | null): string {
@@ -41,7 +47,11 @@ const quandoLongo = (iso: string) => new Date(iso).toLocaleString('pt-BR', { wee
 
 export function RevizaRegistros() {
   const [busca, setBusca] = useState('');
-  const [pessoa, setPessoa] = useState('todas');
+  // ?pessoa=Nome: vindo de Usuários e acessos → "Ver o que fez" (abre já filtrado nessa pessoa)
+  const [params] = useSearchParams();
+  const pessoaParam = params.get('pessoa');
+  const [pessoa, setPessoa] = useState(pessoaParam || 'todas');
+  useEffect(() => { if (pessoaParam) setPessoa(pessoaParam); }, [pessoaParam]);
   const [grupo, setGrupo] = useState<'todos' | (typeof GRUPOS)[number]>('todos');
   const [periodo, setPeriodo] = useState<PeriodoRegistros>('tudo');
   const [aberto, setAberto] = useState<Set<number>>(new Set());
@@ -49,7 +59,7 @@ export function RevizaRegistros() {
   const q = useRegistros(periodo);
   const regs = q.registros;
 
-  const pessoas = useMemo(() => [...new Set(regs.map((r) => r.ator_nome))].sort(), [regs]);
+  const pessoas = useMemo(() => [...new Set([...regs.map((r) => r.ator_nome), ...(pessoa !== 'todas' ? [pessoa] : [])])].sort(), [regs, pessoa]);
   const lista = useMemo(() => {
     const s = busca.trim().toLowerCase();
     return regs.filter((r) => {

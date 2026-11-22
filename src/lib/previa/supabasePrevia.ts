@@ -82,14 +82,17 @@ class Consulta implements PromiseLike<Resp> {
     const t = (this.db.tabelas[this.tabela] ??= []);
     const casa = (r: Linha) => this.filtros.every((f) => f(r));
     if (this.modo === 'insert' || this.modo === 'upsert') {
-      const novos = (Array.isArray(this.carga) ? this.carga : [this.carga ?? {}]).map((r) => ({ id: id(), created_at: new Date().toISOString(), ...DEFAULTS[this.tabela], ...r }));
+      const novos: Linha[] = (Array.isArray(this.carga) ? this.carga : [this.carga ?? {}]).map((r) => ({ id: id(), created_at: new Date().toISOString(), ...DEFAULTS[this.tabela], ...r }));
+      this.db.gatilho?.(this.tabela, 'insert', [], novos);
       t.push(...novos);
       this.db.aoMudar?.(this.tabela);
       return this.fim(novos);
     }
     if (this.modo === 'update') {
       const alvos = t.filter(casa);
+      const antes = alvos.map((r) => ({ ...r }));
       for (const r of alvos) Object.assign(r, this.carga);
+      this.db.gatilho?.(this.tabela, 'update', antes, alvos);
       this.db.aoMudar?.(this.tabela);
       return this.fim(alvos);
     }
@@ -196,6 +199,87 @@ export function criarSupabasePrevia() {
   const avisarAuth = (evento: string) => { setTimeout(() => ouvintesAuth.forEach((cb) => cb(evento, logado ? sessao : null)), 0); };
   const conversa = (cid: unknown) => T.wa_conversas.find((c) => c.id === cid);
   const agoraIso = () => new Date().toISOString();
+
+  /* REGISTROS na prévia: no banco de verdade são os gatilhos que gravam "quem fez o quê"; aqui a mesma
+     coisa acontece em memória, para a tela Registros mostrar na hora o que se faz nas Configurações
+     (criar login, trocar papel/ambientes/telas, senha, conectar e remover WhatsApp). */
+  const ROT_AMB: Record<string, string> = { cobrancas: 'Cobranças', atendimento: 'Atendimento' };
+  const ROT_PAPEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
+  const quemFaz = () => { const p = T.profiles.find((x) => x.id === db.usuario.id); return { ator_id: db.usuario.id, ator_nome: String(p?.nome ?? 'Administrador'), ator_papel: (p?.papel as string) ?? null }; };
+  const proximoRegistro = () => (T.registros ?? []).reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
+  const registrar = (acao: string, entidade: string, rotulo: string | null, detalhe: string, mudancas: Linha[] = [], entidadeId: string | null = null) => {
+    (T.registros ??= []).unshift({ id: proximoRegistro(), quando: agoraIso(), ...quemFaz(), acao, entidade, entidade_id: entidadeId, rotulo, detalhe, mudancas });
+  };
+  const textoAmb = (v: unknown) => (Array.isArray(v) && v.length ? v.map((a) => ROT_AMB[String(a)] ?? String(a)).join(' · ') : 'padrão do papel');
+  const textoTelas = (v: unknown) => (Array.isArray(v) ? `${v.length} tela${v.length === 1 ? '' : 's'}` : 'todas as do papel');
+  db.gatilho = (tabela, op, antes, depois) => {
+    if (tabela === 'registros' && op === 'insert') {
+      // linha vinda da tela (números do Atendimento na prévia): ganha número, hora e quem fez
+      for (const r of depois) Object.assign(r, { id: proximoRegistro() + depois.indexOf(r), quando: agoraIso(), ...quemFaz(), entidade_id: r.entidade_id ?? null, mudancas: r.mudancas ?? [] });
+      return;
+    }
+    if (tabela !== 'profiles' || op !== 'update') return;
+    depois.forEach((d, i) => {
+      const a = antes[i]; const mud: Linha[] = []; const partes: string[] = [];
+      if (a.nome !== d.nome) { mud.push({ c: 'nome', de: a.nome ?? null, para: d.nome ?? null }); partes.push('nome'); }
+      if (a.papel !== d.papel) { mud.push({ c: 'papel', de: ROT_PAPEL[String(a.papel)] ?? a.papel, para: ROT_PAPEL[String(d.papel)] ?? d.papel }); partes.push('papel'); }
+      if (a.ativo !== d.ativo) { mud.push({ c: 'ativo', de: a.ativo ? 'ativo' : 'desativado', para: d.ativo ? 'ativo' : 'desativado' }); partes.push(d.ativo ? 'reativou o acesso' : 'desativou o acesso'); }
+      if (JSON.stringify(a.modulos ?? null) !== JSON.stringify(d.modulos ?? null)) { mud.push({ c: 'modulos', de: textoAmb(a.modulos), para: textoAmb(d.modulos) }); partes.push('ambientes'); }
+      if (JSON.stringify(a.areas ?? null) !== JSON.stringify(d.areas ?? null)) { mud.push({ c: 'areas', de: textoTelas(a.areas), para: textoTelas(d.areas) }); partes.push('telas liberadas'); }
+      if (mud.length) registrar('alterou', 'usuário', String(d.nome ?? ''), partes.join(', '), mud, String(d.id));
+    });
+  };
+
+  /* NÚMEROS de Cobranças na prévia: conectar gera um QR de mentira e, alguns segundos depois, o número
+     aparece conectado — o caminho inteiro da tela, sem nenhuma sessão de WhatsApp de verdade. */
+  const qrFalso = () => {
+    let cels = ''; let x0 = 400 + Math.floor(Math.random() * 900);
+    for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) { x0 = (x0 * 16807) % 2147483647; if (x0 % 5 < 2) cels += `<rect x="${x * 10}" y="${y * 10}" width="10" height="10"/>`; }
+    const olho = (x: number, y: number) => `<rect x="${x}" y="${y}" width="70" height="70" fill="#fff"/><rect x="${x + 5}" y="${y + 5}" width="60" height="60" fill="none" stroke="#000" stroke-width="10"/><rect x="${x + 20}" y="${y + 20}" width="30" height="30"/>`;
+    return 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 210" fill="#000"><rect width="210" height="210" fill="#fff"/>${cels}${olho(0, 0)}${olho(140, 0)}${olho(0, 140)}</svg>`);
+  };
+  const conectarDepois = (canal: Linha) => {
+    setTimeout(() => {
+      if (canal.estado !== 'conectando' || !T.wa_canais.includes(canal)) return;
+      Object.assign(canal, { estado: 'conectado', qr: null, numero: canal.numero ?? `55519${String(Math.floor(80000000 + Math.random() * 19999999))}`, ultimo_evento_em: agoraIso(), verificado_em: agoraIso(), ultimo_erro: null });
+      registrar('conectou', 'whatsapp', String(canal.nome), 'WhatsApp de Cobranças conectado', [], String(canal.id));
+    }, 8000);
+  };
+  const instanciaWa = (b: Linha): unknown => {
+    const k = b.canal_id ? T.wa_canais.find((x) => x.id === b.canal_id) : undefined;
+    const nomeDe = (uid: unknown) => String(T.profiles.find((x) => x.id === uid)?.nome ?? '');
+    if (b.acao === 'create') {
+      // um número por dono: reaproveita o canal dele (reconectar) ou cria
+      let c = b.dono_id ? T.wa_canais.find((x) => x.dono_id === b.dono_id) : T.wa_canais.find((x) => !x.dono_id && x.nome === b.nome);
+      if (!c) {
+        c = { id: id(), nome: String(b.nome ?? 'WhatsApp'), instancia: `previa-${Date.now().toString(36)}`, numero: null, estado: 'desconectado', qr: null, dono_id: b.dono_id ?? null,
+          ultimo_erro: null, ultimo_evento_em: null, verificado_em: null, created_at: agoraIso() };
+        T.wa_canais.push(c);
+      }
+      Object.assign(c, { estado: 'conectando', qr: qrFalso() });
+      conectarDepois(c);
+      return { ok: true, canal_id: c.id };
+    }
+    if (!k) return { ok: true };
+    if (b.acao === 'qr') { Object.assign(k, { estado: 'conectando', qr: qrFalso() }); conectarDepois(k); return { ok: true }; }
+    if (b.acao === 'logout') {
+      const estava = k.estado;
+      Object.assign(k, { estado: 'desconectado', qr: null, ultimo_evento_em: agoraIso() });
+      // QR fechado antes de ler: nada foi conectado, então nada a registrar (e canal recém-criado sem número sai da lista)
+      if (estava === 'conectado') registrar('desconectou', 'whatsapp', String(k.nome), 'WhatsApp de Cobranças desconectado', [], String(k.id));
+      else if (!k.numero) T.wa_canais = T.wa_canais.filter((x) => x !== k);
+      return { ok: true };
+    }
+    if (b.acao === 'remover') { T.wa_canais = T.wa_canais.filter((x) => x !== k); T.wa_conversas = T.wa_conversas.filter((c) => c.canal_id !== k.id); registrar('removeu', 'whatsapp', String(k.nome), 'WhatsApp de Cobranças removido', [], String(k.id)); return { ok: true }; }
+    if (b.acao === 'definir_dono') {
+      const antes = k.dono_id ? nomeDe(k.dono_id) : 'sem dono';
+      k.dono_id = b.dono_id ?? null; if (b.dono_id) k.nome = nomeDe(b.dono_id) || k.nome;
+      registrar('alterou', 'whatsapp', String(k.nome), 'comercial dono do número', [{ c: 'dono', de: antes, para: b.dono_id ? nomeDe(b.dono_id) : 'sem dono' }], String(k.id));
+      return { ok: true };
+    }
+    if (b.acao === 'verificar' || b.acao === 'status') { k.verificado_em = agoraIso(); return { ok: true, estado: k.estado, webhook_ok: true }; }
+    return { ok: true };
+  };
 
   const rpcs: Record<string, (a: Linha) => unknown> = {
     // 1º acesso de quem nasceu com senha temporária (visto pelo "Ver como"): trocou → entra
@@ -304,7 +388,7 @@ export function criarSupabasePrevia() {
       })) : [];
       return { hoje: dia(0), de: b.de, ate: b.ate, itens, cobertura: coberturaRegua(), config: cfg };
     },
-    'reviza-wa-instancia': () => ({ ok: true }),
+    'reviza-wa-instancia': (b) => instanciaWa(b),
     'reviza-admin': (b) => {
       const loginDe = (e: unknown) => String(e ?? '').replace(/@reviza\.local$/i, '');
       const gerar = () => `Rv-${Math.random().toString(36).slice(2, 11)}`;
@@ -315,17 +399,18 @@ export function criarSupabasePrevia() {
         if (T.profiles.some((x) => loginDe(x.email) === usuario)) return { error: 'Ja existe um usuario com esse login.' };
         const senha = (b.senha as string) || gerar();
         T.profiles.push({ id: id(), nome: String(b.nome || usuario), email: `${usuario}@reviza.local`, papel: b.papel ?? 'comercial', ativo: true,
-          deve_trocar_senha: b.senha ? b.exigirTroca !== false : true, created_at: agoraIso(), modulos: Array.isArray(b.modulos) ? b.modulos : null });
+          deve_trocar_senha: b.senha ? b.exigirTroca !== false : true, created_at: agoraIso(), modulos: Array.isArray(b.modulos) ? b.modulos : null, areas: Array.isArray(b.areas) ? b.areas : null });
         salvarPerfis();
+        registrar('cadastrou', 'usuário', String(b.nome || usuario), `papel ${ROT_PAPEL[String(b.papel ?? 'comercial')] ?? b.papel} · ${textoAmb(b.modulos)}`);
         return { usuario, senha };
       }
-      if (b.acao === 'resetar') { const p = achar(); if (p) p.deve_trocar_senha = true; salvarPerfis(); return { senha: gerar() }; }
-      if (b.acao === 'definir_senha') { const p = achar(); if (p) p.deve_trocar_senha = !!b.exigirTroca; salvarPerfis(); return {}; }
-      if (b.acao === 'renomear') { const p = achar(); if (p) p.email = `${String(b.usuario)}@reviza.local`; salvarPerfis(); return { usuario: b.usuario }; }
+      if (b.acao === 'resetar') { const p = achar(); if (p) { p.deve_trocar_senha = true; registrar('alterou', 'usuário', String(p.nome), 'redefiniu a senha (temporária; troca no próximo acesso)', [], String(p.id)); } salvarPerfis(); return { senha: gerar() }; }
+      if (b.acao === 'definir_senha') { const p = achar(); if (p) { p.deve_trocar_senha = !!b.exigirTroca; registrar('alterou', 'usuário', String(p.nome), `definiu uma senha nova${b.exigirTroca ? ' (troca no próximo acesso)' : ''}`, [], String(p.id)); } salvarPerfis(); return {}; }
+      if (b.acao === 'renomear') { const p = achar(); if (p) { const de = loginDe(p.email); p.email = `${String(b.usuario)}@reviza.local`; registrar('alterou', 'usuário', String(p.nome), 'login de entrada', [{ c: 'login', de, para: String(b.usuario) }], String(p.id)); } salvarPerfis(); return { usuario: b.usuario }; }
       if (b.acao === 'excluir') {
         const p = achar(); if (!p) return { error: 'id invalido' };
         if (String(b.confirmar ?? '').trim().toLowerCase() !== loginDe(p.email)) return { error: 'Confirmação não confere: digite o login do usuário.' };
-        T.profiles = T.profiles.filter((x) => x.id !== b.id); salvarPerfis(); return {};
+        T.profiles = T.profiles.filter((x) => x.id !== b.id); salvarPerfis(); registrar('excluiu', 'usuário', String(p.nome), 'excluído do sistema'); return {};
       }
       return { ok: true };
     },

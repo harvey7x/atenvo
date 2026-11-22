@@ -61,6 +61,7 @@ const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
+const ConfigAmbienteV2 = lazy(() => import('@/v2/pages/config/ConfigAmbiente'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
@@ -180,6 +181,9 @@ const routes: RouteObject[] = [
           { path: 'ia', element: <Lz><RequireRoleV2 role="admin"><IaV2 /></RequireRoleV2></Lz> },
           { path: 'fluxos', element: <Lz><RequireRoleV2 role="admin"><FluxosV2 /></RequireRoleV2></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
+          // AMBIENTE CONFIGURAÇÕES da Reviza (22/11): /config/<seção> — WhatsApp, Usuários e acessos, Registros, Minha conta
+          { path: 'config', element: <Lz><ConfigAmbienteV2 /></Lz> },
+          { path: 'config/:secao', element: <Lz><ConfigAmbienteV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
           // Coexistência (Embedded Signup da Meta): rota escondida, sem link no menu.
           { path: 'coexistencia', element: <Lz><RequireRoleV2 role="admin"><CoexistenciaV2 /></RequireRoleV2></Lz> },

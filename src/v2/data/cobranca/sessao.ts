@@ -5,6 +5,7 @@ import { isRevizaMode, supabase } from '@/lib/supabase';
 import { chavesCobranca } from './keys';
 import type { Papel } from './types';
 import { ambientesDoPerfil, type Ambiente } from '../modulos';
+import { lerAreas } from '../config/areas';
 
 export interface SessaoPapel {
   papel: Papel | null; gestor: boolean; podeRevelar: boolean; nome: string | null;
@@ -14,6 +15,8 @@ export interface SessaoPapel {
   id: string | null;
   /** ambientes que a pessoa enxerga (Cobranças / Atendimento) — ver data/modulos.ts */
   ambientes: Ambiente[];
+  /** telas liberadas pelo administrador (profiles.areas); null = todas as que o papel alcança — ver data/config/areas.ts */
+  areas?: string[] | null;
 }
 
 /** mesma lista do banco (pode_aprovar_parado): o cadastro aprova, o comercial não */
@@ -37,7 +40,7 @@ export function usePapel() {
       // dos clientes que já enxerga (o comercial, os dele: reveal_senha/senhas_grade). Cifradas no banco.
       const podeRevelar = papel != null;
       const ambientes = papel ? ambientesDoPerfil(papel, (data as { modulos?: unknown } | null)?.modulos) : [];
-      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id, ambientes };
+      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id, ambientes, areas: papel ? lerAreas((data as { areas?: unknown } | null)?.areas) : null };
     },
   });
 }

@@ -237,12 +237,11 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 }
 /* 9.9 Registros: os indicadores sem altura sobrando e os filtros numa linha só */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpis > .kpi { min-height: 0; }
-@media (min-width: 1380px) {
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-filtros { flex-wrap: nowrap; }
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir { flex: none; flex-wrap: nowrap; }
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir select.inp { width: 108px; }
-  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-busca { width: 168px; }
-}
+/* (22/11: com Atendimento e Configurações são 7 áreas — os filtros ficam em duas linhas certas: as áreas numa, período/pessoa/busca na outra) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-filtros { flex-wrap: wrap; row-gap: 10px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-area { flex: 1 1 100%; flex-wrap: nowrap; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-area .chips { flex-wrap: wrap; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir { margin-left: 0; }
 /* 9.10 formulários: um rótulo só — 12px, médio, sem caixa alta ("Novo cliente" usava caixa alta miúda) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal :is(.nc-rot, .pn-us-campo > label, .pn-us-rot) { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal { border-radius: 14px; }

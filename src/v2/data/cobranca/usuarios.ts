@@ -11,12 +11,15 @@ import { isRevizaMode, supabase } from '@/lib/supabase';
 import { registrarDesfazer, registrarBloqueada } from '../desfazer';
 import type { Papel } from './types';
 import { AMBIENTES, type Ambiente } from '../modulos';
+import { lerAreas } from '../config/areas';
 
 export interface UsuarioRow {
   id: string; nome: string; email: string; papel: Papel; ativo: boolean;
   deve_trocar_senha: boolean; created_at: string; usuario: string;
   /** ambientes marcados pelo administrador (profiles.modulos) — o que vale é ambientesDoPerfil(papel, modulos) */
   modulos?: Ambiente[] | null;
+  /** telas liberadas (profiles.areas): null = todas as que o papel alcança — ver data/config/areas.ts */
+  areas?: string[] | null;
 }
 
 const CHAVE = ['reviza', 'usuarios'] as const;
@@ -98,6 +101,7 @@ export function useUsuarios(habilitado: boolean) {
       return (data ?? []).map((r) => ({
         ...(r as Omit<UsuarioRow, 'usuario'>),
         modulos: Array.isArray((r as { modulos?: unknown }).modulos) ? ((r as { modulos: Ambiente[] }).modulos) : null,
+        areas: lerAreas((r as { areas?: unknown }).areas),
         usuario: String((r as { email?: string }).email ?? '').replace(/@reviza\.local$/i, ''),
       })) as UsuarioRow[];
     },
@@ -143,7 +147,7 @@ export function useCriarUsuario() {
   const qc = useQueryClient();
   return useMutation({
     /** senha vazia = gera temporária (troca obrigatória no 1º acesso) */
-    mutationFn: async (a: { usuario: string; nome: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[] }) => {
+    mutationFn: async (a: { usuario: string; nome: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[]; areas?: string[] | null }) => {
       if (real()) return chamarAdmin({ acao: 'criar', ...a });
       const usuario = loginValido(a.usuario);
       if (!usuario) throw new Error('Usuário inválido (use letras, números, ponto, hífen).');
@@ -151,7 +155,7 @@ export function useCriarUsuario() {
       if (l.some((x) => x.usuario === usuario)) throw new Error('Já existe um usuário com esse nome.');
       if (a.senha) { const f = senhaFraca(a.senha); if (f) throw new Error(f); }
       const senha = a.senha || gerarSenhaDemo();
-      demoGravar([...l, { id: `demo-${Date.now().toString(36)}`, nome: a.nome.trim() || usuario, usuario, email: `${usuario}@alfa.demo`, papel: a.papel, ativo: true, deve_trocar_senha: a.senha ? a.exigirTroca !== false : true, created_at: new Date().toISOString(), modulos: a.modulos ?? null }]);
+      demoGravar([...l, { id: `demo-${Date.now().toString(36)}`, nome: a.nome.trim() || usuario, usuario, email: `${usuario}@alfa.demo`, papel: a.papel, ativo: true, deve_trocar_senha: a.senha ? a.exigirTroca !== false : true, created_at: new Date().toISOString(), modulos: a.modulos ?? null, areas: a.areas ?? null }]);
       return { usuario, senha };
     },
     onSuccess: (_d, a) => { invalidar(qc); registrarBloqueada(`criar usuário ${a.nome}`, 'Criação de usuário não é desfeita por aqui — desative ou exclua o usuário na tela Usuários.'); },
@@ -281,6 +285,31 @@ export function useDefinirAmbientes() {
       registrarDesfazer({ rotulo: `ambientes de ${ctx?.nome ?? 'usuário'}`, inverso: async () => {
         if (!real()) { demoMudar(a.id, { modulos: antes }); return; }
         const { error } = await supabase!.from('profiles').update({ modulos: antes }).eq('id', a.id); if (error) throw new Error(error.message);
+      } });
+    },
+  });
+}
+
+/** ÁREAS da pessoa (22/11): as telas que ela vê dentro do que o papel alcança. null = sem restrição
+    (todas as do papel). Vale na hora: o menu e a rota leem do perfil (data/config/areas.ts). */
+export function useDefinirAreas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: { id: string; areas: string[] | null }) => {
+      const lista = a.areas ? lerAreas(a.areas) : null;
+      if (lista && !lista.length) throw new Error('Marque pelo menos uma tela — sem nenhuma, a pessoa entra e não vê nada.');
+      if (!real()) { demoMudar(a.id, { areas: lista }); return; }
+      const { error } = await supabase!.from('profiles').update({ areas: lista }).eq('id', a.id);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (a) => { const u = qc.getQueryData<UsuarioRow[]>(CHAVE)?.find((x) => x.id === a.id); return { antes: u?.areas ?? null, nome: u?.nome }; },
+    onSuccess: (_d, a, ctx) => {
+      invalidar(qc);
+      void qc.invalidateQueries({ queryKey: ['cobranca', 'papel'] });
+      const antes = ctx?.antes ?? null;
+      registrarDesfazer({ rotulo: `telas de ${ctx?.nome ?? 'usuário'}`, inverso: async () => {
+        if (!real()) { demoMudar(a.id, { areas: antes }); return; }
+        const { error } = await supabase!.from('profiles').update({ areas: antes }).eq('id', a.id); if (error) throw new Error(error.message);
       } });
     },
   });

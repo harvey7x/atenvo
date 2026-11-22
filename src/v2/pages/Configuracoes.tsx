@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 import { WA_REAL, useWaCanais } from '@/data/whatsapp';
@@ -158,7 +158,13 @@ function seedCfg(): SeedCfg {
   };
 }
 
-export default function ConfiguracoesV2() {
+/* AMBIENTE CONFIGURAÇÕES da Reviza (22/11): cada seção desta tela virou um item do menu do ambiente
+   (/config/conta, /config/atendimento, /config/notificacoes, /config/preferencias). `abaFixa` mostra
+   UMA seção, com o título dela e sem a lista de abas; o endereço antigo (/configuracoes) leva para lá. */
+const ABA_PARA_CONFIG: Record<string, string> = { conta: 'conta', usuarios: 'usuarios', canais: 'whatsapp', atendimento: 'atendimento', notif: 'notificacoes', prefs: 'preferencias' };
+const TITULO_ABA_FIXA: Record<string, string> = { conta: 'Conta', atendimento: 'Regras do atendimento', notif: 'Notificações', prefs: 'Preferências' };
+
+export default function ConfiguracoesV2({ abaFixa }: { abaFixa?: string } = {}) {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -173,7 +179,7 @@ export default function ConfiguracoesV2() {
   // Reviza: o administrador abre direto nos Usuários (é o que esta tela ganhou); quem não é admin não tem a aba
   const abas = isRevizaMode ? TABS_REVIZA.filter((t) => t.id !== 'usuarios' || podeAdmin) : TABS;
   const abaPadrao = isRevizaMode && podeAdmin ? 'usuarios' : 'conta';
-  const [tab, setTab] = useState(initialTab && abas.some((t) => t.id === initialTab) ? initialTab : abaPadrao);
+  const [tab, setTab] = useState(abaFixa ?? (initialTab && abas.some((t) => t.id === initialTab) ? initialTab : abaPadrao));
   useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab) && abas.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -203,11 +209,15 @@ export default function ConfiguracoesV2() {
     }
   }, [tab]);
 
+  // Reviza: o endereço antigo abre a seção correspondente do ambiente Configurações
+  if (isRevizaMode && !abaFixa) return <Navigate to={`/config/${ABA_PARA_CONFIG[initialTab ?? ''] ?? ''}`} replace />;
+
   return (
     <>
       <div className="ph sobe">
         <div>
-          <h2>Configurações</h2>
+          {abaFixa && <div className="cob-migalha">Configurações</div>}
+          <h2>{abaFixa ? (TITULO_ABA_FIXA[abaFixa] ?? 'Configurações') : 'Configurações'}</h2>
         </div>
       </div>
 
@@ -220,14 +230,14 @@ export default function ConfiguracoesV2() {
 
       {DEMO_MODE && podeAdmin && <DemoResetCard demo={demo} aoAvisar={setAviso} />}
 
-      <div className="cfg" ref={raizRef}>
-        <CardVidro sobe className="cfg-nav" atraso={0.08} role="tablist" aria-label="Seções de configurações">
+      <div className={abaFixa ? 'cfg cfg-so' : 'cfg'} ref={raizRef}>
+        {!abaFixa && <CardVidro sobe className="cfg-nav" atraso={0.08} role="tablist" aria-label="Seções de configurações">
           {abas.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'it on' : 'it'} onClick={() => setTab(t.id)}>
               {t.label}
             </button>
           ))}
-        </CardVidro>
+        </CardVidro>}
 
         {/* paridade v1: as 6 seções ficam SEMPRE montadas e alternam por CSS —
             edições não salvas, filtros e menus sobrevivem à troca de aba */}

@@ -53,6 +53,8 @@ function MarcaAlfa() { return <IconeReviza />; }
 export const ICONE_AMBIENTE: Record<string, ReactNode> = {
   cobrancas: svg(<><path d="M5 3.5h14v17l-2.4-1.5-2.3 1.5-2.3-1.5-2.3 1.5-2.3-1.5L5 20.5z" /><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" /></>, 16),
   atendimento: svg(<path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.6A7.5 7.5 0 1 1 20 11.5z" />, 16),
+  // Configurações (ambiente de 22/11): os controles deslizantes
+  configuracoes: svg(<><path d="M20 7h-9" /><path d="M14 17H5" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></>, 16),
 };
 const IcCheck = () => svg(<path d="M20 6 9 17l-5-5" />, 16, 'ba-menu-check');
 

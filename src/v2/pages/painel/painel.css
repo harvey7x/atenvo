@@ -789,3 +789,16 @@ html[data-barra-alfa] .v2 .rt-av { color: var(--txt); background: rgba(var(--tin
   html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab .pn-us-1a { display: none; }
   html[data-barra-alfa]:not(#rv-sis) .v2 .pn-us-tab .pn-eq-nm small { white-space: normal; }
 }
+
+/* ---- TELAS de cada pessoa (22/11): a lista de telas por ambiente em Usuários e acessos ---- */
+.v2 .pn-us-telas { display: flex; flex-direction: column; gap: 10px; }
+.v2 .pn-us-telas-amb { padding: 10px 12px 12px; border: 1px solid var(--lin-fio, var(--linha)); border-radius: 10px; background: rgba(var(--tint), .02); }
+.v2 .pn-us-telas-cab { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 12.5px; color: var(--txt); }
+.v2 .pn-us-telas-cab b { font-weight: 600; }
+.v2 .pn-us-telas-cab .num { font-size: 11.5px; color: var(--txt-3); }
+.v2 .pn-us-telas-cab .pn-link { margin-left: auto; font-size: 11.5px; }
+.v2 .pn-us-telas-lista { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px 12px; }
+.v2 .pn-us-telas-lista .pn-us-check { min-width: 0; }
+.v2 .pn-us-telas-tx.restrito { color: var(--cor-acento-txt, var(--azul)); }
+@media (max-width: 620px) { .v2 .pn-us-telas-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+

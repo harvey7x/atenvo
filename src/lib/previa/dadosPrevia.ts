@@ -13,6 +13,8 @@ export interface Banco {
   usuario: { id: string; email: string; user_metadata: Record<string, unknown> };
   /** chamado depois de cada gravação (a prévia guarda os usuários entre recargas) */
   aoMudar?: (tabela: string) => void;
+  /** faz as vezes dos gatilhos do banco (ex.: toda mudança em profiles vira uma linha em registros) */
+  gatilho?: (tabela: string, op: 'insert' | 'update' | 'delete', antes: Linha[], depois: Linha[]) => void;
 }
 
 const MIN = 60_000;
@@ -256,6 +258,11 @@ export function criarBanco(): Banco {
       aviso_anexos: [],
       // registros de exemplo (a tela de Registros mostra a lista, não só o vazio)
       registros: [
+        { id: 12, quando: iso(agora - 0.1 * H), ator_id: 'u-carla', ator_nome: 'Carla', ator_papel: 'atendente', acao: 'moveu', entidade: 'card do Kanban', entidade_id: null, rotulo: 'Terezinha de Jesus', detalhe: 'de "Em atendimento" para "Documentação"', mudancas: [{ c: 'etapa', de: 'Em atendimento', para: 'Documentação' }] },
+        { id: 11, quando: iso(agora - 0.2 * H), ator_id: 'u-bianca', ator_nome: 'Bianca', ator_papel: 'atendente', acao: 'assumiu', entidade: 'conversa', entidade_id: null, rotulo: 'João Batista Ramos', detalhe: 'passou a responder pelo número Atendimento principal', mudancas: [] },
+        { id: 10, quando: iso(agora - 2 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'conectou', entidade: 'whatsapp', entidade_id: null, rotulo: 'Campanha de novembro', detalhe: 'WhatsApp do Atendimento conectado', mudancas: [] },
+        { id: 9, quando: iso(agora - 4 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-bruna', rotulo: 'Bruna', detalhe: 'redefiniu a senha (troca no próximo acesso)', mudancas: [] },
+        { id: 8, quando: iso(agora - 27 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-paty', rotulo: 'Paty', detalhe: 'ambientes da pessoa', mudancas: [{ c: 'modulos', de: 'Cobranças', para: 'Cobranças · Atendimento' }] },
         { id: 7, quando: iso(agora - 0.3 * H), ator_id: 'u-eduardo', ator_nome: 'Eduardo', ator_papel: 'comercial', acao: 'lançou', entidade: 'pagamento', entidade_id: null, rotulo: 'Maria Aparecida Souza', detalhe: 'informou pagamento de R$ 65,00 (out/26)', mudancas: [] },
         { id: 6, quando: iso(agora - 1.2 * H), ator_id: 'u-bruna', ator_nome: 'Bruna', ator_papel: 'financeiro', acao: 'confirmou', entidade: 'pagamento', entidade_id: null, rotulo: 'José Carlos Pereira', detalhe: 'pagamento de R$ 110,00 (out/26)', mudancas: [] },
         { id: 5, quando: iso(agora - 3 * H), ator_id: 'u-paty', ator_nome: 'Paty', ator_papel: 'comercial', acao: 'editou', entidade: 'cliente', entidade_id: null, rotulo: 'Antônia Ferreira Lima', detalhe: 'atualizou o cadastro (2 campos)', mudancas: [{ c: 'telefone', de: '5199990001', para: '5199990002' }, { c: 'valor', de: '300', para: '350' }] },
