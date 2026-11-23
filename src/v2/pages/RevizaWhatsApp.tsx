@@ -34,7 +34,7 @@ import {
 } from './regua/ReguaTela';
 import { useDadosCobranca } from '../data/cobranca/hooks';
 import { useUsuarios } from '../data/cobranca/usuarios';
-import { ambientesDoPerfil } from '../data/modulos';
+import { ambientesCadastrados as ambientesDoPerfil } from '../data/modulos';
 import { NumerosVista, type ComercialCobertura, type NumeroItem } from './painel/NumerosVista';
 import {
   corDe, diaSP, fmtHa, horaSP, iniciaisDe, mmss, nomeAgenda, ondaDe, rotuloDiaFio, rotuloHoraLista, tomEspera, Tiques,

@@ -10,7 +10,7 @@ import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoErro, EstadoVazi
 import { IconeTile } from '../../components/CartaoMetrica';
 import { AcoesNoTopo } from '../comunicacao/MenuMais';
 import { formatarTelefone } from '../../lib/telefone';
-import { ROTULO_AMBIENTE, ambientesDoPerfil, type Ambiente } from '../../data/modulos';
+import { ROTULO_AMBIENTE, ambientesCadastrados as ambientesDoPerfil, type Ambiente } from '../../data/modulos';
 import { useConectarWA, useDefinirDonoWA, useDesconectarWA, useNovoQrWA, useRemoverWA, useVerificarCanalWA } from '../../data/wa/wa';
 import { temRecurso } from '../../data/config/recursos';
 import { useAcoesAtendimento, useConexoesWA, type ConexaoWA, type EstadoConexao } from '../../data/config/conexoes';

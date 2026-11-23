@@ -10,7 +10,8 @@ import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoErro, EstadoVazi
 import { IconeTile } from '../../components/CartaoMetrica';
 import { AcoesNoTopo } from '../comunicacao/MenuMais';
 import { formatarTelefone } from '../../lib/telefone';
-import { ambientesDoPerfil } from '../../data/modulos';
+import { ambientesCadastrados } from '../../data/modulos';
+import { temRecurso } from '../../data/config/recursos';
 import { useConexoesWA, type ConexaoWA } from '../../data/config/conexoes';
 import { useEquipes, useExcluirEquipe, useSalvarEquipe, type Equipe } from '../../data/config/equipes';
 import type { UsuarioRow } from '../../data/cobranca/usuarios';
@@ -20,6 +21,8 @@ const iniciais = (n: string) => (n || '?').trim().split(/\s+/).map((p) => p[0]).
 const fone = (n: string | null) => (n ? formatarTelefone(n) || n : null);
 const ROT_PAPEL: Record<string, string> = { admin: 'administrador', gestor: 'gestor', comercial: 'comercial', financeiro: 'financeiro', cadastro: 'cadastro', atendente: 'atendente' };
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+/** o Atendimento já está ligado nesta instalação? Sem ele as equipes são só cadastro (o gerente ainda não vê conversas) */
+const ATD_LIGADO = temRecurso('atendimento');
 
 export function ConfigEquipes() {
   const eq = useEquipes();
@@ -29,7 +32,7 @@ export function ConfigEquipes() {
 
   const equipes = eq.data ?? [];
   // quem pode entrar numa equipe: as pessoas ativas que trabalham no Atendimento
-  const pessoas = useMemo(() => con.usuarios.filter((u) => u.ativo && ambientesDoPerfil(u.papel, u.modulos).includes('atendimento')), [con.usuarios]);
+  const pessoas = useMemo(() => con.usuarios.filter((u) => u.ativo && ambientesCadastrados(u.papel, u.modulos).includes('atendimento')), [con.usuarios]);
   const numeros = useMemo(() => con.lista.filter((c) => c.ambiente === 'atendimento'), [con.lista]);
   const nomeDe = (id: string | null) => { const u = con.usuarios.find((x) => x.id === id); return u ? (u.nome || u.usuario) : null; };
 
@@ -53,8 +56,14 @@ export function ConfigEquipes() {
         <Kpi rotulo="Equipes" icone={<IconeTile nome="pessoas" />} valor={equipes.length} nota={equipes.length ? plural(gerentes, 'gerente', 'gerentes') : 'Nenhuma equipe ainda'} />
         <Kpi rotulo="Pessoas em equipe" icone={<IconeTile nome="entra" />} valor={atendem.length - semEquipe} nota={semEquipe ? `${plural(semEquipe, 'pessoa', 'pessoas')} do Atendimento sem equipe` : 'Todo o Atendimento em equipe'} />
         <Kpi rotulo="WhatsApp com equipe" icone={<IconeTile nome="telefone" />} valor={numerosComEquipe} nota={numeros.length ? `de ${plural(numeros.length, 'número', 'números')} do Atendimento` : 'Nenhum número do Atendimento ainda'} />
-        <Kpi rotulo="Equipes sem WhatsApp" icone={<IconeTile nome="alerta" />} valor={equipesSemNumero} nota={equipesSemNumero ? 'Escolha o número de cada uma' : 'Toda equipe tem o seu número'} />
+        <Kpi rotulo="Equipes sem WhatsApp" icone={<IconeTile nome="alerta" />} valor={equipesSemNumero} nota={!ATD_LIGADO ? 'O WhatsApp entra quando o Atendimento for ligado' : equipesSemNumero ? 'Escolha o número de cada uma' : 'Toda equipe tem o seu número'} />
       </div>
+
+      {!ATD_LIGADO && (
+        <div className="cfge-aviso sobe" role="note">
+          <b>As equipes já podem ser montadas.</b> O Atendimento ainda vai ser ligado: quando estiver, cada gerente passa a ver as conversas da equipe e o WhatsApp de cada uma é escolhido aqui. Até lá, quem só trabalha no Atendimento entra no sistema e vê esse aviso.
+        </div>
+      )}
 
       <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.06s' }}>
         <div className="pn-card-cab pn-us-cab">
@@ -200,7 +209,7 @@ function JanelaEquipe({ equipe, equipes, pessoas, numeros, nomeDe, aoFechar, aoA
         <div className="pn-us-campo">
           <span className="pn-us-rot">Pessoas da equipe</span>
           {pessoas.filter((u) => u.id !== gerente).length === 0
-            ? <span className="pn-us-dica">Ninguém mais trabalha no Atendimento ainda. Libere o Atendimento para a pessoa em Usuários e acessos.</span>
+            ? <span className="pn-us-dica">Ninguém mais trabalha no Atendimento ainda. Em Usuários e acessos, crie a pessoa com o papel Atendente ou marque o ambiente Atendimento para ela.</span>
             : (
               <div className="cfge-opcoes" role="group" aria-label="Pessoas da equipe">
                 {pessoas.filter((u) => u.id !== gerente).map((u) => {
@@ -219,7 +228,7 @@ function JanelaEquipe({ equipe, equipes, pessoas, numeros, nomeDe, aoFechar, aoA
         <div className="pn-us-campo">
           <span className="pn-us-rot">WhatsApp da equipe</span>
           {numeros.length === 0
-            ? <span className="pn-us-dica">Nenhum número do Atendimento conectado ainda. Conecte em WhatsApp e volte aqui para escolher.</span>
+            ? <span className="pn-us-dica">{ATD_LIGADO ? 'Nenhum número do Atendimento conectado ainda. Conecte em WhatsApp e volte aqui para escolher.' : 'Os números do Atendimento aparecem aqui quando o Atendimento for ligado.'}</span>
             : (
               <div className="cfge-opcoes" role="group" aria-label="WhatsApp da equipe">
                 {numeros.map((n) => {

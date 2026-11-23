@@ -1,3 +1,4 @@
+import { AtendimentoAguardando } from '../pages/AtendimentoAguardando';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -30,7 +31,7 @@ import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
 import { secaoDoPapel } from '../data/cobranca/secoes';
 import { rotaAtendimentoPermitida } from '../data/modulos';
-import { temRecurso } from '../data/config/recursos';
+import { temRecurso, temCadastroAtendimento } from '../data/config/recursos';
 import { areaDaRota, areaLiberada } from '../data/config/areas';
 import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
@@ -198,8 +199,9 @@ const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
 // Iris e Regras do atendimento só entram quando a instalação tem essas peças no servidor (config/recursos.ts)
 const CFG_GRUPOS: GrupoNav[] = [
   { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }, { slug: 'config/integracoes', rotulo: 'Integrações', admin: true }] },
-  // Equipes (gerente, pessoas e WhatsApp de cada equipe) são do Atendimento: só com ele no servidor
-  { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, ...(temRecurso('atendimento') ? [{ slug: 'config/equipes', rotulo: 'Equipes', admin: true }] : []), { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
+  // Equipes (gerente, pessoas e WhatsApp de cada equipe) são do Atendimento: aparecem quando ele está no
+  // servidor ou quando já dá para cadastrá-lo (recurso "acessos")
+  { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, ...(temCadastroAtendimento() ? [{ slug: 'config/equipes', rotulo: 'Equipes', admin: true }] : []), { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
   { rotulo: 'Atendimento', itens: [
     ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }] : []),
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
@@ -853,6 +855,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
   // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
   const acessoCarregando = isRevizaMode && papelQ.isPending;
+  // (23/11) a pessoa só tem o Atendimento e ele ainda não foi ligado nesta instalação: o aviso, nunca as Cobranças
+  const aguardaAtendimento = isRevizaMode && !papelQ.isPending && papelSessao?.papel != null && !temRecurso('atendimento')
+    && !!papelSessao.ambientesCadastro && !papelSessao.ambientesCadastro.includes('cobrancas');
   // a barra lateral desenha o ambiente para onde a pessoa VAI (sem piscar o menu do ambiente que ela não tem)
   const moduloDaBarra: ModuloId = semAcessoAoAmbiente ? (modulosDisponiveis[0]?.id ?? moduloAtivo) : moduloAtivo;
   const modulo = MODULOS.find((m) => m.id === moduloDaBarra) ?? MODULOS[0];
@@ -995,6 +1000,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         )}
       </NavLink>
   );
+
+  if (aguardaAtendimento) return <AtendimentoAguardando nome={papelSessao?.nome ?? null} aoSair={() => void sair()} />;
 
   return (
     <div className="v2 app-v2">

@@ -15,8 +15,8 @@ import {
   useMeuId, useResetarSenha, useUsuarios, type UsuarioRow,
 } from '../data/cobranca/usuarios';
 import type { Papel } from '../data/cobranca/types';
-import { temRecurso } from '../data/config/recursos';
-import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
+import { temRecurso, temCadastroAtendimento } from '../data/config/recursos';
+import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesCadastrados as ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
 import { AREAS, areasPossiveis, resumoAreas } from '../data/config/areas';
 import { lerDesfazer, useDesfazerEstado } from '../data/desfazer';
 import { AcoesNoTopo, MenuMais } from './comunicacao/MenuMais';
@@ -27,7 +27,8 @@ const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'G
 // + atendente (11/11): quem trabalha só no Atendimento
 // o que esta instalação tem no servidor (config/recursos.ts): sem o Atendimento não há papel de atendente nem
 // escolha de ambiente; sem as telas por pessoa não há a coluna nem o campo de telas
-const TEM_ATD = temRecurso('atendimento'), TEM_TELAS = temRecurso('telas');
+// (23/11) o Atendimento pode ser CADASTRADO antes de estar ligado (recurso "acessos"): papel, ambientes e equipes
+const TEM_ATD = temCadastroAtendimento(), TEM_TELAS = temRecurso('telas');
 const PAPEIS: Papel[] = TEM_ATD ? ['comercial', 'financeiro', 'cadastro', 'atendente', 'admin'] : ['comercial', 'financeiro', 'cadastro', 'admin'];
 const PAPEL_DESC: Record<Papel, string> = {
   comercial: 'Painel com os clientes dele, Novos, Gestão, Calendário, Régua, Conversas, Números e Envios. Vê só a própria carteira.',

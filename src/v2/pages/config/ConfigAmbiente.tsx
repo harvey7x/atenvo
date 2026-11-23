@@ -16,7 +16,7 @@ import { lazy, Suspense } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { isRevizaMode } from '@/lib/supabase';
-import { temRecurso } from '../../data/config/recursos';
+import { temCadastroAtendimento, temRecurso } from '../../data/config/recursos';
 import ConfiguracoesV2 from '../Configuracoes';
 import { AbaUsuarios } from '../RevizaUsuarios';
 import { RevizaRegistros } from '../RevizaRegistros';
@@ -62,7 +62,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || ((secao === 'atendimento' || secao === 'equipes') && !temRecurso('atendimento'))) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);

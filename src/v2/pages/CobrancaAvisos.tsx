@@ -21,7 +21,7 @@ import {
   type Aviso, type AvisoDemo, type AnexoAviso, type NovoAnexoAviso, type TipoAnexoAviso,
 } from '../data/cobranca/avisos';
 import { useUsuarios } from '../data/cobranca/usuarios';
-import { ambientesDoPerfil } from '../data/modulos';
+import { ambientesCadastrados as ambientesDoPerfil } from '../data/modulos';
 import type { Papel } from '../data/cobranca/types';
 import { ATENDENTES_DEMO } from './cobrancaAnalytics';
 import { AcoesNoTopo } from './comunicacao/MenuMais';

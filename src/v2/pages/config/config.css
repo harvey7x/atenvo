@@ -253,3 +253,6 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 .v2 .cfge-muda b { color: var(--txt); font-weight: 600; }
 .v2 .cfge-texto { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
 @media (max-width: 720px) { .v2 .cfge-explica, .v2 .cfge-opcoes { grid-template-columns: 1fr; } }
+
+.v2 .cfge-aviso { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); padding: 11px 14px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(var(--tint), .035); }
+.v2 .cfge-aviso b { color: var(--txt); font-weight: 600; }

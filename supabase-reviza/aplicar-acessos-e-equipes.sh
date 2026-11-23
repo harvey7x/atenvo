@@ -31,5 +31,5 @@ echo "» 2/2 função reviza-admin (aceita o papel atendente, os ambientes e as 
 TMP="$(mktemp -d)"; mkdir -p "$TMP/supabase/functions"
 cp -R "$AQUI/functions/reviza-admin" "$TMP/supabase/functions/reviza-admin"
 cd "$TMP"
-supabase functions deploy reviza-admin --project-ref "$REF"
+supabase functions deploy reviza-admin --project-ref "$REF" --use-api
 echo "✓ servidor pronto para ambientes e telas por pessoa. As equipes aparecem na tela quando o Atendimento for ligado."

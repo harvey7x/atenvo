@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { isRevizaMode, supabase } from '@/lib/supabase';
 import { chavesCobranca } from './keys';
 import type { Papel } from './types';
-import { ambientesDoPerfil, type Ambiente } from '../modulos';
+import { ambientesCadastrados, ambientesDoPerfil, type Ambiente } from '../modulos';
 import { lerAreas } from '../config/areas';
 
 export interface SessaoPapel {
@@ -15,6 +15,8 @@ export interface SessaoPapel {
   id: string | null;
   /** ambientes que a pessoa enxerga (Cobranças / Atendimento) — ver data/modulos.ts */
   ambientes: Ambiente[];
+  /** os ambientes gravados no perfil, mesmo o que esta instalação ainda não ligou (ver data/modulos.ts) */
+  ambientesCadastro?: Ambiente[];
   /** telas liberadas pelo administrador (profiles.areas); null = todas as que o papel alcança — ver data/config/areas.ts */
   areas?: string[] | null;
 }
@@ -40,7 +42,9 @@ export function usePapel() {
       // dos clientes que já enxerga (o comercial, os dele: reveal_senha/senhas_grade). Cifradas no banco.
       const podeRevelar = papel != null;
       const ambientes = papel ? ambientesDoPerfil(papel, (data as { modulos?: unknown } | null)?.modulos) : [];
-      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id, ambientes, areas: papel ? lerAreas((data as { areas?: unknown } | null)?.areas) : null };
+      // (23/11) o que está gravado, mesmo o Atendimento que ainda não foi ligado: quem só tem ele vê o aviso
+      const ambientesCadastro = papel ? ambientesCadastrados(papel, (data as { modulos?: unknown } | null)?.modulos) : [];
+      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id, ambientes, ambientesCadastro, areas: papel ? lerAreas((data as { areas?: unknown } | null)?.areas) : null };
     },
   });
 }

@@ -8,14 +8,16 @@
                      (inclusive o que ainda não tem dono);
      atendente       igual a antes: só as conversas dele.
    Tabela `equipes` (id, nome, gerente_id, membros[], canais[]). Só o administrador grava.
-   Faz parte do Atendimento: sem ele no servidor (config/recursos.ts) nada disto aparece nem consulta.
+   Faz parte do Atendimento, mas dá para CADASTRAR antes dele estar ligado (recurso "acessos", migrations 91
+   e 92): a tabela, as regras e a exclusividade já ficam no banco; o gerente passa a ver as conversas quando
+   o Atendimento for ligado. Sem nenhum dos dois (config/recursos.ts) nada disto aparece nem consulta.
    NO SERVIDOR (quando o Atendimento existir no banco do Reviza): a mesma regra tem de valer no banco
    (quem lê cada conversa) e o salvar precisa virar uma operação só. Hoje só a prévia exercita isto. */
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { isPrevia, isRevizaMode, supabase } from '@/lib/supabase';
-import { temRecurso } from './recursos';
+import { temCadastroAtendimento } from './recursos';
 
 export interface Equipe {
   id: string;
@@ -28,7 +30,7 @@ export interface Equipe {
 }
 
 const CHAVE = ['reviza', 'equipes'] as const;
-const ligado = () => isRevizaMode && !!supabase && temRecurso('atendimento');
+const ligado = () => isRevizaMode && !!supabase && temCadastroAtendimento();
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 const ler = (r: Record<string, unknown>): Equipe => ({
   id: String(r.id), nome: String(r.nome ?? ''), gerenteId: r.gerente_id ? String(r.gerente_id) : null, membros: ids(r.membros), canais: ids(r.canais),

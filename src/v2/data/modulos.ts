@@ -30,10 +30,16 @@ const soOQueExiste = (l: Ambiente[]): Ambiente[] => {
   return f.length ? f : ['cobrancas'];
 };
 export function ambientesDoPerfil(papel: string | null | undefined, modulos: unknown): Ambiente[] {
+  return soOQueExiste(ambientesCadastrados(papel, modulos));
+}
+/** os ambientes GRAVADOS no perfil, mesmo o que esta instalação ainda não tem ligado (23/11): é o que vale
+    nas listas de gente (quem é das Cobranças, quem pode entrar numa equipe) e na tela de Usuários.
+    ambientesDoPerfil é o que a pessoa consegue abrir HOJE. */
+export function ambientesCadastrados(papel: string | null | undefined, modulos: unknown): Ambiente[] {
   const fixos = ambientesFixos(papel);
-  if (fixos) return soOQueExiste(fixos);
+  if (fixos) return fixos;
   const lista = Array.isArray(modulos) ? AMBIENTES.filter((a) => (modulos as unknown[]).some((m) => ehAmbiente(m) && m === a)) : [];
-  return soOQueExiste(lista.length ? lista : ['cobrancas']);
+  return lista.length ? lista : ['cobrancas'];
 }
 
 /** liga/desliga um ambiente na lista (nunca deixa vazia: sem nenhum, a pessoa não entraria em nada) */
