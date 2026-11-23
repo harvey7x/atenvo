@@ -233,3 +233,23 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 @media (max-width: 900px) { .v2 .cfgi-gerar { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-gerar-acao { padding-top: 0; } }
 /* o que a Iris do Reviza ainda não usa (modelos por função) não aparece nas abas dela */
 .v2 .ia-wrap[data-aba-ativa] > [data-fora-do-reviza] { display: none !important; }
+
+/* ---------- Equipes (23/11): gerente, pessoas e o WhatsApp de cada equipe ---------- */
+.v2 .cfge-tab td { vertical-align: middle; }
+.v2 .cfge-nomes { display: block; white-space: normal; line-height: 1.4; }
+.v2 .cfge-nums { display: inline-flex; flex-direction: column; gap: 6px; }
+.v2 .cfge-num { display: flex; flex-direction: column; line-height: 1.3; font-size: 12.5px; color: var(--txt); }
+.v2 .cfge-num small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfge-explica { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v2 .cfge-opcoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.v2 .cfge-op { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--linha); background: rgba(var(--tint), .025); font-size: 12.5px; color: var(--txt); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.v2 .cfge-op:hover { border-color: rgba(var(--tint), .25); }
+.v2 .cfge-op:has(input:checked) { border-color: var(--azul); background: rgba(var(--tint), .05); }
+.v2 .cfge-op:has(input:focus-visible) { outline: 2px solid var(--azul); outline-offset: 2px; }
+.v2 .cfge-op input { margin: 2px 0 0; width: 15px; height: 15px; flex: none; accent-color: var(--azul); }
+.v2 .cfge-op span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.v2 .cfge-op small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfge-muda { font-size: 12px; line-height: 1.45; color: var(--txt-2); padding: 9px 11px; border-radius: 9px; background: rgba(var(--tint), .045); border: 1px solid var(--linha); }
+.v2 .cfge-muda b { color: var(--txt); font-weight: 600; }
+.v2 .cfge-texto { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+@media (max-width: 720px) { .v2 .cfge-explica, .v2 .cfge-opcoes { grid-template-columns: 1fr; } }

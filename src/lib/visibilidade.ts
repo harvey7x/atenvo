@@ -1,5 +1,6 @@
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
+import { useEscopoEquipe } from '@/v2/data/config/equipes';
 
 /* ------------------------------------------------------------------
    Visibilidade da carteira (pedido do dono, 22/10): só o ADMIN vê os
@@ -9,6 +10,9 @@ import { useOrg } from '@/context/OrgContext';
    Kanban, Contatos, Pós-venda, Pendências, Portabilidades e avisos.
    Cliente sem dono também fica só com o admin (decisão do dono).
    Modo demonstração (sem Supabase) vê tudo: o seed não tem dono real.
+   EQUIPES (Reviza, 23/11): o GERENTE de uma equipe vê também as conversas
+   das pessoas da equipe e tudo o que chega nos números de WhatsApp dela
+   (v2/data/config/equipes.ts). O atendente continua vendo só as dele.
    ------------------------------------------------------------------ */
 
 export function veTodosClientes(role: string | undefined): boolean {
@@ -20,8 +24,11 @@ export interface Visibilidade {
   veTodos: boolean;
   /** id do usuário logado (dono dos clientes que ele pode ver). */
   uid: string | null;
-  /** o cliente deste responsável pode aparecer para o usuário? */
-  podeVer: (responsavelId: string | null | undefined) => boolean;
+  /** gerente de equipe (e não administrador): vê a equipe inteira, não só a própria carteira. */
+  veEquipe: boolean;
+  /** o cliente deste responsável pode aparecer para o usuário? O número (canal) da conversa, quando
+      informado, vale para o gerente: o que chega no WhatsApp da equipe é da equipe, mesmo sem dono. */
+  podeVer: (responsavelId: string | null | undefined, canalId?: string | null) => boolean;
 }
 
 export function useVisibilidade(): Visibilidade {
@@ -29,10 +36,14 @@ export function useVisibilidade(): Visibilidade {
   const { currentOrg } = useOrg();
   const veTodos = mode !== 'supabase' || veTodosClientes(currentOrg?.role);
   const uid = user?.id ?? null;
+  const equipe = useEscopoEquipe();
+  const veEquipe = !veTodos && equipe.gerente;
   return {
     veTodos,
     uid,
-    podeVer: (responsavelId) => veTodos || (!!uid && responsavelId === uid),
+    veEquipe,
+    podeVer: (responsavelId, canalId) => veTodos || (!!uid && responsavelId === uid)
+      || (veEquipe && ((!!responsavelId && equipe.pessoas.has(responsavelId)) || (!!canalId && equipe.canais.has(canalId)))),
   };
 }
 

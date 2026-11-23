@@ -89,6 +89,17 @@ export function useInboxWhatsApp(opts: {
   const visRef = useRef(vis);
   visRef.current = vis;
   const naListaVisivel = !!currentId && (vis.veTodos || (live.data ?? []).some((c) => c.id === currentId));
+  // demonstração/prévia: a conversa aberta de início é a primeira do exemplo. Se ela não é de quem está
+  // olhando (visibilidade e equipes), abre a primeira que a pessoa pode ver — ou nenhuma
+  const veEquipeDemo = vis.veEquipe; const veTodosDemo = vis.veTodos; const uidDemo = vis.uid;
+  useEffect(() => {
+    if (WA_REAL || veTodosDemo) return;
+    const pode = (c: WaContact) => visRef.current.podeVer(c.respId, c.canalId);
+    const atual = contacts.find((c) => c.id === currentId);
+    if (atual && pode(atual)) return;
+    const primeira = contacts.find(pode);
+    if ((primeira?.id ?? '') !== currentId) setCurrentId(primeira?.id ?? '');
+  }, [contacts, currentId, veEquipeDemo, veTodosDemo, uidDemo]);
   const msgsQ = useWaMensagens(WA_REAL && naListaVisivel ? currentId : null);
   const historicoRef = useRef<WaMessage[] | undefined>(undefined);
   historicoRef.current = msgsQ.data;

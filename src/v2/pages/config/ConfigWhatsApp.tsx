@@ -14,6 +14,7 @@ import { ROTULO_AMBIENTE, ambientesDoPerfil, type Ambiente } from '../../data/mo
 import { useConectarWA, useDefinirDonoWA, useDesconectarWA, useNovoQrWA, useRemoverWA, useVerificarCanalWA } from '../../data/wa/wa';
 import { temRecurso } from '../../data/config/recursos';
 import { useAcoesAtendimento, useConexoesWA, type ConexaoWA, type EstadoConexao } from '../../data/config/conexoes';
+import { useEquipes } from '../../data/config/equipes';
 import type { UsuarioRow } from '../../data/cobranca/usuarios';
 import '../painel/painel.css';
 
@@ -49,6 +50,9 @@ export function ConfigWhatsApp() {
   const avisar = (texto: string, tom: 'ok' | 'erro' = 'ok') => setAviso({ texto, tom });
 
   const lista = q.lista;
+  // equipes (23/11): cada número do Atendimento é de uma equipe (Configurações → Equipes)
+  const equipesQ = useEquipes();
+  const equipeDoNumero = (id: string) => (equipesQ.data ?? []).find((e) => e.canais.includes(id))?.nome ?? null;
   const n = (f: (c: ConexaoWA) => boolean) => lista.filter(f).length;
   const conectados = n((c) => c.estado === 'conectado');
   const visiveis = filtro === 'todos' ? lista : lista.filter((c) => c.ambiente === filtro);
@@ -115,7 +119,7 @@ export function ConfigWhatsApp() {
                         </span>
                       </td>
                       {TEM_ATD && <td><SeloAmbiente a={c.ambiente} /></td>}
-                      <td><span className="pn-us-amb-tx">{c.ambiente === 'cobrancas' ? (c.semDono ? 'Sem dono — só os administradores veem' : `${c.nome} (comercial dono)`) : 'Equipe do Atendimento'}</span></td>
+                      <td><span className="pn-us-amb-tx">{c.ambiente === 'cobrancas' ? (c.semDono ? 'Sem dono — só os administradores veem' : `${c.nome} (comercial dono)`) : equipeDoNumero(c.id) ? `Equipe ${equipeDoNumero(c.id)}` : 'Sem equipe ainda'}</span></td>
                       <td>
                         <BadgeStatus tom={TOM_ESTADO[c.estado]}>{ROT_ESTADO[c.estado]}</BadgeStatus>
                         {c.erro && c.estado !== 'conectado' && <span className="pn-us-1a">{c.erro}</span>}

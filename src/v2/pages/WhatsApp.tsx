@@ -24,6 +24,7 @@ import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dat
 import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
+import { donosDaPrevia } from '../data/config/equipes';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
@@ -422,7 +423,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   }, []);
   useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
 
-  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
+  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => donosDaPrevia(seedWa()), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
   const { demo, contacts, current, currentId, relogioMs } = inbox;
   // visibilidade (22/10): os satélites da conversa aberta (atividades, agendadas, IA) só para conversa
   // que está na lista do usuário — deep-link/sessão para conversa de outro não busca nada dela
@@ -460,8 +461,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(abaKey, t); } catch { /* privado */ } };
   // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
-  const abas = (vis.veTodos || posVenda ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
-  useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
+  // equipes (23/11): o gerente também tem "Todos" e "Não atribuídos", já recortados para a equipe dele
+  const veMaisQueOSeu = vis.veTodos || vis.veEquipe;
+  const abas = (veMaisQueOSeu || posVenda ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
+  useEffect(() => { if (!veMaisQueOSeu && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [veMaisQueOSeu, tab]);
   // atalho ?aba=fechados (Central do Radar → "Abrir a aba Fechados"): troca a aba e limpa a URL.
   // Fechados abre no grupo "Aguardando resposta": aberto (só nesta sessão) e com a lista no topo.
   const abaParam = params.get('aba');
@@ -758,7 +761,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     // Fechado mora na tela Pós-venda; qualquer outro, no atendimento — manda pro lado certo.
     if (alvo && posVenda && varianteAlvo !== 'ganho') { nav('/whatsapp?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
     if (alvo && !posVenda && varianteAlvo === 'ganho') { nav('/pos-venda?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
-    setTab(posVenda ? 'fechados' : eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
+    setTab(posVenda ? 'fechados' : eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos || vis.veEquipe ? 'todos' : 'meus');
     limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
@@ -813,7 +816,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   };
   const passaTab = (c: WaContact, t: TabId) => {
     // 2ª camada da visibilidade (a lista já vem recortada): cliente de outro nunca entra
-    if (!vis.podeVer(c.respId)) return false;
+    if (!vis.podeVer(c.respId, c.canalId)) return false;
     if (t === 'arquivadas') return !!c.arquivada;
     // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
     // de TODAS as listas de atendimento, inclusive "Todos", pra não se misturar com

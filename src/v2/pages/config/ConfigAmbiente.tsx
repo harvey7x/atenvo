@@ -6,6 +6,7 @@
                    os pagamentos pelo Asaas e /config/integracoes/whatsapp-oficial a API oficial
                    do WhatsApp                                                                  (admin)
      usuarios      logins: criar, papel, ambientes, telas liberadas, senha, desativar, excluir  (admin)
+     equipes       as equipes do Atendimento: gerente, pessoas e o WhatsApp de cada uma         (admin)
      registros     tudo o que cada pessoa fez (a tela que ficava em Cobranças)                  (admin)
      iris          a atendente virtual: chave do Google, personalidade, conhecimento, canais    (admin)
      atendimento   regras e etiquetas do Atendimento                                            (admin)
@@ -21,6 +22,7 @@ import { AbaUsuarios } from '../RevizaUsuarios';
 import { RevizaRegistros } from '../RevizaRegistros';
 import { ConfigWhatsApp } from './ConfigWhatsApp';
 import { ConfigIntegracoes } from './ConfigIntegracoes';
+import { ConfigEquipes } from './ConfigEquipes';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
@@ -28,7 +30,7 @@ const Iris = lazy(() => import('../Ia'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'registros', 'atendimento', 'iris']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -60,7 +62,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento'))) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || ((secao === 'atendimento' || secao === 'equipes') && !temRecurso('atendimento'))) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
@@ -71,6 +73,7 @@ export default function ConfigAmbiente() {
     return (<><Cabecalho titulo="Integrações" sub="Os serviços de fora que trabalham junto com o sistema. Conecte e configure cada um aqui." /><ConfigIntegracoes /></>);
   }
   if (secao === 'usuarios') return (<><Cabecalho titulo="Usuários e acessos" sub="Quem entra no sistema, em quais ambientes e quais telas cada pessoa vê." /><AbaUsuarios demo={false} gestor={admin} /></>);
+  if (secao === 'equipes') return (<><Cabecalho titulo="Equipes" sub="As equipes do Atendimento: quem é o gerente, quem faz parte e qual é o WhatsApp de cada uma." /><ConfigEquipes /></>);
   if (secao === 'registros') return (<><Cabecalho titulo="Registros" sub="Tudo o que cada pessoa fez no sistema: quem, o quê, quando e o que mudou." /><RevizaRegistros /></>);
   if (secao === 'iris') return <Suspense fallback={null}><Iris /></Suspense>;
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;

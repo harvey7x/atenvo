@@ -198,7 +198,8 @@ const DESCRICAO_AMBIENTE: Record<ModuloId, string> = {
 // Iris e Regras do atendimento só entram quando a instalação tem essas peças no servidor (config/recursos.ts)
 const CFG_GRUPOS: GrupoNav[] = [
   { rotulo: 'Conexões', itens: [{ slug: 'config/whatsapp', rotulo: 'WhatsApp', admin: true }, { slug: 'config/integracoes', rotulo: 'Integrações', admin: true }] },
-  { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
+  // Equipes (gerente, pessoas e WhatsApp de cada equipe) são do Atendimento: só com ele no servidor
+  { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, ...(temRecurso('atendimento') ? [{ slug: 'config/equipes', rotulo: 'Equipes', admin: true }] : []), { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
   { rotulo: 'Atendimento', itens: [
     ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }] : []),
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),

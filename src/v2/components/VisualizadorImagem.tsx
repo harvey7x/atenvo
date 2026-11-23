@@ -42,7 +42,9 @@ export function VisualizadorImagem({ url, nome, mensagemId, contatoId, aoFechar 
   const [urlIa, setUrlIa] = useState<string | null>(null);
   const [pedindoIa, setPedindoIa] = useState(false);
   const [erroIa, setErroIa] = useState<string | null>(null);
-  const regIa: RegistroIa | null = sitIa?.ocupada?.mensagem_id === mensagemId ? sitIa!.ocupada : sitIa?.desta ?? null;
+  // (sem situação carregada não há registro: comparar dois "indefinidos" dava verdadeiro e quebrava a
+  // tela ao abrir uma imagem sem identificador, como as de exemplo)
+  const regIa: RegistroIa | null = !sitIa ? null : sitIa.ocupada && sitIa.ocupada.mensagem_id === mensagemId ? sitIa.ocupada : sitIa.desta ?? null;
   const usadaEmOutra = !!sitIa?.ocupada && sitIa.ocupada.mensagem_id !== mensagemId;
 
   const atualizarIa = useCallback(async () => {

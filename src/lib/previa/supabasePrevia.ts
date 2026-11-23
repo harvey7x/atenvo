@@ -197,7 +197,16 @@ export function criarSupabasePrevia() {
   }];
   try { const salvo = JSON.parse(localStorage.getItem(LS_OFICIAL) || 'null'); if (Array.isArray(salvo) && salvo.length) T.wa_oficial = salvo; } catch { /* sem armazenamento: só a memória */ }
   const salvarOficial = () => { try { localStorage.setItem(LS_OFICIAL, JSON.stringify(T.wa_oficial)); } catch { /* idem */ } };
-  db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); };
+  // equipes do Atendimento (23/11): gerente, pessoas e números de cada uma — sobrevive ao recarregar,
+  // para dar para ver a regra no "Ver como" (a gerente Bianca vê a equipe; a atendente Carla, só as dela)
+  const LS_EQUIPES = 'previa-equipes-v1';
+  T.equipes = [
+    { id: 'eq-vendas', nome: 'Vendas', gerente_id: 'u-bianca', membros: ['u-carla', 'u-eduardo'], canais: ['atd-principal'], created_at: '2026-11-10T12:00:00Z' },
+    { id: 'eq-campanhas', nome: 'Campanhas', gerente_id: 'u-paty', membros: [], canais: ['atd-campanha'], created_at: '2026-11-18T12:00:00Z' },
+  ];
+  try { const salvo = JSON.parse(localStorage.getItem(LS_EQUIPES) || 'null'); if (Array.isArray(salvo)) T.equipes = salvo; } catch { /* sem armazenamento: só a memória */ }
+  const salvarEquipes = () => { try { localStorage.setItem(LS_EQUIPES, JSON.stringify(T.equipes)); } catch { /* idem */ } };
+  db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); if (tabela === 'equipes') salvarEquipes(); };
   try {
     const ver = localStorage.getItem(LS_VER);
     const p = ver ? T.profiles.find((x) => x.id === ver && x.ativo) : null;
@@ -207,7 +216,7 @@ export function criarSupabasePrevia() {
     perfis: () => T.profiles.map((p) => ({ ...p })),
     eu: () => db.usuario.id,
     verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
-    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); localStorage.removeItem(LS_EQUIPES); } catch { /* idem */ } location.reload(); },
   };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;
