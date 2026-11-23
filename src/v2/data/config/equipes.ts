@@ -137,3 +137,17 @@ export function donosDaPrevia<T extends { id: string; respId?: string | null; ca
     return d ? { ...c, respId: d.resp, ...(d.numero ? { canalId: d.numero } : {}) } : c;
   });
 }
+
+/** o mesmo para os cards de exemplo do Kanban (mesmos clientes das conversas, mesmos donos) */
+const DONO_DO_CARD_NA_PREVIA: Record<string, [id: string, nome: string] | null> = {
+  'kl-1': ['u-carla', 'Carla'], 'kl-2': null, 'kl-3': ['u-carla', 'Carla'], 'kl-4': ['u-bianca', 'Bianca'], 'kl-5': ['u-eduardo', 'Eduardo'],
+  'kl-6': null, 'kl-7': ['u-bianca', 'Bianca'], 'kl-8': ['u-eduardo', 'Eduardo'], 'kl-9': ['u-paty', 'Paty'],
+};
+export function donosDosCardsDaPrevia<T extends { id: string; respId?: string | null; respNome?: string }>(cards: T[]): T[] {
+  if (!isPrevia || !isRevizaMode) return cards;
+  return cards.map((c) => {
+    if (!(c.id in DONO_DO_CARD_NA_PREVIA)) return c;
+    const d = DONO_DO_CARD_NA_PREVIA[c.id];
+    return { ...c, respId: d ? d[0] : null, respNome: d ? d[1] : '' };
+  });
+}

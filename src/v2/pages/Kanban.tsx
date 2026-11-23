@@ -24,6 +24,7 @@ import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials, avatarColor } from '@/lib/avatar';
 import { fotoIlustrativa } from '../lib/fotoIlustrativa';
 import { useVisibilidade } from '@/lib/visibilidade';
+import { donosDosCardsDaPrevia } from '../data/config/equipes';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { DocumentosInssBox } from '@/components/DocumentosInssBox';
@@ -288,7 +289,7 @@ export default function KanbanV2() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const demo = !KANBAN_REAL;
-  const [seed, setSeed] = useState<SeedKb>(seedKb);
+  const [seed, setSeed] = useState<SeedKb>(() => { const s0 = seedKb(); return { ...s0, leads: donosDosCardsDaPrevia(s0.leads) }; });
   const demoSeq = useRef(0);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
@@ -375,7 +376,9 @@ export default function KanbanV2() {
 
   /* ---------- dados (demo | real) ---------- */
   const colunasBase = demo ? seed.colunas : k.colunas;
-  const leads = demo ? seed.leads : k.leads;
+  // equipes (23/11), demonstração: cada pessoa vê os cards dos clientes que pode ver — os dela e, se for
+  // gerente, os das pessoas da equipe (no sistema de verdade o recorte vem da consulta)
+  const leads = demo ? (vis.veTodos ? seed.leads : seed.leads.filter((l) => vis.podeVer(l.respId))) : k.leads;
   const colunas = useMemo(
     () => (ordemOtim ? ordemOtim.map((id) => colunasBase.find((c) => c.id === id)).filter(Boolean) as KColuna[] : colunasBase),
     [ordemOtim, colunasBase],
