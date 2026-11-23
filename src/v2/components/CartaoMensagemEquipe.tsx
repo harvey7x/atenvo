@@ -6,7 +6,7 @@
      Murillo) e vê as dos últimos 7 dias, quem viu e quem deu ok; "Tirar das telas".
    A família do recado do administrador: vidro escuro, filete âmbar (observação), zero emoji.
    ============================================================================ */
-import { useCallback, useEffect, useId, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
 import { haQuantoAviso } from './CartaoAvisoIris';
 import { ModalV2 } from './ModalV2';
 import {
@@ -33,6 +33,25 @@ export const IcMegafone = ({ tamanho = 13 }: { tamanho?: number }) => (
     <path d="M3.5 10.2v3.6c0 .7.6 1.2 1.2 1.2H7l9.5 4.5V4.5L7 9H4.7c-.6 0-1.2.5-1.2 1.2z" /><path d="M7.5 15.2l1.2 4.3h2.6l-1-3.3" /><path d="M19.5 9.3a3.6 3.6 0 010 5.4" />
   </svg>
 );
+
+/** dono 23/11 ("aparecer na tela do Atenvo pra ela abrir"): o link (https://…) da mensagem vira clicável e abre em
+    outra aba. A planilha do Google aparece como "Abrir a planilha"; outro site, como "Abrir <site>". Só http(s): o
+    texto é do administrador, mas nenhum outro tipo de endereço vira link. A pontuação do fim da frase fica fora. */
+const RE_LINK = /(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]])/;
+export function rotuloDoLink(url: string): string {
+  if (/^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)) return 'Abrir a planilha';
+  try { return `Abrir ${new URL(url).hostname.replace(/^www\./, '')}`; } catch { return url; }
+}
+export function TextoComLinks({ texto }: { texto: string }) {
+  const partes = texto.split(new RegExp(RE_LINK.source, 'g'));
+  return (
+    <>
+      {partes.map((p, i) => (i % 2 === 1
+        ? <a key={i} className="meq-link" href={p} target="_blank" rel="noopener noreferrer">{rotuloDoLink(p)}</a>
+        : <Fragment key={i}>{p}</Fragment>))}
+    </>
+  );
+}
 
 /** "Giovana, Isadora, Juliana e Luiz" */
 export function listaDeNomes(nomes: string[]): string {
@@ -82,7 +101,7 @@ export function CartaoMensagemEquipe({ mensagens, agora, aoOk }: PropsCartaoMens
           {mensagens.length > 1 && <span className="rcd-conta">1 de {mensagens.length}</span>}
           <span className="rcd-hora">{haQuantoAviso(m.criadoEm, agora)}</span>
         </header>
-        <p className="meq-texto" id={`${id}-t`}>{m.mensagem}</p>
+        <p className="meq-texto" id={`${id}-t`}><TextoComLinks texto={m.mensagem} /></p>
         <div className="rcd-acoes meq-acoes">
           <button type="button" className="rcd-bt rcd-forte" disabled={enviando}
             onKeyDown={(e) => { if (e.repeat) e.preventDefault(); /* a tecla segurada não vira clique repetido */ }}
@@ -273,7 +292,7 @@ function ListaMensagensEnviadas({ fonte, agora }: { fonte: FonteMensagens; agora
                       </span>
                       <span className="meq-item-conta">{oks}/{m.destinos.length} ok</span>
                     </div>
-                    <p className="meq-item-texto">{m.mensagem}</p>
+                    <p className="meq-item-texto"><TextoComLinks texto={m.mensagem} /></p>
                     <ul className="meq-dest" aria-label="Quem recebeu">
                       {m.destinos.map((d) => (
                         <li key={d.id} data-sit={situacaoDe(d)}>

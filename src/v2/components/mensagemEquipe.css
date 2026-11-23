@@ -29,6 +29,9 @@
   max-height: 46vh; overflow-y: auto;
 }
 .v2 .rcd-veu .meq-texto { font-size: 18px; letter-spacing: -.005em; }
+/* dono 23/11: o link da mensagem (a planilha da atendente) — sublinhado, na cor do texto (azul é só ativo/selecionado) */
+.v2 .meq-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.v2 .meq-link:hover { opacity: .85; }
 .v2 .meq-acoes { justify-content: flex-end; padding-top: 2px; }
 
 /* ---------------------------------------------------------------- a janela do administrador */
