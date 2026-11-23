@@ -123,7 +123,7 @@ export function useContatos() {
   const { currentOrg } = useOrg();
   // visibilidade (22/10): quem não vê todos lista só os contatos de que é o responsável
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useQuery({
     queryKey: soDe ? ['contatos', currentOrg.id, soDe] : ['contatos', currentOrg.id],
     enabled: vis.veTodos || !!soDe,
@@ -161,7 +161,7 @@ export function useBuscaContatos(term: string) {
   const t = (term || '').trim();
   // visibilidade (22/10): a busca acha só a carteira de quem não vê todos
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useQuery({
     queryKey: ['busca-contatos', currentOrg.id, t, soDe ?? 'todos'],
     enabled: isSupabaseConfigured && !!supabase && t.length >= 2 && (vis.veTodos || !!soDe),
@@ -191,7 +191,7 @@ export function useCreateContato() {
   const { currentOrg } = useOrg();
   // visibilidade (22/10): contato criado por quem não vê todos nasce DELE (senão some da própria lista)
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useMutation({
     mutationFn: async (input: NovoContato) => {
       if (!isSupabaseConfigured || !supabase) {

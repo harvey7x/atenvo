@@ -12,6 +12,9 @@ const emRotaV2 = () => { try { return window.location.pathname.startsWith('/v2')
 import { slugify, randomSuffix } from '@/lib/slug';
 import { resolverContextoInicial } from '@/lib/resolverContexto';
 
+/** id da empresa ALFA no banco do Reviza (migration 93) */
+export const ORG_REVIZA = 'a1fa0000-0000-4000-8000-000000000001';
+
 const CUR_KEY = 'atenvo-current-org';
 /* Fase 2.0: org ativa POR USUÁRIO (padrão chaveTema) — a chave global antiga
    vira fallback de leitura (migração suave: quem já tinha seleção não perde). */
@@ -105,7 +108,9 @@ function OrgProviderReviza({ children }: { children: ReactNode }) {
     },
   });
   const role: OrgRole = perfil?.papel === 'admin' ? 'admin' : perfil?.papel === 'gestor' ? 'gestor' : 'atendente';
-  const org: Organization = { id: 'reviza', name: 'ALFA GROUP', slug: 'reviza', role };
+  // a empresa do Atendimento no banco do Reviza (migration 93): uma só, com id fixo — as tabelas do Atendimento
+  // são por empresa (organizacao_id) e as regras conferem esse id
+  const org: Organization = { id: ORG_REVIZA, name: 'ALFA GROUP', slug: 'reviza', role };
   const value = useMemo<OrgState>(() => ({ orgs: [org], currentOrg: org, setCurrentOrg: () => {}, loading: !!user && isLoading }), [role, user?.id, isLoading]);
 
   if (user && isLoading) {

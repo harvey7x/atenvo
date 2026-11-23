@@ -79,7 +79,7 @@ export default function ListaConversasMobile() {
     const passa = (c: WaContact) =>
       // arquivadas escondidas por padrão; busca OU o toggle "Só arquivadas" revelam (paridade desktop)
       (!c.arquivada || buscaAtiva || filtros.arquivadas) &&
-      vis.podeVer(c.respId) &&
+      vis.podeVer(c.respId, c.canalId) &&
       (aba === 'todos' ? true : aba === 'meus' ? c.respId === user?.id : (c.unread ?? 0) > 0) &&
       // busca (term) e todas as facetas vivem no predicado COMPARTILHADO com o desktop
       passaFiltroInbox(c, filtros, { term, relogioMs, transporteDe });

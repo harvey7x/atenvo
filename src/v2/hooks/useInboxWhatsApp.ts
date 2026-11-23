@@ -120,7 +120,7 @@ export function useInboxWhatsApp(opts: {
       // falhou: a recarga completa já foi pedida — segue protegida por mais alguns segundos
       if (!ok) { alvoPendenteRef.current = { id, ate: Date.now() + 8_000 }; return; }
       alvoPendenteRef.current = null;
-      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId));
+      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId, c.canalId));
       if (lista) setCurrentId((cur) => (cur === id ? selecaoValida(cur, lista) : cur));
     });
   }, [orgId, qc]);
@@ -642,7 +642,7 @@ export function useInboxWhatsApp(opts: {
     // antes de selecionar. Se a busca falhar ou não trouxer a conversa, cai na recarga completa.
     tentadosRef.current.add(r.conversaId);
     const ok = await buscarConversasAgora(orgId, { ids: [r.conversaId] });
-    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId));
+    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId, c.canalId));
     if (!ok || !naLista) await live.refetch();
     canalManualRef.current = canalId;
     setReplyCanalId(canalId);

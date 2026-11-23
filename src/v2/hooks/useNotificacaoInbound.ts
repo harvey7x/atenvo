@@ -49,7 +49,7 @@ export function useNotificacaoInbound(opts: {
   // visibilidade (22/10): quem não vê todos só é avisado de cliente DELE (null = avisa de todos)
   const vis = useVisibilidade();
   const soDeRef = useRef<string | null>(null);
-  soDeRef.current = vis.veTodos ? null : vis.uid ?? '';
+  soDeRef.current = vis.veTodos || vis.veEquipe ? null : vis.uid ?? '';
 
   useEffect(() => {
     if (isRevizaMode) return; // instância Reviza: sem realtime de mensagens do Atenvo

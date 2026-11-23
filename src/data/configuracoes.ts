@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { temRecurso } from '@/v2/data/config/recursos';
 import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 
 // Reviza: as tabelas desta tela (usuarios, organizacoes, …) não existem no banco de lá e a página
 // Configurações nem é alcançável (menu oculto + redirect do shell) — curto-circuito evita 404.
-export const CFG_REAL = isSupabaseConfigured && !!supabase && !isRevizaMode;
+// Reviza: com o Atendimento no servidor (migration 93) as configurações do Atendimento são de verdade
+export const CFG_REAL = isSupabaseConfigured && !!supabase && (!isRevizaMode || temRecurso('atendimento'));
 type Row = Record<string, unknown>;
 
 /* ===================== Perfil ===================== */

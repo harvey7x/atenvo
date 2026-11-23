@@ -1,8 +1,9 @@
 -- 93 — ESTRUTURA DO ATENDIMENTO NO BANCO DO REVIZA (gerada em 23/11/2026 por ~/reviza-sist/porte-atendimento/gera.py).
 -- Copiada da estrutura do Atenvo (o sistema do CAF) — SÓ A ESTRUTURA: nenhum cliente, conversa, número ou
--- configuração do CAF vem junto. 96 tabelas, 220 rotinas, as regras de acesso e os gatilhos delas.
+-- configuração do CAF vem junto. 106 tabelas, 256 rotinas, as regras de acesso e os gatilhos delas.
 -- ADITIVA: nada do que as Cobranças usam é alterado. Duas tabelas do Atendimento têm nome igual a tabelas das
--- Cobranças com outro formato e entram com outro nome: notificacoes → atd_notificacoes, wa_optout → atd_wa_optout.
+-- Cobranças com outro formato e entram com outro nome: notificacoes → atd_notificacoes, wa_optout → atd_wa_optout;
+-- integracoes → atd_integracoes (o nome integracoes fica para o Asaas do Reviza, migration 87).
 -- A empresa do Atendimento é UMA só (a ALFA, id fixo) e as pessoas vêm de profiles: quem tem o ambiente
 -- Atendimento entra como membro dela (sincronizado por gatilho — ver o fim do arquivo).
 -- NÃO entra aqui: os agendamentos automáticos (cron) do CAF e as funções de servidor (outro passo).
@@ -38,6 +39,8 @@ do $$ begin if not exists (select 1 from pg_type t join pg_namespace n on n.oid 
 do $$ begin if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'user_role') then create type public.user_role as enum ('admin', 'supervisor', 'atendente'); end if; end $$;
 
 -- 2. sequências
+create sequence if not exists public.adm_movimentos_id_seq;
+create sequence if not exists public.iris_teste_limpezas_id_seq;
 create sequence if not exists public.presenciais_avisos_id_seq;
 
 -- 2b. rotinas usadas pelas colunas calculadas: chave_canonica_telefone
@@ -86,6 +89,19 @@ create table if not exists public.adm_fechados (
   contato_id uuid,
   visto_em timestamp with time zone default now() not null,
   atualizado_em timestamp with time zone default now() not null
+);
+create table if not exists public.adm_movimentos (
+  id bigint default nextval('adm_movimentos_id_seq'::regclass) not null,
+  organizacao_id uuid not null,
+  oportunidade_id uuid not null,
+  contato_id uuid,
+  acao text not null,
+  coluna_anterior_id uuid,
+  status_anterior text,
+  fechado_em_anterior timestamp with time zone,
+  coluna_nova_id uuid,
+  fechado_em_novo timestamp with time zone,
+  criado_em timestamp with time zone default now() not null
 );
 create table if not exists public.adm_pendencias (
   organizacao_id uuid not null,
@@ -182,6 +198,18 @@ create table if not exists public.assinaturas (
   atualizado_em timestamp with time zone default now() not null,
   asaas_subscription_id text,
   checkout_url text
+);
+create table if not exists public.assistente_lembretes (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  usuario_id uuid not null,
+  texto text not null,
+  quando timestamp with time zone not null,
+  status text default 'pendente'::text not null,
+  criado_em timestamp with time zone default now() not null,
+  avisado_em timestamp with time zone,
+  confirmado_em timestamp with time zone,
+  origem text default 'voz'::text not null
 );
 create table if not exists public.audit_log (
   id uuid default gen_random_uuid() not null,
@@ -281,6 +309,21 @@ create table if not exists public.bot_mensagens_saida (
   tipo text default 'texto'::text not null,
   media_url text,
   media_caption text
+);
+create table if not exists public.bot_remarketing (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  oportunidade_id uuid not null,
+  conversa_id uuid,
+  contato_id uuid,
+  canal_id uuid,
+  status text default 'ativo'::text not null,
+  toque integer default 0 not null,
+  proximo_em timestamp with time zone,
+  ultimo_toque_em timestamp with time zone,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  ultimo_envio_id text
 );
 create table if not exists public.bot_roteamentos (
   id uuid default gen_random_uuid() not null,
@@ -500,6 +543,14 @@ create table if not exists public.conversa_atividades (
   motivo text,
   criado_em timestamp with time zone default now() not null
 );
+create table if not exists public.conversa_etiquetas (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  conversa_id uuid not null,
+  etiqueta_id uuid not null,
+  aplicada_por uuid,
+  aplicada_em timestamp with time zone default now() not null
+);
 create table if not exists public.conversa_higiene_adiamentos (
   id uuid default gen_random_uuid() not null,
   organizacao_id uuid not null,
@@ -574,27 +625,6 @@ create table if not exists public.convites (
   whatsapp_key_id text,
   whatsapp_enviado_em timestamp with time zone,
   whatsapp_erro text
-);
-create table if not exists public.disparo_campanhas (
-  id uuid default gen_random_uuid() not null,
-  organizacao_id uuid not null,
-  canal_id uuid not null,
-  template_id uuid not null,
-  nome text not null,
-  status text default 'ativa'::text not null,
-  teto_24h integer default 200 not null,
-  criado_por uuid,
-  criado_em timestamp with time zone default now() not null,
-  atualizado_em timestamp with time zone default now() not null
-);
-create table if not exists public.disparo_envios (
-  id uuid default gen_random_uuid() not null,
-  organizacao_id uuid not null,
-  campanha_id uuid not null,
-  contato_id uuid not null,
-  template_id uuid,
-  wamid text,
-  enviado_em timestamp with time zone default now() not null
 );
 create table if not exists public.etiquetas (
   id uuid default gen_random_uuid() not null,
@@ -799,6 +829,19 @@ create table if not exists public.inss_pedidos (
   assumido_por text,
   bancos text[]
 );
+create table if not exists public.atd_integracoes (
+  id uuid default gen_random_uuid() not null,
+  provedor text not null,
+  canal_id uuid,
+  status integracao_status default 'desconectado'::integracao_status not null,
+  ultima_sincronizacao timestamp with time zone,
+  ultimo_erro text,
+  config jsonb default '{}'::jsonb not null,
+  segredo_ref text,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  organizacao_id uuid not null
+);
 create table if not exists public.iris_acesso (
   user_id uuid not null,
   criado_em timestamp with time zone default now() not null
@@ -905,6 +948,16 @@ create table if not exists public.iris_monitor_ciclos (
   terminado_em timestamp with time zone,
   lease_ate timestamp with time zone
 );
+create table if not exists public.iris_teste_limpezas (
+  id bigint default nextval('iris_teste_limpezas_id_seq'::regclass) not null,
+  contato_id uuid not null,
+  limpo_em timestamp with time zone default now() not null,
+  por text default 'clean_whatsapp'::text not null,
+  organizacao_id uuid not null,
+  canal_id uuid,
+  conversa_id uuid,
+  detalhe jsonb default '{}'::jsonb not null
+);
 create table if not exists public.iris_textos (
   id text not null,
   texto text not null,
@@ -919,6 +972,25 @@ create table if not exists public.iris_textos (
 [ 	]*
 [ 	
 ]*'::text)) stored
+);
+create table if not exists public.ligacoes_marcadas (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  conversa_id uuid,
+  contato_id uuid not null,
+  atendente_id uuid not null,
+  dia date not null,
+  periodo text not null,
+  hora_preferida text,
+  motivo text,
+  status text default 'marcada'::text not null,
+  criado_por text default 'iris'::text not null,
+  lembrete_id uuid,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  status_em timestamp with time zone,
+  status_por uuid,
+  forma text default 'ligacao'::text not null
 );
 create table if not exists public.mensagens (
   id uuid default gen_random_uuid() not null,
@@ -1129,6 +1201,31 @@ create table if not exists public.organizacoes (
   atualizado_em timestamp with time zone default now() not null,
   asaas_customer_id text,
   assinatura_marca text
+);
+create table if not exists public.pendencias (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  contato_id uuid not null,
+  oportunidade_id uuid,
+  conversa_id uuid not null,
+  canal_id uuid not null,
+  tipo text not null,
+  o_que text not null,
+  prazo date,
+  processo text,
+  responsavel_id uuid,
+  criado_por uuid not null,
+  status text default 'aguardando'::text not null,
+  pausada boolean default false not null,
+  primeiro_envio_em timestamp with time zone,
+  resposta_texto text,
+  resposta_em timestamp with time zone,
+  resposta_mensagem_id uuid,
+  resolvida_em timestamp with time zone,
+  resolvida_por uuid,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null,
+  lembrar_desde timestamp with time zone
 );
 create table if not exists public.planilha_config (
   organizacao_id uuid not null,
@@ -1345,6 +1442,15 @@ create table if not exists public.remarketing_tarefas (
   concluida_por uuid,
   tipo text default 'acao'::text not null
 );
+create table if not exists public.retomada_atendimento_log (
+  conversa_id uuid not null,
+  mensagem_id uuid not null,
+  decisao text not null,
+  rota text,
+  motivo text,
+  antes jsonb,
+  criado_em timestamp with time zone default now() not null
+);
 create table if not exists public.robo_ligar (
   conversa_id uuid not null,
   organizacao_id uuid not null,
@@ -1520,6 +1626,32 @@ create table if not exists public.vacuo_repasses (
   decidido_por uuid,
   desfeito_em timestamp with time zone
 );
+create table if not exists public.wa_audio_diag (
+  correlation_id text not null,
+  organizacao_id uuid,
+  blob_mime text,
+  blob_size integer,
+  container_real text,
+  endpoint text,
+  ptt boolean,
+  base64_len integer,
+  http_status integer,
+  key_id text,
+  erro text,
+  criado_em timestamp with time zone default now() not null
+);
+create table if not exists public.wa_lid_map (
+  id uuid default gen_random_uuid() not null,
+  organizacao_id uuid not null,
+  canal_id uuid,
+  lid text not null,
+  jid_telefone text,
+  telefone_normalizado text,
+  fonte text default 'webhook'::text not null,
+  confirmado boolean default false not null,
+  criado_em timestamp with time zone default now() not null,
+  atualizado_em timestamp with time zone default now() not null
+);
 create table if not exists public.atd_wa_optout (
   contato_id uuid not null,
   canal_id uuid not null,
@@ -1552,6 +1684,11 @@ create table if not exists public.wa_templates (
   metadados jsonb default '{}'::jsonb not null,
   toque integer
 );
+create table if not exists public.webhook_config (
+  chave text not null,
+  secret text not null,
+  atualizado_em timestamp with time zone default now() not null
+);
 create table if not exists public.whatsapp_webhook_events (
   id uuid default gen_random_uuid() not null,
   organizacao_id uuid,
@@ -1575,6 +1712,7 @@ create table if not exists public.whatsapp_webhook_events (
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_casos_pkey' and conrelid = 'public.adm_casos'::regclass) then alter table public.adm_casos add constraint adm_casos_pkey PRIMARY KEY (organizacao_id, caso_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_config_pkey' and conrelid = 'public.adm_config'::regclass) then alter table public.adm_config add constraint adm_config_pkey PRIMARY KEY (organizacao_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_fechados_pkey' and conrelid = 'public.adm_fechados'::regclass) then alter table public.adm_fechados add constraint adm_fechados_pkey PRIMARY KEY (organizacao_id, chave); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_movimentos_pkey' and conrelid = 'public.adm_movimentos'::regclass) then alter table public.adm_movimentos add constraint adm_movimentos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_pendencias_pkey' and conrelid = 'public.adm_pendencias'::regclass) then alter table public.adm_pendencias add constraint adm_pendencias_pkey PRIMARY KEY (organizacao_id, caso_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_placar_pkey' and conrelid = 'public.adm_placar'::regclass) then alter table public.adm_placar add constraint adm_placar_pkey PRIMARY KEY (organizacao_id, mes, vendedor); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamento_atividades_pkey' and conrelid = 'public.agendamento_atividades'::regclass) then alter table public.agendamento_atividades add constraint agendamento_atividades_pkey PRIMARY KEY (id); end if; end $$;
@@ -1587,6 +1725,9 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinatura_itens_pkey' and conrelid = 'public.assinatura_itens'::regclass) then alter table public.assinatura_itens add constraint assinatura_itens_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinaturas_pkey' and conrelid = 'public.assinaturas'::regclass) then alter table public.assinaturas add constraint assinaturas_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinaturas_organizacao_id_key' and conrelid = 'public.assinaturas'::regclass) then alter table public.assinaturas add constraint assinaturas_organizacao_id_key UNIQUE (organizacao_id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'assistente_lembretes_status_check' and conrelid = 'public.assistente_lembretes'::regclass) then alter table public.assistente_lembretes add constraint assistente_lembretes_status_check CHECK ((status = ANY (ARRAY['pendente'::text, 'avisado'::text, 'ok'::text, 'cancelado'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'assistente_lembretes_texto_check' and conrelid = 'public.assistente_lembretes'::regclass) then alter table public.assistente_lembretes add constraint assistente_lembretes_texto_check CHECK (((char_length(texto) >= 1) AND (char_length(texto) <= 200))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'assistente_lembretes_pkey' and conrelid = 'public.assistente_lembretes'::regclass) then alter table public.assistente_lembretes add constraint assistente_lembretes_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'audit_log_pkey' and conrelid = 'public.audit_log'::regclass) then alter table public.audit_log add constraint audit_log_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'avisos_passado_humano_pkey' and conrelid = 'public.avisos_passado_humano'::regclass) then alter table public.avisos_passado_humano add constraint avisos_passado_humano_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bom_dia_gestores_pkey' and conrelid = 'public.bom_dia_gestores'::regclass) then alter table public.bom_dia_gestores add constraint bom_dia_gestores_pkey PRIMARY KEY (organizacao_id, usuario_id); end if; end $$;
@@ -1599,6 +1740,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mens
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_tipo_check' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_tipo_check CHECK ((tipo = ANY (ARRAY['texto'::text, 'video'::text, 'audio'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_pkey' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_conversa_id_etapa_ordem_key' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_conversa_id_etapa_ordem_key UNIQUE (conversa_id, etapa, ordem); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_status_check' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_status_check CHECK ((status = ANY (ARRAY['ativo'::text, 'pausado'::text, 'respondeu'::text, 'optout'::text, 'cancelado'::text, 'concluido'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_pkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_genero_check' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_genero_check CHECK ((genero = ANY (ARRAY['homem'::text, 'mulher'::text, 'ambiguo'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_pkey' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_cloud_requer_phone_number_id' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_cloud_requer_phone_number_id CHECK (((transporte <> 'cloud_api'::text) OR (cloud_phone_number_id IS NOT NULL))); end if; end $$;
@@ -1630,6 +1773,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'contatos
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'contatos_pkey' and conrelid = 'public.contatos'::regclass) then alter table public.contatos add constraint contatos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'contatos_id_org_uniq' and conrelid = 'public.contatos'::regclass) then alter table public.contatos add constraint contatos_id_org_uniq UNIQUE (id, organizacao_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_atividades_pkey' and conrelid = 'public.conversa_atividades'::regclass) then alter table public.conversa_atividades add constraint conversa_atividades_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_etiquetas_pkey' and conrelid = 'public.conversa_etiquetas'::regclass) then alter table public.conversa_etiquetas add constraint conversa_etiquetas_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_etiquetas_conversa_id_etiqueta_id_key' and conrelid = 'public.conversa_etiquetas'::regclass) then alter table public.conversa_etiquetas add constraint conversa_etiquetas_conversa_id_etiqueta_id_key UNIQUE (conversa_id, etiqueta_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_tipo_check' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_tipo_check CHECK ((tipo = ANY (ARRAY['nome_adiado'::text, 'nome_nao_informado'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_pkey' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_status_def_pkey' and conrelid = 'public.conversa_status_def'::regclass) then alter table public.conversa_status_def add constraint conversa_status_def_pkey PRIMARY KEY (id); end if; end $$;
@@ -1637,10 +1782,6 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_pkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_id_org_uniq' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_id_org_uniq UNIQUE (id, organizacao_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'convites_pkey' and conrelid = 'public.convites'::regclass) then alter table public.convites add constraint convites_pkey PRIMARY KEY (id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_status_check' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_status_check CHECK ((status = ANY (ARRAY['ativa'::text, 'concluida'::text, 'cancelada'::text]))); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_teto_24h_check' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_teto_24h_check CHECK (((teto_24h >= 1) AND (teto_24h <= 1000))); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_pkey' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_pkey PRIMARY KEY (id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_envios_pkey' and conrelid = 'public.disparo_envios'::regclass) then alter table public.disparo_envios add constraint disparo_envios_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'etiquetas_pkey' and conrelid = 'public.etiquetas'::regclass) then alter table public.etiquetas add constraint etiquetas_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'chk_ficha_avi_arr' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint chk_ficha_avi_arr CHECK ((jsonb_typeof(avisos) = 'array'::text)); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'chk_ficha_idade_nn' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint chk_ficha_idade_nn CHECK (((idade_informada IS NULL) OR (idade_informada >= 0))); end if; end $$;
@@ -1675,6 +1816,7 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_doc
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_documentos_caminho_key' and conrelid = 'public.inss_documentos'::regclass) then alter table public.inss_documentos add constraint inss_documentos_caminho_key UNIQUE (caminho); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_pedidos_status_check' and conrelid = 'public.inss_pedidos'::regclass) then alter table public.inss_pedidos add constraint inss_pedidos_status_check CHECK ((status = ANY (ARRAY['aberto'::text, 'em_andamento'::text, 'pronto'::text, 'falhou'::text, 'cancelado'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_pedidos_pkey' and conrelid = 'public.inss_pedidos'::regclass) then alter table public.inss_pedidos add constraint inss_pedidos_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'atd_integracoes_pkey' and conrelid = 'public.atd_integracoes'::regclass) then alter table public.atd_integracoes add constraint atd_integracoes_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_acesso_pkey' and conrelid = 'public.iris_acesso'::regclass) then alter table public.iris_acesso add constraint iris_acesso_pkey PRIMARY KEY (user_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_carteira_estado_check' and conrelid = 'public.iris_carteira'::regclass) then alter table public.iris_carteira add constraint iris_carteira_estado_check CHECK ((estado = ANY (ARRAY['na_fila'::text, 'abertura_agendada'::text, 'em_contato'::text, 'qualificando'::text, 'documentos'::text, 'pronto_atendente'::text, 'pausado'::text, 'saiu'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_carteira_pkey' and conrelid = 'public.iris_carteira'::regclass) then alter table public.iris_carteira add constraint iris_carteira_pkey PRIMARY KEY (conversa_id); end if; end $$;
@@ -1715,6 +1857,9 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_mon
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_ciclos_modelo_check' and conrelid = 'public.iris_monitor_ciclos'::regclass) then alter table public.iris_monitor_ciclos add constraint iris_monitor_ciclos_modelo_check CHECK ((char_length(modelo) <= 80)); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_ciclos_status_check' and conrelid = 'public.iris_monitor_ciclos'::regclass) then alter table public.iris_monitor_ciclos add constraint iris_monitor_ciclos_status_check CHECK ((status = ANY (ARRAY['rodando'::text, 'ok'::text, 'falhou'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_ciclos_pkey' and conrelid = 'public.iris_monitor_ciclos'::regclass) then alter table public.iris_monitor_ciclos add constraint iris_monitor_ciclos_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_detalhe_check' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_detalhe_check CHECK (((jsonb_typeof(detalhe) = 'object'::text) AND (pg_column_size(detalhe) <= 8000))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_por_check' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_por_check CHECK (((char_length(por) >= 1) AND (char_length(por) <= 60))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_pkey' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_audio_path_check' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_audio_path_check CHECK (((audio_path IS NULL) OR ((tipo = 'audio'::text) AND (audio_path ~ (('^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?iris/'::text || id) || '-[A-Za-z0-9_-]+\.ogg$'::text))))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_duracao_check' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_duracao_check CHECK (((duracao_s IS NULL) OR ((duracao_s > (0)::numeric) AND (duracao_s <= (20)::numeric)))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_id_check' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_id_check CHECK ((id ~ '^[A-Z][0-9]{2,3}$'::text)); end if; end $$;
@@ -1722,6 +1867,12 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_tex
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_texto_check' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_texto_check CHECK (((char_length(btrim(texto)) >= 1) AND (char_length(btrim(texto)) <= 2000))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_tipo_check' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_tipo_check CHECK ((tipo = ANY (ARRAY['audio'::text, 'texto'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_textos_pkey' and conrelid = 'public.iris_textos'::regclass) then alter table public.iris_textos add constraint iris_textos_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_forma_check' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_forma_check CHECK ((forma = ANY (ARRAY['ligacao'::text, 'mensagem'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_hora_preferida_check' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_hora_preferida_check CHECK ((char_length(hora_preferida) <= 60)); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_motivo_check' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_motivo_check CHECK ((char_length(motivo) <= 200)); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_periodo_check' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_periodo_check CHECK ((periodo = ANY (ARRAY['manha'::text, 'tarde'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_status_check' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_status_check CHECK ((status = ANY (ARRAY['marcada'::text, 'ligou'::text, 'nao_atendeu'::text, 'cancelada'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_pkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_pkey' and conrelid = 'public.mensagens'::regclass) then alter table public.mensagens add constraint mensagens_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mag_tem_conteudo' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mag_tem_conteudo CHECK (((texto IS NOT NULL) OR (storage_path IS NOT NULL))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_status_check' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_status_check CHECK ((status = ANY (ARRAY['agendada'::text, 'processando'::text, 'enviada'::text, 'falhou'::text, 'cancelada'::text, 'expirada'::text, 'bloqueada'::text]))); end if; end $$;
@@ -1750,6 +1901,11 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'organiza
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacao_usuarios_organizacao_id_usuario_id_key' and conrelid = 'public.organizacao_usuarios'::regclass) then alter table public.organizacao_usuarios add constraint organizacao_usuarios_organizacao_id_usuario_id_key UNIQUE (organizacao_id, usuario_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacoes_pkey' and conrelid = 'public.organizacoes'::regclass) then alter table public.organizacoes add constraint organizacoes_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacoes_slug_key' and conrelid = 'public.organizacoes'::regclass) then alter table public.organizacoes add constraint organizacoes_slug_key UNIQUE (slug); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_o_que_check' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_o_que_check CHECK (((length(btrim(o_que)) >= 1) AND (length(btrim(o_que)) <= 160))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_processo_check' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_processo_check CHECK (((processo IS NULL) OR (length(processo) <= 40))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_status_check' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_status_check CHECK ((status = ANY (ARRAY['aguardando'::text, 'respondeu'::text, 'sem_resposta'::text, 'resolvida'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_tipo_check' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_tipo_check CHECK ((tipo = ANY (ARRAY['reassinatura'::text, 'documento'::text, 'informacao'::text, 'outro'::text]))); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_pkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'planilha_config_pkey' and conrelid = 'public.planilha_config'::regclass) then alter table public.planilha_config add constraint planilha_config_pkey PRIMARY KEY (organizacao_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'planos_pkey' and conrelid = 'public.planos'::regclass) then alter table public.planos add constraint planos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_status_check' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_status_check CHECK ((status = ANY (ARRAY['marcado'::text, 'desmarcado'::text]))); end if; end $$;
@@ -1792,6 +1948,7 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarket
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_status_check' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_status_check CHECK ((status = ANY (ARRAY['pendente'::text, 'concluida'::text, 'expirada'::text, 'cancelada'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_tipo_check' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_tipo_check CHECK ((tipo = ANY (ARRAY['acao'::text, 'acompanhamento'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_pkey' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'retomada_atendimento_log_pkey' and conrelid = 'public.retomada_atendimento_log'::regclass) then alter table public.retomada_atendimento_log add constraint retomada_atendimento_log_pkey PRIMARY KEY (conversa_id, mensagem_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'robo_ligar_pkey' and conrelid = 'public.robo_ligar'::regclass) then alter table public.robo_ligar add constraint robo_ligar_pkey PRIMARY KEY (conversa_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'script_anexos_pkey' and conrelid = 'public.script_anexos'::regclass) then alter table public.script_anexos add constraint script_anexos_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'script_categorias_pkey' and conrelid = 'public.script_categorias'::regclass) then alter table public.script_categorias add constraint script_categorias_pkey PRIMARY KEY (id); end if; end $$;
@@ -1810,6 +1967,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_co
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_estado_pkey' and conrelid = 'public.vacuo_estado'::regclass) then alter table public.vacuo_estado add constraint vacuo_estado_pkey PRIMARY KEY (conversa_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_decisao_check' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_decisao_check CHECK ((decisao = ANY (ARRAY['repassado'::text, 'mantido'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_pkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_audio_diag_pkey' and conrelid = 'public.wa_audio_diag'::regclass) then alter table public.wa_audio_diag add constraint wa_audio_diag_pkey PRIMARY KEY (correlation_id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_lid_map_pkey' and conrelid = 'public.wa_lid_map'::regclass) then alter table public.wa_lid_map add constraint wa_lid_map_pkey PRIMARY KEY (id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_optout_motivo_check' and conrelid = 'public.atd_wa_optout'::regclass) then alter table public.atd_wa_optout add constraint wa_optout_motivo_check CHECK ((motivo = ANY (ARRAY['erro_131050'::text, 'user_preferences'::text, 'manual'::text, 'sair_texto'::text]))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'atd_wa_optout_pkey' and conrelid = 'public.atd_wa_optout'::regclass) then alter table public.atd_wa_optout add constraint atd_wa_optout_pkey PRIMARY KEY (contato_id, canal_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_categoria_check' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_categoria_check CHECK ((categoria = ANY (ARRAY['MARKETING'::text, 'UTILITY'::text, 'AUTHENTICATION'::text]))); end if; end $$;
@@ -1819,24 +1978,26 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'wat_nome
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wat_remarketing_exige_toque' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wat_remarketing_exige_toque CHECK (((NOT usar_em_remarketing) OR (toque IS NOT NULL))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wat_toque_valido' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wat_toque_valido CHECK (((toque IS NULL) OR ((toque >= 1) AND (toque <= 20)))); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_pkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_pkey PRIMARY KEY (id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'webhook_config_pkey' and conrelid = 'public.webhook_config'::regclass) then alter table public.webhook_config add constraint webhook_config_pkey PRIMARY KEY (chave); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'whatsapp_webhook_events_pkey' and conrelid = 'public.whatsapp_webhook_events'::regclass) then alter table public.whatsapp_webhook_events add constraint whatsapp_webhook_events_pkey PRIMARY KEY (id); end if; end $$;
 
 -- 5. ligações entre tabelas
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_casos_organizacao_id_fkey' and conrelid = 'public.adm_casos'::regclass) then alter table public.adm_casos add constraint adm_casos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_config_organizacao_id_fkey' and conrelid = 'public.adm_config'::regclass) then alter table public.adm_config add constraint adm_config_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_fechados_organizacao_id_fkey' and conrelid = 'public.adm_fechados'::regclass) then alter table public.adm_fechados add constraint adm_fechados_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_movimentos_organizacao_id_fkey' and conrelid = 'public.adm_movimentos'::regclass) then alter table public.adm_movimentos add constraint adm_movimentos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_pendencias_contato_id_fkey' and conrelid = 'public.adm_pendencias'::regclass) then alter table public.adm_pendencias add constraint adm_pendencias_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_pendencias_organizacao_id_fkey' and conrelid = 'public.adm_pendencias'::regclass) then alter table public.adm_pendencias add constraint adm_pendencias_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'adm_placar_organizacao_id_fkey' and conrelid = 'public.adm_placar'::regclass) then alter table public.adm_placar add constraint adm_placar_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamento_atividades_agendamento_id_fkey' and conrelid = 'public.agendamento_atividades'::regclass) then alter table public.agendamento_atividades add constraint agendamento_atividades_agendamento_id_fkey FOREIGN KEY (agendamento_id) REFERENCES agendamentos(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamento_atividades_usuario_id_fkey' and conrelid = 'public.agendamento_atividades'::regclass) then alter table public.agendamento_atividades add constraint agendamento_atividades_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_atendente_id_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_atendente_id_fkey FOREIGN KEY (atendente_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamento_atividades_usuario_id_fkey' and conrelid = 'public.agendamento_atividades'::regclass) then alter table public.agendamento_atividades add constraint agendamento_atividades_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_atendente_id_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_atendente_id_fkey FOREIGN KEY (atendente_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_contato_id_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_criado_por_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_criado_por_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_oportunidade_id_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_oportunidade_id_fkey FOREIGN KEY (oportunidade_id) REFERENCES oportunidades(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'agendamentos_organizacao_id_fkey' and conrelid = 'public.agendamentos'::regclass) then alter table public.agendamentos add constraint agendamentos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_assumido_por_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_assumido_por_fkey FOREIGN KEY (assumido_por) REFERENCES usuarios(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_cancelado_por_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_cancelado_por_fkey FOREIGN KEY (cancelado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_assumido_por_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_assumido_por_fkey FOREIGN KEY (assumido_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_cancelado_por_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_cancelado_por_fkey FOREIGN KEY (cancelado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_contato_id_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_conversa_id_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'alertas_lead_quente_organizacao_id_fkey' and conrelid = 'public.alertas_lead_quente'::regclass) then alter table public.alertas_lead_quente add constraint alertas_lead_quente_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -1844,6 +2005,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinatu
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinatura_itens_organizacao_id_fkey' and conrelid = 'public.assinatura_itens'::regclass) then alter table public.assinatura_itens add constraint assinatura_itens_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinaturas_organizacao_id_fkey' and conrelid = 'public.assinaturas'::regclass) then alter table public.assinaturas add constraint assinaturas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'assinaturas_plano_id_fkey' and conrelid = 'public.assinaturas'::regclass) then alter table public.assinaturas add constraint assinaturas_plano_id_fkey FOREIGN KEY (plano_id) REFERENCES planos(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'assistente_lembretes_organizacao_id_fkey' and conrelid = 'public.assistente_lembretes'::regclass) then alter table public.assistente_lembretes add constraint assistente_lembretes_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'assistente_lembretes_usuario_id_fkey' and conrelid = 'public.assistente_lembretes'::regclass) then alter table public.assistente_lembretes add constraint assistente_lembretes_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'audit_log_org_fk' and conrelid = 'public.audit_log'::regclass) then alter table public.audit_log add constraint audit_log_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'audit_log_usuario_id_fkey' and conrelid = 'public.audit_log'::regclass) then alter table public.audit_log add constraint audit_log_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bom_dia_gestores_organizacao_id_fkey' and conrelid = 'public.bom_dia_gestores'::regclass) then alter table public.bom_dia_gestores add constraint bom_dia_gestores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -1862,13 +2025,18 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mens
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_conversa_id_fkey' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_mensagem_id_fkey' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_mensagem_id_fkey FOREIGN KEY (mensagem_id) REFERENCES mensagens(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_mensagens_saida_organizacao_id_fkey' and conrelid = 'public.bot_mensagens_saida'::regclass) then alter table public.bot_mensagens_saida add constraint bot_mensagens_saida_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_canal_id_fkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_contato_id_fkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_conversa_id_fkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_oportunidade_id_fkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_oportunidade_id_fkey FOREIGN KEY (oportunidade_id) REFERENCES oportunidades(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_remarketing_organizacao_id_fkey' and conrelid = 'public.bot_remarketing'::regclass) then alter table public.bot_remarketing add constraint bot_remarketing_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_consultor_id_fkey' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_consultor_id_fkey FOREIGN KEY (consultor_id) REFERENCES usuarios(id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_contato_id_fkey' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_conversa_id_fkey' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'bot_roteamentos_organizacao_id_fkey' and conrelid = 'public.bot_roteamentos'::regclass) then alter table public.bot_roteamentos add constraint bot_roteamentos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_conflito_com_fkey' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_conflito_com_fkey FOREIGN KEY (conflito_com) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_fonte_aquisicao_id_fkey' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_fonte_aquisicao_id_fkey FOREIGN KEY (fonte_aquisicao_id) REFERENCES fontes_aquisicao(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_gestor_id_fkey' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_gestor_id_fkey FOREIGN KEY (gestor_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_gestor_id_fkey' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_gestor_id_fkey FOREIGN KEY (gestor_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canais_org_fk' and conrelid = 'public.canais'::regclass) then alter table public.canais add constraint canais_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canal_health_runs_canal_id_fkey' and conrelid = 'public.canal_health_runs'::regclass) then alter table public.canal_health_runs add constraint canal_health_runs_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'canal_health_runs_organizacao_id_fkey' and conrelid = 'public.canal_health_runs'::regclass) then alter table public.canal_health_runs add constraint canal_health_runs_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -1897,12 +2065,15 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'contatos
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'contatos_responsavel_id_fkey' and conrelid = 'public.contatos'::regclass) then alter table public.contatos add constraint contatos_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_atividades_conversa_id_fkey' and conrelid = 'public.conversa_atividades'::regclass) then alter table public.conversa_atividades add constraint conversa_atividades_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_atividades_organizacao_id_fkey' and conrelid = 'public.conversa_atividades'::regclass) then alter table public.conversa_atividades add constraint conversa_atividades_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_atividades_usuario_id_fkey' and conrelid = 'public.conversa_atividades'::regclass) then alter table public.conversa_atividades add constraint conversa_atividades_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_atividades_usuario_id_fkey' and conrelid = 'public.conversa_atividades'::regclass) then alter table public.conversa_atividades add constraint conversa_atividades_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_etiquetas_conversa_id_fkey' and conrelid = 'public.conversa_etiquetas'::regclass) then alter table public.conversa_etiquetas add constraint conversa_etiquetas_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_etiquetas_etiqueta_id_fkey' and conrelid = 'public.conversa_etiquetas'::regclass) then alter table public.conversa_etiquetas add constraint conversa_etiquetas_etiqueta_id_fkey FOREIGN KEY (etiqueta_id) REFERENCES etiquetas(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_etiquetas_organizacao_id_fkey' and conrelid = 'public.conversa_etiquetas'::regclass) then alter table public.conversa_etiquetas add constraint conversa_etiquetas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_conversa_id_fkey' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_organizacao_id_fkey' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_usuario_id_fkey' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_higiene_adiamentos_usuario_id_fkey' and conrelid = 'public.conversa_higiene_adiamentos'::regclass) then alter table public.conversa_higiene_adiamentos add constraint conversa_higiene_adiamentos_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa_status_def_organizacao_id_fkey' and conrelid = 'public.conversa_status_def'::regclass) then alter table public.conversa_status_def add constraint conversa_status_def_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_arquivada_por_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_arquivada_por_fkey FOREIGN KEY (arquivada_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_arquivada_por_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_arquivada_por_fkey FOREIGN KEY (arquivada_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_atendente_id_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_atendente_id_fkey FOREIGN KEY (atendente_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_canal_id_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_canal_origem_id_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_canal_origem_id_fkey FOREIGN KEY (canal_origem_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
@@ -1911,14 +2082,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversa
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_org_fk' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_status_id_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_status_id_fkey FOREIGN KEY (status_id) REFERENCES conversa_status_def(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'conversas_ultimo_canal_id_fkey' and conrelid = 'public.conversas'::regclass) then alter table public.conversas add constraint conversas_ultimo_canal_id_fkey FOREIGN KEY (ultimo_canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'convites_convidado_por_fkey' and conrelid = 'public.convites'::regclass) then alter table public.convites add constraint convites_convidado_por_fkey FOREIGN KEY (convidado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'convites_convidado_por_fkey' and conrelid = 'public.convites'::regclass) then alter table public.convites add constraint convites_convidado_por_fkey FOREIGN KEY (convidado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'convites_organizacao_id_fkey' and conrelid = 'public.convites'::regclass) then alter table public.convites add constraint convites_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_canal_id_fkey' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_organizacao_id_fkey' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_campanhas_template_id_fkey' and conrelid = 'public.disparo_campanhas'::regclass) then alter table public.disparo_campanhas add constraint disparo_campanhas_template_id_fkey FOREIGN KEY (template_id) REFERENCES wa_templates(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_envios_campanha_id_fkey' and conrelid = 'public.disparo_envios'::regclass) then alter table public.disparo_envios add constraint disparo_envios_campanha_id_fkey FOREIGN KEY (campanha_id) REFERENCES disparo_campanhas(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_envios_contato_id_fkey' and conrelid = 'public.disparo_envios'::regclass) then alter table public.disparo_envios add constraint disparo_envios_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'disparo_envios_organizacao_id_fkey' and conrelid = 'public.disparo_envios'::regclass) then alter table public.disparo_envios add constraint disparo_envios_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'etiquetas_organizacao_id_fkey' and conrelid = 'public.etiquetas'::regclass) then alter table public.etiquetas add constraint etiquetas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fichas_judiciais_ficha_anterior_id_fkey' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fichas_judiciais_ficha_anterior_id_fkey FOREIGN KEY (ficha_anterior_id) REFERENCES fichas_judiciais(id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_atualpor' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_atualpor FOREIGN KEY (atualizado_por) REFERENCES usuarios(id); end if; end $$;
@@ -1928,7 +2093,7 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_criadopor' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_criadopor FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_oport' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_oport FOREIGN KEY (oportunidade_id, organizacao_id) REFERENCES oportunidades(id, organizacao_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_org' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_org FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_resp' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_resp FOREIGN KEY (responsavel_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ficha_resp' and conrelid = 'public.fichas_judiciais'::regclass) then alter table public.fichas_judiciais add constraint fk_ficha_resp FOREIGN KEY (responsavel_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fontes_aquisicao_org_fk' and conrelid = 'public.fontes_aquisicao'::regclass) then alter table public.fontes_aquisicao add constraint fontes_aquisicao_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'funil_colunas_funil_id_fkey' and conrelid = 'public.funil_colunas'::regclass) then alter table public.funil_colunas add constraint funil_colunas_funil_id_fkey FOREIGN KEY (funil_id) REFERENCES funis(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'funil_colunas_organizacao_id_fkey' and conrelid = 'public.funil_colunas'::regclass) then alter table public.funil_colunas add constraint funil_colunas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -1952,6 +2117,8 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_doc
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_inss_pedido_contato' and conrelid = 'public.inss_pedidos'::regclass) then alter table public.inss_pedidos add constraint fk_inss_pedido_contato FOREIGN KEY (contato_id, organizacao_id) REFERENCES contatos(id, organizacao_id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_pedidos_organizacao_id_fkey' and conrelid = 'public.inss_pedidos'::regclass) then alter table public.inss_pedidos add constraint inss_pedidos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'inss_pedidos_solicitante_id_fkey' and conrelid = 'public.inss_pedidos'::regclass) then alter table public.inss_pedidos add constraint inss_pedidos_solicitante_id_fkey FOREIGN KEY (solicitante_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'integracoes_canal_id_fkey' and conrelid = 'public.atd_integracoes'::regclass) then alter table public.atd_integracoes add constraint integracoes_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'integracoes_org_fk' and conrelid = 'public.atd_integracoes'::regclass) then alter table public.atd_integracoes add constraint integracoes_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_carteira_conversa_id_fkey' and conrelid = 'public.iris_carteira'::regclass) then alter table public.iris_carteira add constraint iris_carteira_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_eventos_conversa_id_fkey' and conrelid = 'public.iris_eventos'::regclass) then alter table public.iris_eventos add constraint iris_eventos_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_eventos_organizacao_id_fkey' and conrelid = 'public.iris_eventos'::regclass) then alter table public.iris_eventos add constraint iris_eventos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -1968,21 +2135,31 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_mon
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_achados_organizacao_id_fkey' and conrelid = 'public.iris_monitor_achados'::regclass) then alter table public.iris_monitor_achados add constraint iris_monitor_achados_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_achados_revisado_por_fkey' and conrelid = 'public.iris_monitor_achados'::regclass) then alter table public.iris_monitor_achados add constraint iris_monitor_achados_revisado_por_fkey FOREIGN KEY (revisado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_monitor_ciclos_organizacao_id_fkey' and conrelid = 'public.iris_monitor_ciclos'::regclass) then alter table public.iris_monitor_ciclos add constraint iris_monitor_ciclos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_canal_id_fkey' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_contato_id_fkey' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_conversa_id_fkey' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'iris_teste_limpezas_organizacao_id_fkey' and conrelid = 'public.iris_teste_limpezas'::regclass) then alter table public.iris_teste_limpezas add constraint iris_teste_limpezas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_atendente_id_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_atendente_id_fkey FOREIGN KEY (atendente_id) REFERENCES usuarios(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_contato_id_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_conversa_id_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_lembrete_id_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_lembrete_id_fkey FOREIGN KEY (lembrete_id) REFERENCES assistente_lembretes(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_organizacao_id_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'ligacoes_marcadas_status_por_fkey' and conrelid = 'public.ligacoes_marcadas'::regclass) then alter table public.ligacoes_marcadas add constraint ligacoes_marcadas_status_por_fkey FOREIGN KEY (status_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_autor_id_fkey' and conrelid = 'public.mensagens'::regclass) then alter table public.mensagens add constraint mensagens_autor_id_fkey FOREIGN KEY (autor_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_conversa_id_fkey' and conrelid = 'public.mensagens'::regclass) then alter table public.mensagens add constraint mensagens_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_org_fk' and conrelid = 'public.mensagens'::regclass) then alter table public.mensagens add constraint mensagens_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_respondida_a_id_fkey' and conrelid = 'public.mensagens'::regclass) then alter table public.mensagens add constraint mensagens_respondida_a_id_fkey FOREIGN KEY (respondida_a_id) REFERENCES mensagens(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_canal_id_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE RESTRICT; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_cancelada_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_cancelada_por_fkey FOREIGN KEY (cancelada_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_cancelada_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_cancelada_por_fkey FOREIGN KEY (cancelada_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_contato_id_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_conversa_id_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_criado_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_editada_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_editada_por_fkey FOREIGN KEY (editada_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_criado_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_editada_por_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_editada_por_fkey FOREIGN KEY (editada_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_mensagem_id_enviada_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_mensagem_id_enviada_fkey FOREIGN KEY (mensagem_id_enviada) REFERENCES mensagens(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_organizacao_id_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'mensagens_agendadas_regua_ativacao_id_fkey' and conrelid = 'public.mensagens_agendadas'::regclass) then alter table public.mensagens_agendadas add constraint mensagens_agendadas_regua_ativacao_id_fkey FOREIGN KEY (regua_ativacao_id) REFERENCES regua_ativacoes(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'midia_melhoria_ia_contato_id_fkey' and conrelid = 'public.midia_melhoria_ia'::regclass) then alter table public.midia_melhoria_ia add constraint midia_melhoria_ia_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'midia_melhoria_ia_criado_por_fkey' and conrelid = 'public.midia_melhoria_ia'::regclass) then alter table public.midia_melhoria_ia add constraint midia_melhoria_ia_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES auth.users(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'midia_melhoria_ia_criado_por_fkey' and conrelid = 'public.midia_melhoria_ia'::regclass) then alter table public.midia_melhoria_ia add constraint midia_melhoria_ia_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES auth.users(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'midia_melhoria_ia_mensagem_id_fkey' and conrelid = 'public.midia_melhoria_ia'::regclass) then alter table public.midia_melhoria_ia add constraint midia_melhoria_ia_mensagem_id_fkey FOREIGN KEY (mensagem_id) REFERENCES mensagens(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'midia_melhoria_ia_organizacao_id_fkey' and conrelid = 'public.midia_melhoria_ia'::regclass) then alter table public.midia_melhoria_ia add constraint midia_melhoria_ia_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'notificacoes_organizacao_id_fkey' and conrelid = 'public.atd_notificacoes'::regclass) then alter table public.atd_notificacoes add constraint notificacoes_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -2004,32 +2181,37 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'oportuni
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacao_limites_organizacao_id_fkey' and conrelid = 'public.organizacao_limites'::regclass) then alter table public.organizacao_limites add constraint organizacao_limites_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacao_usuarios_organizacao_id_fkey' and conrelid = 'public.organizacao_usuarios'::regclass) then alter table public.organizacao_usuarios add constraint organizacao_usuarios_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'organizacao_usuarios_usuario_id_fkey' and conrelid = 'public.organizacao_usuarios'::regclass) then alter table public.organizacao_usuarios add constraint organizacao_usuarios_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_canal_id_fkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_contato_id_fkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_conversa_id_fkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_oportunidade_id_fkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_oportunidade_id_fkey FOREIGN KEY (oportunidade_id) REFERENCES oportunidades(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pendencias_organizacao_id_fkey' and conrelid = 'public.pendencias'::regclass) then alter table public.pendencias add constraint pendencias_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'planilha_config_organizacao_id_fkey' and conrelid = 'public.planilha_config'::regclass) then alter table public.planilha_config add constraint planilha_config_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_alterado_por_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_alterado_por_fkey FOREIGN KEY (alterado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_alterado_por_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_alterado_por_fkey FOREIGN KEY (alterado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_contato_id_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_marcado_por_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_marcado_por_fkey FOREIGN KEY (marcado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_marcado_por_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_marcado_por_fkey FOREIGN KEY (marcado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_organizacao_id_fkey' and conrelid = 'public.presenciais'::regclass) then alter table public.presenciais add constraint presenciais_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_avisos_organizacao_id_fkey' and conrelid = 'public.presenciais_avisos'::regclass) then alter table public.presenciais_avisos add constraint presenciais_avisos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'presenciais_avisos_presencial_id_fkey' and conrelid = 'public.presenciais_avisos'::regclass) then alter table public.presenciais_avisos add constraint presenciais_avisos_presencial_id_fkey FOREIGN KEY (presencial_id) REFERENCES presenciais(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'recados_gestor_contato_id_fkey' and conrelid = 'public.recados_gestor'::regclass) then alter table public.recados_gestor add constraint recados_gestor_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'recados_gestor_origem_id_fkey' and conrelid = 'public.recados_gestor'::regclass) then alter table public.recados_gestor add constraint recados_gestor_origem_id_fkey FOREIGN KEY (origem_id) REFERENCES recados_gestor(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_ativpor' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_ativpor FOREIGN KEY (ativado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_ativpor' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_ativpor FOREIGN KEY (ativado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_canal' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_canal FOREIGN KEY (canal_id, organizacao_id) REFERENCES canais(id, organizacao_id) ON DELETE RESTRICT; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_contato' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_contato FOREIGN KEY (contato_id, organizacao_id) REFERENCES contatos(id, organizacao_id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_conversa' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_conversa FOREIGN KEY (conversa_id, organizacao_id) REFERENCES conversas(id, organizacao_id) ON DELETE SET NULL (conversa_id); end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_org' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_org FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_regua' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_regua FOREIGN KEY (regua_id, organizacao_id) REFERENCES reguas(id, organizacao_id) ON DELETE RESTRICT; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_resp' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_resp FOREIGN KEY (responsavel_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_ativ_resp' and conrelid = 'public.regua_ativacoes'::regclass) then alter table public.regua_ativacoes add constraint fk_ativ_resp FOREIGN KEY (responsavel_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_env_ativ' and conrelid = 'public.regua_envios'::regclass) then alter table public.regua_envios add constraint fk_env_ativ FOREIGN KEY (ativacao_id, organizacao_id) REFERENCES regua_ativacoes(id, organizacao_id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_env_msg' and conrelid = 'public.regua_envios'::regclass) then alter table public.regua_envios add constraint fk_env_msg FOREIGN KEY (mensagem_agendada_id) REFERENCES mensagens_agendadas(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_env_org' and conrelid = 'public.regua_envios'::regclass) then alter table public.regua_envios add constraint fk_env_org FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_env_passo' and conrelid = 'public.regua_envios'::regclass) then alter table public.regua_envios add constraint fk_env_passo FOREIGN KEY (passo_id) REFERENCES regua_passos(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_passo_regua' and conrelid = 'public.regua_passos'::regclass) then alter table public.regua_passos add constraint fk_passo_regua FOREIGN KEY (regua_id, organizacao_id) REFERENCES reguas(id, organizacao_id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_regua_canal' and conrelid = 'public.reguas'::regclass) then alter table public.reguas add constraint fk_regua_canal FOREIGN KEY (canal_padrao_id, organizacao_id) REFERENCES canais(id, organizacao_id) ON DELETE SET NULL (canal_padrao_id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_regua_criadopor' and conrelid = 'public.reguas'::regclass) then alter table public.reguas add constraint fk_regua_criadopor FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_regua_criadopor' and conrelid = 'public.reguas'::regclass) then alter table public.reguas add constraint fk_regua_criadopor FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_regua_org' and conrelid = 'public.reguas'::regclass) then alter table public.reguas add constraint fk_regua_org FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_blq_contato' and conrelid = 'public.relacionamento_bloqueio'::regclass) then alter table public.relacionamento_bloqueio add constraint fk_blq_contato FOREIGN KEY (contato_id, organizacao_id) REFERENCES contatos(id, organizacao_id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_blq_criadopor' and conrelid = 'public.relacionamento_bloqueio'::regclass) then alter table public.relacionamento_bloqueio add constraint fk_blq_criadopor FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_blq_criadopor' and conrelid = 'public.relacionamento_bloqueio'::regclass) then alter table public.relacionamento_bloqueio add constraint fk_blq_criadopor FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'fk_blq_org' and conrelid = 'public.relacionamento_bloqueio'::regclass) then alter table public.relacionamento_bloqueio add constraint fk_blq_org FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_config_organizacao_id_fkey' and conrelid = 'public.remarketing_config'::regclass) then alter table public.remarketing_config add constraint remarketing_config_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_eventos_organizacao_id_fkey' and conrelid = 'public.remarketing_eventos'::regclass) then alter table public.remarketing_eventos add constraint remarketing_eventos_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
@@ -2045,7 +2227,7 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarket
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_organizacao_id_fkey' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_remarketing_id_fkey' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_remarketing_id_fkey FOREIGN KEY (remarketing_id) REFERENCES remarketing_leads(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'remarketing_tarefas_responsavel_id_fkey' and conrelid = 'public.remarketing_tarefas'::regclass) then alter table public.remarketing_tarefas add constraint remarketing_tarefas_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'robo_ligar_concluido_por_fkey' and conrelid = 'public.robo_ligar'::regclass) then alter table public.robo_ligar add constraint robo_ligar_concluido_por_fkey FOREIGN KEY (concluido_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'robo_ligar_concluido_por_fkey' and conrelid = 'public.robo_ligar'::regclass) then alter table public.robo_ligar add constraint robo_ligar_concluido_por_fkey FOREIGN KEY (concluido_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'robo_ligar_conversa_id_fkey' and conrelid = 'public.robo_ligar'::regclass) then alter table public.robo_ligar add constraint robo_ligar_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'script_anexos_org_fk' and conrelid = 'public.script_anexos'::regclass) then alter table public.script_anexos add constraint script_anexos_org_fk FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'script_anexos_script_id_fkey' and conrelid = 'public.script_anexos'::regclass) then alter table public.script_anexos add constraint script_anexos_script_id_fkey FOREIGN KEY (script_id) REFERENCES scripts(id) ON DELETE CASCADE; end if; end $$;
@@ -2072,20 +2254,24 @@ do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_es
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_contato_id_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_conversa_id_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_conversa_id_fkey FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_de_usuario_id_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_de_usuario_id_fkey FOREIGN KEY (de_usuario_id) REFERENCES usuarios(id); end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_decidido_por_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_decidido_por_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_decidido_por_fkey FOREIGN KEY (decidido_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_oportunidade_id_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_oportunidade_id_fkey FOREIGN KEY (oportunidade_id) REFERENCES oportunidades(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'vacuo_repasses_para_usuario_id_fkey' and conrelid = 'public.vacuo_repasses'::regclass) then alter table public.vacuo_repasses add constraint vacuo_repasses_para_usuario_id_fkey FOREIGN KEY (para_usuario_id) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_lid_map_canal_id_fkey' and conrelid = 'public.wa_lid_map'::regclass) then alter table public.wa_lid_map add constraint wa_lid_map_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_lid_map_organizacao_id_fkey' and conrelid = 'public.wa_lid_map'::regclass) then alter table public.wa_lid_map add constraint wa_lid_map_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_optout_canal_id_fkey' and conrelid = 'public.atd_wa_optout'::regclass) then alter table public.atd_wa_optout add constraint wa_optout_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_optout_contato_id_fkey' and conrelid = 'public.atd_wa_optout'::regclass) then alter table public.atd_wa_optout add constraint wa_optout_contato_id_fkey FOREIGN KEY (contato_id) REFERENCES contatos(id) ON DELETE CASCADE; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_optout_organizacao_id_fkey' and conrelid = 'public.atd_wa_optout'::regclass) then alter table public.atd_wa_optout add constraint wa_optout_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_atualizado_por_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_atualizado_por_fkey FOREIGN KEY (atualizado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_atualizado_por_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_atualizado_por_fkey FOREIGN KEY (atualizado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_canal_id_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_canal_id_fkey FOREIGN KEY (canal_id) REFERENCES canais(id) ON DELETE SET NULL; end if; end $$;
-do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_criado_por_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id); end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_criado_por_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_criado_por_fkey FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL; end if; end $$;
 do $$ begin if not exists (select 1 from pg_constraint where conname = 'wa_templates_organizacao_id_fkey' and conrelid = 'public.wa_templates'::regclass) then alter table public.wa_templates add constraint wa_templates_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id) ON DELETE CASCADE; end if; end $$;
 
 -- 6. índices
 CREATE INDEX IF NOT EXISTS idx_adm_casos_completo ON public.adm_casos USING btree (organizacao_id, completo_em);
 CREATE INDEX IF NOT EXISTS idx_adm_fechados_contato ON public.adm_fechados USING btree (contato_id) WHERE (contato_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_adm_mov_contato ON public.adm_movimentos USING btree (contato_id) WHERE (acao = ANY (ARRAY['reabrir'::text, 'arquivar'::text]));
+CREATE INDEX IF NOT EXISTS idx_adm_mov_org ON public.adm_movimentos USING btree (organizacao_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_adm_pendencias_contato ON public.adm_pendencias USING btree (organizacao_id, contato_id);
 CREATE INDEX IF NOT EXISTS idx_agend_ativ ON public.agendamento_atividades USING btree (agendamento_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_agendamentos_atendente ON public.agendamentos USING btree (atendente_id);
@@ -2095,6 +2281,8 @@ CREATE INDEX IF NOT EXISTS idx_alertas_lq_org_status ON public.alertas_lead_quen
 CREATE INDEX IF NOT EXISTS idx_assitem_assinatura ON public.assinatura_itens USING btree (assinatura_id);
 CREATE INDEX IF NOT EXISTS idx_assitem_org ON public.assinatura_itens USING btree (organizacao_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_assinatura_asaas ON public.assinaturas USING btree (asaas_subscription_id) WHERE (asaas_subscription_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_assistente_lembretes_pendentes ON public.assistente_lembretes USING btree (quando) WHERE (status = 'pendente'::text);
+CREATE INDEX IF NOT EXISTS idx_assistente_lembretes_usuario ON public.assistente_lembretes USING btree (usuario_id, quando) WHERE (status = ANY (ARRAY['pendente'::text, 'avisado'::text]));
 CREATE INDEX IF NOT EXISTS idx_audit_criado ON public.audit_log USING btree (criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON public.audit_log USING btree (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_org ON public.audit_log USING btree (organizacao_id);
@@ -2109,6 +2297,10 @@ CREATE INDEX IF NOT EXISTS idx_bot_estado_org ON public.bot_conversa_estado USIN
 CREATE INDEX IF NOT EXISTS idx_bot_estado_vivo ON public.bot_conversa_estado USING btree (etapa) WHERE (NOT pausado);
 CREATE INDEX IF NOT EXISTS idx_bot_saida_conversa ON public.bot_mensagens_saida USING btree (conversa_id);
 CREATE INDEX IF NOT EXISTS idx_bot_saida_drain ON public.bot_mensagens_saida USING btree (status, enviar_apos) WHERE (status = 'pendente'::text);
+CREATE INDEX IF NOT EXISTS bot_remarketing_contato_idx ON public.bot_remarketing USING btree (contato_id);
+CREATE INDEX IF NOT EXISTS bot_remarketing_conversa_idx ON public.bot_remarketing USING btree (conversa_id);
+CREATE INDEX IF NOT EXISTS bot_remarketing_due_idx ON public.bot_remarketing USING btree (status, proximo_em);
+CREATE UNIQUE INDEX IF NOT EXISTS bot_remarketing_opp_ativa_uk ON public.bot_remarketing USING btree (oportunidade_id) WHERE (status = ANY (ARRAY['ativo'::text, 'pausado'::text]));
 CREATE INDEX IF NOT EXISTS idx_bot_roteamentos_org_dia ON public.bot_roteamentos USING btree (organizacao_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_canais_fonte ON public.canais USING btree (fonte_aquisicao_id);
 CREATE INDEX IF NOT EXISTS idx_canais_org ON public.canais USING btree (organizacao_id);
@@ -2144,6 +2336,8 @@ CREATE INDEX IF NOT EXISTS idx_contatos_responsavel ON public.contatos USING btr
 CREATE INDEX IF NOT EXISTS idx_contatos_telefone ON public.contatos USING btree (telefone);
 CREATE INDEX IF NOT EXISTS idx_conv_ativ_conversa ON public.conversa_atividades USING btree (conversa_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_conv_ativ_org ON public.conversa_atividades USING btree (organizacao_id);
+CREATE INDEX IF NOT EXISTS conversa_etiquetas_etiqueta_idx ON public.conversa_etiquetas USING btree (etiqueta_id);
+CREATE INDEX IF NOT EXISTS conversa_etiquetas_org_idx ON public.conversa_etiquetas USING btree (organizacao_id);
 CREATE INDEX IF NOT EXISTS cha_conversa_idx ON public.conversa_higiene_adiamentos USING btree (conversa_id, tipo, criado_em DESC);
 CREATE INDEX IF NOT EXISTS cha_org_idx ON public.conversa_higiene_adiamentos USING btree (organizacao_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS conversas_canal_origem_idx ON public.conversas USING btree (canal_origem_id);
@@ -2161,7 +2355,6 @@ CREATE INDEX IF NOT EXISTS idx_conversas_ultima_inter ON public.conversas USING 
 CREATE UNIQUE INDEX IF NOT EXISTS convites_org_email_pendente ON public.convites USING btree (organizacao_id, lower(email)) WHERE (status = 'pendente'::convite_status);
 CREATE INDEX IF NOT EXISTS convites_org_idx ON public.convites USING btree (organizacao_id);
 CREATE UNIQUE INDEX IF NOT EXISTS convites_request_id_uq ON public.convites USING btree (request_id) WHERE (request_id IS NOT NULL);
-CREATE INDEX IF NOT EXISTS disparo_envios_camp_ix ON public.disparo_envios USING btree (campanha_id, contato_id, enviado_em);
 CREATE UNIQUE INDEX IF NOT EXISTS etiquetas_org_nome_uniq ON public.etiquetas USING btree (organizacao_id, lower(nome));
 CREATE INDEX IF NOT EXISTS ix_ficha_anterior ON public.fichas_judiciais USING btree (ficha_anterior_id);
 CREATE INDEX IF NOT EXISTS ix_ficha_org_contato_criado ON public.fichas_judiciais USING btree (organizacao_id, contato_id, criado_em DESC);
@@ -2190,6 +2383,8 @@ CREATE INDEX IF NOT EXISTS inss_documentos_contato ON public.inss_documentos USI
 CREATE INDEX IF NOT EXISTS inss_documentos_pedido ON public.inss_documentos USING btree (pedido_id);
 CREATE INDEX IF NOT EXISTS inss_pedidos_contato ON public.inss_pedidos USING btree (contato_id, organizacao_id);
 CREATE INDEX IF NOT EXISTS inss_pedidos_org_status ON public.inss_pedidos USING btree (organizacao_id, status, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_integracoes_canal ON public.atd_integracoes USING btree (canal_id);
+CREATE INDEX IF NOT EXISTS idx_integracoes_org ON public.atd_integracoes USING btree (organizacao_id);
 CREATE INDEX IF NOT EXISTS iris_carteira_lote_idx ON public.iris_carteira USING btree (lote, estado);
 CREATE INDEX IF NOT EXISTS idx_iris_eventos_conversa ON public.iris_eventos USING btree (conversa_id, tipo, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_iris_eventos_followup ON public.iris_eventos USING btree (conversa_id, criado_em DESC) WHERE (tipo ~~ 'followup\_%'::text);
@@ -2206,6 +2401,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_iris_monitor_achados_chave ON public.iris_m
 CREATE INDEX IF NOT EXISTS idx_iris_monitor_ciclos_ok ON public.iris_monitor_ciclos USING btree (organizacao_id, fim DESC) WHERE (status = 'ok'::text);
 CREATE INDEX IF NOT EXISTS idx_iris_monitor_ciclos_org ON public.iris_monitor_ciclos USING btree (organizacao_id, iniciado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_iris_monitor_ciclos_rodando ON public.iris_monitor_ciclos USING btree (organizacao_id) WHERE (status = 'rodando'::text);
+CREATE INDEX IF NOT EXISTS idx_iris_teste_limpezas_contato ON public.iris_teste_limpezas USING btree (contato_id, limpo_em DESC);
+CREATE INDEX IF NOT EXISTS idx_iris_teste_limpezas_org ON public.iris_teste_limpezas USING btree (organizacao_id, limpo_em DESC);
+CREATE INDEX IF NOT EXISTS idx_ligacoes_marcadas_atendente_dia ON public.ligacoes_marcadas USING btree (atendente_id, dia);
+CREATE INDEX IF NOT EXISTS idx_ligacoes_marcadas_conversa ON public.ligacoes_marcadas USING btree (conversa_id);
+CREATE INDEX IF NOT EXISTS idx_ligacoes_marcadas_org_dia ON public.ligacoes_marcadas USING btree (organizacao_id, dia);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ligacoes_marcadas_aberta_contato ON public.ligacoes_marcadas USING btree (contato_id) WHERE (status = 'marcada'::text);
 CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON public.mensagens USING btree (conversa_id, enviada_em DESC);
 CREATE INDEX IF NOT EXISTS idx_mensagens_conversa_criado ON public.mensagens USING btree (conversa_id, criado_em DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mensagens_id_externo_unico_full ON public.mensagens USING btree (id_externo);
@@ -2247,6 +2448,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_oport_aberta_contato_funil ON public.oportu
 CREATE INDEX IF NOT EXISTS idx_org_usr_org ON public.organizacao_usuarios USING btree (organizacao_id);
 CREATE INDEX IF NOT EXISTS idx_org_usr_usr ON public.organizacao_usuarios USING btree (usuario_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_org_asaas_customer ON public.organizacoes USING btree (asaas_customer_id) WHERE (asaas_customer_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS pendencias_contato ON public.pendencias USING btree (contato_id);
+CREATE INDEX IF NOT EXISTS pendencias_org_status ON public.pendencias USING btree (organizacao_id, status);
 CREATE INDEX IF NOT EXISTS idx_planos_slug ON public.planos USING btree (slug);
 CREATE INDEX IF NOT EXISTS idx_presenciais_contato ON public.presenciais USING btree (contato_id) WHERE (status = 'marcado'::text);
 CREATE INDEX IF NOT EXISTS idx_presenciais_quando ON public.presenciais USING btree (organizacao_id, quando);
@@ -2293,6 +2496,8 @@ CREATE INDEX IF NOT EXISTS vacuo_estado_org_idx ON public.vacuo_estado USING btr
 CREATE INDEX IF NOT EXISTS vacuo_repasses_conv_idx ON public.vacuo_repasses USING btree (conversa_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS vacuo_repasses_opp_idx ON public.vacuo_repasses USING btree (oportunidade_id) WHERE (oportunidade_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS vacuo_repasses_org_idx ON public.vacuo_repasses USING btree (organizacao_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_wa_lid_map_org_tel ON public.wa_lid_map USING btree (organizacao_id, telefone_normalizado);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wa_lid_map_org_canal_lid ON public.wa_lid_map USING btree (organizacao_id, COALESCE(canal_id, '00000000-0000-0000-0000-000000000000'::uuid), lid);
 CREATE INDEX IF NOT EXISTS idx_wa_optout_org ON public.atd_wa_optout USING btree (organizacao_id, criado_em DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wa_templates_nome_idioma ON public.wa_templates USING btree (organizacao_id, nome, idioma) WHERE ativo;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wa_templates_remarketing ON public.wa_templates USING btree (organizacao_id, toque) WHERE (usar_em_remarketing AND ativo);
@@ -2382,6 +2587,15 @@ AS $function$
   select nullif(btrim(regexp_replace(upper(translate(coalesce(p_nome,''),
     'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ',
     'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN')), '[^A-Z]+', ' ', 'g')), '')
+$function$;
+CREATE OR REPLACE FUNCTION public.adm_saiu_do_fechado(p_contato uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select exists (select 1 from adm_movimentos m
+                   where m.contato_id = p_contato and m.acao in ('reabrir','arquivar'))
 $function$;
 CREATE OR REPLACE FUNCTION public.adm_status(p_org uuid)
  RETURNS jsonb
@@ -3218,6 +3432,21 @@ AS $function$
   where extract(isodow from d) between 1 and 5
     and not (d::date = any (public.dash_v5s_feriados()))
 $function$;
+CREATE OR REPLACE FUNCTION public.bot_avancar_etapa(p_conversa uuid, p_etapa text, p_dados jsonb DEFAULT '{}'::jsonb, p_reprompts integer DEFAULT NULL::integer, p_inbound_msg uuid DEFAULT NULL::uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin
+  update public.bot_conversa_estado set
+    etapa = coalesce(p_etapa, etapa),
+    dados_qualificacao = dados_qualificacao || coalesce(p_dados, '{}'::jsonb),
+    reprompts = coalesce(p_reprompts, reprompts),
+    ultimo_inbound_msg_id = coalesce(p_inbound_msg, ultimo_inbound_msg_id),
+    ultima_atividade_em = now()
+  where conversa_id = p_conversa;
+end $function$;
 CREATE OR REPLACE FUNCTION public.bot_pausar(p_conversa uuid, p_motivo text, p_resumo_texto text DEFAULT NULL::text, p_resumo_json jsonb DEFAULT NULL::jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -3254,6 +3483,60 @@ begin
   insert into public.audit_log (usuario_id, acao, entidade, entidade_id, dados_depois, organizacao_id)
   values (null, 'bot_pausado', 'conversas', p_conversa, jsonb_build_object('motivo', p_motivo), c.organizacao_id);
 end $function$;
+CREATE OR REPLACE FUNCTION public.bot_remarketing_inbound(p_conversa uuid, p_texto text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_contato uuid; v_br uuid; v_opp uuid; v_funil uuid; v_optout boolean; v_col uuid; v_alvo text;
+begin
+  select contato_id into v_contato from public.conversas where id = p_conversa;
+  if v_contato is null then return 'sem_remarketing'; end if;
+
+  select br.id, o.id, o.funil_id into v_br, v_opp, v_funil
+  from public.bot_remarketing br
+  join public.oportunidades o on o.id = br.oportunidade_id
+  where o.contato_id = v_contato and br.status in ('ativo','pausado')
+  order by br.criado_em desc
+  limit 1;
+  if v_br is null then return 'sem_remarketing'; end if;
+
+  v_optout := (
+       coalesce(p_texto,'') ~* '\y(sair|parar|pare|para de|n[ãa]o quero|remover|stop)\y'
+    or coalesce(p_texto,'') ~* '\y(descadastr|cancelar? inscri)'
+  );
+
+  if v_optout then
+    update public.bot_remarketing set status = 'optout' where id = v_br;
+    v_alvo := 'PERDIDO';
+  else
+    update public.bot_remarketing set status = 'respondeu' where id = v_br;
+    v_alvo := 'LEAD NOVO';
+  end if;
+
+  select id into v_col from public.funil_colunas
+  where funil_id = v_funil and nome = v_alvo and arquivada = false limit 1;
+  if v_col is not null then
+    if v_optout then
+      -- coluna PERDIDA exige motivo_perda válido (trigger + check). Preserva um motivo já existente.
+      update public.oportunidades
+        set coluna_id = v_col, motivo_perda = coalesce(motivo_perda, 'sem_interesse')
+        where id = v_opp;
+    else
+      update public.oportunidades set coluna_id = v_col where id = v_opp;
+    end if;
+  end if;
+
+  return case when v_optout then 'optout' else 'respondeu' end;
+end $function$;
+CREATE OR REPLACE FUNCTION public.bot_remarketing_touch_updated()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin new.atualizado_em := now(); return new; end $function$;
 CREATE OR REPLACE FUNCTION public.calcular_valor_assinatura(p_org uuid)
  RETURNS integer
  LANGUAGE sql
@@ -4255,6 +4538,17 @@ begin
   returning * into v_row;
   return v_row;
 end $function$;
+CREATE OR REPLACE FUNCTION public.emprestimo_pos_fluxo_ciclo_inicio(p_contato uuid, p_agora timestamp with time zone DEFAULT now())
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select max(rl.criado_em)
+    from public.retomada_atendimento_log rl
+    join public.conversas cv on cv.id = rl.conversa_id
+   where cv.contato_id = p_contato and rl.rota = 'fluxo_zero' and rl.decisao = 'retomada' and rl.criado_em <= p_agora
+$function$;
 CREATE OR REPLACE FUNCTION public.equipe_listar(p_org uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5034,6 +5328,12 @@ begin
 
   return jsonb_build_object('score', sc, 'fatores', f, 'engagement', eng, 'fit', fitm);
 end $function$;
+CREATE OR REPLACE FUNCTION public.fn_wa_lid_map_touch()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+begin new.atualizado_em := now(); return new; end $function$;
 CREATE OR REPLACE FUNCTION public.garantir_oportunidade_entrada(p_contato uuid, p_funil uuid, p_origem text DEFAULT NULL::text, p_conversa uuid DEFAULT NULL::uuid, p_canal uuid DEFAULT NULL::uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5076,6 +5376,63 @@ begin
       where organizacao_id = v_org and contato_id = p_contato and funil_id = p_funil and status = 'em_andamento' limit 1;
   end if;
   return v_id;
+end $function$;
+CREATE OR REPLACE FUNCTION public.garantir_oportunidade_lead_novo(p_contato uuid, p_conversa uuid DEFAULT NULL::uuid, p_canal uuid DEFAULT NULL::uuid, p_origem text DEFAULT NULL::text, p_forcar boolean DEFAULT false)
+ RETURNS TABLE(oportunidade_id uuid, criou boolean, motivo text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_org uuid; v_funil uuid; v_id uuid; v_tem_fechada boolean;
+begin
+  select organizacao_id into v_org from public.contatos where id = p_contato;
+  if v_org is null then raise exception 'contato_invalido'; end if;
+  -- mesma guarda da primitiva: chamada autenticada exige membership; service_role (uid null) é backend confiável.
+  if auth.uid() is not null and not public.is_member(v_org) then raise exception 'sem_permissao'; end if;
+
+  -- Funil principal = padrao=true (não pelo nome). Desempate determinístico.
+  select id into v_funil from public.funis
+   where organizacao_id = v_org and padrao and not arquivado
+   order by ordem asc, criado_em asc, id asc limit 1;
+  -- Fallback: org sem padrão marcado -> funil não-arquivado mais antigo (evita "lead sumido" silencioso).
+  if v_funil is null then
+    select id into v_funil from public.funis
+     where organizacao_id = v_org and not arquivado
+     order by ordem asc, criado_em asc, id asc limit 1;
+  end if;
+  if v_funil is null then
+    return query select null::uuid, false, 'sem_funil'; return;
+  end if;
+
+  -- Já tem oportunidade ATIVA no funil? Retorna a existente (não duplica).
+  select id into v_id from public.oportunidades
+   where organizacao_id = v_org and contato_id = p_contato and funil_id = v_funil and status = 'em_andamento'
+   limit 1;
+  if v_id is not null then
+    return query select v_id, false, 'ja_ativa'; return;
+  end if;
+
+  -- DECISÃO DO DONO (09/10): contato com pendência (aba Pendências) fica só na aba; nada no Kanban.
+  if exists (select 1 from public.pendencias where organizacao_id = v_org and contato_id = p_contato) then
+    return query select null::uuid, false, 'tem_pendencia'; return;
+  end if;
+
+  -- DECISÃO DO DONO: contato que já teve oportunidade FECHADA não reentra automático.
+  -- (p_forcar=true reserva o caminho manual para reengajar um perdido/ganho, se um dia houver regra.)
+  if not p_forcar then
+    select exists(
+      select 1 from public.oportunidades
+       where organizacao_id = v_org and contato_id = p_contato and funil_id = v_funil
+         and status in ('ganho','perdido','cancelado')
+    ) into v_tem_fechada;
+    if v_tem_fechada then
+      return query select null::uuid, false, 'tem_opp_fechada'; return;
+    end if;
+  end if;
+
+  -- Cria via primitiva idempotente (coluna de entrada, atendente/etiquetas herdados, ON CONFLICT).
+  v_id := public.garantir_oportunidade_entrada(p_contato, v_funil, p_origem, p_conversa, p_canal);
+  return query select v_id, (v_id is not null), coalesce(case when v_id is not null then 'criada' end, 'nao_criada');
 end $function$;
 CREATE OR REPLACE FUNCTION public.higiene_registrar_adiamento(p_conversa uuid, p_tipo text)
  RETURNS jsonb
@@ -5482,6 +5839,53 @@ begin
     return jsonb_build_object('ok', true, 'ia', 'desativada', 'tinha_sessao', v_sess.id is not null);
   end if;
 end $function$;
+CREATE OR REPLACE FUNCTION public.ia_familia_pendente_em(p_conversa uuid, p_agora timestamp with time zone DEFAULT now())
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select q.q_first
+    from public.ia_sessoes s
+    -- última fala do cliente até p_agora (qualquer tipo)
+    left join lateral (
+      select i.criado_em as li_em, i.tipo::text as li_tipo, coalesce(i.conteudo, '') as li_txt
+        from public.mensagens i
+       where i.conversa_id = s.conversa_id and i.direcao = 'entrada' and i.criado_em <= p_agora
+       order by i.criado_em desc limit 1) li on true
+    cross join lateral (
+      select min(m.criado_em) as q_first
+        from public.mensagens m
+       where m.conversa_id = s.conversa_id
+         and m.direcao = 'saida' and m.origem = 'bot' and m.tipo = 'texto'
+         and m.criado_em <= p_agora and m.criado_em >= p_agora - interval '30 days'
+         -- nada do cliente depois da pergunta (qualquer tipo: texto, áudio, figurinha…)
+         and m.criado_em > coalesce(li.li_em, '-infinity'::timestamptz)
+         -- é a pergunta do PARENTE (não a das financeiras do parente, nem Bolsa Família, nem conta de luz)
+         and m.conteudo like '%?%'
+         and m.conteudo ~* '(fam[íi]lia|familiar|parente)'
+         and m.conteudo ~* '(inss|aposentad|pens[ãa]o|pensionista|benef[íi]cio|receb)'
+         and m.conteudo !~* '(empr[ée]stimo|agibank|bmg|facta|mercantil|crefisa|financeira|conta d[eo] |no nome|comprovante|pesquis|(bolsa|sal[áa]rio)[ -]?fam[íi]lia)'
+    ) q
+   where s.conversa_id = p_conversa
+     and s.etapa in ('qualificacao_inss', 'juros_beneficio')
+     and s.dados->>'recebe_inss' = 'nao'
+     and s.dados->>'perguntou_familiar' = 'true'
+     and coalesce(s.dados->>'familiar_recebe', '') not in ('sim', 'nao')
+     and coalesce(s.dados->>'beneficiario', '') <> 'familiar'
+     and coalesce(s.dados->>'financeiras_perguntada', '') <> 'true'
+     and q.q_first is not null
+     -- a última fala do cliente veio DEPOIS de uma pergunta do parente (a IA re-perguntou)? Só vale se foi texto que não
+     -- cita parente ("Olá", "Eu trabalho"). Áudio ou "minha mãe…" → humano/IA decidem, nunca NE automático.
+     and not (li.li_em is not null
+              and exists (select 1 from public.mensagens f
+                           where f.conversa_id = s.conversa_id and f.direcao = 'saida' and f.origem = 'bot' and f.tipo = 'texto'
+                             and f.criado_em < li.li_em and f.criado_em >= p_agora - interval '30 days'
+                             and f.conteudo like '%?%' and f.conteudo ~* '(fam[íi]lia|familiar|parente)'
+                             and f.conteudo ~* '(inss|aposentad|pens[ãa]o|pensionista|benef[íi]cio|receb)')
+              and (li.li_tipo <> 'texto'
+                   or li.li_txt ~* '\m(m[ãa]e|pai|av[óôoa]|v[óô]|marido|espos[oa]|filh[oa]s?|irm[ãa]o?|tio|tia|sogr[oa]|sobrinh[oa]|net[oa]|parente|familiar)\M'))
+$function$;
 CREATE OR REPLACE FUNCTION public.ia_sessao_antonio_so_matheus()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -5509,6 +5913,46 @@ begin
   end if;
   return new;
 end $function$;
+CREATE OR REPLACE FUNCTION public.iris_ativa_na_conversa(p_conversa uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select exists (
+    select 1
+      from public.conversas c
+      cross join lateral (select distinct k.canal from unnest(array[c.canal_id, c.canal_preso_id]) k(canal)
+                           where k.canal is not null) cn
+      cross join lateral (select ci.valor_normalizado as tel from public.contato_identidades ci
+                           where ci.contato_id = c.contato_id and ci.tipo = 'whatsapp' and ci.valor_normalizado is not null
+                           order by ci.principal desc
+                           limit 1) t
+     where c.id = p_conversa
+       and public.iris_ativa_para(cn.canal, t.tel))
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_ativa_para(p_canal uuid, p_telefone text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select coalesce((
+    select b.iris_config -> 'ativo' = 'true'::jsonb
+           and case
+                 -- 01/11: só os contatos de UM atendente (e os números de teste)
+                 when jsonb_typeof(b.iris_config -> 'so_dono') = 'string'
+                   then public.iris_numero_teste(p_canal, p_telefone)
+                        or public.iris_contato_do_dono(p_canal, p_telefone, (b.iris_config ->> 'so_dono')::uuid)
+                        -- 12/11: + os contatos NOVOS (criados depois do todos_desde), de qualquer atendente
+                        or (jsonb_typeof(b.iris_config -> 'todos_desde') = 'string'
+                            and public.iris_contato_novo(p_canal, p_telefone, (b.iris_config ->> 'todos_desde')::timestamptz))
+                 else (b.iris_config -> 'somente_teste' = 'false'::jsonb
+                       or public.iris_numero_teste(p_canal, p_telefone))
+               end
+      from public.bot_canal_config b
+     where b.canal_id = p_canal), false)
+$function$;
 CREATE OR REPLACE FUNCTION public.iris_atraso_resposta_s(p_conversa uuid)
  RETURNS integer
  LANGUAGE plpgsql
@@ -5562,6 +6006,66 @@ begin
   end;
   return null;
 end $function$;
+CREATE OR REPLACE FUNCTION public.iris_contato_do_dono(p_canal uuid, p_telefone text, p_dono uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select exists (
+    select 1
+      from public.contato_identidades ci
+      join public.contatos ct on ct.id = ci.contato_id
+      join public.canais ca on ca.id = p_canal and ca.organizacao_id = ct.organizacao_id
+     where ci.tipo = 'whatsapp'
+       and nullif(public.chave_canonica_telefone(p_telefone), '') is not null
+       and ci.chave_canonica = public.chave_canonica_telefone(p_telefone)
+       and ct.responsavel_id = p_dono)
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_contato_novo(p_canal uuid, p_telefone text, p_desde timestamp with time zone)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select exists (
+    select 1
+      from public.contato_identidades ci
+      join public.contatos ct on ct.id = ci.contato_id
+      join public.canais ca on ca.id = p_canal and ca.organizacao_id = ct.organizacao_id
+     where ci.tipo = 'whatsapp'
+       and nullif(public.chave_canonica_telefone(p_telefone), '') is not null
+       and ci.chave_canonica = public.chave_canonica_telefone(p_telefone)
+       and p_desde is not null and ct.criado_em >= p_desde)
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_corte_limpeza(p_contato uuid)
+ RETURNS timestamp with time zone
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v timestamptz;
+begin
+  if p_contato is null or to_regprocedure('public.iris_limpo_em(uuid)') is null then
+    return null;
+  end if;
+  execute 'select public.iris_limpo_em($1)' into v using p_contato;
+  return v;
+exception when others then
+  return null;
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_dia_util(p_dia date)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select p_dia is not null
+     and extract(isodow from p_dia) between 1 and 5
+     and not (p_dia = any (public.dash_v5s_feriados()))
+$function$;
 CREATE OR REPLACE FUNCTION public.iris_followup_ao_receber()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -5820,6 +6324,23 @@ AS $function$
      and btrim(coalesce(p_texto, '')) ~* (
        '^[^[:alnum:]]*(sim|isso|quero|pode)([^[:alnum:]]+(sim|pode|parar|encerrar|isso|quero|obrigad[oa]|por favor))*[^[:alnum:]]*$')
 $function$;
+CREATE OR REPLACE FUNCTION public.iris_horario_comercial(p_agora timestamp with time zone)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select public.iris_dia_util(x.l::date) and x.l::time >= time '09:00' and x.l::time < time '18:00'
+    from (select p_agora at time zone 'America/Sao_Paulo' as l) x
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_limpo_em(p_contato uuid)
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select max(l.limpo_em) from public.iris_teste_limpezas l where l.contato_id = p_contato
+$function$;
 CREATE OR REPLACE FUNCTION public.iris_monitor_alertar_critico()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -6036,12 +6557,538 @@ AS $function$
     when 'envio_falhando_no_numero'   then 'envio falhando no número'
     else replace(coalesce(p_sub, ''), '_', ' ') end
 $function$;
+CREATE OR REPLACE FUNCTION public.iris_motivo_nao_tocar(p_conversa uuid, p_etapa text, p_tipo text, p_agora timestamp with time zone DEFAULT now())
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  c           record;
+  v_etapa     text := nullif(btrim(coalesce(p_etapa, '')), '');
+  v_ciclo     timestamptz;
+  v_corte     timestamptz;
+  v_ult_cli   timestamptz;
+  v_canal     record;
+begin
+  if p_tipo is null or p_tipo not in ('retomada', 'recuperacao', 'audio', 'objecao', 'agendamento') then
+    return 'tipo_invalido';
+  end if;
+  select cv.id, cv.organizacao_id, cv.contato_id, cv.status::text as status, cv.arquivada_em,
+         coalesce(cv.precisa_humano, false) as precisa_humano, coalesce(cv.canal_preso_id, cv.canal_id) as canal_id
+    into c
+    from public.conversas cv
+   where cv.id = p_conversa;
+  if not found then return 'conversa_inexistente'; end if;
+  v_corte := coalesce(public.iris_corte_limpeza(c.contato_id), '-infinity'::timestamptz);
+  v_ciclo := greatest(coalesce(public.emprestimo_pos_fluxo_ciclo_inicio(c.contato_id, p_agora), '-infinity'::timestamptz), v_corte);
+
+  -- ---- NUNCA
+  if not public.iris_ativa_na_conversa(c.id) then return 'iris_desligada'; end if;
+  if exists (select 1 from public.atd_wa_optout w where w.contato_id = c.contato_id) then return 'optout'; end if;
+  if exists (select 1 from public.conversas cv2
+               join public.mensagens m on m.conversa_id = cv2.id
+              where cv2.contato_id = c.contato_id and m.direcao = 'entrada' and m.tipo = 'texto'
+                and m.criado_em > p_agora - interval '7 days' and m.criado_em <= p_agora
+                and m.criado_em > v_corte
+                and public.iris_texto_irritado(m.conteudo)) then
+    return 'irritacao';
+  end if;
+  if exists (select 1 from public.oportunidades o where o.contato_id = c.contato_id and o.status = 'ganho')
+     or exists (select 1 from public.adm_fechados af where af.contato_id = c.contato_id)
+     or public.adm_saiu_do_fechado(c.contato_id) then
+    return 'fechado';
+  end if;
+  if (not exists (select 1 from public.oportunidades o where o.contato_id = c.contato_id and o.status = 'em_andamento')
+      and exists (select 1 from public.oportunidades o where o.contato_id = c.contato_id
+                     and o.status in ('perdido', 'cancelado')))
+     or exists (select 1 from public.ia_sessoes s where s.conversa_id = c.id and s.dados ? 'ne_origem') then
+    return 'nao_elegivel';
+  end if;
+  if public.fn_ddd_fora_rs(c.contato_id) then return 'fora_rs'; end if;
+
+  -- ---- retomada
+  if p_tipo = 'retomada' then
+    if v_etapa is null then return 'etapa_vazia'; end if;
+    if c.status in ('fechada', 'resolvida') or c.arquivada_em is not null then return 'conversa_fechada'; end if;
+    if not exists (select 1 from public.mensagens mi
+                    where mi.conversa_id = c.id and mi.direcao = 'entrada' and mi.criado_em > v_ciclo and mi.criado_em <= p_agora
+                      and (mi.metadados ? 'formulario'
+                           or exists (select 1 from public.mensagens mo
+                                       where mo.conversa_id = c.id and mo.direcao = 'saida' and mo.criado_em > v_ciclo
+                                         and mo.criado_em < mi.criado_em and mo.tipo::text not in ('sistema', 'nota_interna')))) then
+      return 'nunca_respondeu';
+    end if;
+    if exists (select 1 from public.ia_sessoes s where s.conversa_id = c.id
+                  and s.dados ->> 'aguardando_humano' = 'representacao') then
+      return 'representacao';
+    end if;
+    if public.ia_familia_pendente_em(c.id, p_agora) is not null then return 'familia_pendente'; end if;
+    if exists (select 1 from public.conversa_etiquetas ce join public.etiquetas e on e.id = ce.etiqueta_id
+                where ce.conversa_id = c.id and e.nome = 'PROVÁVEL NÃO ELEGÍVEL') then
+      return 'provavel_nao_elegivel';
+    end if;
+    if c.precisa_humano or exists (
+         select 1 from public.mensagens m
+          where m.conversa_id = c.id and m.direcao = 'saida' and m.criado_em > v_ciclo
+            and ((m.autor_id is not null and m.tipo::text not in ('sistema', 'nota_interna'))
+                 or (m.autor_id is null and m.origem = 'telefone'))) then
+      return 'humano_atendendo';
+    end if;
+    if exists (select 1 from public.ia_sessoes s where s.conversa_id = c.id and s.dados ->> 'recusou' = 'true')
+       or exists (select 1 from public.iris_eventos e where e.conversa_id = c.id and e.tipo = 'recuperacao'
+                     and e.criado_em > v_ciclo)
+       or exists (select 1 from public.conversas cv2
+                    join public.mensagens m on m.conversa_id = cv2.id
+                   where cv2.contato_id = c.contato_id and m.direcao = 'entrada' and m.tipo = 'texto'
+                     and m.criado_em > p_agora - interval '7 days' and m.criado_em <= p_agora
+                     and m.criado_em > v_corte
+                     and public.iris_texto_recusa(m.conteudo))
+       or exists (select 1 from public.mensagens m
+                   where m.conversa_id = c.id and m.direcao = 'saida' and m.origem = 'bot' and m.tipo = 'texto'
+                     and m.criado_em > p_agora - interval '7 days' and m.criado_em <= p_agora
+                     and m.criado_em > v_corte
+                     and public.iris_texto_bot_recusa(m.conteudo)) then
+      return 'recusou';
+    end if;
+    if (select count(*) from public.iris_eventos e
+         where e.conversa_id = c.id and e.tipo = 'retomada' and e.etapa = v_etapa and e.criado_em > v_ciclo) >= 2 then
+      return 'retomadas_da_etapa';
+    end if;
+    select k.status_integracao::text as st, coalesce(k.envio_restrito, false) as restrito, k.health_check_status as hc
+      into v_canal
+      from public.canais k
+     where k.id = c.canal_id;
+    if not found then return 'canal_indisponivel'; end if;
+    if v_canal.st is distinct from 'conectado' or v_canal.restrito or v_canal.hc in ('restrito', 'falha') then
+      return 'canal_indisponivel';
+    end if;
+    if not public.iris_horario_comercial(p_agora) then return 'fora_do_horario'; end if;
+    if not public.toque_automatico_permitido(c.contato_id)
+       or (select count(*) from public.iris_eventos e join public.conversas cv2 on cv2.id = e.conversa_id
+            where cv2.contato_id = c.contato_id and e.tipo = 'retomada' and e.criado_em > v_corte
+              and e.criado_em > p_agora - interval '24 hours' and e.criado_em < p_agora + interval '24 hours') >= 1
+       or (select count(*) from public.iris_eventos e join public.conversas cv2 on cv2.id = e.conversa_id
+            where cv2.contato_id = c.contato_id and e.tipo = 'retomada' and e.criado_em > v_corte
+              and e.criado_em > p_agora - interval '7 days' and e.criado_em < p_agora + interval '7 days') >= 3 then
+      return 'teto_toques';
+    end if;
+    return null;
+  end if;
+
+  -- ---- recuperação
+  if p_tipo = 'recuperacao' then
+    if exists (select 1 from public.ia_sessoes s where s.conversa_id = c.id
+                  and s.dados ->> 'aguardando_humano' = 'representacao') then
+      return 'representacao';
+    end if;
+    if c.precisa_humano or exists (
+         select 1 from public.mensagens m
+          where m.conversa_id = c.id and m.direcao = 'saida' and m.criado_em > v_ciclo
+            and ((m.autor_id is not null and m.tipo::text not in ('sistema', 'nota_interna'))
+                 or (m.autor_id is null and m.origem = 'telefone'))) then
+      return 'humano_atendendo';
+    end if;
+    if exists (select 1 from public.iris_eventos e where e.conversa_id = c.id and e.tipo = 'recuperacao'
+                  and e.criado_em > v_ciclo) then
+      return 'recuperacao_feita';
+    end if;
+    return null;
+  end if;
+
+  -- ---- áudio: nunca 2 seguidos sem o cliente responder (depois da limpeza)
+  if p_tipo = 'audio' then
+    select max(m.criado_em) into v_ult_cli
+      from public.mensagens m
+     where m.conversa_id = c.id and m.direcao = 'entrada' and m.criado_em <= p_agora;
+    v_ult_cli := greatest(coalesce(v_ult_cli, '-infinity'::timestamptz), v_corte);
+    if exists (select 1 from public.iris_eventos e
+                 left join public.iris_textos t on t.id = e.texto_id
+                where e.conversa_id = c.id and e.criado_em > v_ult_cli
+                  and (e.tipo = 'audio' or t.tipo = 'audio'))
+       or exists (select 1 from public.mensagens m
+                   where m.conversa_id = c.id and m.direcao = 'saida' and m.tipo = 'audio'
+                     and m.criado_em > v_ult_cli and m.criado_em <= p_agora
+                     and coalesce(m.status::text, '') <> 'falhou') then
+      return 'audio_seguido';
+    end if;
+    return null;
+  end if;
+
+  -- ---- objeção: até 2 argumentos na mesma objeção (no ciclo, depois da limpeza)
+  if p_tipo = 'objecao' then
+    if v_etapa is null then return 'etapa_vazia'; end if;
+    if (select count(*) from public.iris_eventos e
+         where e.conversa_id = c.id and e.tipo = 'objecao' and e.etapa = v_etapa and e.criado_em > v_ciclo) >= 2 then
+      return 'objecao_esgotada';
+    end if;
+    return null;
+  end if;
+
+  return null;   -- agendamento: só o NUNCA
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_numero_teste(p_canal uuid, p_telefone text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select coalesce((
+    select exists (select 1 from unnest(b.numeros_teste) n
+                    where public.chave_canonica_telefone(n) = public.chave_canonica_telefone(p_telefone)
+                      and char_length(public.chave_canonica_telefone(p_telefone)) >= 10)
+      from public.bot_canal_config b
+     where b.canal_id = p_canal), false)
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_pode_tocar(p_conversa uuid, p_etapa text, p_tipo text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select public.iris_motivo_nao_tocar(p_conversa, p_etapa, p_tipo, now()) is null
+$function$;
 CREATE OR REPLACE FUNCTION public.iris_pode_ver()
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$ select exists (select 1 from public.iris_acesso where user_id = auth.uid()) $function$;
+CREATE OR REPLACE FUNCTION public.iris_registrar_evento(p_conversa uuid, p_etapa text, p_tipo text, p_texto_id text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_org   uuid;
+  v_texto text := nullif(upper(btrim(coalesce(p_texto_id, ''))), '');
+  v_etapa text := nullif(left(btrim(coalesce(p_etapa, '')), 60), '');
+  v_id    uuid;
+begin
+  if p_tipo is null or p_tipo not in ('retomada', 'recuperacao', 'audio', 'objecao', 'agendamento') then
+    return jsonb_build_object('erro', 'tipo_invalido');
+  end if;
+  select c.organizacao_id into v_org from public.conversas c where c.id = p_conversa;
+  if v_org is null then return jsonb_build_object('erro', 'conversa_nao_encontrada'); end if;
+  -- objeção: a IA manda o CÓDIGO da objeção em p_texto_id ('O5', ia-sdr) — ele é a etapa da objeção (o teto de 2
+  -- argumentos conta por objeção, iris_motivo_nao_tocar 'objecao'), não um texto de iris_textos
+  if p_tipo = 'objecao' and v_texto ~ '^O[0-9]{1,2}$' then
+    v_etapa := v_texto;
+    v_texto := null;
+  end if;
+  if v_texto is not null and not exists (select 1 from public.iris_textos t where t.id = v_texto) then
+    return jsonb_build_object('erro', 'texto_desconhecido');
+  end if;
+  insert into public.iris_eventos (organizacao_id, conversa_id, etapa, tipo, texto_id)
+  values (v_org, p_conversa, v_etapa, p_tipo, v_texto)
+  returning id into v_id;
+  return jsonb_build_object('ok', true, 'id', v_id);
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_teste_limpar(p_contato uuid, p_canal uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_org         uuid;
+  v_canal_ok    boolean;
+  v_ativo       boolean;
+  v_tel         text;
+  v_conv        uuid;          -- a conversa mais recente do contato (a do /clean)
+  v_conversas   uuid[];
+  v_ligs        uuid[];
+  v_lembs       uuid[];
+  v_limpo       timestamptz := now();
+  -- quem pediu: pela API (o webhook, com a service key: PostgREST põe request.jwt.claims) ou direto no banco (o 11 da subida)
+  v_por         text := case when nullif(current_setting('request.jwt.claims', true), '') is not null
+                             then 'clean_whatsapp' else 'clean_sql' end;
+  n_lig         int := 0;
+  n_lemb        int := 0;
+  n_sessoes     int := 0;
+  n_fila        int := 0;
+  n_agendadas   int := 0;
+  n_robo        int := 0;
+  n_followups   int := 0;
+  n_fechadas    int := 0;
+  n_humano      int := 0;
+  n_sla         int := 0;
+  n_avisos      int := 0;
+  n_sino        int := 0;
+  n_optout      int := 0;
+  v_card        jsonb := jsonb_build_object('acao', 'sem_card');
+  v_pulados     text[] := '{}';
+  v_f           uuid;
+  v_o           record;
+  v_entrada     uuid;
+  v_res_antigo  text;
+  v_det         jsonb;
+begin
+  if p_contato is null or p_canal is null then
+    return jsonb_build_object('ok', false, 'erro', 'parametros');
+  end if;
+  select ct.organizacao_id into v_org from public.contatos ct where ct.id = p_contato;
+  if v_org is null then return jsonb_build_object('ok', false, 'erro', 'contato_nao_encontrado'); end if;
+  select true, coalesce(b.iris_config -> 'ativo' = 'true'::jsonb, false)
+    into v_canal_ok, v_ativo
+    from public.bot_canal_config b
+   where b.canal_id = p_canal and b.organizacao_id = v_org;
+  if not coalesce(v_canal_ok, false) then return jsonb_build_object('ok', false, 'erro', 'canal_nao_encontrado'); end if;
+
+  -- o telefone que conta é o PRINCIPAL do contato (a mesma régua de iris_ativa_na_conversa: um número de teste guardado
+  -- como identidade secundária de um cliente real não libera o cliente real)
+  select ci.valor_normalizado into v_tel
+    from public.contato_identidades ci
+   where ci.contato_id = p_contato and ci.tipo = 'whatsapp' and ci.valor_normalizado is not null
+   order by ci.principal desc
+   limit 1;
+  select c.id into v_conv from public.conversas c where c.contato_id = p_contato order by c.criado_em desc limit 1;
+
+  if not v_ativo or not public.iris_numero_teste(p_canal, v_tel) then
+    if v_conv is not null then
+      perform public.iris_teste_registrar_negado(v_conv, p_canal,
+        case when not v_ativo then 'iris_desligada' else 'nao_e_numero_teste' end);
+    end if;
+    return jsonb_build_object('ok', false, 'erro', case when not v_ativo then 'iris_desligada' else 'nao_e_numero_teste' end);
+  end if;
+
+  -- dois /clean seguidos do mesmo contato: um de cada vez
+  perform pg_advisory_xact_lock(hashtextextended('iris_teste_limpar:' || p_contato::text, 0));
+
+  select coalesce(array_agg(c.id), '{}') into v_conversas from public.conversas c where c.contato_id = p_contato;
+
+  -- (1) a ligação marcada e o lembrete dela (o que fazia o 11-recomecar-teste.sql)
+  with l as (
+    update public.ligacoes_marcadas
+       set status = 'cancelada', status_em = now()
+     where contato_id = p_contato and status = 'marcada'
+    returning id, lembrete_id
+  )
+  select coalesce(array_agg(l.id), '{}'), coalesce(array_agg(l.lembrete_id) filter (where l.lembrete_id is not null), '{}')
+    into v_ligs, v_lembs
+    from l;
+  n_lig := coalesce(array_length(v_ligs, 1), 0);
+  update public.assistente_lembretes set status = 'cancelado'
+   where id = any(v_lembs) and status in ('pendente', 'avisado');
+  get diagnostics n_lemb = row_count;
+
+  -- (2) a sessão da IA (nenhuma retomada sai numa conversa fechada)
+  update public.ia_sessoes
+     set status = 'encerrada', processar_apos = null, atualizado_em = now(),
+         dados = coalesce(dados, '{}'::jsonb) || jsonb_build_object('encerrada_por', 'iris_teste_clean', 'encerrada_em', now())
+   where contato_id = p_contato and status <> 'encerrada';
+  get diagnostics n_sessoes = row_count;
+
+  -- (3) a fila de saída do robô/IA que ainda não saiu
+  update public.bot_mensagens_saida set status = 'cancelada'
+   where conversa_id = any(v_conversas) and status in ('pendente', 'agendada');
+  get diagnostics n_fila = row_count;
+
+  -- (4) o robô volta ao começo (os valores do padrão da tabela: etapa inicial, dados zerados, sem pausa)
+  update public.bot_conversa_estado
+     set etapa = default, dados_qualificacao = default, pausado = false, motivo_pausa = null, reprompts = default,
+         lead_quente = default, lead_quente_motivos = default, resumo = null, concluido_em = null,
+         processando_ate = null, ultimo_inbound_msg_id = null, ultima_atividade_em = now()
+   where conversa_id = any(v_conversas) or contato_id = p_contato;
+  get diagnostics n_robo = row_count;
+
+  -- (5) o follow-up aberto (frente FOLLOWUP; tolerante: sem a tabela, pula). 'limpeza_teste' = sem aviso no sino.
+  if to_regclass('public.iris_followups') is not null then
+    if to_regprocedure('public.iris_followup_finalizar(uuid, text, text, uuid, uuid)') is not null then
+      for v_f in execute
+        'select id from public.iris_followups where contato_id = $1 and status in (''candidato'', ''agendado'', ''ativo'')'
+        using p_contato
+      loop
+        execute 'select public.iris_followup_finalizar($1, ''cancelado'', ''limpeza_teste'', null, null)' using v_f;
+        n_followups := n_followups + 1;
+      end loop;
+    else
+      execute 'with u as (update public.iris_followups set status = ''cancelado''
+                           where contato_id = $1 and status in (''candidato'', ''agendado'', ''ativo'') returning 1)
+               select count(*) from u'
+        into n_followups using p_contato;
+    end if;
+  else
+    v_pulados := v_pulados || 'iris_followups'::text;
+  end if;
+
+  -- (6) o card volta para a entrada (Lead Novo). Fechado (ganho / administrativo) não é mexido.
+  if exists (select 1 from public.oportunidades o where o.contato_id = p_contato and o.status = 'ganho')
+     or (to_regclass('public.adm_fechados') is not null
+         and exists (select 1 from public.adm_fechados af where af.contato_id = p_contato)) then
+    v_card := jsonb_build_object('acao', 'mantido_cliente_fechado');
+  else
+    if exists (select 1 from public.oportunidades o where o.contato_id = p_contato and o.status = 'em_andamento') then
+      v_card := jsonb_build_object('acao', 'voltou_para_entrada', 'cards', '[]'::jsonb);
+      for v_o in
+        select o.id, o.funil_id, o.coluna_id from public.oportunidades o
+         where o.contato_id = p_contato and o.status = 'em_andamento'
+         order by o.criado_em desc
+      loop
+        select fc.id into v_entrada from public.funil_colunas fc
+         where fc.funil_id = v_o.funil_id and fc.entrada and not fc.arquivada
+         order by fc.ordem limit 1;
+        select coalesce(fc.resultado, 'neutro') into v_res_antigo from public.funil_colunas fc where fc.id = v_o.coluna_id;
+        update public.oportunidades
+           set coluna_id = coalesce(v_entrada, coluna_id),
+               motivo_nao_elegivel = null,
+               etiquetas = array_remove(coalesce(etiquetas, '{}'::text[]), 'nao_elegivel'),
+               motivo_reabertura = case when coalesce(v_res_antigo, 'neutro') in ('ganho', 'perdido')
+                                        then 'Limpeza do número de teste (/clean)' else motivo_reabertura end
+         where id = v_o.id;
+        v_card := jsonb_set(v_card, '{cards}', (v_card -> 'cards') || jsonb_build_object(
+          'id', v_o.id, 'coluna_antes', v_o.coluna_id, 'coluna_depois', coalesce(v_entrada, v_o.coluna_id),
+          'sem_coluna_de_entrada', v_entrada is null));
+      end loop;
+    else
+      select o.id, o.funil_id, o.coluna_id, o.status::text as status into v_o
+        from public.oportunidades o
+       where o.contato_id = p_contato and o.status::text in ('perdido', 'cancelado')
+       order by o.criado_em desc limit 1;
+      if v_o.id is not null then
+        select fc.id into v_entrada from public.funil_colunas fc
+         where fc.funil_id = v_o.funil_id and fc.entrada and not fc.arquivada
+         order by fc.ordem limit 1;
+        if v_entrada is null then
+          v_card := jsonb_build_object('acao', 'sem_coluna_de_entrada', 'id', v_o.id);
+        else
+          select coalesce(fc.resultado, 'neutro') into v_res_antigo from public.funil_colunas fc where fc.id = v_o.coluna_id;
+          update public.oportunidades
+             set coluna_id = v_entrada, status = 'em_andamento', fechado_em = null, fechado_por_id = null,
+                 responsavel_no_fechamento_id = null, motivo_perda = null, motivo_perda_desc = null,
+                 motivo_nao_elegivel = null,
+                 etiquetas = array_remove(coalesce(etiquetas, '{}'::text[]), 'nao_elegivel'),
+                 motivo_reabertura = case when coalesce(v_res_antigo, 'neutro') in ('ganho', 'perdido')
+                                          then 'Limpeza do número de teste (/clean)' else null end
+           where id = v_o.id;
+          v_card := jsonb_build_object('acao', 'reaberto_na_entrada', 'id', v_o.id, 'status_antes', v_o.status,
+                                       'coluna_antes', v_o.coluna_id, 'coluna_depois', v_entrada);
+        end if;
+      end if;
+    end if;
+  end if;
+
+  -- (7) as conversas: ninguém "precisando de humano" e todas fechadas (a próxima mensagem abre uma conversa nova)
+  update public.conversas set precisa_humano = false, precisa_humano_motivo = null, precisa_humano_em = null
+   where contato_id = p_contato and precisa_humano;
+  get diagnostics n_humano = row_count;
+  update public.conversas set status = 'fechada'
+   where contato_id = p_contato and status <> 'fechada';
+  get diagnostics n_fechadas = row_count;
+
+  -- (8) avisos da equipe sobre essas conversas (tolerante: tabela ausente ou diferente → pula e conta em "pulados")
+  if to_regclass('public.sla_alertas') is not null then
+    begin
+      execute 'update public.sla_alertas set resolvido_em = now(), resolucao = ''teste_clean'', atualizado_em = now()
+                where resolvido_em is null and conversa_id = any($1)' using v_conversas;
+      get diagnostics n_sla = row_count;
+    exception when others then v_pulados := v_pulados || 'sla_alertas'::text;
+    end;
+  end if;
+  if to_regclass('public.avisos_passado_humano') is not null then
+    begin
+      execute 'update public.avisos_passado_humano set descartado_em = now()
+                where enviado_em is null and descartado_em is null and conversa_id = any($1)' using v_conversas;
+      get diagnostics n_avisos = row_count;
+    exception when others then v_pulados := v_pulados || 'avisos_passado_humano'::text;
+    end;
+  end if;
+  update public.atd_notificacoes set lida_em = now()
+   where lida_em is null
+     and ((tipo = 'lembrete' and ref_id = any(v_lembs))
+          or (tipo in ('ligacao_marcada', 'retorno_mensagem') and ref_id = any(v_ligs))
+          or (tipo like 'followup\_%' and ref_id = any(v_conversas)));
+  get diagnostics n_sino = row_count;
+
+  -- (9) mensagens agendadas que ainda não saíram (tolerante: um gatilho da tabela que recuse não derruba a limpeza)
+  begin
+    update public.mensagens_agendadas set status = 'cancelada', cancelada_em = now()
+     where contato_id = p_contato and status = 'agendada';
+    get diagnostics n_agendadas = row_count;
+  exception when others then v_pulados := v_pulados || 'mensagens_agendadas'::text;
+  end;
+
+  -- (10) o opt-out que o TESTE grava ("pare de me mandar" → 'sair_texto'); o da Meta (131050 / user_preferences) e o
+  --      manual ficam
+  delete from public.atd_wa_optout where contato_id = p_contato and motivo = 'sair_texto';
+  get diagnostics n_optout = row_count;
+
+  v_det := jsonb_build_object(
+    'canal_id', p_canal, 'conversas_fechadas', n_fechadas, 'sessoes_encerradas', n_sessoes,
+    'ligacoes_canceladas', n_lig, 'lembretes_cancelados', n_lemb, 'fila_cancelada', n_fila,
+    'robo_reiniciado', n_robo, 'followups_cancelados', n_followups, 'card', v_card,
+    'precisa_humano_limpo', n_humano, 'alertas_resolvidos', n_sla, 'avisos_descartados', n_avisos,
+    'sino_lido', n_sino, 'agendadas_canceladas', n_agendadas, 'optout_removido', n_optout,
+    'pulados', to_jsonb(v_pulados), 'por', v_por);
+
+  insert into public.iris_teste_limpezas (contato_id, limpo_em, por, organizacao_id, canal_id, conversa_id, detalhe)
+  values (p_contato, v_limpo, v_por, v_org, p_canal, v_conv, v_det);
+  if v_conv is not null then
+    insert into public.iris_eventos (organizacao_id, conversa_id, etapa, tipo, texto_id, detalhe)
+    values (v_org, v_conv, null, 'teste_clean', null, v_det);
+  end if;
+
+  return jsonb_build_object('ok', true, 'limpo_em', v_limpo, 'conversa_id', v_conv) || v_det;
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_teste_registrar_negado(p_conversa uuid, p_canal uuid, p_motivo text DEFAULT 'nao_e_numero_teste'::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_org uuid;
+  v_id  uuid;
+begin
+  select c.organizacao_id into v_org from public.conversas c where c.id = p_conversa;
+  if v_org is null then return jsonb_build_object('erro', 'conversa_nao_encontrada'); end if;
+  insert into public.iris_eventos (organizacao_id, conversa_id, etapa, tipo, texto_id, detalhe)
+  values (v_org, p_conversa, null, 'teste_clean_negado', null,
+          jsonb_build_object('canal_id', p_canal,
+                             'motivo', left(coalesce(nullif(btrim(coalesce(p_motivo, '')), ''), 'nao_e_numero_teste'), 60)))
+  returning id into v_id;
+  return jsonb_build_object('ok', true, 'id', v_id);
+end
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_texto_bot_recusa(p_texto text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select coalesce(p_texto, '') ~* '(n[ãa]o vou insistir|respeit\w* (muito )?(a )?sua (decis|vontade)|se mudar de ideia|j[áa] cancelei)'
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_texto_irritado(p_texto text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select coalesce(p_texto, '') ~* (
+    'den[uú]nc|golpista|procon|pol[íi]cia'
+    || '|\m(é|e|isso é|isso e|voc[êe]s s[ãa]o|parece|s[óo] pode ser) (um )?golpe'
+    || '|\mpar(a|e|em|ar) de (me )?(mandar|chamar|ligar|encher)'
+    || '|chega de|n[ãa]o me (mande|chame|ligue|perturb)'
+    || '|sair da lista|me tir(a|e) (d[aeo]s? |dess[ae]s? )?(lista|grupo|contatos?|cadastro)'
+    || '|\mme tir(a|e|em) (d[aeo]s?|dess[ae]s?|dest[ae]s?|disso|daqui|da[ií])\M(?!\s+d[úu]vidas?)'
+    || '|vou (te |lhes? )?bloquear|n[ãa]o (me )?insist'
+    || '|^\W*(sair|parar|pare|stop)\W*$')
+$function$;
+CREATE OR REPLACE FUNCTION public.iris_texto_recusa(p_texto text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  select coalesce(p_texto, '') ~* (
+    '\mdesist|deixa (pra|para) l[áa]|n[ãa]o tenho (mais )?interess|n[ãa]o me interess|n[ãa]o vou querer'
+    || '|\mn[ãa]o quero (mais|nada)\M'
+    || '|^\W*n[ãa]o\W*(quero|obrigad[oa])(\W+(mais|nada|n[ãa]o|obrigad[oa]))*\W*$')
+$function$;
 CREATE OR REPLACE FUNCTION public.iris_textos_antes_update()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -6083,6 +7130,32 @@ CREATE OR REPLACE FUNCTION public.is_platform_admin()
 AS $function$
   select coalesce((select platform_admin from public.usuarios where id = auth.uid()), false);
 $function$;
+CREATE OR REPLACE FUNCTION public.mensagens_agendadas_reivindicar(p_limite integer DEFAULT 30)
+ RETURNS SETOF mensagens_agendadas
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  return query
+  with cand as (
+    select distinct on (canal_id) id
+    from public.mensagens_agendadas
+    where (status = 'agendada'   and executar_em <= now())
+       or (status = 'processando' and atualizado_em < now() - interval '5 minutes')  -- lease vencido = órfã
+    order by canal_id, executar_em
+    limit greatest(1, p_limite)
+  )
+  update public.mensagens_agendadas m
+     set status = 'processando', tentativas = tentativas + 1, atualizado_em = now()
+    from cand
+   where m.id = cand.id
+     and (
+       (m.status = 'agendada'    and m.executar_em <= now())
+       or (m.status = 'processando' and m.atualizado_em < now() - interval '5 minutes')
+     )
+  returning m.*;
+end $function$;
 CREATE OR REPLACE FUNCTION public.notificacao_marcar_lida(p_id uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -7941,6 +9014,85 @@ begin
   return new;
 end;
 $function$;
+CREATE OR REPLACE FUNCTION public.toque_automatico_permitido(p_contato uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select p_contato is not null
+     -- (revisão 09/10) janela limitada também no FUTURO: um toque agendado para daqui a dias não barra o de hoje
+     and public.toques_automaticos(p_contato, now() - interval '24 hours', now() + interval '24 hours') < 1
+     and public.toques_automaticos(p_contato, now() - interval '7 days', now() + interval '7 days') < 3
+$function$;
+CREATE OR REPLACE FUNCTION public.toques_automaticos(p_contato uuid, p_desde timestamp with time zone, p_ate timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with itens as (
+    -- (1) fila mensagens_agendadas com marca de automação (lotes, pós-fluxo, iniciar caso, 6h, recuperação, régua)
+    select coalesce('lote:'  || (a.metadados->>'disparo_lote'),
+                    'rec:'   || (a.metadados->>'recuperacao_id'),
+                    'regua:' || a.regua_ativacao_id::text) || '|' || a.conversa_id::text as chave,
+           coalesce(a.enviada_em, a.executar_em) as ts
+      from public.mensagens_agendadas a
+     where a.contato_id = p_contato
+       and a.status in ('agendada', 'processando', 'enviada')
+       and (a.metadados ? 'disparo_lote' or a.metadados ? 'recuperacao_id' or a.regua_ativacao_id is not null)
+       and coalesce(a.enviada_em, a.executar_em) >= p_desde - interval '12 hours'
+       and (p_ate is null or coalesce(a.enviada_em, a.executar_em) < p_ate)
+       -- reativo (responde algo que o cliente disse) não é toque
+       and not (a.metadados ? 'resposta_msg_id')
+       and not (coalesce(a.metadados->>'disparo_lote', '') = 'juros_iniciar_caso' and coalesce(a.metadados->>'ordem', '') = '3')
+       and coalesce(a.metadados->>'reativo', '') not in ('true', 'sim')
+       and coalesce(a.metadados->>'disparo_lote', '') not like 'respostas\_%'
+    union all
+    -- (2) cutucão da IA SDR: 1 evento = 1 toque
+    select 'nudge:' || e.id::text, e.criado_em
+      from public.ia_eventos e
+      join public.conversas c on c.id = e.conversa_id
+     where e.tipo = 'nudge_enviado'
+       and e.criado_em >= p_desde - interval '12 hours'
+       and (p_ate is null or e.criado_em < p_ate)
+       and c.contato_id = p_contato
+    union all
+    -- (3) envios automáticos diretos, fora da fila
+    select case when m.origem::text = 'disparo' then 'disparo_tel'
+                else coalesce('camp:'  || (m.metadados->>'campanha_id'),
+                              'via:'   || (m.metadados->>'via'),
+                              'fluxo:' || (m.metadados->>'fluxo')) end || '|' || m.conversa_id::text,
+           m.criado_em
+      from public.conversas c
+      join public.mensagens m on m.conversa_id = c.id
+     where c.contato_id = p_contato
+       and m.direcao = 'saida'
+       and m.criado_em >= p_desde - interval '12 hours'
+       and (p_ate is null or m.criado_em < p_ate)
+       and coalesce(m.status::text, '') <> 'falhou'
+       and (m.origem::text = 'disparo'
+            or m.metadados->>'via' in ('disparo', 'remarketing', 'janela_guardia')
+            or m.metadados->>'fluxo' = 'reengajar'
+            or (m.origem::text = 'bot' and m.metadados ? 'nudge'))
+  ),
+  pedacos as (   -- mesma automação na mesma conversa: só vira outro bloco se ficou > 12 h sem mensagem
+    select chave, ts,
+           sum(case when ts - prev <= interval '12 hours' then 0 else 1 end)
+             over (partition by chave order by ts rows unbounded preceding) as parte
+      from (select chave, ts, lag(ts) over (partition by chave order by ts) as prev from itens) x
+  ),
+  blocos as (
+    select min(ts) as ini, max(ts) as fim from pedacos group by chave, parte
+  ),
+  toques as (    -- blocos que começam a até 10 min um do outro = o mesmo toque
+    select fim,
+           sum(case when ini - prev <= interval '10 minutes' then 0 else 1 end)
+             over (order by ini, fim rows unbounded preceding) as n
+      from (select ini, fim, lag(ini) over (order by ini, fim) as prev from blocos) x
+  )
+  select count(*)::int from (select n from toques group by n having max(fim) >= p_desde) t
+$function$;
 CREATE OR REPLACE FUNCTION public.trg_fn_conversa_ultima_entrada()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -8420,10 +9572,10 @@ begin
     'altos', (select count(*) from itens where sev=2),
     'medios', (select count(*) from itens where sev=1),
     'severidade_max', coalesce((select max(sev) from itens),0),
-    'acao_url', '/integracoes',
+    'acao_url', '/atd_integracoes',
     'itens', coalesce((select jsonb_agg(jsonb_build_object(
         'canal_id', id, 'nome_interno', nome_interno, 'severidade', severidade, 'tipo_alerta', tipo_alerta,
-        'titulo', titulo, 'acao_label', 'Ver detalhes', 'acao_url', '/integracoes'
+        'titulo', titulo, 'acao_label', 'Ver detalhes', 'acao_url', '/atd_integracoes'
       ) order by sev desc, nome_interno) from itens), '[]'::jsonb)
   ) into r;
   return r;
@@ -8467,6 +9619,59 @@ begin
   values (auth.uid(), 'silenciar_alerta_canal', 'canais', p_canal,
           jsonb_build_object('ate', p_ate, 'motivo', p_motivo), v_org);
   return jsonb_build_object('ok', true, 'canal', p_canal);
+end $function$;
+CREATE OR REPLACE FUNCTION public.wa_consolidar_canal_por_numero(p_org uuid, p_canal_ativo uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare v_num text; v_prov text; v_hist uuid; v_hist_nome text;
+begin
+  select numero_conectado, provider into v_num, v_prov
+  from canais where id = p_canal_ativo and organizacao_id = p_org and tipo = 'whatsapp';
+  if v_num is null then return p_canal_ativo; end if;
+
+  -- outro canal (NÃO removido) com o MESMO número? (o mais antigo)
+  select id, nome_interno into v_hist, v_hist_nome from canais
+   where organizacao_id = p_org and tipo = 'whatsapp' and provider = v_prov
+     and numero_conectado = v_num and id <> p_canal_ativo
+     and status_integracao <> 'removido'
+   order by criado_em asc limit 1;
+  if v_hist is null then return p_canal_ativo; end if;   -- sem conflito: canal novo segue normal
+
+  -- CONFLITO: não funde, não deleta, não reativa o antigo. Só marca o canal novo e sinaliza no painel.
+  update canais set status_integracao = 'atencao', ativo = false, conflito_com = v_hist, conflito_em = now()
+   where id = p_canal_ativo;
+
+  insert into audit_log(organizacao_id, usuario_id, acao, entidade, entidade_id, dados_depois)
+  values (p_org, null, 'canal_conflito_numero', 'canais', p_canal_ativo,
+          jsonb_build_object('canal_novo', p_canal_ativo, 'conflita_com', v_hist, 'nome_existente', v_hist_nome, 'numero', right(v_num, 4)));
+
+  return v_hist;
+end $function$;
+CREATE OR REPLACE FUNCTION public.wa_dentro_janela(p_canal uuid, p_contato uuid, p_horas integer DEFAULT 24)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_org uuid; v_ult timestamptz;
+begin
+  select organizacao_id into v_org from public.canais where id = p_canal;
+  if v_org is null then return false; end if;
+
+  -- auth.uid() null = service_role (worker/webhook). Usuário logado só enxerga a própria org.
+  if auth.uid() is not null and not (public.is_platform_admin() or public.is_member(v_org)) then
+    return false;
+  end if;
+
+  select ultima_entrada_em into v_ult from public.canal_janela
+   where canal_id = p_canal and contato_id = p_contato;
+
+  -- sem registro = o contato NUNCA falou com este número = janela fechada. É o estado
+  -- correto de um número de disparo recém-criado.
+  return coalesce(v_ult > now() - make_interval(hours => greatest(p_horas, 1)), false);
 end $function$;
 CREATE OR REPLACE FUNCTION public.wa_entrega_auto_resumo(p_org uuid)
  RETURNS jsonb
@@ -8594,6 +9799,157 @@ begin
   end if;
   update conversas set fixada_em = case when p_fixar then now() else null end where id = p_conversa;
 end $function$;
+CREATE OR REPLACE FUNCTION public.wa_inbound_garantir_contato_conversa(p_org uuid, p_canal uuid, p_phone text, p_phone_jid text DEFAULT NULL::text, p_lid text DEFAULT NULL::text, p_lid_jid text DEFAULT NULL::text, p_push_name text DEFAULT NULL::text, p_prende boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_phone   text := nullif(btrim(coalesce(p_phone, '')), '');
+  v_lid     text := nullif(btrim(coalesce(p_lid, '')), '');
+  v_chave   text;
+  v_agora   timestamptz := now();
+  v_k       bigint;
+  v_contato uuid;
+  v_criado  boolean := false;
+  v_pn_rec  boolean := false;
+  v_conv    uuid;
+  v_preso   uuid;
+  v_conv_criada boolean := false;
+begin
+  if p_org is null or p_canal is null then raise exception 'parametros_invalidos'; end if;
+  if v_phone is null and v_lid is null then raise exception 'sem_identificador'; end if;
+  v_chave := public.chave_canonica_telefone(v_phone);
+
+  -- 1) TRAVA POR PESSOA, até o COMMIT desta chamada. Chaves em ordem crescente = sem deadlock entre
+  --    um evento PN+LID e outro só-PN / só-LID da mesma pessoa. Cada statement seguinte (READ
+  --    COMMITTED + função VOLATILE) tira snapshot NOVO, então quem esperou enxerga o que o
+  --    anterior commitou.
+  for v_k in
+    select distinct t.k
+      from unnest(array[
+        case when v_chave is not null then hashtextextended('wa_inbound:' || p_org::text || ':pn:'  || v_chave, 0) end,
+        case when v_lid   is not null then hashtextextended('wa_inbound:' || p_org::text || ':lid:' || v_lid,   0) end
+      ]) as t(k)
+     where t.k is not null
+     order by t.k
+  loop
+    perform pg_advisory_xact_lock(v_k);
+  end loop;
+
+  -- 2) RESOLVE — igual ao webhook: chave canônica (v30, com o desempate validado) → LID (v21).
+  if v_phone is not null then
+    v_contato := public.wa_resolver_contato_por_numero(p_org, v_phone);
+  end if;
+  if v_contato is null and v_lid is not null then
+    select ci.contato_id into v_contato
+      from public.contato_identidades ci
+     where ci.organizacao_id = p_org
+       and ci.tipo = 'outro' and ci.provedor = 'evolution_lid'
+       and ci.valor_normalizado = v_lid
+     limit 1;
+  end if;
+
+  -- 3) CRIA — mesmos campos do INSERT do webhook. O LID nunca vira nome (v20).
+  if v_contato is null then
+    insert into public.contatos (nome, telefone, origem, organizacao_id,
+                                 identidade_tipo, identidade_fonte, identidade_resolvida_em)
+    values (coalesce(nullif(p_push_name, ''), v_phone, 'Identidade protegida'), v_phone, 'WhatsApp', p_org,
+            case when v_phone is not null then 'telefone'   else 'lid_pendente' end,
+            case when v_phone is not null then 'webhook_pn' else 'webhook_lid'  end,
+            case when v_phone is not null then v_agora end)
+    returning id into v_contato;
+    v_criado := true;
+  end if;
+
+  -- 4) #7 AUTO-RECUPERAÇÃO de PN: identidade WhatsApp só se o contato não tem NENHUMA (não sobrescreve
+  --    PN diferente já existente). ON CONFLICT DO NOTHING = o mesmo efeito do erro ignorado de antes
+  --    (número já é identidade de outro contato), mas sem abortar a transação.
+  if v_phone is not null and not exists (
+       select 1 from public.contato_identidades where contato_id = v_contato and tipo = 'whatsapp') then
+    insert into public.contato_identidades (contato_id, organizacao_id, tipo, provedor, valor,
+                                            valor_normalizado, principal, metadados)
+    values (v_contato, p_org, 'whatsapp', 'evolution', coalesce(nullif(p_phone_jid, ''), v_phone),
+            v_phone, true, jsonb_build_object('origem', 'webhook'))
+    on conflict do nothing;
+    -- v32: re-dispatch só quando a identidade ENTROU de fato (FOUND). Se o ON CONFLICT pulou, o
+    -- contato continua sem destino (bot-runner/ia-sdr leem SÓ contato_identidades) e re-disparar
+    -- daria só mais um sem_destino_envio. Contato NOVO já nasce com o dispatch normal deste evento.
+    v_pn_rec := found and not v_criado;
+    update public.contatos
+       set telefone = v_phone, identidade_tipo = 'telefone',
+           identidade_resolvida_em = v_agora, identidade_fonte = 'webhook_pn'
+     where id = v_contato and telefone is null;
+    update public.contatos
+       set nome = coalesce(nullif(p_push_name, ''), v_phone)
+     where id = v_contato and nome = 'Identidade protegida';
+  end if;
+
+  -- 5) identidade LID, se ninguém da org tem esse LID ainda.
+  if v_lid is not null and not exists (
+       select 1 from public.contato_identidades
+        where organizacao_id = p_org and tipo = 'outro' and provedor = 'evolution_lid'
+          and valor_normalizado = v_lid) then
+    insert into public.contato_identidades (contato_id, organizacao_id, tipo, provedor, valor,
+                                            valor_normalizado, principal)
+    values (v_contato, p_org, 'outro', 'evolution_lid', coalesce(nullif(p_lid_jid, ''), v_lid), v_lid, false)
+    on conflict do nothing;
+  end if;
+
+  -- 6) CONVERSA — UM atendimento ativo por contato (v27): não-arquivada primeiro; arquivada só se for
+  --    a única (o webhook a reabre). Nova nasce com canal atual = canal de aquisição; presa se o canal
+  --    prende (v31).
+  select cv.id, cv.canal_preso_id into v_conv, v_preso
+    from public.conversas cv
+   where cv.organizacao_id = p_org and cv.contato_id = v_contato and cv.status <> 'fechada'
+   order by cv.arquivada_em asc nulls first, cv.ultima_interacao_em desc nulls last
+   limit 1;
+  if v_conv is null then
+    begin
+      insert into public.conversas (organizacao_id, contato_id, canal_id, canal_origem_id, status,
+                                    canal_preso_id, canal_preso_em)
+      values (p_org, v_contato, p_canal, p_canal, 'aberta',
+              case when p_prende then p_canal end, case when p_prende then v_agora end)
+      returning id, canal_preso_id into v_conv, v_preso;
+      v_conv_criada := true;
+    exception when unique_violation then
+      -- outra via que NÃO passa por esta trava (painel, cloud-webhook) criou a ativa entre o SELECT
+      -- e o INSERT: usa a dela em vez de perder a mensagem.
+      select cv.id, cv.canal_preso_id into v_conv, v_preso
+        from public.conversas cv
+       where cv.organizacao_id = p_org and cv.contato_id = v_contato and cv.status <> 'fechada'
+       order by cv.arquivada_em asc nulls first, cv.ultima_interacao_em desc nulls last
+       limit 1;
+    end;
+  end if;
+
+  return jsonb_build_object(
+    'contato_id',      v_contato,
+    'contato_criado',  v_criado,
+    'pn_recuperado',   v_pn_rec,
+    'conversa_id',     v_conv,
+    'conversa_criada', v_conv_criada,
+    'canal_preso_id',  v_preso
+  );
+end $function$;
+CREATE OR REPLACE FUNCTION public.wa_janela_registrar(p_canal uuid, p_contato uuid, p_quando timestamp with time zone DEFAULT now())
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_org uuid;
+begin
+  select organizacao_id into v_org from public.canais where id = p_canal;
+  if v_org is null or p_contato is null then return; end if;      -- best-effort: nunca quebra a ingestão
+
+  insert into public.canal_janela (canal_id, contato_id, organizacao_id, ultima_entrada_em)
+  values (p_canal, p_contato, v_org, coalesce(p_quando, now()))
+  on conflict (canal_id, contato_id) do update
+    set ultima_entrada_em = greatest(public.canal_janela.ultima_entrada_em, excluded.ultima_entrada_em),
+        atualizado_em = now();
+end $function$;
 CREATE OR REPLACE FUNCTION public.wa_marcar_lida(p_conversa uuid, p_lida boolean)
  RETURNS void
  LANGUAGE plpgsql
@@ -8613,6 +9969,39 @@ begin
     update conversas set nao_lidas = greatest(coalesce(nao_lidas,0), 1), ultima_lida_em = null where id = p_conversa;
   end if;
 end $function$;
+CREATE OR REPLACE FUNCTION public.wa_optout_inbound(p_conversa uuid, p_texto text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_contato uuid; v_canal uuid; v_txt text;
+begin
+  v_txt := btrim(coalesce(p_texto, ''));
+
+  if not (
+       -- (a) mensagem-comando: só a palavra (com pontuação/emoji ao redor), ex. "SAIR", "Parar!", "stop"
+       (length(v_txt) <= 24 and v_txt ~* '^\W*(sair|parar|pare|stop|remover|descadastrar?)\W*$')
+       -- (b) frase explícita de descadastro, em qualquer tamanho
+    or v_txt ~* 'n[ãa]o quero (mais )?(receber|mensag)'
+    or v_txt ~* 'n[ãa]o (me )?(mande|mandem|manda|envie|enviem|chame|chamem) mais'
+    or v_txt ~* 'par(e|a|em) de (me )?(mandar|enviar|chamar|encher)'
+    or v_txt ~* '\y(descadastr|cancelar? (a )?inscri)'
+    or v_txt ~* 'me (remova|remove|tira|tire)( meu (nome|n[uú]mero))? .{0,16}(lista|contatos|grupo)'
+    or v_txt ~* '(tira|tire|remova|remover?) (meu )?(nome|n[uú]mero|contato) .{0,16}lista'
+    or v_txt ~* 'remover? (meu )?(n[uú]mero|contato)'
+    or v_txt ~* 'sair (d\w+ )?lista'
+    or v_txt ~* 'chega de (mensagem|msg|propaganda)'
+  ) then
+    return false;
+  end if;
+
+  select contato_id, canal_id into v_contato, v_canal from public.conversas where id = p_conversa;
+  if v_contato is null or v_canal is null then return false; end if;
+
+  perform public.wa_optout_registrar(v_contato, v_canal, 'sair_texto', left(coalesce(p_texto,''), 300));
+  return true;
+end $function$;
 CREATE OR REPLACE FUNCTION public.wa_optout_registrar(p_contato uuid, p_canal uuid, p_motivo text, p_detalhe text DEFAULT NULL::text)
  RETURNS void
  LANGUAGE plpgsql
@@ -8629,12 +10018,137 @@ begin
   values (p_contato, p_canal, v_org, v_waba, p_motivo, left(coalesce(p_detalhe, ''), 300))
   on conflict (contato_id, canal_id) do nothing;   -- o primeiro "não quero" é o que vale
 end $function$;
+CREATE OR REPLACE FUNCTION public.wa_resolver_contato_por_numero(p_org uuid, p_numero text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_chave text; v_contato uuid; v_mesclado uuid;
+begin
+  v_chave := public.chave_canonica_telefone(p_numero);
+  if v_chave is null then return null; end if;
+
+  -- (a) identidade WhatsApp pela chave canônica.
+  --
+  -- DESEMPATE — a ordem importa e foi validada contra os 14 grupos reais:
+  --  1. não-mesclado          nunca ressuscita um contato já mesclado
+  --  2. TEM MENSAGEM          conversas.ultima_interacao_em é preenchida na CRIAÇÃO da conversa,
+  --                           então contato importado com 0 mensagens parece "recente" e roubaria
+  --                           a thread real (caso ANIRLEI 0 msgs/10-07 x 7 msgs/30-06). EXISTS é
+  --                           barato (idx_mensagens_conversa), não é count().
+  --  3. atividade DESC        segue ONDE O HUMANO ESTÁ TRABALHANDO. Preferir o mais ANTIGO
+  --                           mataria a conversa viva e abriria uma vazia no lugar — pior que a
+  --                           duplicata que estamos consertando.
+  --  4-6. principal, criado_em, id  determinismo: dois eventos simultâneos escolhem o MESMO
+  --                           contato; sem isso o webhook faria split-brain sob concorrência.
+  select c.id, c.mesclado_para into v_contato, v_mesclado
+  from public.contato_identidades ci
+  join public.contatos c on c.id = ci.contato_id
+  where ci.organizacao_id = p_org
+    and ci.tipo = 'whatsapp'
+    and ci.chave_canonica = v_chave
+  order by
+    (c.mesclado_para is null) desc,
+    exists (select 1 from public.conversas cv
+            join public.mensagens m on m.conversa_id = cv.id
+            where cv.contato_id = c.id) desc,
+    (select max(cv.ultima_interacao_em) from public.conversas cv
+     where cv.contato_id = c.id) desc nulls last,
+    ci.principal desc, ci.criado_em asc, ci.id asc
+  limit 1;
+
+  -- (b) fallback: telefone do CRM pela mesma chave (contato criado à mão, sem identidade).
+  if v_contato is null then
+    select c.id, c.mesclado_para into v_contato, v_mesclado
+    from public.contatos c
+    where c.organizacao_id = p_org
+      and public.chave_canonica_telefone(c.telefone) = v_chave
+    order by
+      (c.mesclado_para is null) desc,
+      exists (select 1 from public.conversas cv
+              join public.mensagens m on m.conversa_id = cv.id
+              where cv.contato_id = c.id) desc,
+      (select max(cv.ultima_interacao_em) from public.conversas cv
+       where cv.contato_id = c.id) desc nulls last,
+      c.criado_em asc, c.id asc
+    limit 1;
+  end if;
+
+  -- contato já mesclado -> devolve o alvo do merge (nunca ressuscita o mesclado).
+  return coalesce(v_mesclado, v_contato);
+end $function$;
 CREATE OR REPLACE FUNCTION public.wa_templates_touch()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO 'public'
 AS $function$
 begin new.atualizado_em := now(); return new; end $function$;
+CREATE OR REPLACE FUNCTION public.wa_vincular_numero(p_conversa uuid, p_numero text, p_jid text, p_usuario uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare v_org uuid; v_contato uuid; v_canal uuid; v_norm text; v_tel text;
+begin
+  select cv.organizacao_id, cv.contato_id, cv.canal_id into v_org, v_contato, v_canal
+  from conversas cv where cv.id = p_conversa;
+  if v_contato is null then raise exception 'conversa_nao_encontrada'; end if;
+
+  if not exists (select 1 from organizacao_usuarios ou
+                 where ou.organizacao_id = v_org and ou.usuario_id = coalesce(auth.uid(), p_usuario) and ou.status = 'ativo') then
+    raise exception 'sem_permissao';
+  end if;
+
+  v_norm := regexp_replace(coalesce(p_numero,''), '[^0-9]', '', 'g');
+  if length(v_norm) < 12 then raise exception 'numero_invalido'; end if;
+
+  -- CONFLITO: PN já é identidade de OUTRO contato → não faz merge automático (alerta p/ revisão manual).
+  if exists (select 1 from contato_identidades i
+             where i.organizacao_id = v_org and i.tipo = 'whatsapp' and i.valor_normalizado = v_norm and i.contato_id <> v_contato) then
+    raise exception 'pn_em_outro_contato';
+  end if;
+  if exists (select 1 from contato_identidades i
+             where i.contato_id = v_contato and i.tipo = 'whatsapp' and i.valor_normalizado <> v_norm) then
+    raise exception 'pn_confirmado_diferente_existe';
+  end if;
+
+  if not exists (select 1 from contato_identidades i
+                 where i.contato_id = v_contato and i.tipo = 'whatsapp' and i.valor_normalizado = v_norm) then
+    insert into contato_identidades (contato_id, organizacao_id, tipo, provedor, valor, valor_normalizado, principal, metadados)
+    values (v_contato, v_org, 'whatsapp', 'evolution', coalesce(p_jid, v_norm || '@s.whatsapp.net'), v_norm, true,
+            jsonb_build_object('origem','manual','vinculado_por', coalesce(auth.uid(), p_usuario), 'em', now()::text, 'canal_id', v_canal));
+  end if;
+
+  select telefone into v_tel from contatos where id = v_contato;
+  if v_tel is null or btrim(v_tel) = '' then
+    update contatos set telefone = v_norm where id = v_contato;
+  end if;
+
+  -- Estado de identidade + corrige nome placeholder (vínculo manual não tem pushName → usa o número).
+  update contatos set identidade_tipo = 'resolvido_manual', identidade_resolvida_em = now(), identidade_fonte = 'manual'
+   where id = v_contato;
+  update contatos set nome = v_norm where id = v_contato and nome = 'Identidade protegida';
+
+  -- Mapa LID↔PN por canal: confirma os existentes e insere os que faltam (reuso futuro).
+  update wa_lid_map m set telefone_normalizado = v_norm, jid_telefone = coalesce(p_jid, v_norm || '@s.whatsapp.net'),
+         confirmado = true, fonte = 'manual'
+    from contato_identidades ci
+   where ci.contato_id = v_contato and ci.provedor = 'evolution_lid'
+     and m.organizacao_id = v_org and m.lid = ci.valor_normalizado
+     and (m.canal_id = v_canal or (m.canal_id is null and v_canal is null));
+  insert into wa_lid_map (organizacao_id, canal_id, lid, jid_telefone, telefone_normalizado, fonte, confirmado)
+    select v_org, v_canal, ci.valor_normalizado, coalesce(p_jid, v_norm || '@s.whatsapp.net'), v_norm, 'manual', true
+    from contato_identidades ci
+   where ci.contato_id = v_contato and ci.provedor = 'evolution_lid'
+     and not exists (select 1 from wa_lid_map m where m.organizacao_id = v_org and m.lid = ci.valor_normalizado
+         and (m.canal_id = v_canal or (m.canal_id is null and v_canal is null)));
+
+  return jsonb_build_object('ok', true, 'contato', v_contato, 'numero_norm', v_norm);
+end $function$;
+alter sequence public.adm_movimentos_id_seq owned by public.adm_movimentos.id;
+alter sequence public.iris_teste_limpezas_id_seq owned by public.iris_teste_limpezas.id;
 alter sequence public.presenciais_avisos_id_seq owned by public.presenciais_avisos.id;
 
 -- 8. gatilhos
@@ -8658,6 +10172,8 @@ drop trigger if exists trg_opp_move_qualificado on public.bot_conversa_estado;
 CREATE TRIGGER trg_opp_move_qualificado AFTER INSERT OR UPDATE OF etapa, concluido_em ON public.bot_conversa_estado FOR EACH ROW EXECUTE FUNCTION fn_opp_move_qualificado();
 drop trigger if exists trg_bot_saida_upd on public.bot_mensagens_saida;
 CREATE TRIGGER trg_bot_saida_upd BEFORE UPDATE ON public.bot_mensagens_saida FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
+drop trigger if exists trg_bot_remarketing_updated on public.bot_remarketing;
+CREATE TRIGGER trg_bot_remarketing_updated BEFORE UPDATE ON public.bot_remarketing FOR EACH ROW EXECUTE FUNCTION bot_remarketing_touch_updated();
 drop trigger if exists trg_canais_upd on public.canais;
 CREATE TRIGGER trg_canais_upd BEFORE UPDATE ON public.canais FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
 drop trigger if exists trg_canal_snapshot_before_delete on public.canais;
@@ -8730,6 +10246,8 @@ drop trigger if exists trg_audit on public.inss_pedidos;
 CREATE TRIGGER trg_audit AFTER INSERT OR DELETE OR UPDATE ON public.inss_pedidos FOR EACH ROW EXECUTE FUNCTION fn_audit();
 drop trigger if exists trg_inss_pedido_before on public.inss_pedidos;
 CREATE TRIGGER trg_inss_pedido_before BEFORE UPDATE ON public.inss_pedidos FOR EACH ROW EXECUTE FUNCTION fn_inss_pedido_before();
+drop trigger if exists trg_integracoes_upd on public.atd_integracoes;
+CREATE TRIGGER trg_integracoes_upd BEFORE UPDATE ON public.atd_integracoes FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
 drop trigger if exists trg_iris_monitor_guarda on public.iris_eventos;
 CREATE TRIGGER trg_iris_monitor_guarda AFTER INSERT ON public.iris_eventos FOR EACH ROW WHEN ((new.tipo = 'guarda_critica'::text)) EXECUTE FUNCTION iris_monitor_de_guarda();
 drop trigger if exists trg_iris_followups_upd on public.iris_followups;
@@ -8738,6 +10256,8 @@ drop trigger if exists trg_iris_monitor_critico on public.iris_monitor_achados;
 CREATE TRIGGER trg_iris_monitor_critico AFTER INSERT ON public.iris_monitor_achados FOR EACH ROW WHEN ((new.gravidade = 'critica'::text)) EXECUTE FUNCTION iris_monitor_alertar_critico();
 drop trigger if exists trg_iris_textos_antes_update on public.iris_textos;
 CREATE TRIGGER trg_iris_textos_antes_update BEFORE UPDATE ON public.iris_textos FOR EACH ROW EXECUTE FUNCTION iris_textos_antes_update();
+drop trigger if exists trg_ligacoes_marcadas_upd on public.ligacoes_marcadas;
+CREATE TRIGGER trg_ligacoes_marcadas_upd BEFORE UPDATE ON public.ligacoes_marcadas FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
 drop trigger if exists trg_alerta_lq_humano_cancela on public.mensagens;
 CREATE TRIGGER trg_alerta_lq_humano_cancela AFTER INSERT ON public.mensagens FOR EACH ROW WHEN (((new.direcao = 'saida'::mensagem_direcao) AND (new.origem = ANY (ARRAY['atenvo'::text, 'telefone'::text])))) EXECUTE FUNCTION fn_alerta_lq_humano_cancela();
 drop trigger if exists trg_alerta_lq_inbound_cancela on public.mensagens;
@@ -8798,6 +10318,8 @@ drop trigger if exists trg_sla_alertas_upd on public.sla_alertas;
 CREATE TRIGGER trg_sla_alertas_upd BEFORE UPDATE ON public.sla_alertas FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
 drop trigger if exists trg_usuarios_upd on public.usuarios;
 CREATE TRIGGER trg_usuarios_upd BEFORE UPDATE ON public.usuarios FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
+drop trigger if exists trg_wa_lid_map_touch on public.wa_lid_map;
+CREATE TRIGGER trg_wa_lid_map_touch BEFORE UPDATE ON public.wa_lid_map FOR EACH ROW EXECUTE FUNCTION fn_wa_lid_map_touch();
 drop trigger if exists trg_wa_templates_upd on public.wa_templates;
 CREATE TRIGGER trg_wa_templates_upd BEFORE UPDATE ON public.wa_templates FOR EACH ROW EXECUTE FUNCTION wa_templates_touch();
 
@@ -8811,6 +10333,9 @@ create policy adm_config_sel on public.adm_config as permissive for select to au
 alter table public.adm_fechados enable row level security;
 drop policy if exists adm_fechados_sel on public.adm_fechados;
 create policy adm_fechados_sel on public.adm_fechados as permissive for select to authenticated using (is_member(organizacao_id));
+alter table public.adm_movimentos enable row level security;
+drop policy if exists adm_mov_sel on public.adm_movimentos;
+create policy adm_mov_sel on public.adm_movimentos as permissive for select to authenticated using (is_member(organizacao_id));
 alter table public.adm_pendencias enable row level security;
 drop policy if exists adm_pendencias_sel on public.adm_pendencias;
 create policy adm_pendencias_sel on public.adm_pendencias as permissive for select to authenticated using (is_member(organizacao_id));
@@ -8844,6 +10369,7 @@ drop policy if exists ass_mut on public.assinaturas;
 create policy ass_mut on public.assinaturas as permissive for all to authenticated using (is_platform_admin()) with check (is_platform_admin());
 drop policy if exists ass_sel on public.assinaturas;
 create policy ass_sel on public.assinaturas as permissive for select to authenticated using ((is_platform_admin() OR (papel_na_org(organizacao_id) = 'admin'::user_role)));
+alter table public.assistente_lembretes enable row level security;
 alter table public.audit_log enable row level security;
 drop policy if exists audit_ins on public.audit_log;
 create policy audit_ins on public.audit_log as permissive for insert to authenticated with check (is_platform_admin());
@@ -8860,6 +10386,9 @@ create policy bot_estado_sel on public.bot_conversa_estado as permissive for sel
 alter table public.bot_mensagens_saida enable row level security;
 drop policy if exists bot_saida_sel on public.bot_mensagens_saida;
 create policy bot_saida_sel on public.bot_mensagens_saida as permissive for select to authenticated using ((is_platform_admin() OR is_member(organizacao_id)));
+alter table public.bot_remarketing enable row level security;
+drop policy if exists bot_remarketing_sel on public.bot_remarketing;
+create policy bot_remarketing_sel on public.bot_remarketing as permissive for select to public using ((is_platform_admin() OR is_member(organizacao_id)));
 alter table public.bot_roteamentos enable row level security;
 drop policy if exists bot_roteamentos_sel on public.bot_roteamentos;
 create policy bot_roteamentos_sel on public.bot_roteamentos as permissive for select to public using (is_member(organizacao_id));
@@ -8935,6 +10464,15 @@ drop policy if exists conv_ativ_select on public.conversa_atividades;
 create policy conv_ativ_select on public.conversa_atividades as permissive for select to authenticated using ((organizacao_id IN ( SELECT organizacao_usuarios.organizacao_id
    FROM organizacao_usuarios
   WHERE ((organizacao_usuarios.usuario_id = auth.uid()) AND (organizacao_usuarios.status = 'ativo'::membership_status)))));
+alter table public.conversa_etiquetas enable row level security;
+drop policy if exists ce_del on public.conversa_etiquetas;
+create policy ce_del on public.conversa_etiquetas as permissive for delete to public using ((is_platform_admin() OR ((papel_na_org(organizacao_id) = ANY (ARRAY['admin'::user_role, 'supervisor'::user_role])) AND org_operacional(organizacao_id))));
+drop policy if exists ce_ins on public.conversa_etiquetas;
+create policy ce_ins on public.conversa_etiquetas as permissive for insert to public with check ((is_platform_admin() OR (is_member(organizacao_id) AND org_operacional(organizacao_id))));
+drop policy if exists ce_sel on public.conversa_etiquetas;
+create policy ce_sel on public.conversa_etiquetas as permissive for select to public using ((organizacao_id IN ( SELECT orgs_visiveis() AS orgs_visiveis)));
+drop policy if exists ce_upd on public.conversa_etiquetas;
+create policy ce_upd on public.conversa_etiquetas as permissive for update to public using ((is_platform_admin() OR (is_member(organizacao_id) AND org_operacional(organizacao_id)))) with check ((is_platform_admin() OR (is_member(organizacao_id) AND org_operacional(organizacao_id))));
 alter table public.conversa_higiene_adiamentos enable row level security;
 drop policy if exists cha_sel on public.conversa_higiene_adiamentos;
 create policy cha_sel on public.conversa_higiene_adiamentos as permissive for select to public using ((is_platform_admin() OR is_member(organizacao_id)));
@@ -8959,12 +10497,6 @@ create policy conversas_upd on public.conversas as permissive for update to auth
 alter table public.convites enable row level security;
 drop policy if exists convites_select on public.convites;
 create policy convites_select on public.convites as permissive for select to authenticated using (_eh_admin_org(organizacao_id));
-alter table public.disparo_campanhas enable row level security;
-drop policy if exists disparo_campanhas_sel on public.disparo_campanhas;
-create policy disparo_campanhas_sel on public.disparo_campanhas as permissive for select to authenticated using ((papel_na_org(organizacao_id) IS NOT NULL));
-alter table public.disparo_envios enable row level security;
-drop policy if exists disparo_envios_sel on public.disparo_envios;
-create policy disparo_envios_sel on public.disparo_envios as permissive for select to authenticated using ((papel_na_org(organizacao_id) IS NOT NULL));
 alter table public.etiquetas enable row level security;
 drop policy if exists etq_del on public.etiquetas;
 create policy etq_del on public.etiquetas as permissive for delete to public using ((is_platform_admin() OR ((papel_na_org(organizacao_id) = ANY (ARRAY['admin'::user_role, 'supervisor'::user_role])) AND org_operacional(organizacao_id))));
@@ -9052,6 +10584,9 @@ drop policy if exists inss_pedidos_sel on public.inss_pedidos;
 create policy inss_pedidos_sel on public.inss_pedidos as permissive for select to public using (is_member(organizacao_id));
 drop policy if exists inss_pedidos_upd on public.inss_pedidos;
 create policy inss_pedidos_upd on public.inss_pedidos as permissive for update to public using (is_member(organizacao_id)) with check (is_member(organizacao_id));
+alter table public.atd_integracoes enable row level security;
+drop policy if exists integr_all on public.atd_integracoes;
+create policy integr_all on public.atd_integracoes as permissive for all to authenticated using ((is_platform_admin() OR ((papel_na_org(organizacao_id) = 'admin'::user_role) AND org_operacional(organizacao_id)))) with check ((is_platform_admin() OR ((papel_na_org(organizacao_id) = 'admin'::user_role) AND org_operacional(organizacao_id))));
 alter table public.iris_acesso enable row level security;
 alter table public.iris_carteira enable row level security;
 drop policy if exists iris_carteira_select on public.iris_carteira;
@@ -9067,7 +10602,11 @@ create policy iris_monitor_achados_sel on public.iris_monitor_achados as permiss
 alter table public.iris_monitor_ciclos enable row level security;
 drop policy if exists iris_monitor_ciclos_sel on public.iris_monitor_ciclos;
 create policy iris_monitor_ciclos_sel on public.iris_monitor_ciclos as permissive for select to authenticated using ((is_platform_admin() OR COALESCE((assistente_papel(organizacao_id, auth.uid()) = 'admin'::text), false)));
+alter table public.iris_teste_limpezas enable row level security;
+drop policy if exists iris_teste_limpezas_sel on public.iris_teste_limpezas;
+create policy iris_teste_limpezas_sel on public.iris_teste_limpezas as permissive for select to authenticated using ((is_platform_admin() OR is_member(organizacao_id)));
 alter table public.iris_textos enable row level security;
+alter table public.ligacoes_marcadas enable row level security;
 alter table public.mensagens enable row level security;
 drop policy if exists mensagens_del on public.mensagens;
 create policy mensagens_del on public.mensagens as permissive for delete to authenticated using ((is_platform_admin() OR ((papel_na_org(organizacao_id) = ANY (ARRAY['admin'::user_role, 'supervisor'::user_role])) AND org_operacional(organizacao_id))));
@@ -9128,6 +10667,9 @@ drop policy if exists org_sel on public.organizacoes;
 create policy org_sel on public.organizacoes as permissive for select to authenticated using ((is_platform_admin() OR is_member(id)));
 drop policy if exists org_upd on public.organizacoes;
 create policy org_upd on public.organizacoes as permissive for update to authenticated using ((is_platform_admin() OR (papel_na_org(id) = 'admin'::user_role))) with check ((is_platform_admin() OR (papel_na_org(id) = 'admin'::user_role)));
+alter table public.pendencias enable row level security;
+drop policy if exists pend_sel on public.pendencias;
+create policy pend_sel on public.pendencias as permissive for select to authenticated using (is_member(organizacao_id));
 alter table public.planilha_config enable row level security;
 drop policy if exists planilha_config_sel on public.planilha_config;
 create policy planilha_config_sel on public.planilha_config as permissive for select to authenticated using (is_member(organizacao_id));
@@ -9181,6 +10723,7 @@ create policy rmkt_leads_sel on public.remarketing_leads as permissive for selec
 alter table public.remarketing_tarefas enable row level security;
 drop policy if exists rmkt_tarefas_sel on public.remarketing_tarefas;
 create policy rmkt_tarefas_sel on public.remarketing_tarefas as permissive for select to authenticated using ((is_platform_admin() OR is_member(organizacao_id)));
+alter table public.retomada_atendimento_log enable row level security;
 alter table public.robo_ligar enable row level security;
 drop policy if exists robo_ligar_sel on public.robo_ligar;
 create policy robo_ligar_sel on public.robo_ligar as permissive for select to authenticated using (is_member(organizacao_id));
@@ -9253,18 +10796,28 @@ create policy vacuo_estado_sel on public.vacuo_estado as permissive for select t
 alter table public.vacuo_repasses enable row level security;
 drop policy if exists vacuo_repasses_sel on public.vacuo_repasses;
 create policy vacuo_repasses_sel on public.vacuo_repasses as permissive for select to authenticated using (is_member(organizacao_id));
+alter table public.wa_audio_diag enable row level security;
+drop policy if exists wa_audio_diag_admin_select on public.wa_audio_diag;
+create policy wa_audio_diag_admin_select on public.wa_audio_diag as permissive for select to authenticated using ((organizacao_id IN ( SELECT organizacao_usuarios.organizacao_id
+   FROM organizacao_usuarios
+  WHERE ((organizacao_usuarios.usuario_id = auth.uid()) AND (organizacao_usuarios.status = 'ativo'::membership_status) AND (organizacao_usuarios.papel = 'admin'::user_role)))));
+alter table public.wa_lid_map enable row level security;
+drop policy if exists wa_lid_map_sel on public.wa_lid_map;
+create policy wa_lid_map_sel on public.wa_lid_map as permissive for select to authenticated using ((is_member(organizacao_id) OR is_platform_admin()));
 alter table public.atd_wa_optout enable row level security;
 drop policy if exists waopt_sel on public.atd_wa_optout;
 create policy waopt_sel on public.atd_wa_optout as permissive for select to authenticated using ((is_platform_admin() OR is_member(organizacao_id)));
 alter table public.wa_templates enable row level security;
 drop policy if exists wat_sel on public.wa_templates;
 create policy wat_sel on public.wa_templates as permissive for select to authenticated using ((is_platform_admin() OR is_member(organizacao_id)));
+alter table public.webhook_config enable row level security;
 alter table public.whatsapp_webhook_events enable row level security;
 
 -- 10. permissões nas tabelas (iguais às do Atenvo)
 revoke all on public.adm_casos from anon, authenticated;
 revoke all on public.adm_config from anon, authenticated;
 revoke all on public.adm_fechados from anon, authenticated;
+revoke all on public.adm_movimentos from anon, authenticated;
 revoke all on public.adm_pendencias from anon, authenticated;
 revoke all on public.adm_placar from anon, authenticated;
 revoke all on public.agendamento_atividades from anon, authenticated;
@@ -9272,12 +10825,14 @@ revoke all on public.agendamentos from anon, authenticated;
 revoke all on public.alertas_lead_quente from anon, authenticated;
 revoke all on public.assinatura_itens from anon, authenticated;
 revoke all on public.assinaturas from anon, authenticated;
+revoke all on public.assistente_lembretes from anon, authenticated;
 revoke all on public.audit_log from anon, authenticated;
 revoke all on public.avisos_passado_humano from anon, authenticated;
 revoke all on public.bom_dia_gestores from anon, authenticated;
 revoke all on public.bot_canal_config from anon, authenticated;
 revoke all on public.bot_conversa_estado from anon, authenticated;
 revoke all on public.bot_mensagens_saida from anon, authenticated;
+revoke all on public.bot_remarketing from anon, authenticated;
 revoke all on public.bot_roteamentos from anon, authenticated;
 revoke all on public.canais from anon, authenticated;
 revoke all on public.canal_health_runs from anon, authenticated;
@@ -9291,12 +10846,11 @@ revoke all on public.configuracoes from anon, authenticated;
 revoke all on public.contato_identidades from anon, authenticated;
 revoke all on public.contatos from anon, authenticated;
 revoke all on public.conversa_atividades from anon, authenticated;
+revoke all on public.conversa_etiquetas from anon, authenticated;
 revoke all on public.conversa_higiene_adiamentos from anon, authenticated;
 revoke all on public.conversa_status_def from anon, authenticated;
 revoke all on public.conversas from anon, authenticated;
 revoke all on public.convites from anon, authenticated;
-revoke all on public.disparo_campanhas from anon, authenticated;
-revoke all on public.disparo_envios from anon, authenticated;
 revoke all on public.etiquetas from anon, authenticated;
 revoke all on public.fichas_judiciais from anon, authenticated;
 revoke all on public.fontes_aquisicao from anon, authenticated;
@@ -9310,6 +10864,7 @@ revoke all on public.ia_pausas from anon, authenticated;
 revoke all on public.ia_sessoes from anon, authenticated;
 revoke all on public.inss_documentos from anon, authenticated;
 revoke all on public.inss_pedidos from anon, authenticated;
+revoke all on public.atd_integracoes from anon, authenticated;
 revoke all on public.iris_acesso from anon, authenticated;
 revoke all on public.iris_carteira from anon, authenticated;
 revoke all on public.iris_eventos from anon, authenticated;
@@ -9317,7 +10872,9 @@ revoke all on public.iris_fila_abertura from anon, authenticated;
 revoke all on public.iris_followups from anon, authenticated;
 revoke all on public.iris_monitor_achados from anon, authenticated;
 revoke all on public.iris_monitor_ciclos from anon, authenticated;
+revoke all on public.iris_teste_limpezas from anon, authenticated;
 revoke all on public.iris_textos from anon, authenticated;
+revoke all on public.ligacoes_marcadas from anon, authenticated;
 revoke all on public.mensagens from anon, authenticated;
 revoke all on public.mensagens_agendadas from anon, authenticated;
 revoke all on public.midia_melhoria_ia from anon, authenticated;
@@ -9328,6 +10885,7 @@ revoke all on public.oportunidades from anon, authenticated;
 revoke all on public.organizacao_limites from anon, authenticated;
 revoke all on public.organizacao_usuarios from anon, authenticated;
 revoke all on public.organizacoes from anon, authenticated;
+revoke all on public.pendencias from anon, authenticated;
 revoke all on public.planilha_config from anon, authenticated;
 revoke all on public.planos from anon, authenticated;
 revoke all on public.presenciais from anon, authenticated;
@@ -9343,6 +10901,7 @@ revoke all on public.remarketing_config from anon, authenticated;
 revoke all on public.remarketing_eventos from anon, authenticated;
 revoke all on public.remarketing_leads from anon, authenticated;
 revoke all on public.remarketing_tarefas from anon, authenticated;
+revoke all on public.retomada_atendimento_log from anon, authenticated;
 revoke all on public.robo_ligar from anon, authenticated;
 revoke all on public.script_anexos from anon, authenticated;
 revoke all on public.script_categorias from anon, authenticated;
@@ -9355,8 +10914,11 @@ revoke all on public.usuarios from anon, authenticated;
 revoke all on public.vacuo_config from anon, authenticated;
 revoke all on public.vacuo_estado from anon, authenticated;
 revoke all on public.vacuo_repasses from anon, authenticated;
+revoke all on public.wa_audio_diag from anon, authenticated;
+revoke all on public.wa_lid_map from anon, authenticated;
 revoke all on public.atd_wa_optout from anon, authenticated;
 revoke all on public.wa_templates from anon, authenticated;
+revoke all on public.webhook_config from anon, authenticated;
 revoke all on public.whatsapp_webhook_events from anon, authenticated;
 grant select on public.adm_casos to authenticated;
 grant select on public.adm_casos to service_role;
@@ -9364,6 +10926,8 @@ grant select on public.adm_config to authenticated;
 grant select on public.adm_config to service_role;
 grant select on public.adm_fechados to authenticated;
 grant select on public.adm_fechados to service_role;
+grant select on public.adm_movimentos to authenticated;
+grant select on public.adm_movimentos to service_role;
 grant select on public.adm_placar to authenticated;
 grant select on public.adm_placar to service_role;
 grant select on public.agendamento_atividades to authenticated;
@@ -9376,6 +10940,7 @@ grant select on public.assinatura_itens to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.assinatura_itens to service_role;
 grant select on public.assinaturas to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.assinaturas to service_role;
+grant insert, select, update on public.assistente_lembretes to service_role;
 grant select on public.audit_log to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.audit_log to service_role;
 grant delete, insert, references, select, trigger, truncate, update on public.avisos_passado_humano to service_role;
@@ -9408,6 +10973,8 @@ grant delete, insert, references, select, trigger, truncate, update on public.co
 grant delete, insert, select, update on public.contatos to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.contatos to service_role;
 grant select on public.conversa_atividades to authenticated;
+grant delete, insert, select, update on public.conversa_etiquetas to authenticated;
+grant delete, insert, references, select, trigger, truncate, update on public.conversa_etiquetas to service_role;
 grant select on public.conversa_higiene_adiamentos to authenticated;
 grant delete, insert, select, update on public.conversa_status_def to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.conversa_status_def to service_role;
@@ -9415,10 +10982,6 @@ grant delete, insert, select, update on public.conversas to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.conversas to service_role;
 grant select on public.convites to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.convites to service_role;
-grant select on public.disparo_campanhas to authenticated;
-grant delete, insert, select, update on public.disparo_campanhas to service_role;
-grant select on public.disparo_envios to authenticated;
-grant delete, insert, select, update on public.disparo_envios to service_role;
 grant delete, insert, select, update on public.etiquetas to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.etiquetas to service_role;
 grant insert, select, update on public.fichas_judiciais to authenticated;
@@ -9442,6 +11005,8 @@ grant select on public.inss_documentos to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.inss_documentos to service_role;
 grant insert, select, update on public.inss_pedidos to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.inss_pedidos to service_role;
+grant delete, insert, select, update on public.atd_integracoes to authenticated;
+grant delete, insert, references, select, trigger, truncate, update on public.atd_integracoes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on public.iris_acesso to service_role;
 grant select on public.iris_carteira to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.iris_carteira to service_role;
@@ -9450,7 +11015,9 @@ grant delete, insert, references, select, trigger, truncate, update on public.ir
 grant select on public.iris_followups to service_role;
 grant select on public.iris_monitor_achados to service_role;
 grant select on public.iris_monitor_ciclos to service_role;
+grant select on public.iris_teste_limpezas to service_role;
 grant select on public.iris_textos to service_role;
+grant select on public.ligacoes_marcadas to service_role;
 grant delete, insert, select, update on public.mensagens to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.mensagens to service_role;
 grant select on public.mensagens_agendadas to authenticated;
@@ -9469,6 +11036,8 @@ grant delete, insert, select, update on public.organizacao_usuarios to authentic
 grant delete, insert, references, select, trigger, truncate, update on public.organizacao_usuarios to service_role;
 grant select on public.organizacoes to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.organizacoes to service_role;
+grant select on public.pendencias to authenticated;
+grant delete, insert, references, select, trigger, truncate, update on public.pendencias to service_role;
 grant select on public.planos to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on public.planos to service_role;
 grant select on public.presenciais to authenticated;
@@ -9513,11 +11082,18 @@ grant select on public.vacuo_estado to authenticated;
 grant delete, insert, select, update on public.vacuo_estado to service_role;
 grant select on public.vacuo_repasses to authenticated;
 grant delete, insert, select, update on public.vacuo_repasses to service_role;
+grant select on public.wa_audio_diag to authenticated;
+grant delete, insert, select, update on public.wa_audio_diag to service_role;
+grant select on public.wa_lid_map to authenticated;
+grant delete, insert, select, update on public.wa_lid_map to service_role;
 grant select on public.atd_wa_optout to authenticated;
 grant delete, insert, select on public.atd_wa_optout to service_role;
 grant select on public.wa_templates to authenticated;
 grant insert, select, update on public.wa_templates to service_role;
+grant delete, insert, select, update on public.webhook_config to service_role;
 grant delete, insert, select, update on public.whatsapp_webhook_events to service_role;
+grant usage, select on sequence public.adm_movimentos_id_seq to authenticated, service_role;
+grant usage, select on sequence public.iris_teste_limpezas_id_seq to authenticated, service_role;
 grant usage, select on sequence public.presenciais_avisos_id_seq to authenticated, service_role;
 
 -- 11. quem pode chamar cada rotina (igual ao Atenvo)
@@ -9534,6 +11110,8 @@ revoke all on function public.adm_mes_inicio(timestamp with time zone) from publ
 grant execute on function public.adm_mes_inicio(timestamp with time zone) to authenticated, service_role;
 revoke all on function public.adm_nome_chave(text) from public, anon, authenticated;
 grant execute on function public.adm_nome_chave(text) to authenticated, service_role;
+revoke all on function public.adm_saiu_do_fechado(uuid) from public, anon, authenticated;
+grant execute on function public.adm_saiu_do_fechado(uuid) to authenticated, service_role;
 revoke all on function public.adm_status(uuid) from public, anon, authenticated;
 grant execute on function public.adm_status(uuid) to authenticated, service_role;
 revoke all on function public.adm_trava_assinar() from public, anon, authenticated;
@@ -9584,8 +11162,14 @@ revoke all on function public.bom_dia_resumo(uuid,text) from public, anon, authe
 grant execute on function public.bom_dia_resumo(uuid,text) to authenticated, service_role;
 revoke all on function public.bom_dia_ultimo_util(date) from public, anon, authenticated;
 grant execute on function public.bom_dia_ultimo_util(date) to service_role;
+revoke all on function public.bot_avancar_etapa(uuid,text,jsonb,integer,uuid) from public, anon, authenticated;
+grant execute on function public.bot_avancar_etapa(uuid,text,jsonb,integer,uuid) to authenticated, service_role;
 revoke all on function public.bot_pausar(uuid,text,text,jsonb) from public, anon, authenticated;
 grant execute on function public.bot_pausar(uuid,text,text,jsonb) to authenticated, service_role;
+revoke all on function public.bot_remarketing_inbound(uuid,text) from public, anon, authenticated;
+grant execute on function public.bot_remarketing_inbound(uuid,text) to service_role;
+revoke all on function public.bot_remarketing_touch_updated() from public, anon, authenticated;
+grant execute on function public.bot_remarketing_touch_updated() to anon, authenticated, service_role;
 revoke all on function public.calcular_valor_assinatura(uuid) from public, anon, authenticated;
 grant execute on function public.calcular_valor_assinatura(uuid) to service_role;
 revoke all on function public.cancelar_agendamento(uuid) from public, anon, authenticated;
@@ -9635,6 +11219,8 @@ revoke all on function public.dashboard_v5(timestamp with time zone,timestamp wi
 grant execute on function public.dashboard_v5(timestamp with time zone,timestamp with time zone,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone) to authenticated, service_role;
 revoke all on function public.editar_agendamento(uuid,uuid,text,timestamp with time zone) from public, anon, authenticated;
 grant execute on function public.editar_agendamento(uuid,uuid,text,timestamp with time zone) to authenticated;
+revoke all on function public.emprestimo_pos_fluxo_ciclo_inicio(uuid,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.emprestimo_pos_fluxo_ciclo_inicio(uuid,timestamp with time zone) to service_role;
 revoke all on function public.equipe_listar(uuid) from public, anon, authenticated;
 grant execute on function public.equipe_listar(uuid) to authenticated;
 revoke all on function public.fila_iris_dono(uuid) from public, anon, authenticated;
@@ -9685,8 +11271,12 @@ revoke all on function public.fn_protege_coluna_entrada() from public, anon, aut
 grant execute on function public.fn_protege_coluna_entrada() to anon, authenticated, service_role;
 revoke all on function public.fn_remarketing_score(uuid) from public, anon, authenticated;
 grant execute on function public.fn_remarketing_score(uuid) to service_role;
+revoke all on function public.fn_wa_lid_map_touch() from public, anon, authenticated;
+grant execute on function public.fn_wa_lid_map_touch() to anon, authenticated, service_role;
 revoke all on function public.garantir_oportunidade_entrada(uuid,uuid,text,uuid,uuid) from public, anon, authenticated;
 grant execute on function public.garantir_oportunidade_entrada(uuid,uuid,text,uuid,uuid) to authenticated, service_role;
+revoke all on function public.garantir_oportunidade_lead_novo(uuid,uuid,uuid,text,boolean) from public, anon, authenticated;
+grant execute on function public.garantir_oportunidade_lead_novo(uuid,uuid,uuid,text,boolean) to authenticated, service_role;
 revoke all on function public.higiene_registrar_adiamento(uuid,text) from public, anon, authenticated;
 grant execute on function public.higiene_registrar_adiamento(uuid,text) to authenticated;
 revoke all on function public.ia_agente_metricas(uuid) from public, anon, authenticated;
@@ -9709,14 +11299,28 @@ revoke all on function public.ia_conversa_recomecar(uuid) from public, anon, aut
 grant execute on function public.ia_conversa_recomecar(uuid) to authenticated, service_role;
 revoke all on function public.ia_conversa_toggle(uuid,boolean) from public, anon, authenticated;
 grant execute on function public.ia_conversa_toggle(uuid,boolean) to authenticated, service_role;
+revoke all on function public.ia_familia_pendente_em(uuid,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.ia_familia_pendente_em(uuid,timestamp with time zone) to service_role;
 revoke all on function public.ia_sessao_antonio_so_matheus() from public, anon, authenticated;
 grant execute on function public.ia_sessao_antonio_so_matheus() to authenticated, service_role;
+revoke all on function public.iris_ativa_na_conversa(uuid) from public, anon, authenticated;
+grant execute on function public.iris_ativa_na_conversa(uuid) to service_role;
+revoke all on function public.iris_ativa_para(uuid,text) from public, anon, authenticated;
+grant execute on function public.iris_ativa_para(uuid,text) to service_role;
 revoke all on function public.iris_atraso_resposta_s(uuid) from public, anon, authenticated;
 grant execute on function public.iris_atraso_resposta_s(uuid) to service_role;
 revoke all on function public.iris_carteira_lista() from public, anon, authenticated;
 grant execute on function public.iris_carteira_lista() to authenticated, service_role;
 revoke all on function public.iris_cliente_escreveu() from public, anon, authenticated;
 grant execute on function public.iris_cliente_escreveu() to service_role;
+revoke all on function public.iris_contato_do_dono(uuid,text,uuid) from public, anon, authenticated;
+grant execute on function public.iris_contato_do_dono(uuid,text,uuid) to service_role;
+revoke all on function public.iris_contato_novo(uuid,text,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.iris_contato_novo(uuid,text,timestamp with time zone) to authenticated, service_role;
+revoke all on function public.iris_corte_limpeza(uuid) from public, anon, authenticated;
+grant execute on function public.iris_corte_limpeza(uuid) to service_role;
+revoke all on function public.iris_dia_util(date) from public, anon, authenticated;
+grant execute on function public.iris_dia_util(date) to service_role;
 revoke all on function public.iris_followup_ao_receber() from public, anon, authenticated;
 grant execute on function public.iris_followup_ao_receber() to service_role;
 revoke all on function public.iris_followup_classificar(text,text,boolean) from public, anon, authenticated;
@@ -9737,6 +11341,10 @@ revoke all on function public.iris_followup_texto_parar(text) from public, anon,
 grant execute on function public.iris_followup_texto_parar(text) to service_role;
 revoke all on function public.iris_followup_texto_sim(text) from public, anon, authenticated;
 grant execute on function public.iris_followup_texto_sim(text) to service_role;
+revoke all on function public.iris_horario_comercial(timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.iris_horario_comercial(timestamp with time zone) to service_role;
+revoke all on function public.iris_limpo_em(uuid) from public, anon, authenticated;
+grant execute on function public.iris_limpo_em(uuid) to service_role;
 revoke all on function public.iris_monitor_alertar_critico() from public, anon, authenticated;
 grant execute on function public.iris_monitor_alertar_critico() to service_role;
 revoke all on function public.iris_monitor_categoria_guarda(text) from public, anon, authenticated;
@@ -9753,14 +11361,34 @@ revoke all on function public.iris_monitor_inserir(uuid,uuid,jsonb) from public,
 grant execute on function public.iris_monitor_inserir(uuid,uuid,jsonb) to service_role;
 revoke all on function public.iris_monitor_rotulo(text) from public, anon, authenticated;
 grant execute on function public.iris_monitor_rotulo(text) to service_role;
+revoke all on function public.iris_motivo_nao_tocar(uuid,text,text,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.iris_motivo_nao_tocar(uuid,text,text,timestamp with time zone) to service_role;
+revoke all on function public.iris_numero_teste(uuid,text) from public, anon, authenticated;
+grant execute on function public.iris_numero_teste(uuid,text) to service_role;
+revoke all on function public.iris_pode_tocar(uuid,text,text) from public, anon, authenticated;
+grant execute on function public.iris_pode_tocar(uuid,text,text) to service_role;
 revoke all on function public.iris_pode_ver() from public, anon, authenticated;
 grant execute on function public.iris_pode_ver() to authenticated, service_role;
+revoke all on function public.iris_registrar_evento(uuid,text,text,text) from public, anon, authenticated;
+grant execute on function public.iris_registrar_evento(uuid,text,text,text) to service_role;
+revoke all on function public.iris_teste_limpar(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.iris_teste_limpar(uuid,uuid) to service_role;
+revoke all on function public.iris_teste_registrar_negado(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function public.iris_teste_registrar_negado(uuid,uuid,text) to service_role;
+revoke all on function public.iris_texto_bot_recusa(text) from public, anon, authenticated;
+grant execute on function public.iris_texto_bot_recusa(text) to service_role;
+revoke all on function public.iris_texto_irritado(text) from public, anon, authenticated;
+grant execute on function public.iris_texto_irritado(text) to service_role;
+revoke all on function public.iris_texto_recusa(text) from public, anon, authenticated;
+grant execute on function public.iris_texto_recusa(text) to service_role;
 revoke all on function public.iris_textos_antes_update() from public, anon, authenticated;
 grant execute on function public.iris_textos_antes_update() to service_role;
 revoke all on function public.is_member(uuid) from public, anon, authenticated;
 grant execute on function public.is_member(uuid) to authenticated, service_role;
 revoke all on function public.is_platform_admin() from public, anon, authenticated;
 grant execute on function public.is_platform_admin() to authenticated, service_role;
+revoke all on function public.mensagens_agendadas_reivindicar(integer) from public, anon, authenticated;
+grant execute on function public.mensagens_agendadas_reivindicar(integer) to service_role;
 revoke all on function public.notificacao_marcar_lida(uuid) from public, anon, authenticated;
 grant execute on function public.notificacao_marcar_lida(uuid) to authenticated, service_role;
 revoke all on function public.notificacoes_marcar_todas(uuid) from public, anon, authenticated;
@@ -9911,6 +11539,10 @@ revoke all on function public.tg_etiqueta_delete_sync_cache() from public, anon,
 grant execute on function public.tg_etiqueta_delete_sync_cache() to anon, authenticated, service_role;
 revoke all on function public.tg_etiqueta_rename_sync_cache() from public, anon, authenticated;
 grant execute on function public.tg_etiqueta_rename_sync_cache() to anon, authenticated, service_role;
+revoke all on function public.toque_automatico_permitido(uuid) from public, anon, authenticated;
+grant execute on function public.toque_automatico_permitido(uuid) to service_role;
+revoke all on function public.toques_automaticos(uuid,timestamp with time zone,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.toques_automaticos(uuid,timestamp with time zone,timestamp with time zone) to service_role;
 revoke all on function public.trg_fn_conversa_ultima_entrada() from public, anon, authenticated;
 revoke all on function public.trg_fn_lead_fora_rs() from public, anon, authenticated;
 grant execute on function public.trg_fn_lead_fora_rs() to authenticated, service_role;
@@ -9941,15 +11573,29 @@ revoke all on function public.wa_canal_reativar_alerta(uuid) from public, anon, 
 grant execute on function public.wa_canal_reativar_alerta(uuid) to authenticated;
 revoke all on function public.wa_canal_silenciar_alerta(uuid,timestamp with time zone,text) from public, anon, authenticated;
 grant execute on function public.wa_canal_silenciar_alerta(uuid,timestamp with time zone,text) to authenticated;
+revoke all on function public.wa_consolidar_canal_por_numero(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.wa_consolidar_canal_por_numero(uuid,uuid) to authenticated, service_role;
+revoke all on function public.wa_dentro_janela(uuid,uuid,integer) from public, anon, authenticated;
+grant execute on function public.wa_dentro_janela(uuid,uuid,integer) to authenticated, service_role;
 revoke all on function public.wa_entrega_auto_resumo(uuid) from public, anon, authenticated;
 grant execute on function public.wa_entrega_auto_resumo(uuid) to authenticated, service_role;
 revoke all on function public.wa_fixar_conversa(uuid,boolean) from public, anon, authenticated;
 grant execute on function public.wa_fixar_conversa(uuid,boolean) to authenticated, service_role;
+revoke all on function public.wa_inbound_garantir_contato_conversa(uuid,uuid,text,text,text,text,text,boolean) from public, anon, authenticated;
+grant execute on function public.wa_inbound_garantir_contato_conversa(uuid,uuid,text,text,text,text,text,boolean) to service_role;
+revoke all on function public.wa_janela_registrar(uuid,uuid,timestamp with time zone) from public, anon, authenticated;
+grant execute on function public.wa_janela_registrar(uuid,uuid,timestamp with time zone) to service_role;
 revoke all on function public.wa_marcar_lida(uuid,boolean) from public, anon, authenticated;
 grant execute on function public.wa_marcar_lida(uuid,boolean) to authenticated, service_role;
+revoke all on function public.wa_optout_inbound(uuid,text) from public, anon, authenticated;
+grant execute on function public.wa_optout_inbound(uuid,text) to service_role;
 revoke all on function public.wa_optout_registrar(uuid,uuid,text,text) from public, anon, authenticated;
 grant execute on function public.wa_optout_registrar(uuid,uuid,text,text) to service_role;
+revoke all on function public.wa_resolver_contato_por_numero(uuid,text) from public, anon, authenticated;
+grant execute on function public.wa_resolver_contato_por_numero(uuid,text) to service_role;
 revoke all on function public.wa_templates_touch() from public, anon, authenticated;
+revoke all on function public.wa_vincular_numero(uuid,text,text,uuid) from public, anon, authenticated;
+grant execute on function public.wa_vincular_numero(uuid,text,text,uuid) to authenticated, service_role;
 
 -- 12. tempo real (as telas do Atendimento recebem as mudanças na hora)
 do $$ begin if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'contatos') then alter publication supabase_realtime add table public.contatos; end if; end $$;
@@ -9987,6 +11633,26 @@ revoke all on function private.atd_sincroniza_pessoa() from public, anon, authen
 drop trigger if exists profiles_atd_sincroniza on public.profiles;
 create trigger profiles_atd_sincroniza after insert or update of papel, ativo, modulos, nome, email, deve_trocar_senha on public.profiles
   for each row execute function private.atd_sincroniza_pessoa();
+-- limites da empresa: o Atenvo vende por número de pessoas e de WhatsApp; no Reviza não há limite
+insert into public.organizacao_limites (organizacao_id, usuarios_incluidos, whatsapps_incluidos, facebook_incluidos)
+values ('a1fa0000-0000-4000-8000-000000000001', 500, 50, 5) on conflict (organizacao_id) do nothing;
+
+-- o funil do Kanban, igual ao da demonstração aprovada (LEAD NOVO é a entrada; Fechado e Perdido encerram)
+do $$
+declare v_funil uuid;
+begin
+  if not exists (select 1 from public.funis where organizacao_id = 'a1fa0000-0000-4000-8000-000000000001') then
+    insert into public.funis (organizacao_id, nome, padrao, ordem) values ('a1fa0000-0000-4000-8000-000000000001', 'Funil principal', true, 0) returning id into v_funil;
+    insert into public.funil_colunas (funil_id, organizacao_id, nome, cor, ordem, entrada, resultado, encerra_oportunidade, papel) values
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'LEAD NOVO',      '#64748b', 0, true,  'neutro',  false, null),
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'Em atendimento', '#3b82f6', 1, false, 'neutro',  false, null),
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'Documentação',   '#f59e0b', 2, false, 'neutro',  false, 'producao'),
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'Qualificado',    '#8b5cf6', 3, false, 'neutro',  false, 'qualificado'),
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'Fechado',        '#19C37D', 4, false, 'ganho',   true,  null),
+      (v_funil, 'a1fa0000-0000-4000-8000-000000000001', 'Perdido',        '#e11d48', 5, false, 'perdido', true,  null);
+  end if;
+end $$;
+
 -- quem já existe hoje (sem mexer em profiles)
 insert into public.usuarios (id, nome, email, papel, ativo, deve_trocar_senha)
 select p.id, coalesce(nullif(btrim(p.nome), ''), split_part(coalesce(p.email, 'pessoa'), '@', 1)), p.email,
@@ -9997,6 +11663,51 @@ select 'a1fa0000-0000-4000-8000-000000000001', p.id, case when p.papel::text = '
        case when p.ativo and (p.papel::text in ('admin', 'atendente') or 'atendimento' = any (coalesce(p.modulos, '{}'::text[]))) then 'ativo' else 'inativo' end::public.membership_status
   from public.profiles p on conflict (organizacao_id, usuario_id) do nothing;
 
+-- 14. PASTAS DE ARQUIVOS do Atendimento: script-midia (mensagens prontas e mídias recebidas, por empresa) e
+-- atd-midia (mídias enviadas). A pasta wa-midia continua só das Cobranças.
+insert into storage.buckets (id, name, public) values ('script-midia', 'script-midia', false) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('atd-midia', 'atd-midia', false) on conflict (id) do nothing;
+drop policy if exists script_midia_del on storage.objects;
+create policy script_midia_del on storage.objects as permissive for delete to authenticated using (((bucket_id = 'script-midia'::text) AND is_member((NULLIF((storage.foldername(name))[1], ''::text))::uuid)));
+drop policy if exists script_midia_ins on storage.objects;
+create policy script_midia_ins on storage.objects as permissive for insert to authenticated with check (((bucket_id = 'script-midia'::text) AND is_member((NULLIF((storage.foldername(name))[1], ''::text))::uuid)));
+drop policy if exists script_midia_sel on storage.objects;
+create policy script_midia_sel on storage.objects as permissive for select to authenticated using (((bucket_id = 'script-midia'::text) AND is_member((NULLIF((storage.foldername(name))[1], ''::text))::uuid)));
+-- 15. A REGRA DO GERENTE DENTRO DO BANCO (dono 23/11). No Atenvo qualquer pessoa da empresa consegue ler todas as
+-- conversas pelo banco (o recorte é só da tela). No Reviza, ler contatos, conversas, mensagens e oportunidades:
+--   administrador: tudo; gerente: as das pessoas das equipes dele e as que chegam nos números delas;
+--   atendente: só as dos clientes dele. As funções do servidor (WhatsApp) não passam por esta regra.
+create or replace function public.atd_resp_do_contato(p_contato uuid)
+returns uuid language sql stable security definer set search_path = '' as $$
+  select c.responsavel_id from public.contatos c where c.id = p_contato
+$$;
+create or replace function public.atd_vejo_conversa(p_conversa uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.is_at_least('admin') or exists (
+    select 1 from public.conversas cv join public.contatos ct on ct.id = cv.contato_id
+     where cv.id = p_conversa
+       and (ct.responsavel_id = any (public.equipe_pessoas_que_vejo())
+            or coalesce(cv.canal_id, cv.ultimo_canal_id, cv.canal_origem_id) = any (public.equipe_canais_que_vejo())))
+$$;
+revoke all on function public.atd_resp_do_contato(uuid) from public, anon;
+revoke all on function public.atd_vejo_conversa(uuid) from public, anon;
+grant execute on function public.atd_resp_do_contato(uuid) to authenticated, service_role;
+grant execute on function public.atd_vejo_conversa(uuid) to authenticated, service_role;
+drop policy if exists atd_quem_ve on public.contatos;
+create policy atd_quem_ve on public.contatos as restrictive for select to authenticated using (
+  (select public.is_at_least('admin')) or responsavel_id = any ((select public.equipe_pessoas_que_vejo())::uuid[])
+  or canal_origem_id = any ((select public.equipe_canais_que_vejo())::uuid[]));
+drop policy if exists atd_quem_ve on public.conversas;
+create policy atd_quem_ve on public.conversas as restrictive for select to authenticated using (
+  (select public.is_at_least('admin')) or public.atd_resp_do_contato(contato_id) = any ((select public.equipe_pessoas_que_vejo())::uuid[])
+  or coalesce(canal_id, ultimo_canal_id, canal_origem_id) = any ((select public.equipe_canais_que_vejo())::uuid[]));
+drop policy if exists atd_quem_ve on public.mensagens;
+create policy atd_quem_ve on public.mensagens as restrictive for select to authenticated using (
+  (select public.is_at_least('admin')) or public.atd_vejo_conversa(conversa_id));
+drop policy if exists atd_quem_ve on public.oportunidades;
+create policy atd_quem_ve on public.oportunidades as restrictive for select to authenticated using (
+  (select public.is_at_least('admin')) or coalesce(responsavel_id, public.atd_resp_do_contato(contato_id)) = any ((select public.equipe_pessoas_que_vejo())::uuid[])
+  or canal_origem_id = any ((select public.equipe_canais_que_vejo())::uuid[]));
 reset check_function_bodies;
--- DESFAZER: drop trigger profiles_atd_sincroniza on public.profiles; e apagar as 96 tabelas, as rotinas e os
+-- DESFAZER: drop trigger profiles_atd_sincroniza on public.profiles; e apagar as 106 tabelas, as rotinas e os
 -- tipos criados acima (lista em ~/reviza-sist/porte-atendimento/fechamento.json). Nada das Cobranças depende deles.

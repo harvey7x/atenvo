@@ -624,7 +624,8 @@ export function useWaConversations() {
   // também na saída (select): o cache nunca remove um card — conversa transferida para outra
   // pessoa, ou carregada por outro usuário nesta mesma aba, não pode aparecer.
   const vis = useVisibilidade();
-  const soDoUsuario = vis.veTodos ? null : vis.uid ?? '';
+  // gerente de equipe: sem recorte aqui — o banco já entrega só o que é da equipe dele (migration 93)
+  const soDoUsuario = vis.veTodos || vis.veEquipe ? null : vis.uid ?? '';
   definirEscopoLista(orgId, soDoUsuario);
   const recortar = useCallback(
     (lista: WaContact[]) => (soDoUsuario === null ? lista : lista.filter((c) => !!soDoUsuario && c.respId === soDoUsuario)),
@@ -1020,7 +1021,7 @@ export function useIniciarConversaWa() {
   // visibilidade (22/10): quem não vê todos não abre (nem move de número) a conversa de cliente
   // de outra pessoa; contato NOVO criado por ele já nasce dele (senão sumiria da própria lista)
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useMutation({
     mutationFn: async (input: { canalId: string; telefone: string; nome?: string }): Promise<{ conversaId: string; reused: boolean }> => {
       const org = currentOrg.id;
@@ -1592,7 +1593,7 @@ export function useAgendamentosOrg() {
   const { currentOrg } = useOrg();
   // visibilidade (22/10): quem não vê todos só vê os agendamentos dos clientes DELE
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useQuery({
     queryKey: ['mensagens-agendadas-org', currentOrg.id, soDe ?? 'todos'],
     enabled: WA_REAL && (vis.veTodos || !!soDe),

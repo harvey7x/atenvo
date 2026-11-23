@@ -65,7 +65,7 @@ export function usePosVendaAguardando() {
   const { currentOrg } = useOrg();
   // visibilidade (22/10): quem não vê todos conta só os fechados DELE
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useQuery({
     queryKey: ['pv-aguardando', currentOrg.id, soDe ?? 'todos'],
     enabled: WA_REAL && !!currentOrg.id && (vis.veTodos || !!soDe),
