@@ -15,6 +15,10 @@ function gerarSenha(): string {
   return s;
 }
 const PAPEIS = ['cadastro', 'comercial', 'financeiro', 'admin']; // sem "gestor" por decisão do dono (11/09); "cadastro" = só tela Novos
+// 23/11 (migrations 91 e 92): "atendente" = quem trabalha só no Atendimento (a tela só oferece esse papel
+// quando o Atendimento está ligado na instalação).
+const PAPEIS_ATENDIMENTO = ['atendente'];
+const AMBIENTES = ['cobrancas', 'atendimento'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -46,7 +50,12 @@ Deno.serve(async (req) => {
     if (acao === 'criar') {
       const usuario = String(body.usuario ?? '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       if (!usuario) return json({ error: 'Usuario invalido (use letras, numeros, ponto, hifen).' }, 400);
-      const papel = PAPEIS.includes(body.papel) ? body.papel : 'comercial';
+      // papel que o sistema não conhece é recusado (antes virava "comercial" sem avisar)
+      if (body.papel != null && ![...PAPEIS, ...PAPEIS_ATENDIMENTO].includes(body.papel)) return json({ error: 'Papel desconhecido.' }, 400);
+      const papel = body.papel ?? 'comercial';
+      // ambientes (profiles.modulos) e telas liberadas (profiles.areas): opcionais; sem eles vale o padrão do papel
+      const modulos = Array.isArray(body.modulos) ? AMBIENTES.filter((a) => (body.modulos as unknown[]).includes(a)) : null;
+      const areas = Array.isArray(body.areas) ? (body.areas as unknown[]).filter((x): x is string => typeof x === 'string' && x.length <= 60).slice(0, 80) : null;
       const nome = String(body.nome ?? '').trim() || usuario;
       const email = `${usuario}@reviza.local`;
       // senha: a que o admin escolheu (validada) ou uma temporária gerada aqui
@@ -56,8 +65,12 @@ Deno.serve(async (req) => {
       const exigirTroca = escolhida ? body.exigirTroca !== false : true;
       const { data: created, error } = await admin.auth.admin.createUser({ email, password: senha, email_confirm: true, user_metadata: { nome } });
       if (error) return json({ error: /already|exists|registered/i.test(error.message) ? 'Ja existe um usuario com esse nome.' : error.message }, 400);
-      const { error: e2 } = await admin.from('profiles').update({ papel, ativo: true, nome, deve_trocar_senha: exigirTroca }).eq('id', created.user.id);
-      if (e2) return json({ error: e2.message }, 400);
+      const { error: e2 } = await admin.from('profiles').update({
+        papel, ativo: true, nome, deve_trocar_senha: exigirTroca,
+        ...(modulos && modulos.length ? { modulos } : {}), ...(areas ? { areas } : {}),
+      }).eq('id', created.user.id);
+      // o login não pode ficar criado pela metade (sem papel): se o perfil não gravou, desfaz
+      if (e2) { await admin.auth.admin.deleteUser(created.user.id).catch(() => undefined); return json({ error: e2.message }, 400); }
       await registrar('criou', created.user.id, nome, `login ${usuario} · papel ${papel}`);
       return json({ ok: true, usuario, senha, papel, nome });
     }
