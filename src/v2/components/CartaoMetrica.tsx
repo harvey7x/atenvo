@@ -283,7 +283,7 @@ const CORES_SERIE = {
   light: ['#4F46E5', '#1F7E95', '#1E8A44', '#A14A77', '#5E7183'],
 } as const;
 const CORES_SERIE_CASA = {
-  dark: ['#F48349', '#E7E3DF', '#8D8780', '#C4967A', '#544F4B'],
+  dark: ['#F48349', '#E4E4E7', '#8A8A93', '#FAB882', '#52525B'], // 23/11: cinzas neutros e o pêssego da logo no lugar do castanho (o escuro estava amarronzado)
   light: ['#ED642E', '#292523', '#A39D97', '#9C6A4C', '#D6D1CC'],
 } as const;
 const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number, casa: boolean): string => {

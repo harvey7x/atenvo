@@ -21,24 +21,30 @@
    gráfico, painel das telas de acesso). Os cinzas ganham um fio de calor
    (o preto da logo puxa para o marrom) e a queda/atraso vai para o
    tijolo, para não se confundir com o laranja.
+
+   23/11 — ESCURO DE VERDADE (dono: "na cor escura tá com uma cor muito
+   amarronzada, eu preciso de um escuro"): os cinzas do ESCURO voltam ao
+   neutro do dia 21/11 (preto + grafite, sem o fio de calor) e o laranja
+   deixa de ser usado translúcido sobre o preto — ver a seção 12. O tema
+   claro não mudou.
    ===================================================================== */
 
 /* ---- 0. CORES ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 {
-  --base: #0A0908;
-  --vidro-a: #151312; --vidro-b: #151312; --surface: #1C1917;
-  --linha: #23201E; --fio-a: #282522; --fio-b: #282522; --line-2: #282522;
-  --txt: #F5F2EF; --txt-2: #ABA5A0; --txt-3: #807973;
-  --rp-elev: #24211F; --rp-menu: #191716; --rp-campo: #100E0D; --rp-campo-fio: #2B2825; --rp-campo-fio-hover: #3D3834;
-  --rp-trilho: #100E0D; --rp-cartao-solido: #151312;
-  --lin-branco: #FBF9F7; --lin-nevoa: #D9D4CF; --lin-fio: #24211F; --lin-fio-hover: #373330;
-  --lin-grafite: #24211F; --lin-obsidiana: #1C1917; --lin-tinta-botao: #0A0908;
-  --d5-fio: #211E1C; --d5-fio-forte: #2E2A27;
+  --base: #0A0A0B;
+  --vidro-a: #151517; --vidro-b: #151517; --surface: #1C1C1F;
+  --linha: #222226; --fio-a: #27272B; --fio-b: #27272B; --line-2: #27272B;
+  --txt: #F2F2F3; --txt-2: #A8A8AF; --txt-3: #7D7D86;
+  --rp-elev: #232327; --rp-menu: #18181B; --rp-campo: #101012; --rp-campo-fio: #2A2A2F; --rp-campo-fio-hover: #3B3B41;
+  --rp-trilho: #101012; --rp-cartao-solido: #151517;
+  --lin-branco: #FAFAFA; --lin-nevoa: #D6D6DA; --lin-fio: #232327; --lin-fio-hover: #36363C;
+  --lin-grafite: #232327; --lin-obsidiana: #1C1C1F; --lin-tinta-botao: #0A0A0B;
+  --d5-fio: #202024; --d5-fio-forte: #2D2D32;
   --azul: #F48349; --azul-rgb: 244, 131, 73; --platina-a: #F48349; --platina-b: #F48349;
   --gf-creme: #FCEBDB; --gf-pessego: #FAB882; --gf-brasa: #ED642E; --gf-tinta-bt: #2B1205;
   /* a queda/atraso em tijolo (vermelho queimado): o laranja agora é a cor do destaque */
-  --rubro: #CC5345; --rubro-rgb: 204, 83, 69; --rubro-bg: rgba(204, 83, 69, .14);
-  --cor-erro-txt: #E27467; --cor-erro-suave: rgba(204, 83, 69, .16);
+  --rubro: #CC5345; --rubro-rgb: 204, 83, 69; --rubro-bg: rgba(255, 255, 255, .06);
+  --cor-erro-txt: #E27467; --cor-erro-suave: rgba(255, 255, 255, .06);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 {
   --base: #EFEDEA;
@@ -55,9 +61,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light
 /* ---- 1. O CHÃO: uma cor só de ponta a ponta; barra e topo acompanham o tema ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 { background: var(--base) !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-app {
-  --ba-fundo: #0A0908; --ba-menu: #191716; --ba-mudo: #9E9892; --ba-rotulo: #736D67;
+  --ba-fundo: #0A0A0B; --ba-menu: #18181B; --ba-mudo: #9A9AA3; --ba-rotulo: #6E6E77;
   --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(244, 131, 73, .75);
-  --gf-barra: #141211; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
+  --gf-barra: #131315; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app {
   --ba-fundo: #EFEDEA; --ba-fio: rgba(20, 18, 16, .08); --ba-txt: #141210; --ba-mudo: #59534D; --ba-rotulo: #8D8780;
@@ -117,13 +123,13 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra :is(.ba-pe, .ba-grupo:not([role="group"])) .ba-item::before { content: none; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="trilho"] .ba-barra .ba-item::before { content: none; }
 
-/* o item: 32px, canto 9; o ativo é a pílula com o laranja entrando pela direita */
+/* o item: 32px, canto 9; o ativo é a pílula cinza com um fio laranja na borda direita (23/11: no escuro o degradê laranja virava marrom) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item { padding: 5px 8px 5px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 450; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo { gap: 2px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
   color: #FFFFFF; font-weight: 500;
-  background: linear-gradient(90deg, rgba(255, 255, 255, .075) 0%, rgba(255, 255, 255, .055) 42%, rgba(var(--azul-rgb), .46) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), inset 0 -1px 0 rgba(var(--azul-rgb), .28);
+  background: rgba(255, 255, 255, .075);
+  box-shadow: inset -2px 0 0 var(--azul), inset 0 0 0 1px rgba(255, 255, 255, .05);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
   color: #141210; font-weight: 500;
@@ -166,15 +172,15 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 
 /* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa com o degradê da logo (creme → pêssego → laranja) ---- */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col .pn-graf-bar { border-radius: 8px 8px 3px 3px; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2B2825; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2A2A2F; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar {
   background: linear-gradient(180deg, var(--gf-creme) 0%, var(--gf-pessego) 32%, var(--azul) 100%);
   box-shadow: 0 0 26px -6px rgba(var(--azul-rgb), .6);
 }
 
 /* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: rgba(var(--azul-rgb), .1); border: 1px solid rgba(var(--azul-rgb), .2); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #F48349; --zp-acao: #F48349; --zp-badge: #F48349; --zp-tique-lida: #F48349; --zp-onda-on: #F48349; --zp-onda-ponto: #F48349; --zp-out: #3A1D10; --zp-rubro: #CC5345; --zp-ambar: #F48349; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: #26262B; border: 1px solid rgba(255, 255, 255, .07); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #F48349; --zp-acao: #F48349; --zp-badge: #F48349; --zp-tique-lida: #F48349; --zp-onda-on: #F48349; --zp-onda-ponto: #F48349; --zp-out: #2A2A2F; --zp-rubro: #CC5345; --zp-ambar: #F48349; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-badge: #ED642E; --zp-onda-on: #ED642E; --zp-onda-ponto: #ED642E; --zp-tique-lida: #D9591F; --zp-ambar: #D9591F; --zp-out: #FDEBDD; --zp-rubro: #B03A2E; }
 
 /* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
@@ -187,14 +193,12 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 /* no painel da marca (telas de acesso): a logo grande, com o clarão quente atrás */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo {
   display: block; position: absolute; left: 50%; top: 44%; width: clamp(120px, 15vw, 176px); height: auto; aspect-ratio: 1;
-  transform: translate(-50%, -50%); filter: drop-shadow(0 26px 60px rgba(var(--azul-rgb), .42)); pointer-events: none;
+  transform: translate(-50%, -50%); filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .55)); pointer-events: none;
 }
-/* o painel da marca repete o ambiente da imagem da logo: preto, com a luz quente subindo do canto de baixo à direita */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.tela-login { background: #070605 !important; }
+/* o painel da marca: preto, com um halo cinza muito leve atrás da logo (23/11: a luz quente do canto saiu — deixava o preto marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.tela-login { background: #070708 !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel {
-  background:
-    radial-gradient(82% 64% at 106% 110%, rgba(252, 235, 219, .46) 0%, rgba(250, 184, 130, .32) 15%, rgba(244, 131, 73, .21) 33%, rgba(150, 70, 32, .12) 54%, transparent 78%),
-    radial-gradient(520px 420px at 50% 44%, rgba(244, 131, 73, .10), transparent 70%);
+  background: radial-gradient(560px 460px at 50% 44%, rgba(255, 255, 255, .055), transparent 70%);
 }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { color: var(--gf-tinta-bt); background: var(--azul); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); }
@@ -208,7 +212,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
    deixar mais profissional, atraente e organizado") — 27 telas, nos dois temas.
    ===================================================================== */
 /* 9.1 UMA COR DE DESTAQUE SÓ: o tom de "atenção" é o mesmo laranja da logo (antes convivia com um dourado antigo em 8 telas) */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #F48349; --ambar-rgb: 244, 131, 73; --ambar-bg: rgba(244, 131, 73, .13); --cor-alerta-txt: #F48349; --cor-alerta-suave: rgba(244, 131, 73, .14); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #F48349; --ambar-rgb: 244, 131, 73; --ambar-bg: rgba(255, 255, 255, .06); --cor-alerta-txt: #F48349; --cor-alerta-suave: rgba(255, 255, 255, .06); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --ambar: #D9591F; --ambar-rgb: 217, 89, 31; --ambar-bg: rgba(237, 100, 46, .12); --cor-alerta-txt: #B84A1C; --cor-alerta-suave: rgba(237, 100, 46, .13); }
 /* 9.2 cartões: um raio só (as Ferramentas usavam 12 e o resto 14) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
@@ -254,8 +258,8 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
    10. ACABAMENTO (dono 21/11: "se tiver como deixar a cara mais bonita,
    aquele detalhe de profissional, eu quero que tu faça"). Tudo discreto.
    ===================================================================== */
-/* 10.1 o clarão da marca: um dourado muito leve no alto à direita do chão (o mesmo ambiente da logo) */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: radial-gradient(1100px 540px at 90% -180px, rgba(var(--azul-rgb), .085), transparent 62%), var(--base); }
+/* 10.1 o clarão da marca: um tom muito leve no alto à direita do chão — SÓ no claro (23/11: no escuro ele deixava o preto amarronzado) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: var(--base); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: radial-gradient(1100px 540px at 90% -180px, rgba(var(--azul-rgb), .06), transparent 62%), var(--base); }
 /* 10.2 cartões: um fio de luz no alto (profundidade) e a borda acende no dourado ao passar o mouse nos indicadores */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
@@ -294,3 +298,43 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --cor-acento-txt: #B84A1C; }
 /* o balão enviado no claro era um creme amarelado: vai para o creme da logo */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: #FDF0E6; border-color: #F5D9C4; }
+
+/* =====================================================================
+   12. ESCURO DE VERDADE (dono 23/11: "o sistema na cor escura tá com uma
+   cor muito amarronzada, eu preciso de um escuro"). O marrom vinha de três
+   lugares: (a) os cinzas com fio de calor do dia 22/11 — voltaram ao neutro
+   na seção 0; (b) o clarão laranja no chão — saiu na 10.1; (c) laranja
+   TRANSLÚCIDO por cima do preto, que na tela vira marrom.
+   REGRA DO ESCURO: superfície é preto ou cinza neutro; o laranja só entra
+   SÓLIDO (texto, ícone, linha, ponto, botão, coluna acesa). Para conferir:
+   ~/reviza-sist/tools/quente.cjs lista tudo que estiver pintado em tom quente.
+   ===================================================================== */
+/* 12.1 quadradinho do ícone dos indicadores e os avatares: fundo cinza, o laranja fica no desenho */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .kpi-ic { background: rgba(255, 255, 255, .06); color: var(--azul); }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi):hover .kpi-ic { background: rgba(255, 255, 255, .1); }
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-conta-av, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { background: rgba(255, 255, 255, .08); color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { border-color: rgba(255, 255, 255, .1); }
+/* 12.2 sem halo laranja em volta: a logo da barra, a coluna acesa do gráfico e o botão principal */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca :is(svg, img) { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .5)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar { box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 1px 2px rgba(0, 0, 0, .45); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .45); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 1px 2px rgba(0, 0, 0, .45); }
+/* 12.3 indicadores: ao passar o mouse a borda clareia (o laranja a 32% sobre o grafite dava um fio marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover { border-color: rgba(255, 255, 255, .16); }
+/* 12.4 gráficos de linha: a linha continua laranja; o preenchimento embaixo vira uma névoa cinza (laranja a 20% sobre o grafite é marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.pmc-chart__svg, .rvo-svg) linearGradient stop { stop-color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient stop:first-child { stop-opacity: .2; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient stop:nth-child(2) { stop-opacity: .05; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient stop:first-child { stop-opacity: .07; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient:first-child stop:first-child { stop-opacity: .13; }
+/* 12.5 selos, ícones e marcas que tinham fundo laranja translúcido: fundo cinza, a cor fica no texto/desenho */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cfgw-amb.cobrancas, .cfgi-ic.on, .cfgw-ok-ic, .cfgr-passos-lista i, .cfgo-conf i, .cv2-n, .cv2-av.p, .ev-st-ic.atencao) { background: rgba(255, 255, 255, .06); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .cfgi-nota { background: rgba(255, 255, 255, .035); border-color: rgba(255, 255, 255, .09); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cfgw-amb.cobrancas, .cfgi-ic.on) { border-color: rgba(255, 255, 255, .1); }
+/* 12.6 Gestão de cobranças: o risco do cabeçalho da planilha em laranja cheio e fino (2px a 60% sobre o grafite dava marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -1px 0 var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -1px 0 var(--azul), inset 2px 0 0 var(--plx-sep); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-rn { box-shadow: inset 0 -1px 0 var(--azul); }
