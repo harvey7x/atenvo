@@ -338,3 +338,11 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -1px 0 var(--azul); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -1px 0 var(--azul), inset 2px 0 0 var(--plx-sep); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-rn { box-shadow: inset 0 -1px 0 var(--azul); }
+/* 12.7 o "acento suave" (aba e opção escolhidas, caixa de resultado, anel de foco) era laranja a 14% com borda a 42%: no escuro vira
+   cinza claro. O dia de hoje nos calendários fica com o fundo cinza e a borda laranja CHEIA. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --cor-acento-suave: rgba(255, 255, 255, .08); --cor-acento-fio: rgba(255, 255, 255, .3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.calx-cell.hoje, .calx-cell.hoje:hover, .calx-cell.hoje.sel, .pr-dia.hoje, .ev-data.hoje) { background: rgba(255, 255, 255, .06); border-color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pr-dia.hoje.sel { box-shadow: inset 0 0 0 1px var(--azul); }
+/* 12.8 botão ligado da barra da planilha e o ícone da fase na ficha do WhatsApp: mesma regra (fundo cinza, borda cinza clara) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-bt.on { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ctx-fase .ic { background: rgba(255, 255, 255, .06); }
