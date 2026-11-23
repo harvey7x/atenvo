@@ -13,6 +13,9 @@ import { nomeContatoExib } from '@/data/slaView';
 import { DEMO_USER } from '@/data/demo';
 
 export const VACUO_REAL = isSupabaseConfigured && !!supabase;
+/** Central de Avisos (Radar) DESLIGADA (dono 19/11): nenhuma leitura do Radar sai do front — barra, telas cheias,
+    selos do inbox, sino, Painel da Equipe e Kanban ficam sem dado e não desenham nada. Religar = true. */
+export const RADAR_LIGADO = false;
 
 export interface VacuoRepasse {
   id: string;
@@ -180,7 +183,7 @@ export function useRadarAvisos() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['radar-avisos', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     // demo: as fixtures nascem uma vez — refazer a cada minuto desfaria "Já liguei" e "Pedir resposta"
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000, refetchOnWindowFocus: true }
@@ -291,7 +294,7 @@ export function useVacuoRepasses() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-repasses', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000 }
       : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),
@@ -345,7 +348,7 @@ export function useVacuoRanking() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-ranking', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     staleTime: 120_000,
     refetchInterval: 180_000,
     queryFn: async (): Promise<VacuoRankItem[]> => {
@@ -383,7 +386,7 @@ export function useVacuoConfig() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-config', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     staleTime: 300_000,
     queryFn: async (): Promise<VacuoConfigView | null> => {
       if (!VACUO_REAL) return CONFIG_DEMO;
@@ -446,7 +449,7 @@ export function useVacuoDecisoes() {
   const gestor = currentOrg.role === 'admin';
   return useQuery({
     queryKey: ['vacuo-decisoes', orgId],
-    enabled: !!orgId && gestor,
+    enabled: RADAR_LIGADO && !!orgId && gestor,
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000 }
       : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),

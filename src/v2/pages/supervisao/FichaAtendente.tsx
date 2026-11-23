@@ -23,7 +23,6 @@ export interface DadosPosto {
 }
 
 const PAPEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', atendente: 'Atendente' };
-const ESTAGIO: Record<number, string> = { 1: '1º aviso', 2: '2º aviso', 3: 'Último aviso' };
 
 /** Posição (1-based) do membro numa métrica; empates dividem a posição; sem dado = null. */
 function posicao(postos: readonly DadosPosto[], id: string, valor: (p: DadosPosto) => number | null, menorMelhor = false): number | null {
@@ -82,7 +81,7 @@ export function FichaAtendente({ aberto, posto, postos, rotuloPeriodo, agora, ao
   }, [posto, agora]);
 
   if (!posto) return <DrawerV2 aberto={false} aoFechar={aoFechar}>{null}</DrawerV2>;
-  const { membro: m, resumo, radar, stats: s } = posto;
+  const { membro: m, resumo, stats: s } = posto;
   const id = m.id;
   const posFech = posicao(postos, id, (p) => p.stats?.ganhos ?? null);
   const posResp = posicao(postos, id, (p) => p.stats?.respMedianaMin ?? null, true);
@@ -148,11 +147,6 @@ export function FichaAtendente({ aberto, posto, postos, rotuloPeriodo, agora, ao
               <dt>Aguardando resposta</dt>
               <dd className="num">{fmtInt(resumo.aguardando)}{espera ? <small className={`sv-tom-${tomEspera(espera, agora)}`}>mais antigo {fmtHa(espera, agora)}</small> : null}</dd>
             </div>
-            <div>
-              <dt>Na Central de Avisos</dt>
-              <dd className="num">{fmtInt(radar.emAviso)}{radar.ultimoAviso ? <small className="sv-tom-rubro">{radar.ultimoAviso} no último aviso</small> : null}</dd>
-            </div>
-            <div><dt>Leads para ligar</dt><dd className="num">{fmtInt(radar.ligar)}</dd></div>
           </dl>
         </section>
 
@@ -173,28 +167,6 @@ export function FichaAtendente({ aberto, posto, postos, rotuloPeriodo, agora, ao
                   </li>
                 );
               })}
-            </ul>
-          </section>
-        )}
-
-        {radar.itens.length > 0 && (
-          <section className="sv-ficha-sec">
-            <h4>Na Central de Avisos</h4>
-            <ul className="sv-lista">
-              {radar.itens.slice(0, 8).map((i) => (
-                <li key={i.alertaId}>
-                  <button type="button" onClick={() => aoAbrirConversa(id, i.conversaId)}>
-                    <span className="sv-av sv-av-p" style={{ background: iniciaisDe(i.nome) ? corDe(i.conversaId) : undefined }} aria-hidden>{iniciaisDe(i.nome) || <IcContatoMini />}</span>
-                    <span className="sv-lista-tx">
-                      <b>{nomeAgenda(i.nome, null)}</b>
-                      <span>{i.categoria === 'ligar' ? 'Parou no atendimento automático' : i.categoria === 'fechado' ? 'Cliente fechado sem resposta' : 'Em negociação sem resposta'}</span>
-                    </span>
-                    <span className={`sv-selo ${i.categoria === 'ligar' ? 'sv-selo-azul' : i.estagio === 3 ? 'sv-selo-rubro' : 'sv-selo-ambar'}`}>
-                      {i.categoria === 'ligar' ? 'Ligar' : ESTAGIO[i.estagio] ?? 'Aviso'}
-                    </span>
-                  </button>
-                </li>
-              ))}
             </ul>
           </section>
         )}

@@ -24,7 +24,7 @@ const AJUDA_AT = 'Relógio do ATENDENTE: de quando a pessoa RECEBEU o lead (prim
 const AJUDA_RESP = 'Tempo de resposta: mediana, em minutos ÚTEIS (seg–sex, 9h–19h), da mensagem do cliente à '
   + 'primeira resposta humana. Madrugada e fim de semana não contam no relógio. Inclui respostas pelo celular, '
   + 'creditadas ao dono do lead.';
-const AJUDA_AGORA = 'Fotos de AGORA, independentes do período escolhido: clientes no 3º aviso do radar de vácuo, '
+const AJUDA_AGORA = 'Fotos de AGORA, independentes do período escolhido: '
   + 'conversas abertas na carteira e paradas há mais de 7 dias. Carteira e parados carregam o legado antigo — '
   + 'servem para comparar entre a equipe, não como meta.';
 
@@ -109,8 +109,6 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
     }));
   }, [d.atendentes, d.serieGanhos, balde]);
   const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
-
-  const vacuoTotal = d.atendentes.reduce((s, a) => s + a.vacuo3o, 0);
 
   return (
     <>
@@ -201,7 +199,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
       )}
 
       <Secao className="d5-agora" titulo="Carteira agora" ajuda={AJUDA_AGORA}
-        sub={`Foto deste instante, não do período escolhido.${vacuoTotal > 0 ? ` ${fmtInt(vacuoTotal)} clientes no 3º aviso do vácuo.` : ''}`}>
+        sub="Foto deste instante, não do período escolhido.">
         {d.atendentes.length === 0 ? (
           <Vazio texto="Sem carteira para mostrar." />
         ) : (
@@ -210,18 +208,16 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
               <thead>
                 <tr>
                   <th scope="col">Atendente</th>
-                  <th scope="col" className="d5-dir">No vácuo (3º aviso)</th>
                   <th scope="col" className="d5-dir">Conversas abertas</th>
                   <th scope="col" className="d5-dir">Paradas há 7+ dias</th>
                 </tr>
               </thead>
               <tbody>
-                {[...d.atendentes].sort((a, b) => b.vacuo3o - a.vacuo3o || a.nome.localeCompare(b.nome, 'pt-BR')).map((a) => (
+                {[...d.atendentes].sort((a, b) => b.carteira - a.carteira || a.nome.localeCompare(b.nome, 'pt-BR')).map((a) => (
                   <tr key={a.usuarioId}>
                     <th scope="row" className="d5-nome">
                       <span className="d5-nome-in"><Avatar nome={a.nome} /><b className="d5-pessoa">{a.nome}</b></span>
                     </th>
-                    <td className="d5-dir"><b className={'num' + (a.vacuo3o ? ' d5-agora-vac' : ' d5-mudo')}>{fmtInt(a.vacuo3o)}</b></td>
                     <td className="d5-dir"><b className={'num' + (a.carteira ? '' : ' d5-mudo')}>{fmtInt(a.carteira)}</b></td>
                     <td className="d5-dir"><b className={'num' + (a.parados7d ? '' : ' d5-mudo')}>{fmtInt(a.parados7d)}</b></td>
                   </tr>
@@ -231,7 +227,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
           </div>
         )}
         <p className="d5-graf-nota">Perda marcada pela equipe quase não existe no sistema (em novembro, 100% das perdas são não
-          elegíveis) — por isso o "deixou esperando" sai do radar de vácuo e das conversas paradas, não de um botão de perda.</p>
+          elegíveis) — por isso o "deixou esperando" sai das conversas paradas, não de um botão de perda.</p>
       </Secao>
     </>
   );

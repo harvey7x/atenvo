@@ -70,7 +70,6 @@ const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const PosVendaV2 = lazy(() => import('@/v2/pages/PosVenda'));
-const GuardiaoV2 = lazy(() => import('@/v2/pages/Guardiao'));
 const SupervisaoV2 = lazy(() => import('@/v2/pages/Supervisao'));
 // /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
 const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
@@ -162,8 +161,9 @@ const routes: RouteObject[] = [
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
           // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
           { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
-          // Central de Avisos (ex-Radar de Atendimento): nenhum cliente esquecido — risco ao vivo e repasses (só admin)
-          { path: 'radar', element: <Lz><RequireRoleV2 role="admin"><GuardiaoV2 /></RequireRoleV2></Lz> },
+          // Central de Avisos (ex-Radar de Atendimento) SAIU do sistema (dono 19/11): link antigo cai no WhatsApp.
+          // Página Guardiao.tsx preservada (não deletada), só fora do menu/rota — reversível.
+          { path: 'radar', element: <Navigate to="/whatsapp" replace /> },
           // Painel da Equipe (Gestão, 29/10): um celular por atendente, somente leitura (só admin).
           // Nome interno dos arquivos segue "supervisao" (Supervisao.tsx, data/supervisao.ts).
           { path: 'equipe', element: <Lz><RequireRoleV2 role="admin"><SupervisaoV2 /></RequireRoleV2></Lz> },

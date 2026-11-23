@@ -72,9 +72,8 @@ function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, aoAbrir, aoFicha, 
   aoAbrir: (conversaId: string | null) => void; aoFicha: () => void;
   aoAbrirNoAtenvo: (conversaId: string) => void; aoAmpliar: (url: string, nome: string, anexoPath?: string) => void;
 }) {
-  const { membro: m, resumo, radar, stats: s } = p;
+  const { membro: m, resumo, stats: s } = p;
   const espera = resumo.esperaMaisAntiga ? Date.parse(resumo.esperaMaisAntiga) : 0;
-  const tomRadar = radar.ultimoAviso ? 'rubro' : radar.emAviso ? 'ambar' : 'ok';
   return (
     <article className={foco ? 'sv-posto sv-posto-foco' : 'sv-posto'} data-faixa-id={m.id} aria-label={`Celular de ${m.nome}`}>
       <header className="sv-posto-cab">
@@ -103,12 +102,6 @@ function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, aoAbrir, aoFicha, 
           {resumo.aguardando
             ? <><b className="num">{resumo.aguardando}</b>&nbsp;aguardando resposta · mais antigo {fmtHa(espera, agora)}</>
             : 'Ninguém esperando resposta'}
-        </span>
-        <span className={`sv-pv sv-tom-${tomRadar}`}>
-          <i aria-hidden />
-          {radar.emAviso
-            ? <><b className="num">{radar.emAviso}</b>&nbsp;na Central de Avisos{radar.ultimoAviso ? ` · ${radar.ultimoAviso} no último aviso` : ''}</>
-            : 'Em dia na Central de Avisos'}
         </span>
       </div>
     </article>
@@ -243,14 +236,6 @@ export default function SupervisaoV2() {
           <span className="sv-fx-r">Fechados · {rotuloPeriodo}</span>
           <b className="num">{dq.data ? fmtInt(total.fech) : '—'}</b>
           <span className="sv-fx-s">{dq.data ? <><span className="num">{fmtInt(total.rec)}</span> leads recebidos</> : 'carregando…'}</span>
-        </div>
-        <div className="sv-fx">
-          <span className="sv-fx-r">Na Central de Avisos</span>
-          <b className="num">{fmtInt(total.emAviso)}</b>
-          <span className="sv-fx-s">
-            {total.ultimo ? <em className="sv-tom-rubro">{total.ultimo} no último aviso</em> : 'nenhum no último aviso'}
-            {total.ligar ? ` · ${total.ligar} para ligar` : ''}
-          </span>
         </div>
       </CardVidro>
 

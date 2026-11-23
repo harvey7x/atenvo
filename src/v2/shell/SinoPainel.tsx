@@ -27,7 +27,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
 import { useNotificacoes, useMarcarNotificacao, REMARKETING_REAL, type Notificacao } from '@/data/remarketing';
 import { useRadarAvisos, useRadarMeus, useVacuoDecisoes, type RadarFilas, type RadarItem, type VacuoDecisao } from '@/data/vacuo';
-import { useModoBomDia } from '@/data/bomDia';
 import { dataHoraSP, tempoRelativo } from '../lib/tempo';
 import { rt, rtTit, rtTxt, type RadarParams } from '../lib/radarTextos';
 import { IcNegociacao, IcFechado, IcLigar, IcDecisao, IcEmDia, IcDocumento, IcInteresse } from '../components/RadarIcones';
@@ -241,8 +240,8 @@ const SEM_DECISAO: VacuoDecisao[] = [];
 export function useSino(): SinoDados {
   const { currentOrg } = useOrg();
   const gestor = currentOrg?.role === 'admin';
-  // perfil gestor do bom dia (ou perfil ainda não lido — a Central nunca pisca para o gestor): sem o Radar
-  const comRadar = useModoBomDia() === 'vendedor';
+  // a Central de Avisos (Radar) saiu do sistema (dono 19/11): o sino fica sem o Radar para todos
+  const comRadar = false;
   const qc = useQueryClient();
   const notifsQ = useNotificacoes();
   const { mutate: marcarNotif } = useMarcarNotificacao();

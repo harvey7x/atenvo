@@ -36,8 +36,8 @@
 .v2 .sv-barra-dir .sv-rot + .segm { margin-right: 8px; }
 .v2 .sv-pg .segm button { font-size: 12.5px; padding: 5px 12px; }
 
-/* faixa da equipe: quatro números, centralizados (regra do dono) */
-.v2 .sv-faixa { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* faixa da equipe: três números, centralizados (regra do dono; a Central de Avisos saiu em 19/11) */
+.v2 .sv-faixa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .v2 .sv-fx {
   display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px;
   padding: 15px 18px 16px; min-width: 0; position: relative;

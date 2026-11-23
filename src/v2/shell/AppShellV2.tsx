@@ -14,7 +14,6 @@ import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
-import { GuardiaoAvisos, RadarBarra } from '../components/GuardiaoAvisos';
 import { SinoPainel, naoLidasQueAcendem, useSino } from './SinoPainel';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
@@ -65,7 +64,7 @@ type ItemNav = { slug: string; rotulo: string; admin?: boolean; /** só aparece 
 type GrupoNav = { rotulo: string; itens: ItemNav[]; fixo?: boolean };
 /* Menu do perfil GESTOR (o administrador Murilo — dono 30/10): Operação, Kanban, Dashboard, Painel da
    Equipe e Ferramentas; sem a Central de Avisos "por enquanto" e sem o Acompanhamento (não listado). */
-const ESCONDIDO_DO_GESTOR = new Set(['radar', 'pendencias']);
+const ESCONDIDO_DO_GESTOR = new Set(['pendencias']);
 
 const GRUPOS: GrupoNav[] = [
   {
@@ -106,9 +105,7 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
       // Painel da Equipe (29/10): um celular por atendente, igual ao WhatsApp, somente leitura
       { slug: 'equipe', rotulo: 'Painel da Equipe', admin: true },
-      // Central de Avisos = o antigo "Radar de Atendimento" (renomeado 29/10; rota /radar mantida):
-      // clientes sem resposta, decisões de repasse e conversão.
-      { slug: 'radar', rotulo: 'Central de Avisos', admin: true },
+      // Central de Avisos (ex-Radar) SAIU do sistema (dono 19/11): /radar cai no WhatsApp
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
       // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
@@ -224,7 +221,6 @@ export default function AppShellV2() {
   // não repete). Depois das 17h, sem saber ainda se a pessoa é gestor, espera a RPC (o gestor ouve o da
   // tarde, não o da manhã). A tela guarda o DIA em que abriu: esquecida aberta de um dia para o outro
   // (falta, fim de semana com o notebook no site), às 8h ela dá lugar à de hoje (proximaTelaBomDia).
-  const orgBomDia = currentOrg?.id ?? '';
   // o perfil (RPC bom_dia_modo) é UMA consulta para o sistema todo (useModoBomDia: o sino e a Central de Avisos
   // leem o mesmo cache). null até a RPC responder; sem resposta em 6 s, vendedor (e se ela responder depois, o
   // modo se corrige); na demo, a pessoa escolhida na barra da prévia
@@ -588,9 +584,6 @@ export default function AppShellV2() {
         <main className="principal">
           <div className="p-topbar">
             {/* a busca "Buscar contatos, conversas, cobranças… ⌘K" SAIU (dono 12/11): era só enfeite, não buscava nada */}
-            {/* Radar de Atendimento: cápsula Em negociação · Fechados · Ligar · Decisões no vão à esquerda dos ícones */}
-            {/* o perfil gestor (Murilo) não vê a Central de Avisos por enquanto (dono 30/10) */}
-            {!gestorBomDia && <div className="radar-slot"><RadarBarra /></div>}
             <div className="top-dir">
               {/* Mensagem para a equipe (dono 13/11): só o administrador vê; aparece no meio da tela deles, como Murillo */}
               <BotaoMensagemEquipe />
@@ -696,9 +689,6 @@ export default function AppShellV2() {
           orgId={currentOrg?.id ?? ''}
         />
         <AvisoAtualizacao />
-        {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
-        {/* depois das 17h, enquanto o modo (gestor?) não chegou, o Radar também espera */}
-        <GuardiaoAvisos bloqueado={gestorBomDia || bomDia !== null || (modoBomDia === null && !!orgBomDia && new Date().getHours() >= HORA_FIM_DIA)} />
         {/* Assistente de IA (dono 30/10): balão no canto inferior direito; some enquanto o bom dia está na tela */}
         <AssistenteBalao oculto={bomDia !== null} />
         {/* Lembretes por voz (dono 30/10): o aviso na hora, acima do balão; liberado junto com a voz */}

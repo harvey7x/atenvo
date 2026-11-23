@@ -280,6 +280,7 @@ export function useNotificacoes() {
       // poucas horas, quando o Radar grava muitos avisos.
       const dia = new Date(Date.now() - 86_400_000).toISOString();
       const { data, error } = await q
+        .not('tipo', 'like', 'vacuo*').not('tipo', 'like', 'robo_ligar*')
         .or(`lida_em.is.null,lida_em.gte."${dia}",criado_em.gte."${dia}",and(tipo.not.like.vacuo*,tipo.not.like.robo*)`)
         .order('criado_em', { ascending: false })
         .limit(500);

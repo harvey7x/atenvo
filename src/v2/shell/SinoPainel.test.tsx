@@ -96,10 +96,11 @@ describe('sino: sem o Radar no perfil gestor', () => {
     expect(ponto).toBe(2);
   });
 
-  it('vendedor (Matheus, atendentes): nada muda — as seções do Radar e a linha das decisões continuam', () => {
+  it('vendedor (Matheus, atendentes): a Central de Avisos saiu do sistema (dono 19/11) — também sem o Radar', () => {
     const { html, ponto } = abrirSino('vendedor');
-    for (const s of SECOES_DO_RADAR) expect(html, s).toContain(s);
-    expect(html).toContain('Decisões de repasse pendentes: 1');
-    expect(ponto).toBe(9);
+    expect(html).toContain('Aviso rm1');
+    for (const s of SECOES_DO_RADAR) expect(html, s).not.toContain(s);
+    expect(html).not.toContain('Decisões de repasse pendentes');
+    expect(ponto).toBe(2);
   });
 });
