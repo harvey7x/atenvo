@@ -5,7 +5,7 @@
    ============================================================================ */
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { HORAS_MARCACAO, type Marca, type TipoMarca } from './dados';
-import { textosDoLead, type Lead } from './lead';
+import { TEXTO_SENHA_OCULTA, docsCompletos, marcarNovo, soPelaSenha, textosDoLead, type Lead } from './lead';
 import { registrarFilaLocal, useDonosLocais } from './recados';
 import { mexerFilaDemo, useFilaDemo } from './filaDemo';
 
@@ -87,6 +87,9 @@ export interface FonteFila {
   chegadas?: (p: Periodo) => Chegadas | null;
   /** os clientes que a Iris está atendendo agora (dono 14/11); só o administrador recebe */
   irisAgora?: IrisAgora | null;
+  /** dono 19/11: o banco já põe quem passou a senha do INSS na Prioridade (os textos da tela dizem isso só então;
+      o banco antigo e a chave desligada mandam a coluna vazia) */
+  senhaLigada?: boolean;
 }
 
 /** uma mensagem da conversa, como a ficha mostra */
@@ -114,14 +117,22 @@ export function conversaDeExemplo(l: Lead, modo: 'demo' | 'previa'): ConversaFic
     { id: 'e2', dir: 'in', tipo: 'texto', em: t(170), texto: 'Oi, pode sim' },
     { id: 'e3', dir: 'out', quem: 'ia', tipo: 'texto', em: t(165), texto: 'Para começar, me mande uma foto do seu documento com foto (frente e verso) e um comprovante de residência.' },
   ];
-  if (l.cat === 'quente' || l.cat === 'documentacao' || l.docPessoal) m.push({ id: 'e4', dir: 'in', tipo: 'imagem', em: t(120), texto: 'Imagem' });
-  if (l.cat === 'quente') m.push({ id: 'e5', dir: 'in', tipo: 'imagem', em: t(110), texto: 'Imagem' }, { id: 'e6', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi tudo, obrigado! Já passei para o seu atendente seguir com você.' });
+  /* Prioridade pela documentação completa ou só pela senha do INSS (dono 19/11): as imagens são as que chegaram */
+  const comTudo = l.cat === 'quente' && docsCompletos(l);
+  const soSenha = soPelaSenha(l);
+  const imagens = comTudo ? 2 : soSenha ? Number(!!l.docPessoal) + Number(!!l.comprovante) : l.cat === 'documentacao' || l.docPessoal ? 1 : 0;
+  if (imagens >= 1) m.push({ id: 'e4', dir: 'in', tipo: 'imagem', em: t(120), texto: 'Imagem' });
+  if (imagens >= 2) m.push({ id: 'e5', dir: 'in', tipo: 'imagem', em: t(110), texto: 'Imagem' });
+  if (comTudo) m.push({ id: 'e6', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi tudo, obrigado! Já passei para o seu atendente seguir com você.' });
+  if (soSenha) m.push({ id: 'e6', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi a sua senha do gov.br, obrigado! Já passei para o seu atendente seguir com você.' });
   if (l.cat === 'documentacao') m.push({ id: 'e5', dir: 'out', quem: 'ia', tipo: 'texto', em: t(100), texto: 'Recebi o documento. Falta só o comprovante de residência para seguir.' });
   if (l.cat === 'sem_resposta') m.push({ id: 'e5', dir: 'out', quem: 'ia', tipo: 'texto', em: t(60), texto: 'Oi! Conseguiu separar os documentos? Estou aqui para te ajudar.' });
-  /* a última mensagem do cliente que a fila conhece (texto ou "[audio]"/"[imagem]"…) fecha a conversa */
+  /* a última mensagem do cliente que a fila conhece (texto ou "[audio]"/"[imagem]"…) fecha a conversa; a que parece
+     senha vem trocada pelo banco e aparece como aviso, não como fala do cliente */
   const disse = l.disse.replace(/\s+/g, ' ').trim();
   const midia = disse.match(/^\[(\w+)\]$/);
-  if (midia) m.push({ id: 'e9', dir: 'in', tipo: midia[1] === 'image' ? 'imagem' : midia[1], em: fim, texto: '' });
+  if (disse === TEXTO_SENHA_OCULTA) m.push({ id: 'e9', dir: 'in', tipo: 'oculta', em: fim, texto: '' });
+  else if (midia) m.push({ id: 'e9', dir: 'in', tipo: midia[1] === 'image' ? 'imagem' : midia[1], em: fim, texto: '' });
   else if (disse) m.push({ id: 'e9', dir: 'in', tipo: 'texto', em: fim, texto: disse });
   return { mensagens: m.sort((a, b) => a.em - b.em), carregando: false, erro: null, exemplo: modo };
 }
@@ -154,14 +165,27 @@ export function textoPeriodo(p: Periodo, agora = new Date()): string {
   return `mês da casa, ${dm(ini)} a ${dm(fim)}`;
 }
 
-/* recalcula a categoria e os textos quando o atendente corrige a documentação (só no modo local) */
-function comDocs(l: Lead, estado: 'completos' | 'incompletos' | null): Lead {
+/* recalcula a categoria e os textos quando o atendente corrige a documentação (só no modo local), como o banco faz:
+   marcada completa = documento e comprovante recebidos; incompleta = nenhum dos dois; sem marcação = a leitura
+   automática (guardada em docsAuto para o "voltar à leitura automática") */
+export function comDocs(l: Lead, estado: 'completos' | 'incompletos' | null, agora = Date.now()): Lead {
   const docsManual = estado ?? undefined;
-  const automatico = l.docPessoal && l.comprovante ? 'quente' : 'documentacao';
+  const auto = l.docsAuto ?? { docPessoal: l.docPessoal, comprovante: l.comprovante };
+  const docPessoal = estado === 'completos' ? true : estado === 'incompletos' ? false : auto.docPessoal;
+  const comprovante = estado === 'completos' ? true : estado === 'incompletos' ? false : auto.comprovante;
+  const automatico = docPessoal && comprovante ? 'quente' : 'documentacao';
   const cat = l.cat === 'historico' || l.cat === 'sem_resposta' && !estado ? l.cat
-    : docsManual === 'completos' ? 'quente' : docsManual === 'incompletos' ? 'documentacao' : automatico;
-  const [situacao, curta] = textosDoLead({ ...l, cat, docsManual });
-  return { ...l, cat, docsManual, lista: cat === 'quente' ? 1 : cat === 'documentacao' ? 3 : l.lista, situacao, curta };
+    /* dono 19/11: com a senha do INSS, continua em Prioridade (a correção muda só o que falta) */
+    : l.senha ? 'quente'
+      : docsManual === 'completos' ? 'quente' : docsManual === 'incompletos' ? 'documentacao' : automatico;
+  const novo: Lead = { ...l, cat, docsManual, docPessoal, comprovante, docsAuto: estado ? auto : undefined };
+  const [situacao, curta] = textosDoLead(novo);
+  const soSenha = soPelaSenha(novo);
+  /* o "A Iris passou" como o banco: só pela senha não tem; marcada completa conta da marcação */
+  const vinda = soSenha ? {} : marcarNovo(novo, estado === 'completos' ? agora : undefined, agora);
+  const lista = cat === 'historico' ? 0 : cat === 'quente' && !soSenha ? 1
+    : cat === 'documentacao' || soSenha ? (docPessoal && !comprovante ? 2 : 3) : l.lista;
+  return { ...novo, novo: vinda.novo, passouEm: vinda.passouEm, lista, situacao, curta };
 }
 
 /* ---------------------------------------------------------------- as marcações no modo local (fila e aviso) */
@@ -224,5 +248,7 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     usarConversa: (l) => conversaDeExemplo(l, modo),
     chegadas: (p) => extras?.chegadas?.[p] ?? null,
     irisAgora: extras?.irisAgora ?? null,
+    /* a demonstração tem clientes com a senha do INSS; a prévia (foto do banco de antes) não */
+    senhaLigada: modo === 'demo',
   }), [comDono, modo, rotulo, numeros, extras]);
 }

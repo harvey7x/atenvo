@@ -42,6 +42,8 @@ export interface InfoCategoria {
   entra: string;
   vazioT: string;
   vazio: string;
+  /** dono 19/11: os textos de quando o banco já põe a senha do INSS na Prioridade (textosDaCategoria) */
+  comSenha?: Pick<InfoCategoria, 'resumo' | 'regra' | 'entra' | 'vazio'>;
 }
 
 /* a ORDEM é a prioridade: quentes primeiro, sempre. Nomes do dono (12/11: "eu não quero o nome de prioridade 1,
@@ -63,6 +65,14 @@ const TODAS_CATEGORIAS: InfoCategoria[] = [
     entra: 'O cliente mandou toda a documentação (documento pessoal frente e verso e comprovante de residência). Sobe na hora.',
     vazioT: 'Nenhum cliente quente agora',
     vazio: 'Quando um cliente mandar toda a documentação, ele aparece aqui, no topo da fila.',
+    /* dono 19/11: "para quem passou a senha do INSS… esses daí são prioridades para a gente já entrar no INSS e
+       assinar" — valem quando o banco já põe a senha na Prioridade. Textos PROPOSTOS (aguardam o dono) */
+    comSenha: {
+      resumo: 'Passou a senha do INSS ou mandou toda a documentação. Falta você fechar.',
+      regra: 'quem passou a senha do INSS primeiro; depois quem a Iris acabou de passar; depois quem está aguardando resposta',
+      entra: 'O cliente passou a senha do INSS (na conversa, para a Iris ou na ficha) ou mandou toda a documentação (documento pessoal frente e verso e comprovante de residência). Sobe na hora. Quem passou a senha fica no topo.',
+      vazio: 'Quando um cliente passar a senha do INSS ou mandar toda a documentação, ele aparece aqui, no topo da fila.',
+    },
   },
   {
     id: 'documentacao', ordem: 2, rotulo: 'Documentação faltando',
@@ -85,6 +95,9 @@ const TODAS_CATEGORIAS: InfoCategoria[] = [
     remover da fila") — a categoria segue no tipo (o banco ainda manda), mas não entra na tela */
 export const CATEGORIAS: InfoCategoria[] = TODAS_CATEGORIAS.filter((c) => c.id !== 'historico');
 export const infoCategoria = (c: Categoria) => TODAS_CATEGORIAS.find((x) => x.id === c)!;
+/** os textos da seção: com a senha do INSS na Prioridade (o banco novo, com a chave ligada) ou os de antes */
+export const textosDaCategoria = (info: InfoCategoria, senhaLigada?: boolean): InfoCategoria =>
+  (senhaLigada && info.comSenha ? { ...info, ...info.comSenha } : info);
 
 export const PRODUTO: Record<Produto, string> = {
   revisao: 'Revisão de juros',
@@ -134,18 +147,26 @@ export interface ClienteFila {
   parou?: Parada;
   /** áudios de retomada que a Iris já mandou */
   tentativas?: number;
+  /** dono 19/11: há quantos minutos passou a senha do INSS (só a presença) e se ela está na ficha do cliente */
+  senha?: number;
+  senhaFicha?: boolean;
+  /** aguardando a nossa resposta (sem isso, um em cada cinco da lista) */
+  esperando?: boolean;
+  /** a última mensagem parece senha: a fila mostra "Mensagem com senha (oculta)" (dono 19/11: "Esconder") */
+  falaOculta?: boolean;
 }
 
 const D = (s: string) => s.split('').map((c) => c === '1');
 
-/* 32 clientes fictícios: 9 quentes, 10 com documentação pendente, 13 sem resposta */
+/* 32 clientes fictícios: 9 quentes, 10 com documentação pendente, 13 sem resposta. Três passaram a senha do INSS
+   (dono 19/11): um quente (c23) e dois com documentação pendente (c05, c18), que sobem para Prioridade */
 export const CLIENTES: ClienteFila[] = [
   // ---------------- Matheus
   { id: 'c01', nome: 'Dirce Aparecida Moraes', g: 'f', atendente: 'matheus', cat: 'quente', produto: 'revisao', canal: 'JUROS', financeiras: ['Agibank', 'Crefisa'], min: 142, pref: 'tarde', fala: 'Pode fazer sim. Me liga à tarde que eu tô em casa.' },
   { id: 'c02', nome: 'José Ribamar Costa', g: 'm', atendente: 'matheus', cat: 'quente', produto: 'revisao', canal: 'ANTONIO', financeiras: ['BMG'], min: 38, pref: 'mensagem', fala: 'Quero sim, pode encaminhar que eu assino.' },
   { id: 'c03', nome: 'Neusa Fernandes Lima', g: 'f', atendente: 'matheus', cat: 'quente', produto: 'rmc', canal: 'JUROS', pensionista: true, min: 12, pref: 'manha', fala: 'Mandei tudo. Amanhã cedo pode me ligar.' },
   { id: 'c04', nome: 'Antônio Carlos Siqueira', g: 'm', atendente: 'matheus', cat: 'documentacao', produto: 'revisao', canal: 'JUROS', financeiras: ['Facta', 'Mercantil'], docs: D('1101'), min: 95, fala: 'Vou pedir pro meu neto tirar esse extrato do INSS.' },
-  { id: 'c05', nome: 'Terezinha de Jesus Prado', g: 'f', atendente: 'matheus', cat: 'documentacao', produto: 'emprestimo', canal: 'EMPRESTIMO', docs: D('1000'), min: 1560, fala: 'O comprovante tá no nome do meu marido, serve?' },
+  { id: 'c05', nome: 'Terezinha de Jesus Prado', g: 'f', atendente: 'matheus', cat: 'documentacao', produto: 'emprestimo', canal: 'EMPRESTIMO', docs: D('1000'), min: 1560, senha: 42, fala: 'O comprovante tá no nome do meu marido, serve?' },
   { id: 'c06', nome: 'Valdemar Rocha', g: 'm', atendente: 'matheus', cat: 'documentacao', produto: 'revisao', canal: 'ANTONIO', financeiras: ['Agibank'], docs: D('1110'), min: 50, fala: 'O contrato eu tenho em papel, posso mandar foto?' },
   { id: 'c07', nome: 'Iracema Gomes', g: 'f', atendente: 'matheus', cat: 'sem_resposta', produto: 'revisao', canal: 'JUROS', financeiras: ['Crefisa'], parou: 'aceite', tentativas: 1, min: 1560, fala: 'Vou ver com a minha filha e te falo.' },
   { id: 'c08', nome: 'Osvaldo Pereira Santos', g: 'm', atendente: 'matheus', cat: 'sem_resposta', produto: 'emprestimo', canal: 'EMPRESTIMO', parou: 'qualificacao', tentativas: 2, min: 4300, fala: 'Qual banco vocês são?' },
@@ -162,14 +183,14 @@ export const CLIENTES: ClienteFila[] = [
 
   // ---------------- Giovana (turno da tarde: a Iris só oferece "à tarde")
   { id: 'c17', nome: 'Clarice Duarte', g: 'f', atendente: 'giovana', cat: 'quente', produto: 'revisao', canal: 'JUROS', financeiras: ['BMG', 'Crefisa'], min: 88, pref: 'tarde', fala: 'Pode fazer, minha filha vai me ajudar a assinar.' },
-  { id: 'c18', nome: 'Nelson Teixeira', g: 'm', atendente: 'giovana', cat: 'documentacao', produto: 'revisao', canal: 'ANTONIO', financeiras: ['Agibank'], docs: D('0101'), min: 240, fala: 'Meu RG tá vencido, a carteira de motorista serve?' },
+  { id: 'c18', nome: 'Nelson Teixeira', g: 'm', atendente: 'giovana', cat: 'documentacao', produto: 'revisao', canal: 'ANTONIO', financeiras: ['Agibank'], docs: D('0101'), min: 240, senha: 185, senhaFicha: true, esperando: true, fala: 'Meu RG tá vencido, a carteira de motorista serve?' },
   { id: 'c19', nome: 'Rosa Maria Campos', g: 'f', atendente: 'giovana', cat: 'documentacao', produto: 'rmc', canal: 'JUROS', pensionista: true, docs: D('1100'), min: 130, fala: 'Vou mandar a fatura quando chegar.' },
   { id: 'c20', nome: 'Ademir Souza', g: 'm', atendente: 'giovana', cat: 'sem_resposta', produto: 'revisao', canal: 'JUROS', financeiras: ['Facta'], parou: 'qualificacao', tentativas: 1, min: 1300, fala: 'Tenho empréstimo em dois lugares.' },
   { id: 'c21', nome: 'Ivone Barbosa', g: 'f', atendente: 'giovana', cat: 'sem_resposta', produto: 'emprestimo', canal: 'EMPRESTIMO', parou: 'aceite', tentativas: 2, min: 3600, fala: 'Quanto que eu consigo pegar?' },
 
   // ---------------- Isadora
   { id: 'c22', nome: 'Hilda Moreira', g: 'f', atendente: 'isadora', cat: 'quente', produto: 'revisao', canal: 'JUROS', financeiras: ['Agibank'], min: 41, pref: 'manha', fala: 'Quero sim. Amanhã de manhã pode me ligar.' },
-  { id: 'c23', nome: 'Waldir Antunes', g: 'm', atendente: 'isadora', cat: 'quente', produto: 'emprestimo', canal: 'EMPRESTIMO', min: 9, pref: 'mensagem', fala: 'Mandei os documentos todos, confere aí.' },
+  { id: 'c23', nome: 'Waldir Antunes', g: 'm', atendente: 'isadora', cat: 'quente', produto: 'emprestimo', canal: 'EMPRESTIMO', min: 9, pref: 'mensagem', senha: 6, falaOculta: true, fala: 'Mandei os documentos todos, confere aí.' },
   { id: 'c24', nome: 'Conceição Farias', g: 'f', atendente: 'isadora', cat: 'documentacao', produto: 'revisao', canal: 'ANTONIO', financeiras: ['Mercantil', 'BMG'], docs: D('1010'), min: 160, fala: 'O comprovante de luz serve?' },
   { id: 'c25', nome: 'Raimundo Nonato Silva', g: 'm', atendente: 'isadora', cat: 'sem_resposta', produto: 'revisao', canal: 'JUROS', financeiras: ['Crefisa'], parou: 'documentos', docs: D('1000'), tentativas: 1, min: 1500, fala: 'Vou procurar os papéis.' },
   { id: 'c26', nome: 'Odete Cardoso', g: 'f', atendente: 'isadora', cat: 'sem_resposta', produto: 'rmc', canal: 'ANTONIO', pensionista: true, parou: 'aceite', tentativas: 1, min: 400, fala: 'Meu filho cuida dessas coisas pra mim.' },

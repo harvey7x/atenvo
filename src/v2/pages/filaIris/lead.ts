@@ -31,6 +31,13 @@ export interface Lead {
   disse: string;
   docPessoal?: boolean;
   comprovante?: boolean;
+  /** dono 19/11: passou a senha do INSS (só a presença: o valor nunca vem do banco), quando, e se ela está na ficha
+      do cliente (senão, está na conversa) */
+  senha?: boolean;
+  senhaEm?: number;
+  senhaNaFicha?: boolean;
+  /** só na demonstração: a leitura automática de antes da correção à mão (para voltar a ela) */
+  docsAuto?: { docPessoal?: boolean; comprovante?: boolean };
   /** correção manual da documentação feita pelo atendente */
   docsManual?: 'completos' | 'incompletos';
   docsManualId?: string;
@@ -84,7 +91,14 @@ export interface LinhaFila {
   /** a NOSSA última mensagem (texto) e de onde saiu: bot (IA/robô) · atenvo (painel) · telefone (celular) — 13/11 */
   ult_nossa_texto?: string | null;
   ult_nossa_origem?: string | null;
+  /** dono 19/11: passou a senha do INSS — só a presença, quando e se ela está na ficha (20261119170000) */
+  senha_inss?: boolean | null;
+  senha_em?: string | null;
+  senha_na_ficha?: boolean | null;
 }
+
+/** o que o banco põe no lugar da última mensagem que parece senha (fila_iris_parece_senha; dono 19/11: "Esconder") */
+export const TEXTO_SENHA_OCULTA = 'Mensagem com senha (oculta)';
 
 export const ROTULO_LISTA: Record<number, string> = {
   0: 'Assinado · falta o histórico de créditos', 1: 'Documentação completa', 2: 'Só falta o comprovante',
@@ -150,6 +164,8 @@ const MIDIA: Record<string, string> = {
 export function mensagemDoCliente(t: string | null | undefined): { texto: string; midia: boolean } | null {
   const s = (t ?? '').replace(/\s+/g, ' ').trim();
   if (!s) return null;
+  /* a mensagem que parece senha vem trocada pelo banco: aparece como aviso (sem aspas), não como fala */
+  if (s === TEXTO_SENHA_OCULTA) return { texto: s, midia: true };
   const m = s.match(/^\[(\w+)\]$/);
   if (m) return { texto: MIDIA[m[1]] ?? 'Mandou um arquivo', midia: true };
   return { texto: s, midia: false };
@@ -192,12 +208,31 @@ const ROTULO_FALTA: Record<string, string> = {
 const faltaEmTexto = (c: string[]) => [...c].sort((a, b) => Number(b === 'historico') - Number(a === 'historico'))
   .map((f) => ROTULO_FALTA[f] ?? f.replace(/_/g, ' '));
 
+/** a documentação está completa? (a correção à mão do atendente vale mais que a leitura automática) */
+export function docsCompletos(l: Pick<Lead, 'docPessoal' | 'comprovante' | 'docsManual'>): boolean {
+  if (l.docsManual) return l.docsManual === 'completos';
+  return !!(l.docPessoal && l.comprovante);
+}
+
+/** em Prioridade só pela senha do INSS (a documentação ainda não está completa) — dono 19/11 */
+export const soPelaSenha = (l: Pick<Lead, 'cat' | 'senha' | 'docPessoal' | 'comprovante' | 'docsManual'>) =>
+  !!l.senha && l.cat === 'quente' && !docsCompletos(l);
+
 /** textos da situação (janela) e versão curta (fila) */
-export function textosDoLead(l: Pick<Lead, 'cat' | 'docPessoal' | 'comprovante' | 'docsManual' | 'udoc' | 'nu' | 'falta' | 'faltaCodigos'>): [string, string] {
+export function textosDoLead(l: Pick<Lead, 'cat' | 'docPessoal' | 'comprovante' | 'docsManual' | 'udoc' | 'nu' | 'falta' | 'faltaCodigos' | 'senha'>): [string, string] {
   if (l.cat === 'historico') {
     const outros = (l.faltaCodigos ?? []).filter((f) => f !== 'historico').length;
     return [`Assinado · falta ${l.falta || 'o histórico de créditos'}`,
       outros ? `Falta o histórico e mais ${outros} documento${outros > 1 ? 's' : ''}` : 'Falta o histórico'];
+  }
+  if (l.cat === 'quente' && l.senha) {
+    /* dono 19/11: quem passou a senha do INSS é Prioridade, com ou sem toda a documentação */
+    if (docsCompletos(l)) {
+      return [`Passou a senha do INSS · documentação completa${l.docsManual === 'completos' ? ', marcada pelo atendente' : ''}`, 'Senha do INSS'];
+    }
+    if (l.docsManual === 'incompletos') return ['Passou a senha do INSS · documentação incompleta, marcada pelo atendente', 'Senha do INSS'];
+    const falta = [!l.docPessoal && 'documento pessoal (frente e verso)', !l.comprovante && 'comprovante de residência'].filter(Boolean) as string[];
+    return [falta.length ? `Passou a senha do INSS · falta ${juntar(falta)}` : 'Passou a senha do INSS', 'Senha do INSS'];
   }
   if (l.cat === 'quente') {
     return l.docsManual === 'completos'
@@ -255,11 +290,16 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
     cat: r.categoria, docPessoal: r.doc_pessoal, comprovante: r.comprovante, docsManual,
     udoc: ms(r.ult_doc_em), nu: ms(r.ult_nossa_em),
     falta: juntar(faltaEmTexto(r.falta ?? [])), faltaCodigos: r.falta ?? [],
+    /* dono 19/11: passou a senha do INSS (o banco antigo não manda: fica como antes) */
+    senha: r.senha_inss ? true : undefined,
   };
   const [situacao, curta] = textosDoLead(base);
-  const vinda = marcarNovo({ cat: r.categoria, udoc: base.udoc, ud: ms(r.ult_cliente_em), nu: base.nu }, docsManual === 'completos' ? manualEm : undefined);
-  const lista = r.categoria === 'historico' ? 0 : r.categoria === 'quente' ? 1
-    : r.categoria === 'documentacao' ? (r.doc_pessoal && !r.comprovante ? 2 : 3) : 5;
+  /* em Prioridade só pela senha: sem o "A Iris passou" (o relógio também não avisa — 20261119170000) */
+  const soSenha = soPelaSenha(base);
+  const vinda = soSenha ? {} : marcarNovo({ cat: r.categoria, udoc: base.udoc, ud: ms(r.ult_cliente_em), nu: base.nu }, docsManual === 'completos' ? manualEm : undefined);
+  /* a lista (o rótulo da situação e o caminho) segue a documentação: com a senha e sem tudo, o que falta */
+  const lista = r.categoria === 'historico' ? 0 : r.categoria === 'quente' && !soSenha ? 1
+    : r.categoria === 'documentacao' || soSenha ? (r.doc_pessoal && !r.comprovante ? 2 : 3) : 5;
   return {
     ...base, id: r.contato_id, conversaId: r.conversa_id ?? undefined, nome: nomeBonito(r.nome, r.telefone),
     fone: foneBonito(r.telefone), atendente: equipeDoUid(r.dono_id) ?? r.dono_id ?? '', lista,
@@ -267,15 +307,25 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
     esperandoEm: r.aguardando ? ms(r.ult_cliente_em) : undefined, disse: r.ult_cliente_texto ?? '',
     nossaTexto: r.ult_nossa_texto ?? undefined, nossaOrigem: r.ult_nossa_origem ?? undefined,
     docsManualId, assinadoEm: ms(r.assinado_em), entrouEm: ms(r.entrou_em), ...vinda, nota: '', planilha: '', situacao, curta, ordem, marcas,
+    ...(r.senha_inss ? { senhaEm: ms(r.senha_em), senhaNaFicha: !!r.senha_na_ficha } : {}),
   };
 }
 
-/** a ordem dentro de cada categoria: quem a Iris acabou de passar (24 h) fica no topo, o mais novo
-    primeiro; depois quem está aguardando resposta; depois do mais recente para o mais antigo */
+/** a ordem dentro de cada categoria: quem passou a senha do INSS fica no topo (dono 19/11) — aguardando resposta
+    primeiro, depois a senha mais recente; depois quem a Iris acabou de passar (24 h), o mais novo primeiro; depois
+    quem está aguardando resposta; depois do mais recente para o mais antigo */
 export function ordenarLeads(l: Lead[]): Lead[] {
   const quando = (x: Lead) => (x.cat === 'sem_resposta' ? x.nu : (x.udoc ?? x.ud)) ?? 0;
   return [...l].sort((a, b) => {
     if (a.cat === 'historico' || b.cat === 'historico') return a.ordem - b.ordem;
+    if (!!a.senha !== !!b.senha) return a.senha ? -1 : 1;
+    if (a.senha && b.senha) {
+      const ea = a.esperandoEm ?? 0;
+      const eb = b.esperandoEm ?? 0;
+      if (!!ea !== !!eb) return ea ? -1 : 1;
+      if (ea && eb) return eb - ea;
+      return (b.senhaEm ?? 0) - (a.senhaEm ?? 0) || a.ordem - b.ordem;
+    }
     const na = a.novo ? (a.passouEm ?? 0) : 0;
     const nb = b.novo ? (b.passouEm ?? 0) : 0;
     if (!!na !== !!nb) return na ? -1 : 1;
@@ -321,15 +371,24 @@ export function leadsFicticios(): Lead[] {
     const docPessoal = c.cat === 'quente' || !!(c.docs ?? [])[0];
     const comprovante = c.cat === 'quente' || !!(c.docs ?? [])[1];
     const t = agora - c.min * 60_000;
-    const base = { cat: CAT_FICTICIA[c.cat], docPessoal, comprovante, udoc: c.cat === 'documentacao' ? t : undefined, nu: c.cat === 'sem_resposta' ? t : undefined, falta: '' };
+    /* dono 19/11: quem passou a senha do INSS é Prioridade (com ou sem toda a documentação) */
+    const comSenha = c.senha != null;
+    const base = {
+      cat: comSenha ? 'quente' as Categoria : CAT_FICTICIA[c.cat], docPessoal, comprovante,
+      udoc: c.cat === 'documentacao' ? t : undefined, nu: c.cat === 'sem_resposta' ? t : undefined, falta: '',
+      senha: comSenha || undefined,
+    };
     const [situacao, curta] = textosDoLead(base);
-    const vinda = marcarNovo({ cat: base.cat, udoc: base.udoc, ud: c.cat === 'quente' ? t : undefined, nu: base.nu });
+    const soSenha = soPelaSenha(base);
+    const vinda = soSenha ? {} : marcarNovo({ cat: base.cat, udoc: base.udoc, ud: c.cat === 'quente' ? t : undefined, nu: base.nu });
     return {
       ...vinda,
       ...base, id: c.id, nome: c.nome, fone: '(51) 9' + String(10000000 + ordem * 7919).slice(0, 4) + '-' + String(1000 + ordem * 37).slice(-4),
-      atendente: c.atendente, lista: c.cat === 'quente' ? 1 : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
+      ...(comSenha ? { senhaEm: agora - (c.senha ?? 0) * 60_000, senhaNaFicha: !!c.senhaFicha } : {}),
+      atendente: c.atendente,
+      lista: c.cat === 'quente' ? 1 : soSenha ? (docPessoal && !comprovante ? 2 : 3) : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
       campanha: c.canal, funil: c.cat === 'quente' ? 'Documentos' : 'Lead Qualificado', ud: c.cat === 'sem_resposta' ? t - 3_600_000 : t,
-      esperandoEm: ordem % 5 === 0 ? t : undefined, disse: c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: marcasDeExemplo[c.id] ?? [],
+      esperandoEm: (c.esperando ?? ordem % 5 === 0) ? t : undefined, disse: c.falaOculta ? TEXTO_SENHA_OCULTA : c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: marcasDeExemplo[c.id] ?? [],
       /* a nossa última mensagem (a lista mostra a última, de quem for): nos sem resposta falamos por último */
       ...(c.cat === 'sem_resposta' ? { nossaTexto: 'Oi! Conseguiu separar os documentos? Estou aqui para te ajudar.', nossaOrigem: 'bot' } : {}),
       /* "Entrou hoje": metade dos quentes chegou hoje; o resto, dias atrás */

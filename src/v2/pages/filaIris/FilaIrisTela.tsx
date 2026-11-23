@@ -12,11 +12,11 @@ import { BotaoPrimario, BotaoSec, ConfirmDialogV2, Segmentado } from '../../comp
 import { criarRaizPortalV2 } from '../../components/portal';
 import {
   CATEGORIAS, EQUIPE, GRUPOS_MARCA, HORAS_MARCACAO, LIGUEI_NAO_ATENDEU, MARCAS, atalhosDoTipo, atendente, curtoMarca, equipeDoUid, estadoPrazo, grupoMarca, haQuanto,
-  infoCategoria, ordenarMarcas, quando, textoMarca, textoPrazo, turnoTexto, vencidasDe,
+  infoCategoria, ordenarMarcas, quando, textoMarca, textoPrazo, textosDaCategoria, turnoTexto, vencidasDe,
   type Atendente, type Categoria, type GrupoMarca, type Marca, type TipoMarca,
 } from './dados';
 import {
-  PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, ultimaMensagem, type Lead,
+  PASSOS, ROTULO_LISTA, TEXTO_SENHA_OCULTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, ultimaMensagem, type Lead,
 } from './lead';
 import {
   inicioPeriodo, textoPeriodo, type CategoriaChegada, type ConversaFicha, type FonteFila, type MensagemFicha, type NumeroAtendente, type Periodo,
@@ -130,7 +130,11 @@ function metaPrioridade(id: Categoria, lista: Lead[], minha: boolean): ReactNode
     const novos = lista.filter((l) => l.novo).length;
     return novos ? `${novos} da Iris agora` : n ? 'sem resposta há mais de 24h' : 'ninguém parado';
   }
-  if (id === 'quente') return n ? 'documentação completa' : 'nenhum agora';
+  if (id === 'quente') {
+    /* dono 19/11: quem passou a senha do INSS fica no topo da Prioridade */
+    const senha = lista.filter((l) => l.senha).length;
+    return n ? (senha ? `${senha} com a senha do INSS` : 'documentação completa') : 'nenhum agora';
+  }
   const so = lista.filter((l) => l.lista === 2).length;
   return so ? `em ${so} só falta o comprovante` : n ? 'falta documento' : 'nenhuma pendente';
 }
@@ -139,9 +143,11 @@ function metaPrioridade(id: Categoria, lista: Lead[], minha: boolean): ReactNode
 type NumerosPainel = { titulo: string; nota: string; per: NumeroAtendente | null; sub: string | null };
 
 /** o resumo do topo: responder agora · as três seções · os números (recebidos, marcações, fechados) */
-function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros, minha }: {
+function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros, minha, senhaLigada }: {
   base: Lead[]; filtro: Filtro; aoFiltrar?: (c: Categoria) => void;
   esperandoAtivo: boolean; aoEsperando?: () => void; numeros: NumerosPainel | null; minha: boolean;
+  /** dono 19/11: o banco já põe a senha do INSS na Prioridade (os textos dizem isso) */
+  senhaLigada?: boolean;
 }) {
   const total = base.length;
   const esperando = base.filter((l) => l.esperandoEm);
@@ -164,7 +170,8 @@ function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros,
       ) : <div className="fi-pn fi-pn-agora" data-tem={esperando.length ? '' : undefined}>{agora}</div>}
 
       <div className="fi-pn-prios" role="group" aria-label="Prioridades da fila">
-        {CATEGORIAS.map((info) => {
+        {CATEGORIAS.map((info0) => {
+          const info = textosDaCategoria(info0, senhaLigada);
           const lista = base.filter((l) => l.cat === info.id);
           const pct = total ? (lista.length / total) * 100 : 0;
           const pctTxt = total ? `${Math.round(pct)}% da fila` : '';
@@ -262,6 +269,8 @@ function Detalhe({ l }: { l: Lead }) {
   if (l.cat === 'historico') return <span className="fi-l2">{l.assinadoEm ? `assinado ${dataHora(l.assinadoEm)}` : 'assinado no administrativo'}</span>;
   if (l.cat === 'sem_resposta') return <span className="fi-l2">{l.nu ? `nossa última mensagem ${dataHora(l.nu)}` : 'sem mensagem nossa'}</span>;
   if (l.docsManual) return <span className="fi-l2">marcada à mão pelo atendente</span>;
+  /* dono 19/11: com a senha do INSS, a documentação que já chegou (completa ou não) */
+  if (l.senha && l.cat === 'quente') return <DocsMini l={l} />;
   if (l.cat === 'quente') {
     const t = l.udoc ?? l.ud;
     return <span className="fi-l2">{t ? `mandou tudo ${haQuanto(minDesde(t) ?? 0)}` : 'documento e comprovante recebidos'}</span>;
@@ -288,10 +297,12 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
   const situacao = l.cat === 'sem_resposta' && l.nu ? `${l.curta} ${haQuanto(minDesde(l.nu) ?? 0)}` : l.curta;
   /* o leitor de tela também ouve a marcação vencida (a linha é um botão: o que está dentro não é lido) */
   const nVencidas = vencidasDe(l.marcas);
+  /* dono 19/11: a marca de quem passou a senha do INSS (no lugar do texto da situação) */
+  const comSenha = !!l.senha && l.cat === 'quente';
   return (
     <div className="fi-lin" role="button" tabIndex={0} data-id={l.id} data-cat={l.cat} data-ativo={ativo ? '' : undefined}
       data-espera={l.esperandoEm ? '' : undefined}
-      aria-label={`Abrir ${l.nome}${nVencidas ? `, ${nVencidas === 1 ? '1 marcação vencida' : `${nVencidas} marcações vencidas`}` : ''}`}
+      aria-label={`Abrir ${l.nome}${comSenha ? ', passou a senha do INSS' : ''}${nVencidas ? `, ${nVencidas === 1 ? '1 marcação vencida' : `${nVencidas} marcações vencidas`}` : ''}`}
       onClick={() => { if (window.getSelection()?.toString()) return; aoAbrir(); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); aoAbrir(); } }}>
       <span className="fi-col-cli">
@@ -307,7 +318,11 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
         </span>
       </span>
       <span className="fi-col-sit">
-        <span className="fi-l1 fi-elip" title={l.situacao}>{situacao}</span>
+        {comSenha
+          ? <span className="fi-l1 fi-senha" title={`${l.situacao}${l.senhaEm ? ` · recebida ${dataHora(l.senhaEm)}` : ''}`}>
+              <IcChave t={11} /><span className="fi-elip">Senha do INSS</span>
+            </span>
+          : <span className="fi-l1 fi-elip" title={l.situacao}>{situacao}</span>}
         {l.novo
           ? <span className="fi-l2 fi-iris-chip" title={`${textoIris(l, !!sua, dono.nome).titulo}. ${textoIris(l, !!sua, dono.nome).faca}`}>
               <IcIris t={11} /><span className="fi-elip">{textoIris(l, !!sua, dono.nome).curto} · {haQuanto(minDesde(l.passouEm) ?? 0)}</span>
@@ -673,6 +688,8 @@ function ListaRecados({ fonte, aoConversa }: { fonte: FonteRecados; aoConversa: 
 /* ---------------------------------------------------------------- a conversa com o cliente na ficha */
 const ROTULO_MIDIA: Record<string, string> = {
   imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', sticker: 'Figurinha', figurinha: 'Figurinha', localizacao: 'Localização', contato: 'Contato',
+  /* só a conversa de exemplo: a mensagem que parece senha (dono 19/11) */
+  oculta: TEXTO_SENHA_OCULTA,
 };
 const pad2 = (n: number) => String(n).padStart(2, '0');
 function diaDaConversa(t: number): string {
@@ -801,6 +818,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
   const tempo = tempoDe(l);
   const msg = mensagemDoCliente(l.disse);
   const fatos: [string, string][] = [['Situação', ROTULO_LISTA[l.lista] ?? '—']];
+  /* dono 19/11: só QUANDO e ONDE (o valor da senha não vem para a fila) */
+  if (l.senha) fatos.push(['Senha do INSS', `${l.senhaEm ? `Recebida ${dataHora(l.senhaEm)}` : 'Recebida'} · ${l.senhaNaFicha ? 'está na ficha do cliente' : 'está na conversa'}`]);
   if (l.funil) fatos.push(['Coluna no Kanban', l.funil]);
   fatos.push(['Campanha', campanhaBonita(l.campanha)]);
   if (l.entrouEm) fatos.push(['Entrou no Kanban', dataHora(l.entrouEm)]);
@@ -897,7 +916,8 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
                   <span>{l.docsManual ? 'Documentação marcada à mão.' : 'A leitura dos documentos errou?'}</span>
                   {l.docsManual
                     ? <button type="button" className="fi-link" onClick={() => aoCorrigirDocs(null)}>Voltar à leitura automática</button>
-                    : l.cat === 'quente'
+                    /* com a senha do INSS a Prioridade não diz se a documentação está completa: a leitura diz */
+                    : (l.senha ? !!(l.docPessoal && l.comprovante) : l.cat === 'quente')
                       ? <button type="button" className="fi-link" onClick={() => aoCorrigirDocs('incompletos')}>Marcar como incompleta</button>
                       : <button type="button" className="fi-link" onClick={() => aoCorrigirDocs('completos')}>Marcar como completa</button>}
                 </div>
@@ -1145,8 +1165,8 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const daFila = useMemo(() => leads.filter((l) => l.atendente === dono), [leads, dono]);
   const base = visaoEf === 'equipe' ? leads : daFila;
   const grupos = useMemo(
-    () => CATEGORIAS.map((info) => ({ info, itens: ordenarLeads(daFila.filter((l) => l.cat === info.id)) })),
-    [daFila],
+    () => CATEGORIAS.map((info) => ({ info: textosDaCategoria(info, fonte.senhaLigada), itens: ordenarLeads(daFila.filter((l) => l.cat === info.id)) })),
+    [daFila, fonte.senhaLigada],
   );
   const passaMarca = (l: Lead) => filtroMarca === 'todas'
     /* a ficha aberta fica na lista enquanto estiver aberta (o Atualizar tira a vencida, a resposta tira o aguardando):
@@ -1337,16 +1357,21 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
             {CATEGORIAS.map((k) => (
               <div key={k.id} className="fi-como-it" data-cat={k.id}>
                 <span className="fi-como-t">{k.rotulo}</span>
-                <span>{k.entra}</span>
+                <span>{textosDaCategoria(k, fonte.senhaLigada).entra}</span>
               </div>
             ))}
           </div>
           <p className="fi-como-pe">
             Cada atendente vê os clientes que o robô distribuiu para ele, como hoje. A fila se organiza sozinha pelo andamento do atendimento.
-            Quando o administrativo fecha o cliente, ele sai da fila e vai para a aba Fechados. Cliente no Remarketing não entra.
+            Quando o administrativo fecha o cliente, ele sai da fila e vai para a aba Fechados.
+            {/* dono 19/11: com a senha do INSS na Prioridade (o banco novo, com a chave ligada) */}
+            {fonte.senhaLigada
+              ? ' Cliente no Remarketing não entra, a não ser que tenha passado a senha do INSS. Quem passou a senha do INSS fica no topo da Prioridade, antes de todos, com a marca Senha do INSS, mesmo se o card for antigo. '
+              : ' Cliente no Remarketing não entra. '}
             Cliente que a Iris acabou de passar chega com o aviso "A Iris passou para você" e fica no topo da seção por 24 horas.
             Cada marcação tem {HORAS_MARCACAO} horas para ser atualizada (dizer o que foi feito) ou tirada, contadas com o cliente na fila;
-            passou disso, ela fica vencida, em vermelho, e aparece um aviso no meio da tela que só sai quando ela for atualizada ou tirada.
+            passou disso, ela fica vencida, em vermelho, e aparece um aviso no meio da tela que só sai quando ela for atualizada ou
+            tirada (dá para pedir para lembrar em 1 hora).
             Clique numa prioridade do topo para filtrar e no título de uma seção para recolher.
             {fonte.modo === 'previa' && ' Prévia: foto da fila de hoje, só leitura; as marcações feitas aqui não são gravadas.'}
             {fonte.modo === 'demo' && ' Demonstração com clientes fictícios.'}
@@ -1371,7 +1396,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         aoFiltrar={visaoEf === 'equipe' ? undefined : (c) => setFiltro((f) => (f === c ? 'todas' : c))}
         esperandoAtivo={visaoEf !== 'equipe' && filtroMarca === 'esperando'}
         aoEsperando={visaoEf === 'equipe' ? undefined : () => setFiltroMarca((f) => (f === 'esperando' ? 'todas' : 'esperando'))}
-        numeros={numerosPainel} />
+        numeros={numerosPainel} senhaLigada={fonte.senhaLigada} />
 
       {visaoEf === 'equipe' ? (
         <div className="fi-equipe">
@@ -1525,8 +1550,11 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           aoAtualizar={fonte.atualizarMarca ? (mid, texto) => fonte.atualizarMarca!(clienteAberto.id, mid, texto) : undefined}
           aoCorrigirDocs={(estado) => {
             fonte.corrigirDocs(clienteAberto.id, estado);
-            avisar(estado === 'completos' ? 'Marcada como completa: o cliente sobe para Clientes quentes.'
-              : estado === 'incompletos' ? 'Marcada como incompleta: o cliente vai para Documentação pendente.' : 'Voltou para a leitura automática dos documentos.');
+            /* dono 19/11: com a senha do INSS o cliente continua em Prioridade (a correção muda só a documentação) */
+            avisar(clienteAberto.senha && estado
+              ? `Marcada como ${estado === 'completos' ? 'completa' : 'incompleta'}. Com a senha do INSS, o cliente continua em Prioridade.`
+              : estado === 'completos' ? 'Marcada como completa: o cliente sobe para Clientes quentes.'
+                : estado === 'incompletos' ? 'Marcada como incompleta: o cliente vai para Documentação pendente.' : 'Voltou para a leitura automática dos documentos.');
           }}
           aoTirarDaFila={() => setTirando(clienteAberto)} />
       )}

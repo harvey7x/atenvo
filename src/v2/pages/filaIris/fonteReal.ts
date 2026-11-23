@@ -78,6 +78,9 @@ export function useFonteReal(): FonteFila {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
   const [leads, setLeads] = useState<Lead[]>([]);
+  /* dono 19/11: o banco já põe a senha do INSS na Prioridade (a coluna vem true/false; o banco antigo e a chave
+     desligada mandam sem valor) — os textos da tela seguem isso */
+  const [senhaLigada, setSenhaLigada] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [nums, setNums] = useState<Partial<Record<Periodo, NumeroAtendente[]>>>({});
@@ -105,7 +108,9 @@ export function useFonteReal(): FonteFila {
     }
     tentativa.current = 0;
     setErro(null);
-    setLeads(((data ?? []) as LinhaFila[]).map(leadDeLinha));
+    const linhas = (data ?? []) as LinhaFila[];
+    setSenhaLigada(linhas.some((r) => typeof r.senha_inss === 'boolean'));
+    setLeads(linhas.map(leadDeLinha));
     setCarregando(false);
   }, [org]);
 
@@ -270,6 +275,7 @@ export function useFonteReal(): FonteFila {
       SecaoConversa: ConversaWa,
       chegadas: (p) => cheg[p] ?? null,
       irisAgora: iris,
+      senhaLigada,
     };
-  }, [carregando, erro, leads, nums, rpc, carregar, cheg, iris, org]);
+  }, [carregando, erro, leads, nums, rpc, carregar, cheg, iris, org, senhaLigada]);
 }
