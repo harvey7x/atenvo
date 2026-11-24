@@ -265,3 +265,4 @@
 }
 @media (max-width: 520px) { .v2 .irs-slots { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .v2 .irs-slot, .v2 .irs-nav-item, .v2 .irs-opcao, .v2 .irs-barra i { transition: none; } }
+.v2 .irs-nota.irs-nota-forte { border-color: rgba(var(--tint), .16); background: rgba(var(--tint), .045); }

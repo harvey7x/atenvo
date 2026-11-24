@@ -322,23 +322,31 @@ function mesclar(modelo: unknown, veio: unknown, caminho = ''): unknown {
 /* ============================== banco ============================== */
 type Row = Record<string, unknown>;
 const ligado = () => !!supabase && (isPrevia || temRecurso('iris'));
+/** O motor da Iris (as funções que conversam com o cliente) já está no servidor desta instalação? Sem ele a tela serve
+ *  para configurar, mas ligar a Iris num número fica travado: o Atendimento acharia que a IA está atendendo e ninguém
+ *  responderia. */
+export const temMotorIris = () => temRecurso('iris-motor');
 const CHAVE = ['iris-versoes'];
 const CHAVE_NUM = ['iris-numeros'];
 
+/* A configuração mora dentro de ia_agentes.comportamentos (jsonb que já existe no servidor desde a 93): `iris` (a
+   configuração inteira), `iris_descricao` e `iris_origem`. Assim a tela funciona sem mudar o banco; o motor lê dali. */
 function mapVersao(r: Row): VersaoIris {
-  const cfg = (r.iris as IrisConfig | null) ?? null;
+  const comp = (r.comportamentos as Row | null) ?? {};
+  const cfg = (comp.iris as IrisConfig | null) ?? null;
   return {
-    id: String(r.id), nome: String(r.nome ?? 'Iris'), descricao: String(r.descricao ?? ''),
-    origem: ((r.origem as OrigemVersao) || 'nova'), ativa: !!r.ativo,
+    id: String(r.id), nome: String(r.nome ?? 'Iris'), descricao: String(comp.iris_descricao ?? ''),
+    origem: ((comp.iris_origem as OrigemVersao) || 'nova'), ativa: !!r.ativo,
     chaveDefinidaEm: (r.chave_definida_em as string) || null, criadoEm: String(r.criado_em ?? ''), atualizadoEm: String(r.atualizado_em ?? r.criado_em ?? ''),
     config: cfg ? (mesclar(irisPreConfigurada(), cfg) as IrisConfig) : irisPreConfigurada(),
   };
 }
 /** o que o motor antigo (ia_agentes) também lê, para as duas leituras nunca discordarem */
-function colunasDoMotor(c: IrisConfig): Row {
+function colunasDoMotor(c: IrisConfig, descricao: string, origem: OrigemVersao): Row {
   return {
     modelo: c.modelo.conversa, provedor: 'gemini', persona_prompt: c.identidade.instrucoes,
     comportamentos: {
+      iris: c, iris_descricao: descricao, iris_origem: origem,
       horario: { ativo: true, inicio: c.horarios.inicio, fim: c.horarios.fim, dias: c.horarios.dias },
       janela: { inicio: c.horarios.janelaEnvio[0], fim: c.horarios.janelaEnvio[1] },
       nudges_ativos: c.retomadas.ativo, max_chamadas_dia: c.modelo.maxChamadasDia,
@@ -353,7 +361,7 @@ export function useVersoesIris() {
     queryKey: CHAVE, enabled: ligado(), staleTime: 15_000,
     queryFn: async (): Promise<VersaoIris[]> => {
       const { data, error } = await supabase!.from('ia_agentes')
-        .select('id, nome, descricao, origem, ativo, chave_definida_em, criado_em, atualizado_em, iris')
+        .select('id, nome, ativo, chave_definida_em, criado_em, atualizado_em, comportamentos')
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
       return ((data as Row[]) ?? []).map(mapVersao);
@@ -386,9 +394,9 @@ export function useNumerosIris() {
 export function useSalvarVersao() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { id: string; nome: string; descricao: string; config: IrisConfig }) => {
+    mutationFn: async (v: { id: string; nome: string; descricao: string; origem: OrigemVersao; config: IrisConfig }) => {
       const { error } = await supabase!.from('ia_agentes')
-        .update({ nome: v.nome.trim() || 'Iris', descricao: v.descricao, iris: v.config, ...colunasDoMotor(v.config), atualizado_em: new Date().toISOString() })
+        .update({ nome: v.nome.trim() || 'Iris', ...colunasDoMotor(v.config, v.descricao, v.origem), atualizado_em: new Date().toISOString() })
         .eq('id', v.id);
       if (error) throw new Error(error.message);
     },
@@ -401,7 +409,7 @@ export function useCriarVersao() {
   return useMutation({
     mutationFn: async (v: { nome: string; descricao: string; origem: OrigemVersao; config: IrisConfig }): Promise<string> => {
       const { data, error } = await supabase!.from('ia_agentes')
-        .insert({ organizacao_id: ORG_REVIZA, nome: v.nome.trim() || 'Iris', descricao: v.descricao, origem: v.origem, ativo: false, iris: v.config, ...colunasDoMotor(v.config) })
+        .insert({ organizacao_id: ORG_REVIZA, nome: v.nome.trim() || 'Iris', ativo: false, ...colunasDoMotor(v.config, v.descricao, v.origem) })
         .select('id').single();
       if (error) throw new Error(error.message);
       return String((data as Row).id);

@@ -17,7 +17,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'acessos';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

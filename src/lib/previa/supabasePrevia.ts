@@ -214,8 +214,8 @@ export function criarSupabasePrevia() {
   try { const salvo = JSON.parse(localStorage.getItem(LS_EQUIPES) || 'null'); if (Array.isArray(salvo)) T.equipes = salvo; } catch { /* sem armazenamento: só a memória */ }
   // IRIS (24/11): a versão pré-configurada como vai nascer no servidor (iris vazio = a tela usa a pré-configurada) e os
   // números do Atendimento com a configuração da Iris de cada um (desligada, em modo teste)
-  T.ia_agentes = [{ id: 'iris-pre', nome: 'Iris', descricao: 'A Iris do Atenvo, com o nome da Reviza. Nasce desligada.', origem: 'pre_configurada', ativo: false,
-    chave_definida_em: null, criado_em: '2026-11-24T12:00:00Z', atualizado_em: '2026-11-24T12:00:00Z', iris: null }];
+  T.ia_agentes = [{ id: 'iris-pre', nome: 'Iris', ativo: false, chave_definida_em: null, criado_em: '2026-11-24T12:00:00Z', atualizado_em: '2026-11-24T12:00:00Z',
+    comportamentos: { iris: null, iris_descricao: 'A Iris pré-configurada, como a do Atenvo, com o nome da empresa.', iris_origem: 'pre_configurada' } }];
   T.canais = [
     { id: 'atd-principal', nome_interno: 'Atendimento principal', numero_conectado: '5551988880001', status_integracao: 'conectado', tipo: 'whatsapp',
       bot_canal_config: { ia_enabled: false, ia_modo_teste: true, ia_agente_id: 'iris-pre', numeros_teste: ['5551999990001'] } },
@@ -224,7 +224,7 @@ export function criarSupabasePrevia() {
     { id: 'atd-recepcao', nome_interno: 'Recepção', numero_conectado: '5551966660003', status_integracao: 'desconectado', tipo: 'whatsapp',
       bot_canal_config: { ia_enabled: false, ia_modo_teste: true, ia_agente_id: null, numeros_teste: [] } },
   ];
-  const LS_IRIS = 'previa-iris-v1';
+  const LS_IRIS = 'previa-iris-v2';
   try { const salvo = JSON.parse(localStorage.getItem(LS_IRIS) || 'null'); if (salvo && Array.isArray(salvo.ia_agentes) && Array.isArray(salvo.canais)) { T.ia_agentes = salvo.ia_agentes; T.canais = salvo.canais; } } catch { /* sem armazenamento: só a memória */ }
   const salvarIris = () => { try { localStorage.setItem(LS_IRIS, JSON.stringify({ ia_agentes: T.ia_agentes, canais: T.canais })); } catch { /* idem */ } };
   const cfgCanal = (id: unknown) => (T.canais.find((c) => c.id === id)?.bot_canal_config ?? null) as Linha | null;
@@ -239,7 +239,7 @@ export function criarSupabasePrevia() {
     perfis: () => T.profiles.map((p) => ({ ...p })),
     eu: () => db.usuario.id,
     verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
-    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); localStorage.removeItem(LS_EQUIPES); localStorage.removeItem('previa-iris-v1'); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); localStorage.removeItem(LS_EQUIPES); localStorage.removeItem('previa-iris-v2'); } catch { /* idem */ } location.reload(); },
   };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;

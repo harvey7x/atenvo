@@ -13,7 +13,7 @@ import { formatarTelefone } from '../../../lib/telefone';
 import { ambientesCadastrados } from '../../../data/modulos';
 import { useConexoesWA } from '../../../data/config/conexoes';
 import {
-  MODELOS_GEMINI, exportarVersao, irisEmBranco, irisPreConfigurada, lerArquivo, prontidao,
+  MODELOS_GEMINI, exportarVersao, temMotorIris, irisEmBranco, irisPreConfigurada, lerArquivo, prontidao,
   useAtivarVersao, useConversarIris, useCriarVersao, useExcluirVersao, useLigarNumero, useMetricasIris, useModoTesteNumero,
   useNumerosDaVersao, useNumerosIris, useSalvarChaveIris, useSalvarVersao, useTestarChaveIris, useVersoesIris,
   type BolhaTeste, type IrisConfig, type NumeroIris, type VersaoIris,
@@ -88,12 +88,20 @@ export function ConfigIris() {
   const escolher = (id: string) => { if (sujo) { setDestino(id); setJanela('trocar'); return; } setSelId(id); setSecao('resumo'); };
   const fazerSalvar = async () => {
     if (!sel || !rasc) return;
-    try { await salvar.mutateAsync({ id: sel.id, ...rasc }); avisar('ok', `"${rasc.nome}" foi salva.`); } catch (e) { avisar('erro', `Não foi possível salvar: ${(e as Error).message}`); }
+    try { await salvar.mutateAsync({ id: sel.id, ...rasc, origem: sel.origem }); avisar('ok', `"${rasc.nome}" foi salva.`); } catch (e) { avisar('erro', `Não foi possível salvar: ${(e as Error).message}`); }
   };
   const criarVersao = async (nome: string, origem: VersaoIris['origem'], config: IrisConfig, descricao = '') => {
     try { const id = await criar.mutateAsync({ nome, descricao, origem, config }); setSelId(id); setSecao('resumo'); setJanela(null); avisar('ok', `"${nome}" foi criada. Ela nasce desligada.`); }
     catch (e) { avisar('erro', `Não foi possível criar: ${(e as Error).message}`); }
   };
+
+  // 1ª visita: a Iris pré-configurada já nasce (desligada) — "deixar a íris pré-configurada só para eles ativarem"
+  const semeou = useRef(false);
+  useEffect(() => {
+    if (semeou.current || versoesQ.isLoading || versoesQ.isError || !versoesQ.isFetched || versoes.length > 0) return;
+    semeou.current = true;
+    void criar.mutateAsync({ nome: 'Iris', descricao: 'A Iris pré-configurada, como a do Atenvo, com o nome da empresa.', origem: 'pre_configurada', config: irisPreConfigurada() }).catch(() => { /* fica o vazio com o botão */ });
+  }, [versoesQ.isLoading, versoesQ.isError, versoesQ.isFetched, versoes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const itens = sel && rasc ? prontidao({ ...sel, config: rasc.config }, numeros) : [];
   const faltam = itens.filter((i) => i.obrigatorio && !i.ok);
@@ -251,8 +259,14 @@ function SecResumo({ v, itens, faltam, numeros, meus, atendendo, versoes, irPara
 }) {
   const met = useMetricasIris(v.id);
   const m = met.data;
+  const motor = temMotorIris();
   return (
     <>
+      {!motor && (
+        <div className="irs-nota irs-nota-forte" role="note">
+          <b>Ela ainda não atende clientes.</b> Dá para configurar tudo agora: quem ela é, os fatos da empresa, os textos, a equipe e os números. Ligar fica travado até o motor da Iris entrar no servidor — sem ele, o Atendimento ia achar que a IA está respondendo e o cliente ficaria sem resposta.
+        </div>
+      )}
       <div className="kpis irs-kpis">
         <Kpi rotulo="Conversas agora" icone={<IconeTile nome="balao" />} valor={m?.conversasAtivas ?? 0} nota={v.ativa ? `em ${atendendo} ${atendendo === 1 ? 'número' : 'números'}` : 'IA desligada'} />
         <Kpi rotulo="Respostas hoje" icone={<IconeTile nome="envia" />} valor={m?.respostasHoje ?? 0} nota={`teto de ${v.config.modelo.maxChamadasDia} por dia`} />
@@ -262,7 +276,7 @@ function SecResumo({ v, itens, faltam, numeros, meus, atendendo, versoes, irPara
 
       <Bloco titulo={faltam ? `Para ligar, falta${faltam > 1 ? 'm' : ''} ${faltam} ${faltam === 1 ? 'passo' : 'passos'}` : 'Pronta para ligar'}
         desc="Ela só pode atender quando tudo isso estiver resolvido."
-        acao={<Liga titulo={v.ativa ? 'Ligada' : 'Desligada'} ligado={v.ativa} aoMudar={aoAtivar} travado={!v.ativa && faltam ? 'Resolva os passos antes' : undefined} />}>
+        acao={<Liga titulo={v.ativa ? 'Ligada' : 'Desligada'} ligado={v.ativa} aoMudar={aoAtivar} travado={!motor ? 'Começa quando o motor entrar' : !v.ativa && faltam ? 'Resolva os passos antes' : undefined} />}>
         <ul className="irs-pronto">
           {itens.map((i) => (
             <li key={i.id} className={i.ok ? 'ok' : 'falta'}>
@@ -307,10 +321,10 @@ function BlocoNumeros({ v, numeros, meus, versoes }: { v: VersaoIris; numeros: N
                         {daqui ? 'Esta IA' : outra ? `Usa "${outra}"` : 'Nenhuma'}
                       </label>
                     </td>
-                    <td>{daqui ? <Toggle ligado={n.ligado} rotulo={`Iris no número ${n.nome}`} aoMudar={(a) => void tentar(ligar.mutateAsync({ canal: n.id, ligado: a }))} /> : <span className="irs-sub-l">—</span>}</td>
+                    <td>{daqui ? <Toggle ligado={n.ligado} rotulo={`Iris no número ${n.nome}`} disabled={!temMotorIris()} aoMudar={(a) => void tentar(ligar.mutateAsync({ canal: n.id, ligado: a }))} /> : <span className="irs-sub-l">—</span>}</td>
                     <td>{daqui ? (
                       <span className="irs-teste">
-                        <Toggle ligado={n.modoTeste} rotulo={`Modo teste no número ${n.nome}`} aoMudar={(a) => void tentar(teste.mutateAsync({ canal: n.id, teste: a, numeros: n.numerosTeste }))} />
+                        <Toggle ligado={n.modoTeste} rotulo={`Modo teste no número ${n.nome}`} disabled={!temMotorIris()} aoMudar={(a) => void tentar(teste.mutateAsync({ canal: n.id, teste: a, numeros: n.numerosTeste }))} />
                         {n.modoTeste && <button type="button" className="irs-link" onClick={() => setTesteDe(n)}>{n.numerosTeste.length ? `${n.numerosTeste.length} ${n.numerosTeste.length === 1 ? 'número de teste' : 'números de teste'}` : 'escolher os números de teste'}</button>}
                       </span>
                     ) : <span className="irs-sub-l">—</span>}</td>
@@ -354,6 +368,11 @@ function SecTestar({ v, sujo, irPara }: { v: VersaoIris; sujo: boolean; irPara: 
     try { const resp = await conversar.mutateAsync({ id: v.id, historico: hist }); setBolhas([...hist, ...resp]); }
     catch (e) { setBolhas([...hist, { de: 'iris', texto: '', nota: `Não respondeu: ${(e as Error).message}` }]); }
   };
+  if (!temMotorIris()) return (
+    <Bloco titulo="Conversa de teste">
+      <EstadoVazio titulo="Começa junto com o motor da Iris" descricao="A conversa de teste usa o mesmo motor que atende os clientes. Quando ele entrar no servidor, é aqui que você conversa com ela antes de ligar." />
+    </Bloco>
+  );
   if (!v.chaveDefinidaEm) return (
     <Bloco titulo="Conversa de teste">
       <EstadoVazio titulo="Falta a chave do Google" descricao="Para conversar com ela, guarde a chave do Gemini em Avançado." acao={{ rotulo: 'Ir para Avançado', onClick: () => irPara('avancado') }} />
@@ -411,7 +430,7 @@ function SecAvancado({ v, c, set, aviso, aoDuplicar, aoExcluir }: {
         }}>
           <input className="inp" type="password" autoComplete="off" value={chave} onChange={(e) => setChave(e.target.value)} placeholder={v.chaveDefinidaEm ? 'Colar uma chave nova para trocar' : 'Colar a chave (começa com AIza…)'} aria-label="Chave do Gemini" />
           <BotaoPrimario type="submit" disabled={chave.trim().length < 20 || salvarChave.isPending}>{v.chaveDefinidaEm ? 'Trocar a chave' : 'Guardar a chave'}</BotaoPrimario>
-          <BotaoSec type="button" disabled={!v.chaveDefinidaEm || testar.isPending} onClick={async () => setResultado(await testar.mutateAsync(v.id))}>{testar.isPending ? 'Testando…' : 'Testar a chave'}</BotaoSec>
+          <BotaoSec type="button" disabled={!v.chaveDefinidaEm || testar.isPending || !temMotorIris()} title={temMotorIris() ? undefined : 'O teste da chave entra junto com o motor da Iris'} onClick={async () => setResultado(await testar.mutateAsync(v.id))}>{testar.isPending ? 'Testando…' : 'Testar a chave'}</BotaoSec>
         </form>
         {resultado && <p className={resultado.ok ? 'irs-ok' : 'irs-erro'} role="status">{resultado.detalhe}</p>}
       </Bloco>
