@@ -1,0 +1,226 @@
+/* Configurações → Iris (24/11). Mesmo kit das telas novas de Configurações: cartões de vidro, rótulos pequenos, laranja só
+   no que pede atenção (falta preencher, escolhido, pendente). Títulos de coluna no meio; a 1ª coluna à esquerda. */
+.v2 .irs { display: flex; flex-direction: column; gap: 16px; padding-bottom: 80px; }
+
+/* ---------- versões ---------- */
+.v2 .irs-versoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.v2 .irs-versao {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 13px 15px; border-radius: 14px; cursor: pointer;
+  background: var(--vidro-a); border: 1px solid var(--linha); color: var(--txt); font: inherit; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.v2 .irs-versao:hover { border-color: rgba(var(--tint), .22); }
+.v2 .irs-versao.on { border-color: var(--azul); box-shadow: inset 0 0 0 1px var(--azul); }
+.v2 .irs-versao:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+.v2 .irs-versao-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.v2 .irs-versao-topo b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .irs-versao-meta { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-versao-pronta { font-size: 12px; color: var(--azul); font-weight: 500; }
+.v2 .irs-versao-pronta.ok { color: var(--verde); }
+
+/* ---------- editor: navegação + conteúdo ---------- */
+.v2 .irs-editor { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+.v2 .irs-nav { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 1px; }
+.v2 .irs-nav-nome { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--linha); }
+.v2 .irs-nome { border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 15px; font-weight: 600; padding: 2px 0; border-radius: 4px; }
+.v2 .irs-desc { border: 0; background: transparent; color: var(--txt-3); font: inherit; font-size: 12px; padding: 2px 0; border-radius: 4px; }
+.v2 .irs-nome:focus-visible, .v2 .irs-desc:focus-visible { outline: 1px solid var(--linha); outline-offset: 2px; }
+.v2 .irs-nav-grupo { display: block; margin: 12px 10px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .irs-nav-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--txt-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: background-color .12s ease, color .12s ease;
+}
+.v2 .irs-nav-item:hover { background: rgba(var(--tint), .04); color: var(--txt); }
+.v2 .irs-nav-item.on { background: rgba(var(--tint), .07); color: var(--txt); font-weight: 600; }
+.v2 .irs-pend { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--azul); flex: none; }
+.v2 .irs-conteudo { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ---------- blocos e campos ---------- */
+.v2 .irs-bloco { background: var(--vidro-a); border: 1px solid var(--linha); border-radius: 14px; padding: 18px 20px; }
+.v2 .irs-bloco > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.v2 .irs-bloco > header h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--txt); letter-spacing: -.01em; }
+.v2 .irs-bloco > header p { margin: 3px 0 0; font-size: 12.5px; color: var(--txt-3); max-width: 70ch; }
+.v2 .irs-bloco-corpo { display: flex; flex-direction: column; gap: 14px; }
+.v2 .irs-grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.v2 .irs-grade3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.v2 .irs-col { display: flex; flex-direction: column; gap: 14px; }
+.v2 .irs-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.v2 .irs-campo.largo { grid-column: 1 / -1; }
+.v2 .irs-rot { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--txt-2); }
+.v2 .irs-dica { font-size: 12px; color: var(--txt-3); line-height: 1.45; }
+.v2 .irs-falta { font-size: 11px; font-weight: 600; color: var(--azul); }
+.v2 .irs .inp.irs-inp-falta { border-color: var(--azul); }
+.v2 .irs .irs-area { height: auto; padding: 8px 11px; resize: vertical; line-height: 1.5; font-family: var(--fonte); }
+.v2 .irs-num { display: inline-flex; align-items: center; gap: 8px; }
+.v2 .irs-num .inp { width: 96px; font-variant-numeric: tabular-nums; }
+.v2 .irs-num span { font-size: 12.5px; color: var(--txt-3); }
+.v2 .irs-faixa { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--txt-3); }
+.v2 .irs-hora { width: 108px; font-variant-numeric: tabular-nums; }
+.v2 .irs-sub { display: flex; flex-direction: column; gap: 10px; padding-left: 16px; border-left: 1px solid var(--linha); }
+
+.v2 .irs-liga { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--linha); }
+.v2 .irs-bloco-corpo > .irs-liga:first-child, .v2 .irs-bloco > header .irs-liga { border-top: 0; padding: 0; }
+.v2 .irs-liga > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .irs-liga b { font-size: 13.5px; font-weight: 500; color: var(--txt); }
+.v2 .irs-liga span { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-liga .irs-trava { font-size: 11px; color: var(--txt-3); }
+
+.v2 .irs-opcoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.v2 .irs-opcoes.col { grid-template-columns: 1fr; margin-top: 12px; }
+.v2 .irs-opcao {
+  display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid var(--linha); color: var(--txt); font: inherit; transition: border-color .12s ease;
+}
+.v2 .irs-opcao:hover:not(:disabled) { border-color: rgba(var(--tint), .25); }
+.v2 .irs-opcao.on { border-color: var(--azul); box-shadow: inset 0 0 0 1px var(--azul); }
+.v2 .irs-opcao:disabled { opacity: .45; cursor: not-allowed; }
+.v2 .irs-opcao b { font-size: 13px; font-weight: 600; }
+.v2 .irs-opcao span { font-size: 12px; color: var(--txt-3); line-height: 1.4; }
+
+.v2 .irs-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px; border: 1px solid var(--linha); border-radius: 10px; background: rgba(var(--tint), .02); }
+.v2 .irs-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 7px; background: rgba(var(--tint), .07); font-size: 12.5px; color: var(--txt); }
+.v2 .irs-tag button { border: 0; background: transparent; color: var(--txt-3); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; border-radius: 4px; }
+.v2 .irs-tag button:hover { color: var(--txt); }
+.v2 .irs-tag-inp { flex: 1; min-width: 160px; border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 13px; padding: 4px; outline: none; }
+
+.v2 .irs-ufs { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .irs-uf { min-width: 42px; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--linha); background: transparent; color: var(--txt-2); font: inherit; font-size: 12.5px; cursor: pointer; }
+.v2 .irs-uf.on { background: var(--azul); border-color: var(--azul); color: #fff; font-weight: 600; }
+
+.v2 .irs-nota { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linha); background: rgba(var(--tint), .03); font-size: 13px; color: var(--txt-2); line-height: 1.5; }
+.v2 .irs-nota b { color: var(--txt); font-weight: 600; }
+.v2 .irs-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--txt-3); }
+.v2 .irs-vars code { font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: rgba(var(--tint), .07); color: var(--txt-2); cursor: help; }
+.v2 .irs-vazio { margin: 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .irs-ok { margin: 0; font-size: 12.5px; color: var(--verde); }
+.v2 .irs-erro { margin: 0; font-size: 12.5px; color: var(--rubro); }
+
+.v2 .irs-fala { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border-radius: 12px; background: rgba(var(--tint), .04); }
+.v2 .irs-fala-de { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .irs-fala p { margin: 0; font-size: 13.5px; color: var(--txt); line-height: 1.5; }
+
+.v2 .irs-x, .v2 .irs-ic { width: 28px; height: 28px; flex: none; border: 0; border-radius: 7px; background: transparent; color: var(--txt-3); cursor: pointer; font-size: 16px; line-height: 1; }
+.v2 .irs-ic { font-size: 13px; }
+.v2 .irs-x:hover { color: var(--rubro); background: rgba(var(--tint), .05); }
+.v2 .irs-ic:hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .irs-ic:disabled { opacity: .3; cursor: default; }
+.v2 .irs-link { border: 0; background: transparent; padding: 0; color: var(--txt-2); font: inherit; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(var(--tint), .3); }
+.v2 .irs-link:hover { color: var(--txt); }
+.v2 .irs-link.perigo { color: var(--rubro); }
+.v2 .irs-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); white-space: nowrap; }
+
+.v2 .irs-fato { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 28px; gap: 8px; align-items: start; }
+
+/* ---------- análise ---------- */
+.v2 .irs-perg { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.v2 .irs-perg li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--linha); }
+.v2 .irs-perg li:first-child { border-top: 0; padding-top: 0; }
+.v2 .irs-perg li.off .irs-perg-corpo { opacity: .5; }
+.v2 .irs-perg-n { display: grid; place-items: center; width: 24px; height: 24px; margin-top: 6px; border-radius: 50%; background: rgba(var(--tint), .07); font-size: 12px; font-weight: 600; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+.v2 .irs-perg-corpo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v2 .irs-perg-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.v2 .irs-perg-linha select.inp { width: auto; }
+.v2 .irs-perg-ex { flex: 1 1 240px; font-size: 12px; color: var(--txt-3); }
+.v2 .irs-perg-acoes { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+
+/* ---------- documentos ---------- */
+.v2 .irs-docs { display: flex; flex-direction: column; }
+.v2 .irs-doc { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 28px; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--linha); }
+.v2 .irs-doc:first-child { border-top: 0; padding-top: 0; }
+.v2 .irs-doc.off .irs-doc-corpo { opacity: .5; }
+.v2 .irs-doc-corpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+
+/* ---------- tabelas (números, atendentes) ---------- */
+.v2 .irs-tab-rolo { overflow-x: auto; }
+.v2 .irs-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.v2 .irs-tab th { padding: 8px 12px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); text-align: center; border-bottom: 1px solid var(--linha); white-space: nowrap; }
+.v2 .irs-tab td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--linha); color: var(--txt); vertical-align: middle; }
+.v2 .irs-tab th:first-child, .v2 .irs-tab td:first-child { text-align: left; }
+.v2 .irs-tab tr:last-child td { border-bottom: 0; }
+.v2 .irs-tab tr.on td { background: rgba(var(--tint), .025); }
+.v2 .irs-tab td .tgl { margin: 0 auto; }
+.v2 .irs-tab select.inp { width: auto; margin: 0 auto; }
+.v2 .irs-sub-l { display: block; font-size: 12px; color: var(--txt-3); }
+.v2 .irs-teste { display: inline-flex; align-items: center; gap: 10px; }
+
+/* ---------- textos ---------- */
+.v2 .irs-textos { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; align-items: start; }
+.v2 .irs-grupos { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 1px; padding: 8px; border-radius: 14px; border: 1px solid var(--linha); background: var(--vidro-a); }
+.v2 .irs-grupo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--txt-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.v2 .irs-grupo:hover { background: rgba(var(--tint), .04); color: var(--txt); }
+.v2 .irs-grupo.on { background: rgba(var(--tint), .07); color: var(--txt); font-weight: 600; }
+.v2 .irs-cont { font-size: 11.5px; color: var(--txt-3); font-variant-numeric: tabular-nums; font-weight: 500; }
+.v2 .irs-cont.alerta { color: var(--azul); font-weight: 600; }
+.v2 .irs-textos-lista { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v2 .irs-textos-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 2px 2px 4px; }
+.v2 .irs-textos-cab h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--txt); }
+.v2 .irs-textos-cab p { margin: 3px 0 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .irs-textos-acoes { display: flex; gap: 8px; flex: none; }
+.v2 .irs-texto { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linha); background: var(--vidro-a); }
+.v2 .irs-texto.fora { opacity: .6; }
+.v2 .irs-texto > header { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .irs-texto-id { font-size: 11px; font-weight: 600; color: var(--txt-3); font-variant-numeric: tabular-nums; flex: none; }
+.v2 .irs-texto-quando { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 13px; font-weight: 600; padding: 2px 0; border-radius: 4px; }
+.v2 .irs-texto-quando:focus-visible { outline: 1px solid var(--linha); outline-offset: 2px; }
+.v2 .irs-tipo { flex: none; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--linha); background: transparent; color: var(--txt-2); font: inherit; font-size: 11.5px; cursor: pointer; }
+.v2 .irs-tipo.audio { color: var(--azul); border-color: var(--azul); }
+.v2 .irs-fora { font-size: 11px; color: var(--txt-3); flex: none; }
+.v2 .irs-texto-pe { display: flex; align-items: center; gap: 12px; }
+.v2 .irs-texto-ex { flex: 1; margin: 0; font-size: 12.5px; color: var(--txt-2); line-height: 1.45; min-width: 0; }
+.v2 .irs-texto-ex span { color: var(--txt-3); }
+
+/* ---------- resumo ---------- */
+.v2 .irs-kpis { margin: 0; }
+.v2 .irs-pronto { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.v2 .irs-pronto li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--linha); }
+.v2 .irs-pronto li:first-child { border-top: 0; padding-top: 0; }
+.v2 .irs-pronto li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .irs-pronto b { font-size: 13.5px; font-weight: 500; color: var(--txt); }
+.v2 .irs-pronto li > div span { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-pronto-ic { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--azul); font-size: 11px; font-weight: 700; color: #fff; }
+.v2 .irs-pronto li.ok .irs-pronto-ic { background: var(--verde); border-color: var(--verde); }
+
+/* ---------- testar ---------- */
+.v2 .irs-chat { display: flex; flex-direction: column; gap: 8px; height: 380px; overflow-y: auto; padding: 14px; border-radius: 12px; background: rgba(var(--tint), .025); border: 1px solid var(--linha); }
+.v2 .irs-bolha { max-width: 78%; display: flex; flex-direction: column; gap: 4px; }
+.v2 .irs-bolha p { margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.45; color: var(--txt); }
+.v2 .irs-bolha.cliente { align-self: flex-end; }
+.v2 .irs-bolha.cliente p { background: rgba(var(--tint), .08); }
+.v2 .irs-bolha.iris { align-self: flex-start; }
+.v2 .irs-bolha.iris p { background: var(--surface); border: 1px solid var(--linha); }
+.v2 .irs-bolha.digitando p { color: var(--txt-3); }
+.v2 .irs-bolha-audio { color: var(--azul); font-weight: 600; }
+.v2 .irs-bolha-nota { font-size: 11.5px; color: var(--rubro); padding: 0 4px; }
+.v2 .irs-chat-form { display: flex; gap: 8px; margin-top: 10px; }
+.v2 .irs-chat-form .inp { flex: 1; }
+
+/* ---------- avançado ---------- */
+.v2 .irs-chave { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.v2 .irs-chave-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.v2 .irs-chave-form .inp { flex: 1 1 260px; }
+.v2 .irs-acoes-linha { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--linha); }
+.v2 .irs-acoes-linha:first-child { border-top: 0; padding-top: 0; }
+.v2 .irs-acoes-linha > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .irs-acoes-linha b { font-size: 13.5px; font-weight: 500; color: var(--txt); }
+.v2 .irs-acoes-linha span { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-acoes-linha.perigo b { color: var(--rubro); }
+.v2 .irs-arquivo { display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; margin: 8px 0; border-radius: 9px; border: 1px dashed var(--linha); color: var(--txt-2); font-size: 13px; cursor: pointer; }
+.v2 .irs-arquivo input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.v2 .irs-arquivo:focus-within { outline: 2px solid var(--azul); outline-offset: 2px; }
+.v2 .irs-salvar { z-index: 6; }
+
+/* ---------- celular ---------- */
+@media (max-width: 880px) {
+  .v2 .irs-editor { grid-template-columns: 1fr; }
+  .v2 .irs-nav { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
+  .v2 .irs-nav > div { flex: none; }
+  .v2 .irs-nav-nome { flex: none; min-width: 220px; border-bottom: 0; margin: 0; padding: 0 8px 0 0; }
+  .v2 .irs-nav-grupo { display: none; }
+  .v2 .irs-nav-item { white-space: nowrap; }
+  .v2 .irs-grade2, .v2 .irs-grade3, .v2 .irs-fato, .v2 .irs-doc-corpo { grid-template-columns: 1fr; }
+  .v2 .irs-textos { grid-template-columns: 1fr; }
+  .v2 .irs-grupos { position: static; flex-direction: row; overflow-x: auto; }
+  .v2 .irs-grupo { white-space: nowrap; }
+  .v2 .irs-texto-pe, .v2 .irs-acoes-linha { flex-wrap: wrap; }
+  .v2 .irs-bloco { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .v2 .irs-versao, .v2 .irs-nav-item, .v2 .irs-opcao { transition: none; } }

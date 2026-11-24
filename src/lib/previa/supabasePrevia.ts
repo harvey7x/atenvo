@@ -212,8 +212,24 @@ export function criarSupabasePrevia() {
     { id: 'eq-campanhas', nome: 'Campanhas', gerente_id: 'u-paty', membros: [], canais: ['atd-campanha'], created_at: '2026-11-18T12:00:00Z' },
   ];
   try { const salvo = JSON.parse(localStorage.getItem(LS_EQUIPES) || 'null'); if (Array.isArray(salvo)) T.equipes = salvo; } catch { /* sem armazenamento: só a memória */ }
+  // IRIS (24/11): a versão pré-configurada como vai nascer no servidor (iris vazio = a tela usa a pré-configurada) e os
+  // números do Atendimento com a configuração da Iris de cada um (desligada, em modo teste)
+  T.ia_agentes = [{ id: 'iris-pre', nome: 'Iris', descricao: 'A Iris do Atenvo, com o nome da Reviza. Nasce desligada.', origem: 'pre_configurada', ativo: false,
+    chave_definida_em: null, criado_em: '2026-11-24T12:00:00Z', atualizado_em: '2026-11-24T12:00:00Z', iris: null }];
+  T.canais = [
+    { id: 'atd-principal', nome_interno: 'Atendimento principal', numero_conectado: '5551988880001', status_integracao: 'conectado', tipo: 'whatsapp',
+      bot_canal_config: { ia_enabled: false, ia_modo_teste: true, ia_agente_id: 'iris-pre', numeros_teste: ['5551999990001'] } },
+    { id: 'atd-campanha', nome_interno: 'Campanha de novembro', numero_conectado: '5551977770002', status_integracao: 'conectado', tipo: 'whatsapp',
+      bot_canal_config: { ia_enabled: false, ia_modo_teste: true, ia_agente_id: null, numeros_teste: [] } },
+    { id: 'atd-recepcao', nome_interno: 'Recepção', numero_conectado: '5551966660003', status_integracao: 'desconectado', tipo: 'whatsapp',
+      bot_canal_config: { ia_enabled: false, ia_modo_teste: true, ia_agente_id: null, numeros_teste: [] } },
+  ];
+  const LS_IRIS = 'previa-iris-v1';
+  try { const salvo = JSON.parse(localStorage.getItem(LS_IRIS) || 'null'); if (salvo && Array.isArray(salvo.ia_agentes) && Array.isArray(salvo.canais)) { T.ia_agentes = salvo.ia_agentes; T.canais = salvo.canais; } } catch { /* sem armazenamento: só a memória */ }
+  const salvarIris = () => { try { localStorage.setItem(LS_IRIS, JSON.stringify({ ia_agentes: T.ia_agentes, canais: T.canais })); } catch { /* idem */ } };
+  const cfgCanal = (id: unknown) => (T.canais.find((c) => c.id === id)?.bot_canal_config ?? null) as Linha | null;
   const salvarEquipes = () => { try { localStorage.setItem(LS_EQUIPES, JSON.stringify(T.equipes)); } catch { /* idem */ } };
-  db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); if (tabela === 'equipes') salvarEquipes(); };
+  db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); if (tabela === 'equipes') salvarEquipes(); if (tabela === 'ia_agentes') salvarIris(); };
   try {
     const ver = localStorage.getItem(LS_VER);
     const p = ver ? T.profiles.find((x) => x.id === ver && x.ativo) : null;
@@ -223,7 +239,7 @@ export function criarSupabasePrevia() {
     perfis: () => T.profiles.map((p) => ({ ...p })),
     eu: () => db.usuario.id,
     verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
-    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); localStorage.removeItem(LS_EQUIPES); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); localStorage.removeItem(LS_INTEG); localStorage.removeItem(LS_OFICIAL); localStorage.removeItem(LS_EQUIPES); localStorage.removeItem('previa-iris-v1'); } catch { /* idem */ } location.reload(); },
   };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;
@@ -315,6 +331,21 @@ export function criarSupabasePrevia() {
   };
 
   const rpcs: Record<string, (a: Linha) => unknown> = {
+    // Iris (24/11): versão por número, liga/desliga, modo teste, chave no cofre, números de desempenho
+    ia_agente_vincular_canais: (a) => {
+      const lista = new Set((a.p_canais as string[]) ?? []);
+      for (const c of T.canais) { const cfg = c.bot_canal_config as Linha; if (lista.has(String(c.id))) cfg.ia_agente_id = a.p_agente; else if (cfg.ia_agente_id === a.p_agente) { cfg.ia_agente_id = null; cfg.ia_enabled = false; } }
+      salvarIris(); return null;
+    },
+    ia_canal_ativar: (a) => { const cfg = cfgCanal(a.p_canal); if (cfg) cfg.ia_enabled = !!a.p_ativo; salvarIris(); return null; },
+    ia_canal_modo_teste: (a) => { const cfg = cfgCanal(a.p_canal); if (cfg) { cfg.ia_modo_teste = !!a.p_teste; if (Array.isArray(a.p_numeros)) cfg.numeros_teste = a.p_numeros; } salvarIris(); return null; },
+    ia_agente_salvar_chave: (a) => { const ag = T.ia_agentes.find((x) => x.id === a.p_agente); if (ag) ag.chave_definida_em = new Date().toISOString(); salvarIris(); return null; },
+    ia_agente_metricas: (a) => {
+      const ag = T.ia_agentes.find((x) => x.id === a.p_agente);
+      const ligados = T.canais.filter((c) => (c.bot_canal_config as Linha).ia_agente_id === a.p_agente && (c.bot_canal_config as Linha).ia_enabled).length;
+      const on = !!ag?.ativo && ligados > 0;
+      return [{ sessoes_ativas: on ? 7 : 0, chamadas_hoje: on ? 42 : 0, nudges_hoje: on ? 5 : 0, handoffs_7d: on ? 18 : 0 }];
+    },
     // 1º acesso de quem nasceu com senha temporária (visto pelo "Ver como"): trocou → entra
     senha_redefinida: () => { const p = T.profiles.find((x) => x.id === db.usuario.id); if (p) p.deve_trocar_senha = false; salvarPerfis(); return null; },
     wa_canais_visao_equipe: () => T.wa_canais.map(({ qr: _q, instancia: _i, ...r }) => r),
@@ -399,6 +430,18 @@ export function criarSupabasePrevia() {
   };
 
   const funcoes: Record<string, (b: Linha) => unknown> = {
+    // Iris (24/11): na prévia não há Gemini — o teste da chave responde se há chave guardada e a conversa segue um roteiro de exemplo
+    'ia-agente-testar': (b) => { const ag = T.ia_agentes.find((x) => x.id === b.agente_id); return ag?.chave_definida_em ? { ok: true, modelo: 'gemini-3.6-flash' } : { ok: false, erro: 'Nenhuma chave guardada.' }; },
+    'ia-agente-conversar': (b) => {
+      const n = ((b.mensagens as Linha[]) ?? []).filter((m) => m.papel === 'user').length;
+      const roteiro: Linha[][] = [
+        [{ texto: 'Olá, tudo bem? 😊' }, { texto: 'Oi, tudo bem? Aqui é a Iris, sou atendente virtual da Reviza. Como que eu posso te ajudar hoje? Seria referente a empréstimo, processos referente à revisão de juros abusivo e cancelamento dos cartões RMC.', audio: true }],
+        [{ texto: 'Que bom! A análise eu faço aqui mesmo com o senhor, e ela é gratuita.' }, { texto: 'O senhor tem, ou já teve, empréstimo pessoal em alguma destas: Agibank, BMG, Facta, Mercantil ou Crefisa?' }],
+        [{ texto: 'Conta sim! Mesmo quitado, a gente consegue analisar.' }, { texto: 'E no seu benefício, tem desconto de cartão consignado, aquele RMC ou RCC?' }],
+        [{ texto: 'Perfeito. Agora, pra concluir, eu preciso de alguns documentos: RG ou CNH (frente e verso), comprovante de residência e um e-mail. Pode mandar por aqui mesmo, foto do celular serve.' }],
+      ];
+      return { bolhas: roteiro[Math.min(n, roteiro.length) - 1] ?? [{ texto: 'Anotei aqui. Posso deixar avisado para quem cuida do seu caso. O senhor prefere que ligue ou que mande uma mensagem aqui pelo WhatsApp?' }] };
+    },
     'reviza-wa-enviar': (b) => {
       if (b.acao === 'ler') return { ok: true };
       if (b.acao === 'apagar') { const m = T.wa_mensagens.find((x) => x.id === b.mensagem_id); if (m) m.apagada = true; return { ok: true }; }

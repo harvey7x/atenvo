@@ -27,7 +27,7 @@ import { ConfigEntradas } from './ConfigEntradas';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
-const Iris = lazy(() => import('../Ia'));
+const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
@@ -77,7 +77,7 @@ export default function ConfigAmbiente() {
   if (secao === 'usuarios') return (<><Cabecalho titulo="Usuários e acessos" sub="Quem entra no sistema, em quais ambientes e quais telas cada pessoa vê." /><AbaUsuarios demo={false} gestor={admin} /></>);
   if (secao === 'equipes') return (<><Cabecalho titulo="Equipes" sub="As equipes do Atendimento: quem é o gerente, quem faz parte e qual é o WhatsApp de cada uma." /><ConfigEquipes /></>);
   if (secao === 'registros') return (<><Cabecalho titulo="Registros" sub="Tudo o que cada pessoa fez no sistema: quem, o quê, quando e o que mudou." /><RevizaRegistros /></>);
-  if (secao === 'iris') return <Suspense fallback={null}><Iris /></Suspense>;
+  if (secao === 'iris') return (<><Cabecalho titulo="Iris" sub="A atendente virtual do Atendimento: as versões dela, o que cada uma sabe e faz, e em quais números atende." /><Suspense fallback={null}><Iris /></Suspense></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
 }
