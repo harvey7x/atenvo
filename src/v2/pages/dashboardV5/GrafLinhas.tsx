@@ -6,7 +6,11 @@ import { escalaBonita, type Balde } from '@/data/dashboardV5.series';
 import { fmtInt } from '@/data/dashboardV5.formato';
 import { Vazio } from './comum';
 
-/* Gráfico de LINHAS multi-série ("ondas") no estilo da referência aprovada pelo dono
+/* 24/11 — REGRA do dono: todo gráfico em BARRAS ("não quero mais aquelas linhazinhas"). Este desenho agora é de
+   COLUNAS AGRUPADAS: em cada período, uma coluna por série, lado a lado, com o topo arredondado. O resto continua
+   (escala redonda, dica acima da coluna mais alta, legenda que esconde/mostra e destaca, teclado, tabela p/ leitor).
+   O texto abaixo é o histórico de quando era de linhas.
+   Gráfico de LINHAS multi-série ("ondas") no estilo da referência aprovada pelo dono
    (12/11, "Project Activity": "eu quero assim"):
    - cada linha com a SUA área em degradê, da cor da linha até sumir na base (as maiores
      atrás, as menores na frente), curva suave e linha de 2px;
@@ -69,14 +73,14 @@ export function LegendaGraf({ series, controle, className }: {
 }) {
   if (series.length < 2) return null;
   return (
-    <ul className={'d5-graf-leg' + (className ? ` ${className}` : '')} aria-label="Linhas do gráfico — clique para esconder ou mostrar">
+    <ul className={'d5-graf-leg' + (className ? ` ${className}` : '')} aria-label="Séries do gráfico — clique para esconder ou mostrar">
       {series.map((s) => {
         const vis = !controle.ocultas.has(s.id);
         return (
           <li key={s.id}>
             <button type="button" className="d5-graf-leg-bt" aria-pressed={vis}
               aria-label={[s.rotulo, ...(vis ? (s.notas ?? []).map((nt) => nt.texto) : [])].join(', ')}
-              title={vis ? 'Esconder esta linha' : 'Mostrar esta linha'}
+              title={vis ? 'Esconder do gráfico' : 'Mostrar no gráfico'}
               onClick={() => controle.alternar(s.id, series.length)}
               onMouseEnter={() => vis && controle.destacar(s.id)} onMouseLeave={() => controle.destacar(null)}
               onFocus={() => vis && controle.destacar(s.id)} onBlur={() => controle.destacar(null)}>
@@ -110,36 +114,6 @@ const limitar = (v: number, a: number, b: number) => Math.min(Math.max(v, a), Ma
 
 /** Curva monótona de Fritsch–Carlson: passa por todos os pontos, sem overshoot
  *  (entre dois pontos a curva nunca sai do intervalo deles — nada é inventado). */
-function caminhoSuave(px: number[], py: number[]): string {
-  const n = px.length;
-  if (n === 0) return '';
-  if (n === 1) return `M${px[0].toFixed(1)} ${py[0].toFixed(1)}`;
-  const dx: number[] = [];
-  const m: number[] = [];
-  for (let i = 0; i < n - 1; i++) {
-    dx.push(px[i + 1] - px[i]);
-    m.push((py[i + 1] - py[i]) / (px[i + 1] - px[i]));
-  }
-  const t: number[] = [m[0]];
-  for (let i = 1; i < n - 1; i++) {
-    if (m[i - 1] * m[i] <= 0) t.push(0);
-    else {
-      const w1 = 2 * dx[i] + dx[i - 1];
-      const w2 = dx[i] + 2 * dx[i - 1];
-      t.push((w1 + w2) / (w1 / m[i - 1] + w2 / m[i]));
-    }
-  }
-  t.push(m[n - 2]);
-  let d = `M${px[0].toFixed(1)} ${py[0].toFixed(1)}`;
-  for (let i = 0; i < n - 1; i++) {
-    const h = dx[i];
-    d += ` C${(px[i] + h / 3).toFixed(1)} ${(py[i] + (t[i] * h) / 3).toFixed(1)}`
-      + ` ${(px[i + 1] - h / 3).toFixed(1)} ${(py[i + 1] - (t[i + 1] * h) / 3).toFixed(1)}`
-      + ` ${px[i + 1].toFixed(1)} ${py[i + 1].toFixed(1)}`;
-  }
-  return d;
-}
-
 export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALTURA_PADRAO, controle }: {
   baldes: Balde[]; series: SerieGraf[]; titulo: string; vazio: string; rodape?: string; altura?: number;
   /** estado da legenda quando ela mora no topo do cartão; sem ele, a legenda vem acima do desenho */
@@ -180,25 +154,32 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
   const { ocultas, destaque } = ctl;
   const visiveis = series.filter((s) => !ocultas.has(s.id));
   const valoresDe = (id: string) => pontos.get(id) ?? [];
-  const soma = (id: string) => valoresDe(id).reduce((a, b) => a + b, 0);
   const emDestaque = destaque && !ocultas.has(destaque) ? destaque : null;
-  // áreas: a maior atrás, a menor na frente; com uma linha em destaque, só a dela
-  const comArea = (emDestaque ? visiveis.filter((s) => s.id === emDestaque) : [...visiveis])
-    .sort((a, b) => soma(b.id) - soma(a.id));
 
   // geometria em pixels reais
   const H = altura;
   const plotW = Math.max(40, W - PAD_L - PAD_R);
-  const passoX = n > 1 ? plotW / (n - 1) : 0;
-  const x = (i: number) => (n > 1 ? PAD_L + i * passoX : PAD_L + plotW / 2);
+  // cada período é uma faixa; as colunas das séries ficam no meio dela
+  const banda = plotW / Math.max(1, n);
+  const x = (i: number) => PAD_L + (i + 0.5) * banda;
   const maxVis = Math.max(0, ...visiveis.flatMap((s) => valoresDe(s.id)));
   const esc = escalaBonita(maxVis);
   const y0 = H - PAD_B;
   const y = (v: number) => y0 - (v / esc.topo) * (y0 - PAD_T);
-  const xs = baldes.map((_, i) => x(i));
   // rótulos das datas: um a cada k, contando do fim (o último — hoje — sempre aparece)
   const k = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / ESPACO_ROTULO))));
-  const ancoraX = (i: number): 'start' | 'middle' | 'end' => (n > 1 && i === 0 ? 'start' : n > 1 && i === n - 1 ? 'end' : 'middle');
+  const ancoraX = (_i: number): 'start' | 'middle' | 'end' => 'middle';
+  // colunas: largura dividida entre as séries visíveis, com folga entre os períodos
+  const nCols = Math.max(1, visiveis.length);
+  const larguraGrupo = Math.min(banda * 0.62, nCols * 34);
+  const larguraCol = Math.max(2, (larguraGrupo - (nCols - 1) * 2) / nCols);
+  const colX = (i: number, k: number) => x(i) - larguraGrupo / 2 + k * (larguraCol + 2);
+  const coluna = (cx: number, v: number) => {
+    const topo = y(v); const alt = y0 - topo;
+    if (alt <= 0.5) return '';
+    const r = Math.min(3, larguraCol / 2, alt);
+    return `M${cx.toFixed(1)} ${y0} V${(topo + r).toFixed(1)} Q${cx.toFixed(1)} ${topo.toFixed(1)} ${(cx + r).toFixed(1)} ${topo.toFixed(1)} H${(cx + larguraCol - r).toFixed(1)} Q${(cx + larguraCol).toFixed(1)} ${topo.toFixed(1)} ${(cx + larguraCol).toFixed(1)} ${(topo + r).toFixed(1)} V${y0} Z`;
+  };
 
   const linhasDo = (i: number) => visiveis
     .map((s) => ({ id: s.id, rotulo: s.rotulo, cor: s.cor, v: valoresDe(s.id)[i] ?? 0 }))
@@ -208,7 +189,7 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
   const indiceDoMouse = (clientX: number): number => {
     if (!el || n <= 1) return 0;
     const px = clientX - el.getBoundingClientRect().left;
-    return Math.min(n - 1, Math.max(0, Math.round((px - PAD_L) / passoX)));
+    return Math.min(n - 1, Math.max(0, Math.floor((px - PAD_L) / banda)));
   };
   const irPara = (i: number) => { setFoco(i); setAnuncio(textoDo(i)); };
   const aoTeclar = (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -261,9 +242,9 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
         onMouseLeave={() => setFoco(null)}
         onKeyDown={aoTeclar} onFocus={aoFocar} onBlur={() => setFoco(null)}>
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="d5-graf-svg" aria-hidden focusable="false">
-          {n > 1 && (
+          {n > 0 && (
             <defs>
-              {comArea.map((s) => (
+              {visiveis.map((s) => (
                 <linearGradient key={s.id} id={`g${uid}-a-${s.id}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0" className="d5-graf-stop-topo" style={{ stopColor: s.cor }} />
                   <stop offset=".55" className="d5-graf-stop-meio" style={{ stopColor: s.cor }} />
@@ -281,25 +262,16 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
           {baldes.map((b, i) => ((n - 1 - i) % k === 0) && (
             <text key={b.chave} x={x(i)} y={H - 7} className="d5-graf-eixo" textAnchor={ancoraX(i)}>{b.rotulo}</text>
           ))}
-          {n > 1 && comArea.map((s) => (
-            <path key={s.id} className="d5-graf-area"
-              d={`${caminhoSuave(xs, valoresDe(s.id).map(y))} L${x(n - 1).toFixed(1)} ${y0} L${x(0).toFixed(1)} ${y0} Z`}
-              fill={`url(#g${uid}-a-${s.id})`} />
+          {/* a faixa do período sob o mouse/teclado fica marcada atrás das colunas */}
+          {foco != null && <rect className="d5-graf-faixa" x={x(foco) - banda / 2} width={banda} y={PAD_T - 6} height={y0 - PAD_T + 6} rx="4" />}
+          {visiveis.map((s, kk) => (
+            <g key={s.id} className="d5-graf-serie" data-apagada={emDestaque && emDestaque !== s.id ? '' : undefined}>
+              {valoresDe(s.id).map((v, i) => {
+                const d = coluna(colX(i, kk), v);
+                return d ? <path key={i} className="d5-graf-barra" d={d} fill={`url(#g${uid}-a-${s.id})`} style={{ stroke: 'none' }} data-foco={foco === i ? '' : undefined} /> : null;
+              })}
+            </g>
           ))}
-          {foco != null && <line className="d5-graf-mira" x1={x(foco)} x2={x(foco)} y1={PAD_T - 6} y2={y0} />}
-          {visiveis.map((s) => (
-            <path key={s.id} className="d5-graf-linha" d={caminhoSuave(xs, valoresDe(s.id).map(y))}
-              style={{ stroke: s.cor }} data-apagada={emDestaque && emDestaque !== s.id ? '' : undefined} />
-          ))}
-          {/* ponto com halo: na coluna sob a mira (ou sempre, com um balde só), só onde há valor */}
-          {(foco != null || n === 1) && visiveis
-            .filter((s) => (valoresDe(s.id)[foco ?? 0] ?? 0) > 0)
-            .map((s) => (
-              <g key={s.id}>
-                <circle cx={x(foco ?? 0)} cy={y(valoresDe(s.id)[foco ?? 0] ?? 0)} r="9" className="d5-graf-halo" style={{ fill: s.cor }} />
-                <circle cx={x(foco ?? 0)} cy={y(valoresDe(s.id)[foco ?? 0] ?? 0)} r="4.5" className="d5-graf-ponto" style={{ fill: s.cor }} />
-              </g>
-            ))}
         </svg>
 
         {foco != null && estiloDica && (

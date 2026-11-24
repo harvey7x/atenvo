@@ -777,3 +777,11 @@ html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab thead tr > :last-child { pa
   html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
   html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord { line-height: 1.35; }
 }
+
+/* 24/11 — o gráfico do Dashboard virou de COLUNAS (regra do dono: todo gráfico em barras) */
+.v2 .d5-graf-barra { transition: opacity .12s ease; }
+.v2 .d5-graf-serie[data-apagada] .d5-graf-barra { opacity: .18; }
+.v2 .d5-graf-faixa { fill: rgba(var(--tint), .05); }
+.v2 .d5-graf-svg .d5-graf-stop-topo { stop-opacity: 1; }
+.v2 .d5-graf-svg .d5-graf-stop-meio { stop-opacity: .92; }
+.v2 .d5-graf-svg .d5-graf-stop-base { stop-opacity: .72; }

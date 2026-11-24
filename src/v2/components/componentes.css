@@ -797,3 +797,10 @@ html:root[data-tema="light"] .v2 .fj-modal :is(.atv-input, .atv-select, .atv-tex
 
 /* X do ModalV2: só a ALFA mostra (reviza-sistema.css); fora dela o cabeçalho segue como sempre */
 .v2 .p-modal-x { display: none; }
+
+/* 24/11 — o mini gráfico dos indicadores em barras (regra do dono) */
+.v2 .spark.spark-barras { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-top: 9px; }
+.v2 .spark.spark-barras i { flex: 1 1 0; min-width: 3px; border-radius: 3px 3px 1px 1px; background: rgba(var(--tint), .16); transform-origin: bottom; animation: v2-barra-sobe .5s cubic-bezier(.2, .7, .2, 1) both; }
+.v2 .spark.spark-barras i.on { background: linear-gradient(to top, var(--azul), color-mix(in srgb, var(--azul) 62%, #fff)); }
+@keyframes v2-barra-sobe { from { transform: scaleY(.1); opacity: .4; } to { transform: scaleY(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v2 .spark.spark-barras i { animation: none; } }

@@ -209,13 +209,13 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
           titulo="Fechados da equipe, no tempo"
           ajuda={<Ajuda rotulo="Fechados da equipe, no tempo" texto={'Fechados do placar da ALFA por atendente. O administrativo lança em dia útil: fim de semana e feriado '
             + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
-            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'} />}
+            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar as barras da pessoa.'} />}
           sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
           pontos={baldes.map((b) => ({ chave: b.chave, rotulo: b.rotuloLongo }))}
           eixo={baldes.map((b) => b.rotulo)}
           series={serieEquipe}
           unidade={(n) => (n === 1 ? 'fechado' : 'fechados')}
-          rodape="Clique num nome para esconder ou mostrar a linha."
+          rodape="Clique num nome para esconder ou mostrar as barras da pessoa."
           vazio="Sem fechados lançados neste período."
         />
       )}

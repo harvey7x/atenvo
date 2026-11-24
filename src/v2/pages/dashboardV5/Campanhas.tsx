@@ -56,8 +56,8 @@ const AJUDA_MELHOR = 'Melhor do dia = mais entradas (fechados do dia só aparece
 const AJUDA_RETORNOS = 'Clientes que mandaram a mensagem do anúncio mas JÁ ESTAVAM no sistema. "De qual campanha" '
   + 'é o número da primeira conversa deles (aquisição). A atribuição por número é exata só nos últimos 14 dias '
   + '(retenção dos eventos do WhatsApp); quem volta escrevendo direto, sem o texto do anúncio, não é contado.';
-const AJUDA_ONDAS = 'Cada ponto é o número exato do dia (ou da semana, ou do mês da casa); a curva só liga '
-  + 'os pontos — nada é inventado entre eles. Clique no nome de uma campanha para esconder ou mostrar a linha '
+const AJUDA_ONDAS = 'Cada barra é o número exato do dia (ou da semana, ou do mês da casa) — nada é inventado '
+  + 'entre elas. Clique no nome de uma campanha para esconder ou mostrar as barras dela '
   + '(a escala se ajusta). Com período curto o gráfico mostra os últimos 7 dias para dar contexto; as tabelas '
   + 'abaixo continuam só no período escolhido. Ao lado do nome: cresceu ou caiu no último dia/semana fechado, '
   + 'e "parou e voltou" quando a campanha zerou e retomou dentro do desenho.';
@@ -187,7 +187,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
         unidade={(n) => (metrica === 'entradas' ? (n === 1 ? 'entrada' : 'entradas') : metrica === 'ganhos' ? (n === 1 ? 'fechado' : 'fechados') : (n === 1 ? 'não elegível' : 'não elegíveis'))}
         rodape={metrica === 'ganhos'
           ? 'Fechados entram quando o administrativo lança (dias úteis): fim de semana e feriado aparecem zerados.'
-          : 'Clique numa campanha para esconder ou mostrar a linha.'}
+          : 'Clique numa campanha para esconder ou mostrar as barras dela.'}
         vazio="Sem movimento para desenhar neste período."
       />
 
@@ -358,7 +358,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
               <GrafLinhas
                 baldes={baldesDe(periodo.iniDate, fimComHoje(periodo.fimDate, hoje), periodo.dias <= 14 ? 'dia' : 'semana')}
                 series={[{
-                  id: 'parente', rotulo: 'Recuperados', cor: 'var(--dado-3)',
+                  id: 'parente', rotulo: 'Recuperados', cor: 'var(--azul)',
                   valores: somarEmBaldes(d.parente.serie.map((p) => ({ dia: p.dia, valor: p.n })), periodo.dias <= 14 ? 'dia' : 'semana'),
                 }]}
                 titulo="Recuperados pelo parente por dia" vazio="" altura={176}

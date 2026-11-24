@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { MetricChart, monotonePath, type ChartView, type SeriesPoint } from '@/components/ui/metric-chart';
-import { Icon, PeriodSelect, ViewToggle, type PeriodOption } from '@/components/ui/metric-controls';
+import { Icon, PeriodSelect, type PeriodOption } from '@/components/ui/metric-controls';
+// REGRA do dono (24/11): todo gráfico em BARRAS, como as dos cartões do Painel — sem o modo linha e sem o seletor
+const SO_BARRAS: ChartView = 'bar';
 import { PmcStyles } from '@/components/ui/progress-metric-card';
 import { useTemaAtual } from '@/v2/lib/temaAtual';
 import { useMoldura } from '@/v2/lib/molduraAlfa';
@@ -155,7 +157,7 @@ export function CartaoMetrica({
   const tema = useTemaAtual();
   const moldura = useMoldura();
   const [rotulo, setRotulo] = useState(periodo ?? '');
-  const [view, setView] = useState<ChartView>('curve');
+  const view = SO_BARRAS;
   const opcao = periodos?.find((p) => p.label === rotulo) ?? periodos?.[periodos.length - 1];
   const janela = useMemo(
     () => (opcao?.points && opcao.points < data.length ? data.slice(-opcao.points) : data),
@@ -225,7 +227,6 @@ export function CartaoMetrica({
             </>
           ) : rotuloDelta}
         </span>
-        {mostraGraf && <ViewToggle value={view} onChange={setView} />}
       </footer>
     </article>
   );
@@ -439,12 +440,12 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
 }) {
   const tema = useTemaAtual();
   const moldura = useMoldura();
-  const [view, setView] = useState<ChartView>('curve');
+  const view = SO_BARRAS;
   const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
   const alternar = (id: string) => setOcultas((prev) => {
     const prox = new Set(prev);
     if (prox.has(id)) prox.delete(id);
-    else if (series.length - prox.size > 1) prox.add(id);   // a última linha visível nunca some
+    else if (series.length - prox.size > 1) prox.add(id);   // a última série visível nunca some
     return prox;
   });
 
@@ -475,15 +476,14 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
         </div>
         <div className="rvm-series-acao">
           {acao}
-          {temDado && <ViewToggle value={view} onChange={setView} />}
         </div>
       </header>
       <div className="rvm-series-topo">
         <div className="rvm-linha">
           <span className="rvm-val"><Contagem texto={n(total)} /></span>
-          <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas linhas visíveis' : ''}</span>
+          <span className="rvm-un">{unidade(total)}{ocultas.size > 0 ? ' nas séries visíveis' : ''}</span>
         </div>
-        <ul className="rvm-leg" aria-label="Linhas do gráfico (clique para esconder ou mostrar)">
+        <ul className="rvm-leg" aria-label="Séries do gráfico (clique para esconder ou mostrar)">
           {comCor.map((s) => {
             const ligada = !ocultas.has(s.id);
             return (

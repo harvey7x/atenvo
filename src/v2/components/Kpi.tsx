@@ -80,18 +80,17 @@ export function DefsSpark() {
   );
 }
 
-/** Sparkline que se desenha (viewBox 120×34; y em 0–34, menor = mais alto). */
+/** Mini gráfico do indicador — em BARRAS (regra do dono 24/11: nada de linha). y em 0–34, menor = mais alto;
+    a última barra (o agora) fica acesa. */
 export function Spark({ pontos }: { pontos: number[] }) {
   if (pontos.length < 2) return null;
-  const passo = 120 / (pontos.length - 1);
-  const cords = pontos.map((y, i) => `${Math.round(i * passo)},${y}`);
-  const linha = `M${cords.join(' L')}`;
-  const area = `${cords.join(' ')} 120,34 0,34`;
+  const n = pontos.length;
   return (
-    <svg className="spark" viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden>
-      <polygon points={area} />
-      <path pathLength={1} d={linha} />
-    </svg>
+    <span className="spark spark-barras" aria-hidden>
+      {pontos.map((y, i) => (
+        <i key={i} className={i === n - 1 ? 'on' : undefined} style={{ height: `${Math.max(8, ((34 - y) / 34) * 100)}%`, animationDelay: `${Math.min(i, 12) * 30}ms` }} />
+      ))}
+    </span>
   );
 }
 

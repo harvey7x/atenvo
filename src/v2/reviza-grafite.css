@@ -330,6 +330,11 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient stop:nth-child(2) { stop-opacity: .05; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient stop:first-child { stop-opacity: .07; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient:first-child stop:first-child { stop-opacity: .13; }
+/* 12.4b (24/11) gráficos SEMPRE em barras: no escuro as barras dos cartões ficam laranja SÓLIDO (pêssego no topo → laranja na base,
+   igual à barra do mês atual do Painel). A névoa branca acima continua só para degradês de área, que não aparecem mais. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient[id^="bar-"] stop:first-child { stop-color: var(--gf-pessego); stop-opacity: 1; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient[id^="bar-"] stop:last-child { stop-color: var(--azul); stop-opacity: 1; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .d5-graf-svg :is(.d5-graf-stop-topo, .d5-graf-stop-meio, .d5-graf-stop-base) { stop-opacity: 1; }
 /* 12.5 selos, ícones e marcas que tinham fundo laranja translúcido: fundo cinza, a cor fica no texto/desenho */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cfgw-amb.cobrancas, .cfgi-ic.on, .cfgw-ok-ic, .cfgr-passos-lista i, .cfgo-conf i, .cv2-n, .cv2-av.p, .ev-st-ic.atencao) { background: rgba(255, 255, 255, .06); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .cfgi-nota { background: rgba(255, 255, 255, .035); border-color: rgba(255, 255, 255, .09); }
