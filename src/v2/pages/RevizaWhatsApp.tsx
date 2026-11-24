@@ -524,7 +524,7 @@ export function ConversasReviza() {
         {sel && cliSel ? (
           <CardVidro spot className="cv2-cli fx-span2">
             <div className="cv2-cli-cab">
-              <span className={`cv2-av t-${estadoDe(sel).tom}`} aria-hidden>{iniciaisNome(cliSel.nome)}<FotoCliente nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
+              <span className={`cv2-av t-${estadoDe(sel).tom}`} aria-hidden>{iniciaisNome(cliSel.nome)}<FotoCliente ilustrativa nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
               <div className="cv2-cli-quem">
                 <b>{cliSel.nome}</b>
                 <span className="num">{fmtTel(sel.telefone)}{nomeGente(cliSel.atendente) ? ` · ${nomeGente(cliSel.atendente)}` : ''}</span>
@@ -591,7 +591,7 @@ export function ConversasReviza() {
         ) : sel ? (
           <CardVidro spot className="cv2-cli fx-span2">
             <div className="cv2-cli-cab">
-              <span className="cv2-av t-neutro" aria-hidden>{iniciaisNome(nomeDe(sel))}<FotoCliente nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
+              <span className="cv2-av t-neutro" aria-hidden>{iniciaisNome(nomeDe(sel))}<FotoCliente ilustrativa nome={nomeAgenda(nomeDe(sel), sel.telefone)} id={sel.lead_id ?? sel.id} tam={46} /></span>
               <div className="cv2-cli-quem">
                 <b>{nomeDe(sel)}</b>
                 {nomeDe(sel) !== fmtTel(sel.telefone) && <span className="num">{fmtTel(sel.telefone)}</span>}
@@ -608,7 +608,7 @@ export function ConversasReviza() {
                 <div className="cv2-lista">
                   {esperando.map((c) => (
                     <button type="button" key={c.id} className="cv2-item" onClick={() => setSelId(c.id)}>
-                      <span className={`cv2-av p t-${estadoDe(c).tom}`} aria-hidden>{iniciaisNome(nomeDe(c))}<FotoCliente nome={nomeAgenda(nomeDe(c), c.telefone)} id={c.lead_id ?? c.id} tam={32} /></span>
+                      <span className={`cv2-av p t-${estadoDe(c).tom}`} aria-hidden>{iniciaisNome(nomeDe(c))}<FotoCliente ilustrativa nome={nomeAgenda(nomeDe(c), c.telefone)} id={c.lead_id ?? c.id} tam={32} /></span>
                       <span className="cv2-item-mid"><b>{nomeDe(c)}</b><i>{textoPreviaWa(c.ultima_previa).texto || '—'}</i></span>
                       <span className="cv2-item-fim"><span className="num">{quandoLista(c.ultima_em)}</span><span className="cv2-badge num">{c.nao_lidas}</span></span>
                     </button>
@@ -622,7 +622,7 @@ export function ConversasReviza() {
                 <div className="cv2-lista">
                   {responderam.map((a) => { const rp = textoPreviaWa(a.resposta_previa); return (
                     <button type="button" key={a.id} className="cv2-item" onClick={() => setSelId(a.conversa_id!)}>
-                      <span className="cv2-av p" aria-hidden>{iniciaisNome(a.nome ?? '')}<FotoCliente nome={nomeAgenda(a.nome ?? '', a.telefone)} id={a.lead_id ?? a.conversa_id ?? a.id} tam={32} /></span>
+                      <span className="cv2-av p" aria-hidden>{iniciaisNome(a.nome ?? '')}<FotoCliente ilustrativa nome={nomeAgenda(a.nome ?? '', a.telefone)} id={a.lead_id ?? a.conversa_id ?? a.id} tam={32} /></span>
                       <span className="cv2-item-mid"><b>{a.nome ?? fmtTel(a.telefone)}</b><i>{rp.texto ? (rp.midia ? rp.texto : `“${rp.texto}”`) : `respondeu “${a.passo_nome ?? a.wa_envios?.nome ?? 'envio'}”`}</i></span>
                       <span className="cv2-item-fim"><span className="num">{a.respondeu_em ? new Date(a.respondeu_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span></span>
                     </button>
@@ -1076,7 +1076,7 @@ function LinhaZap({ c, nome, agora, aoAbrir }: {
   const nova = c.nao_lidas > 0;
   return (
     <button type="button" data-id={c.id} className="zp-linha" onClick={() => aoAbrir(c.id)}>
-      <span className="zp-av" style={{ background: ini ? corDe(c.id) : undefined }} aria-hidden>{ini || <IcContatoMini />}<FotoCliente nome={exibido} id={c.lead_id ?? c.id} tam={54} /></span>
+      <span className="zp-av" style={{ background: ini ? corDe(c.id) : undefined }} aria-hidden>{ini || <IcContatoMini />}<FotoCliente ilustrativa nome={exibido} id={c.lead_id ?? c.id} tam={54} /></span>
       <span className="zp-linha-tx">
         <span className="zp-l1">
           <b>{exibido}</b>
@@ -1625,7 +1625,7 @@ function ChatReviza({ conversa, titulo, estado, aoVoltar, inserirTexto, aoConsum
           <IcVoltar />{naoLidasOutras > 0 && <span className="zp-voltar-n" aria-hidden>{naoLidasOutras > 99 ? '99+' : naoLidasOutras}</span>}
         </button>
         <span className="zp-av zp-av-p" style={{ background: corDe(conversa.id) }} aria-hidden>
-          {iniciaisDe(nomeTela) || <IcContatoMini />}<FotoCliente nome={nomeTela} id={conversa.lead_id ?? conversa.id} tam={38} />
+          {iniciaisDe(nomeTela) || <IcContatoMini />}<FotoCliente ilustrativa nome={nomeTela} id={conversa.lead_id ?? conversa.id} tam={38} />
         </span>
         <span className="zp-conv-quem">
           <b ref={tituloRef} tabIndex={-1}>{nomeTela}</b>

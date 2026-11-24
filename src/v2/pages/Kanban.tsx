@@ -22,7 +22,7 @@ import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials, avatarColor } from '@/lib/avatar';
-import { fotoIlustrativa } from '../lib/fotoIlustrativa';
+import { useFotoReal } from '../lib/fotosReais';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDosCardsDaPrevia } from '../data/config/equipes';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
@@ -1575,9 +1575,10 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   const nomeCard = fone ?? nomeExibicao(l.nome);
 
   // Kanban PRO (29/10, dono: "mais minimalista, profissional"): nome + 1 linha cinza + chips
-  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto ILUSTRATIVA).
+  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto do cliente).
   const subtitulo = [benefLbl, ...metaPartes].filter(Boolean).join(' · ');
-  const foto = fotoIlustrativa(l.nome, l.contatoId ?? l.id);
+  // 24/11: a foto REAL do WhatsApp do cliente; quem esconde a foto fica só com o responsável
+  const foto = useFotoReal(l.contatoId ?? null, l.nome);
   const estado = badge
     ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
     : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `Parado ${dp}d`, msg: false }
@@ -1670,7 +1671,8 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         <span className="kc-pessoas">
           <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
             style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '?'}</span>
-          <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title="Foto ilustrativa" draggable={false} />
+          {foto && <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title={nomeCard} draggable={false}
+            referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         </span>
       </div>
     </div>

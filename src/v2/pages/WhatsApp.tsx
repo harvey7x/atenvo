@@ -1412,7 +1412,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
               <button type="button" className="ib2 wa-cel-volta" title="Voltar para a lista" aria-label="Voltar para a lista de conversas" onClick={() => setCelPainel('lista')}><IcVoltar /></button>
-              <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
+              <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente atualizar nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
@@ -1700,7 +1700,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
          <div className="wa-ctx-inner">
           <div className="ctx-topo spot">
             <button type="button" className="ib2 wa-cel-volta ctx-volta" title="Voltar para a conversa" aria-label="Voltar para a conversa" onClick={() => setCelPainel('conversa')}><IcVoltar /></button>
-            <div className="av2">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
+            <div className="av2">{initials(nomeExibicao(current))}<FotoCliente atualizar nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
             <div className="n2">{nomeExibicao(current)}</div>
             <div className="t2 num">
               {current.phone ? numeroMascarado(current.phone) : 'sem número'}
