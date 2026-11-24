@@ -272,3 +272,8 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 .v2 .cfgr-endereco { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; background: rgba(var(--tint), .03); }
 .v2 .cfgr-endereco code { flex: 1; min-width: 0; font: 12px/1.45 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; color: var(--txt); }
 @media (max-width: 860px) { .v2 .cfgr-instr { grid-template-columns: 1fr; } }
+
+.v2 .cfgr-passos { margin: 0 0 4px; padding-left: 18px; display: grid; gap: 7px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgr-passos b { color: var(--txt); font-weight: 600; }
+.v2 .cfgr-sub { margin-top: 14px; }
+.v2 .cfgr-det { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4; color: var(--txt-3); }
