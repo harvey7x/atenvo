@@ -29,7 +29,7 @@ export function SecQuem({ c, set }: P) {
           <p>{exemplo(apresentacao, c)}</p>
         </div>
       </Bloco>
-      <Bloco titulo="O trabalho dela" desc="O que ela faz nesta versão e como ela fala. Vai para o motor junto com as regras de fábrica, que não mudam.">
+      <Bloco titulo="O trabalho dela" desc="O que ela faz e como ela fala. Vai para o motor junto com as regras de fábrica, que não mudam.">
         <TextoLongo rotulo="O que ela faz" valor={i.papel} aoMudar={mud('papel')} linhas={3} max={1500}
           dica="Ex.: faz o primeiro atendimento, a análise inicial e pede os documentos; quem conclui é o atendente." />
         <TextoLongo rotulo="Como ela fala" valor={i.instrucoes} aoMudar={mud('instrucoes')} linhas={4} max={4000}
@@ -319,7 +319,7 @@ export function SecTextos({ c, set }: P) {
         </nav>
         <div className="irs-textos-lista">
           <div className="irs-textos-cab">
-            <div><h3>{grupo === 'pendentes' ? 'Falta aprovar' : grupoInfo?.rotulo}</h3><p>{grupo === 'pendentes' ? 'Os textos que esta versão usa e ainda não foram aprovados.' : grupoInfo?.desc}</p></div>
+            <div><h3>{grupo === 'pendentes' ? 'Falta aprovar' : grupoInfo?.rotulo}</h3><p>{grupo === 'pendentes' ? 'Os textos que esta IA usa e ainda não foram aprovados.' : grupoInfo?.desc}</p></div>
             <div className="irs-textos-acoes">
               {lista.some((t) => !t.aprovado) && <BotaoSec mini onClick={() => set((x) => ({ ...x, textos: x.textos.map((t) => (lista.some((l) => l.id === t.id) ? { ...t, aprovado: true } : t)) }))}>Aprovar {lista.filter((t) => !t.aprovado).length} daqui</BotaoSec>}
               {grupo !== 'pendentes' && <BotaoSec mini onClick={() => set((x) => ({ ...x, textos: [...x.textos, { id: novoId('X').toUpperCase(), grupo: grupo as GrupoTexto, quando: 'Texto novo', tipo: 'texto', texto: '', aprovado: false, origem: 'novo' }] }))}>＋ Texto</BotaoSec>}
@@ -333,7 +333,7 @@ export function SecTextos({ c, set }: P) {
                 <input className="irs-texto-quando" aria-label="Quando é usado" value={t.quando} maxLength={120} onChange={(e) => mudarT(t.id, (x) => ({ ...x, quando: e.target.value }))} />
                 <button type="button" className={'irs-tipo ' + t.tipo} onClick={() => mudarT(t.id, (x) => ({ ...x, tipo: x.tipo === 'texto' ? 'audio' : 'texto', aprovado: false }))} title="Trocar entre texto e áudio">{t.tipo === 'audio' ? 'Áudio' : 'Texto'}</button>
                 {t.aprovado ? <BadgeStatus tom="ok">Aprovado</BadgeStatus> : <BadgeStatus tom="atencao">{t.origem === 'atenvo' ? 'Adaptado do Atenvo' : 'Novo'}</BadgeStatus>}
-                {!usados.has(t.id) && <span className="irs-fora">fora desta versão</span>}
+                {!usados.has(t.id) && <span className="irs-fora">não usado nesta IA</span>}
               </header>
               <textarea className="inp irs-area" aria-label={`Texto ${t.id}`} rows={Math.min(5, Math.max(2, Math.ceil(t.texto.length / 90)))} value={t.texto} maxLength={1200}
                 onChange={(e) => mudarT(t.id, (x) => ({ ...x, texto: e.target.value, aprovado: false, origem: x.origem === 'novo' ? 'novo' : 'editado' }))} />

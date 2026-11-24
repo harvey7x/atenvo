@@ -244,7 +244,7 @@ export function prontidao(v: VersaoIris, numeros: NumeroIris[]): ItemProntidao[]
     { id: 'equipe', titulo: 'Quem recebe os clientes', ok: recebem > 0 || c.equipe.distribuicao === 'equipe_do_numero', secao: 'equipe', obrigatorio: true,
       detalhe: c.equipe.distribuicao === 'equipe_do_numero' ? 'Vai para a equipe dona de cada número.' : recebem ? `${recebem} ${recebem === 1 ? 'pessoa recebe' : 'pessoas recebem'}.` : 'Escolha quem recebe os clientes prontos.' },
     { id: 'numeros', titulo: 'Números escolhidos', ok: meus.length > 0, secao: 'resumo', obrigatorio: true,
-      detalhe: meus.length ? `${meus.length} ${meus.length === 1 ? 'número' : 'números'} com esta versão.` : 'Escolha em quais números esta versão atende.' },
+      detalhe: meus.length ? `${meus.length} ${meus.length === 1 ? 'número' : 'números'} com esta IA.` : 'Escolha em quais números esta IA atende.' },
   ];
 }
 

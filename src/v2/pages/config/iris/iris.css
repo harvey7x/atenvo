@@ -2,40 +2,73 @@
    no que pede atenção (falta preencher, escolhido, pendente). Títulos de coluna no meio; a 1ª coluna à esquerda. */
 .v2 .irs { display: flex; flex-direction: column; gap: 16px; padding-bottom: 80px; }
 
-/* ---------- versões ---------- */
-.v2 .irs-versoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.v2 .irs-versao {
-  display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 13px 15px; border-radius: 14px; cursor: pointer;
-  background: var(--vidro-a); border: 1px solid var(--linha); color: var(--txt); font: inherit; transition: border-color .15s ease, box-shadow .15s ease;
+/* ---------- as IAs: slots (cheios e vazios) ---------- */
+.v2 .irs-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.v2 .irs-slot {
+  position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 148px; padding: 16px; border-radius: 16px; text-align: left; cursor: pointer;
+  background: var(--vidro-a); border: 1px solid var(--linha); color: var(--txt); font: inherit;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
-.v2 .irs-versao:hover { border-color: rgba(var(--tint), .22); }
-.v2 .irs-versao.on { border-color: var(--azul); box-shadow: inset 0 0 0 1px var(--azul); }
-.v2 .irs-versao:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
-.v2 .irs-versao-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.v2 .irs-versao-topo b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2 .irs-versao-meta { font-size: 12px; color: var(--txt-3); }
-.v2 .irs-versao-pronta { font-size: 12px; color: var(--azul); font-weight: 500; }
-.v2 .irs-versao-pronta.ok { color: var(--verde); }
+.v2 .irs-slot:hover { border-color: rgba(var(--tint), .2); box-shadow: 0 6px 18px -10px rgba(16, 24, 40, .25); }
+.v2 .irs-slot.on { border-color: var(--azul); box-shadow: inset 0 0 0 1px var(--azul), 0 8px 22px -14px rgba(16, 24, 40, .35); }
+.v2 .irs-slot:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+.v2 .irs-slot-topo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.v2 .irs-slot-nome { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.v2 .irs-slot-nome b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .irs-slot-nome span { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-slot-fatos { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .irs-slot-fatos > span { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .irs-slot-fatos .irs-icone { color: var(--txt-3); }
+.v2 .irs-slot-pronta { display: flex; flex-direction: column; gap: 6px; margin-top: auto; font-size: 12px; color: var(--txt-3); }
+.v2 .irs-slot-pronta > span.ok { color: var(--verde); font-weight: 500; }
+.v2 .irs-barra { display: block; height: 4px; border-radius: 4px; background: rgba(var(--tint), .08); overflow: hidden; }
+.v2 .irs-barra i { display: block; height: 100%; border-radius: 4px; background: var(--azul); transition: width .3s ease; }
+.v2 .irs-barra i.ok { background: var(--verde); }
+/* slot vazio: tracejado, o "+" no meio */
+.v2 .irs-slot.vazio { align-items: center; justify-content: center; gap: 4px; text-align: center; background: transparent; border: 1.5px dashed rgba(var(--tint), .18); box-shadow: none; color: var(--txt-2); }
+.v2 .irs-slot.vazio:hover { border-color: var(--azul); color: var(--txt); background: rgba(var(--tint), .02); }
+.v2 .irs-slot.vazio b { font-size: 13.5px; font-weight: 600; }
+.v2 .irs-slot.vazio > span:last-child { font-size: 12px; color: var(--txt-3); }
+.v2 .irs-slot-mais { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 6px; border-radius: 50%; border: 1px solid var(--linha); color: var(--txt-2); background: var(--vidro-a); transition: border-color .15s ease, color .15s ease; }
+.v2 .irs-slot.vazio:hover .irs-slot-mais { border-color: var(--azul); color: var(--azul); }
+
+/* monograma da IA */
+.v2 .irs-av { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; font-size: 15px; font-weight: 600; color: var(--txt-2); background: rgba(var(--tint), .07); border: 1px solid var(--linha); }
+.v2 .irs-av.viva { background: var(--azul); border-color: var(--azul); color: #fff; }
+.v2 .irs-av.grande { width: 52px; height: 52px; border-radius: 15px; font-size: 21px; }
+
+/* ---------- a IA escolhida ---------- */
+.v2 .irs-cab { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 16px; background: var(--vidro-a); border: 1px solid var(--linha); }
+.v2 .irs-cab-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .irs-cab-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.v2 .irs-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--linha); font-size: 12px; color: var(--txt-2); }
+.v2 .irs-chip .irs-icone { color: var(--txt-3); }
+.v2 .irs-cab-acoes { display: flex; gap: 8px; }
+.v2 .irs-nome { width: 100%; border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 18px; font-weight: 600; letter-spacing: -.015em; padding: 2px 4px; margin-left: -4px; border-radius: 6px; }
+.v2 .irs-desc { width: 100%; border: 0; background: transparent; color: var(--txt-3); font: inherit; font-size: 13px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; }
+.v2 .irs-nome:hover, .v2 .irs-desc:hover { background: rgba(var(--tint), .04); }
+.v2 .irs-nome:focus-visible, .v2 .irs-desc:focus-visible { outline: 0; background: rgba(var(--tint), .05); box-shadow: inset 0 0 0 1px var(--linha); }
 
 /* ---------- editor: navegação + conteúdo ---------- */
-.v2 .irs-editor { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
-.v2 .irs-nav { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 1px; }
-.v2 .irs-nav-nome { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--linha); }
-.v2 .irs-nome { border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 15px; font-weight: 600; padding: 2px 0; border-radius: 4px; }
-.v2 .irs-desc { border: 0; background: transparent; color: var(--txt-3); font: inherit; font-size: 12px; padding: 2px 0; border-radius: 4px; }
-.v2 .irs-nome:focus-visible, .v2 .irs-desc:focus-visible { outline: 1px solid var(--linha); outline-offset: 2px; }
+.v2 .irs-editor { display: grid; grid-template-columns: 228px minmax(0, 1fr); gap: 20px; align-items: start; }
+.v2 .irs-nav { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 1px; padding: 10px; border-radius: 16px; background: var(--vidro-a); border: 1px solid var(--linha); }
 .v2 .irs-nav-grupo { display: block; margin: 12px 10px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); }
 .v2 .irs-nav-item {
-  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent;
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent;
   color: var(--txt-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: background-color .12s ease, color .12s ease;
 }
+.v2 .irs-nav-item .irs-icone { color: var(--txt-3); flex: none; transition: color .12s ease; }
 .v2 .irs-nav-item:hover { background: rgba(var(--tint), .04); color: var(--txt); }
 .v2 .irs-nav-item.on { background: rgba(var(--tint), .07); color: var(--txt); font-weight: 600; }
+.v2 .irs-nav-item.on .irs-icone { color: var(--azul); }
 .v2 .irs-pend { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--azul); flex: none; }
+.v2 .irs-sec-cab { display: flex; flex-direction: column; gap: 3px; padding: 2px 2px 2px; }
+.v2 .irs-sec-cab h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.015em; color: var(--txt); }
+.v2 .irs-sec-cab p { margin: 0; font-size: 13px; color: var(--txt-3); }
 .v2 .irs-conteudo { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 /* ---------- blocos e campos ---------- */
-.v2 .irs-bloco { background: var(--vidro-a); border: 1px solid var(--linha); border-radius: 14px; padding: 18px 20px; }
+.v2 .irs-bloco { background: var(--vidro-a); border: 1px solid var(--linha); border-radius: 16px; padding: 20px 22px; box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
 .v2 .irs-bloco > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .v2 .irs-bloco > header h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--txt); letter-spacing: -.01em; }
 .v2 .irs-bloco > header p { margin: 3px 0 0; font-size: 12.5px; color: var(--txt-3); max-width: 70ch; }
@@ -86,7 +119,12 @@
 .v2 .irs-uf { min-width: 42px; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--linha); background: transparent; color: var(--txt-2); font: inherit; font-size: 12.5px; cursor: pointer; }
 .v2 .irs-uf.on { background: var(--azul); border-color: var(--azul); color: #fff; font-weight: 600; }
 
-.v2 .irs-nota { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linha); background: rgba(var(--tint), .03); font-size: 13px; color: var(--txt-2); line-height: 1.5; }
+.v2 .irs-nota { position: relative; padding: 12px 16px 12px 42px; border-radius: 12px; border: 1px solid var(--linha); background: rgba(var(--tint), .03); font-size: 13px; color: var(--txt-2); line-height: 1.5; }
+.v2 .irs-nota::before {
+  content: ''; position: absolute; left: 15px; top: 14px; width: 16px; height: 16px; background: var(--txt-3);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 .v2 .irs-nota b { color: var(--txt); font-weight: 600; }
 .v2 .irs-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--txt-3); }
 .v2 .irs-vars code { font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: rgba(var(--tint), .07); color: var(--txt-2); cursor: help; }
@@ -209,11 +247,13 @@
 .v2 .irs-salvar { z-index: 6; }
 
 /* ---------- celular ---------- */
+@media (max-width: 1180px) { .v2 .irs-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 880px) {
   .v2 .irs-editor { grid-template-columns: 1fr; }
+  .v2 .irs-cab { grid-template-columns: auto minmax(0, 1fr); }
+  .v2 .irs-cab-acoes { grid-column: 1 / -1; }
   .v2 .irs-nav { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
   .v2 .irs-nav > div { flex: none; }
-  .v2 .irs-nav-nome { flex: none; min-width: 220px; border-bottom: 0; margin: 0; padding: 0 8px 0 0; }
   .v2 .irs-nav-grupo { display: none; }
   .v2 .irs-nav-item { white-space: nowrap; }
   .v2 .irs-grade2, .v2 .irs-grade3, .v2 .irs-fato, .v2 .irs-doc-corpo { grid-template-columns: 1fr; }
@@ -223,4 +263,5 @@
   .v2 .irs-texto-pe, .v2 .irs-acoes-linha { flex-wrap: wrap; }
   .v2 .irs-bloco { padding: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .v2 .irs-versao, .v2 .irs-nav-item, .v2 .irs-opcao { transition: none; } }
+@media (max-width: 520px) { .v2 .irs-slots { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .v2 .irs-slot, .v2 .irs-nav-item, .v2 .irs-opcao, .v2 .irs-barra i { transition: none; } }

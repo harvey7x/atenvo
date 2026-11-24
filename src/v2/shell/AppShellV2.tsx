@@ -203,7 +203,7 @@ const CFG_GRUPOS: GrupoNav[] = [
   // servidor ou quando já dá para cadastrá-lo (recurso "acessos")
   { rotulo: 'Equipe', itens: [{ slug: 'config/usuarios', rotulo: 'Usuários e acessos', admin: true }, ...(temCadastroAtendimento() ? [{ slug: 'config/equipes', rotulo: 'Equipes', admin: true }] : []), { slug: 'config/registros', rotulo: 'Registros', admin: true }] },
   { rotulo: 'Atendimento', itens: [
-    ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Iris, atendente virtual', admin: true }] : []),
+    ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Atendentes de IA', admin: true }] : []),
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor

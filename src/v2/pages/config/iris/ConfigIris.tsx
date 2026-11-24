@@ -19,20 +19,38 @@ import {
   type BolhaTeste, type IrisConfig, type NumeroIris, type VersaoIris,
 } from '../../../data/config/iris';
 import { Bloco, Liga, Numero } from './campos';
+import { Ic } from './icones';
 import { SecDocumentos, SecEmpresa, SecEquipe, SecHorarios, SecNunca, SecOferece, SecQualificacao, SecQuem, SecRetomadas, SecTextos } from './secoes';
 import '../../painel/painel.css';
 import './iris.css';
 
 type Secao = 'resumo' | 'quem' | 'empresa' | 'oferece' | 'analise' | 'documentos' | 'equipe' | 'textos' | 'retomadas' | 'horarios' | 'nunca' | 'testar' | 'avancado';
-const SECOES: { id: Secao; rotulo: string; grupo: string }[] = [
-  { id: 'resumo', rotulo: 'Resumo', grupo: '' },
-  { id: 'quem', rotulo: 'Quem ela é', grupo: 'Ela' }, { id: 'empresa', rotulo: 'A empresa', grupo: 'Ela' }, { id: 'oferece', rotulo: 'O que oferece', grupo: 'Ela' },
-  { id: 'analise', rotulo: 'Análise inicial', grupo: 'Atendimento' }, { id: 'documentos', rotulo: 'Documentos', grupo: 'Atendimento' },
-  { id: 'equipe', rotulo: 'Passar para a equipe', grupo: 'Atendimento' }, { id: 'textos', rotulo: 'Textos e áudios', grupo: 'Atendimento' },
-  { id: 'retomadas', rotulo: 'Retomadas', grupo: 'Ritmo' }, { id: 'horarios', rotulo: 'Horários', grupo: 'Ritmo' }, { id: 'nunca', rotulo: 'O que ela nunca diz', grupo: 'Ritmo' },
-  { id: 'testar', rotulo: 'Conversar para testar', grupo: 'Ferramentas' }, { id: 'avancado', rotulo: 'Avançado', grupo: 'Ferramentas' },
+const SECOES: { id: Secao; rotulo: string; grupo: string; desc: string }[] = [
+  { id: 'resumo', rotulo: 'Resumo', grupo: '', desc: 'O que falta para ela atender, em quais números ela está e como ela está indo.' },
+  { id: 'quem', rotulo: 'Quem ela é', grupo: 'Identidade', desc: 'O nome, como ela se apresenta, o trabalho dela e o jeito de falar.' },
+  { id: 'empresa', rotulo: 'A empresa', grupo: 'Identidade', desc: 'Os fatos que ela pode dizer: dados, valores, prazos e de onde atende.' },
+  { id: 'oferece', rotulo: 'O que oferece', grupo: 'Identidade', desc: 'Os assuntos que ela atende. O que estiver desligado ela não oferece.' },
+  { id: 'analise', rotulo: 'Análise inicial', grupo: 'Atendimento', desc: 'As perguntas que ela faz para saber se o cliente pode ser atendido.' },
+  { id: 'documentos', rotulo: 'Documentos', grupo: 'Atendimento', desc: 'O que ela pede depois da análise e como confere cada documento.' },
+  { id: 'equipe', rotulo: 'Passar para a equipe', grupo: 'Atendimento', desc: 'Como ela entrega o cliente pronto e quem da equipe recebe.' },
+  { id: 'textos', rotulo: 'Textos e áudios', grupo: 'Atendimento', desc: 'As frases fixas dela. Ela só usa um texto depois de aprovado.' },
+  { id: 'retomadas', rotulo: 'Retomadas', grupo: 'Ritmo', desc: 'Quando ela volta a chamar quem parou, sem insistir.' },
+  { id: 'horarios', rotulo: 'Horários', grupo: 'Ritmo', desc: 'Os dias, os turnos e quando ela pode chamar o cliente.' },
+  { id: 'nunca', rotulo: 'O que ela nunca diz', grupo: 'Ritmo', desc: 'As regras e as palavras que ela não usa em hipótese nenhuma.' },
+  { id: 'testar', rotulo: 'Conversar para testar', grupo: 'Ferramentas', desc: 'Você faz o papel do cliente e vê como ela responde.' },
+  { id: 'avancado', rotulo: 'Avançado', grupo: 'Ferramentas', desc: 'A chave do Google, os modelos, o teto do dia, exportar, duplicar e excluir.' },
 ];
 const ROT_ORIGEM: Record<VersaoIris['origem'], string> = { pre_configurada: 'Pré-configurada', nova: 'Criada aqui', duplicada: 'Cópia', importada: 'Importada' };
+const SLOTS = 4;
+const inicial = (n: string) => (n.trim().replace(/[^\p{L}\p{N}]/gu, '')[0] ?? 'I').toUpperCase();
+type Estado = { tom: 'ok' | 'atencao' | 'neutro'; txt: string };
+function estadoDe(v: VersaoIris, numeros: NumeroIris[]): Estado {
+  const nums = numeros.filter((n) => n.versaoId === v.id);
+  if (!v.ativa) return { tom: 'neutro', txt: 'Desligada' };
+  if (nums.some((n) => n.ligado && !n.modoTeste)) return { tom: 'ok', txt: 'Atendendo' };
+  if (nums.some((n) => n.ligado)) return { tom: 'atencao', txt: 'Em teste' };
+  return { tom: 'neutro', txt: 'Ligada, sem número' };
+}
 const fone = (n: string | null) => (n ? formatarTelefone(n) || n : 'sem número');
 const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -87,47 +105,79 @@ export function ConfigIris() {
     <div className="pn cfgw irs" ref={topo}>
       <AcoesNoTopo>
         <BotaoSec onClick={() => setJanela('importar')}>Importar</BotaoSec>
-        <BotaoPrimario onClick={() => setJanela('nova')}>＋ Nova versão</BotaoPrimario>
+        <BotaoPrimario onClick={() => setJanela('nova')}>＋ Nova IA</BotaoPrimario>
       </AcoesNoTopo>
 
       {aviso && <div className={'gs-aviso ' + (aviso.tom === 'ok' ? 'ok' : 'erro')} role="status"><span>{aviso.txt}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
 
-      {carregando ? <p className="pn-vazio">Carregando a Iris…</p>
-        : versoesQ.isError ? <EstadoErro titulo="Não foi possível carregar a Iris" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={() => void versoesQ.refetch()} />
+      {carregando ? <p className="pn-vazio">Carregando as IAs…</p>
+        : versoesQ.isError ? <EstadoErro titulo="Não foi possível carregar as IAs" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={() => void versoesQ.refetch()} />
         : versoes.length === 0 ? (
-          <EstadoVazio titulo="A Iris ainda não está aqui" descricao="Crie a Iris pré-configurada: ela vem como a do Atenvo, com o nome da empresa, e nasce desligada."
+          <EstadoVazio titulo="Nenhuma IA ainda" descricao="Comece pela Iris pré-configurada: ela vem como a do Atenvo, com o nome da empresa, e nasce desligada."
             acao={{ rotulo: 'Criar a Iris pré-configurada', onClick: () => void criarVersao('Iris', 'pre_configurada', irisPreConfigurada()) }} />
         ) : (
           <>
-            <div className="irs-versoes" role="tablist" aria-label="Versões da Iris">
+            <div className="irs-slots" role="tablist" aria-label="Atendentes de IA">
               {versoes.map((v) => {
                 const nums = numeros.filter((n) => n.versaoId === v.id);
-                const pend = prontidao(v, numeros).filter((i) => i.obrigatorio && !i.ok).length;
-                const estado = !v.ativa ? { tom: 'neutro' as const, txt: 'Desligada' } : nums.some((n) => n.ligado && !n.modoTeste) ? { tom: 'ok' as const, txt: 'Atendendo' } : nums.some((n) => n.ligado) ? { tom: 'atencao' as const, txt: 'Em teste' } : { tom: 'neutro' as const, txt: 'Ligada, sem número' };
+                const pr = prontidao(v, numeros);
+                const prontos = pr.filter((i) => i.ok).length;
+                const est = estadoDe(v, numeros);
+                const ativos = v.config.produtos.filter((p) => p.ativo).length;
                 return (
-                  <button key={v.id} type="button" role="tab" aria-selected={sel?.id === v.id} className={'irs-versao' + (sel?.id === v.id ? ' on' : '')} onClick={() => escolher(v.id)}>
-                    <span className="irs-versao-topo"><b>{v.nome}</b><BadgeStatus tom={estado.tom}>{estado.txt}</BadgeStatus></span>
-                    <span className="irs-versao-meta">{ROT_ORIGEM[v.origem]} · {nums.length ? `${nums.length} ${nums.length === 1 ? 'número' : 'números'}` : 'nenhum número'}</span>
-                    <span className={'irs-versao-pronta' + (pend ? '' : ' ok')}>{pend ? `Falta${pend > 1 ? 'm' : ''} ${pend} ${pend === 1 ? 'passo' : 'passos'} para ligar` : 'Pronta para ligar'}</span>
+                  <button key={v.id} type="button" role="tab" aria-selected={sel?.id === v.id} className={'irs-slot' + (sel?.id === v.id ? ' on' : '')} onClick={() => escolher(v.id)}>
+                    <span className="irs-slot-topo">
+                      <span className={'irs-av' + (est.tom === 'ok' ? ' viva' : '')} aria-hidden>{inicial(v.nome)}</span>
+                      <span className="irs-slot-nome"><b>{v.nome}</b><span>{ROT_ORIGEM[v.origem]}</span></span>
+                      <BadgeStatus tom={est.tom}>{est.txt}</BadgeStatus>
+                    </span>
+                    <span className="irs-slot-fatos">
+                      <span><Ic nome="numero" tam={13} />{nums.length ? `${nums.length} ${nums.length === 1 ? 'número' : 'números'}` : 'Sem número'}</span>
+                      <span><Ic nome="oferece" tam={13} />{ativos} {ativos === 1 ? 'assunto' : 'assuntos'}</span>
+                    </span>
+                    <span className="irs-slot-pronta">
+                      <span className="irs-barra" aria-hidden><i style={{ width: `${(prontos / pr.length) * 100}%` }} className={prontos === pr.length ? 'ok' : ''} /></span>
+                      <span className={prontos === pr.length ? 'ok' : ''}>{prontos === pr.length ? 'Pronta para ligar' : `${prontos} de ${pr.length} passos para ligar`}</span>
+                    </span>
                   </button>
                 );
               })}
+              {Array.from({ length: versoes.length < SLOTS ? SLOTS - versoes.length : Math.max(1, (SLOTS - (versoes.length % SLOTS)) % SLOTS) }, (_, n) => (
+                <button key={`vazio-${n}`} type="button" className="irs-slot vazio" onClick={() => setJanela('nova')}>
+                  <span className="irs-slot-mais" aria-hidden><Ic nome="mais" tam={18} /></span>
+                  <b>Adicionar IA</b>
+                  <span>Slot vazio</span>
+                </button>
+              ))}
             </div>
 
             {sel && rasc && (
-              <div className="irs-editor">
-                <nav className="irs-nav" aria-label="Partes da versão">
-                  <div className="irs-nav-nome">
-                    <input className="irs-nome" aria-label="Nome da versão" value={rasc.nome} maxLength={80} onChange={(e) => setRasc({ ...rasc, nome: e.target.value })} />
-                    <input className="irs-desc" aria-label="Para que serve esta versão" value={rasc.descricao} maxLength={300} placeholder="Para que serve esta versão" onChange={(e) => setRasc({ ...rasc, descricao: e.target.value })} />
+              <>
+              <div className="irs-cab">
+                <span className={'irs-av grande' + (estadoDe(sel, numeros).tom === 'ok' ? ' viva' : '')} aria-hidden>{inicial(rasc.nome)}</span>
+                <div className="irs-cab-tx">
+                  <input className="irs-nome" aria-label="Nome da IA" value={rasc.nome} maxLength={80} onChange={(e) => setRasc({ ...rasc, nome: e.target.value })} />
+                  <input className="irs-desc" aria-label="Para que serve esta IA" value={rasc.descricao} maxLength={300} placeholder="Para que serve esta IA (ex.: atende a campanha do cartão RMC)" onChange={(e) => setRasc({ ...rasc, descricao: e.target.value })} />
+                  <div className="irs-cab-chips">
+                    <BadgeStatus tom={estadoDe(sel, numeros).tom}>{estadoDe(sel, numeros).txt}</BadgeStatus>
+                    <span className="irs-chip"><Ic nome="numero" tam={13} />{meus.length ? `${meus.length} ${meus.length === 1 ? 'número' : 'números'}` : 'Sem número'}</span>
+                    <span className="irs-chip"><Ic nome="ia" tam={13} />{MODELOS_GEMINI.find((m) => m.valor === rasc.config.modelo.conversa)?.rotulo ?? rasc.config.modelo.conversa}</span>
+                    <span className="irs-chip">{ROT_ORIGEM[sel.origem]}</span>
                   </div>
+                </div>
+                <div className="irs-cab-acoes">
+                  <BotaoSec onClick={() => setSecao('testar')}>Conversar para testar</BotaoSec>
+                </div>
+              </div>
+              <div className="irs-editor">
+                <nav className="irs-nav" aria-label="Partes da IA">
                   {SECOES.map((s, n) => {
                     const pend = itens.find((i) => i.secao === s.id && i.obrigatorio && !i.ok);
                     return (
                       <div key={s.id}>
                         {s.grupo && s.grupo !== SECOES[n - 1]?.grupo && <span className="irs-nav-grupo">{s.grupo}</span>}
                         <button type="button" className={'irs-nav-item' + (secao === s.id ? ' on' : '')} aria-current={secao === s.id ? 'page' : undefined} onClick={() => setSecao(s.id)}>
-                          {s.rotulo}{pend && <i className="irs-pend" title={pend.detalhe} aria-label="falta resolver" />}
+                          <Ic nome={s.id} /><span>{s.rotulo}</span>{pend && <i className="irs-pend" title={pend.detalhe} aria-label="falta resolver" />}
                         </button>
                       </div>
                     );
@@ -135,6 +185,10 @@ export function ConfigIris() {
                 </nav>
 
                 <div className="irs-conteudo">
+                  <header className="irs-sec-cab">
+                    <h2>{SECOES.find((s) => s.id === secao)?.rotulo}</h2>
+                    <p>{SECOES.find((s) => s.id === secao)?.desc}</p>
+                  </header>
                   {secao === 'resumo' && (
                     <SecResumo v={sel} itens={itens} faltam={faltam.length} numeros={numeros} meus={meus} atendendo={atendendo.length} versoes={versoes} irPara={setSecao}
                       aoAtivar={async (a) => {
@@ -161,6 +215,7 @@ export function ConfigIris() {
                   )}
                 </div>
               </div>
+              </>
             )}
           </>
         )}
@@ -177,10 +232,10 @@ export function ConfigIris() {
         aoFechar={() => setJanela(null)} aoCriar={(nome, origem, config) => void criarVersao(nome, origem, config)} />
       <JanelaImportar aberta={janela === 'importar'} aoFechar={() => setJanela(null)} criando={criar.isPending}
         aoCriar={(nome, descricao, config) => void criarVersao(nome, 'importada', config, descricao)} />
-      <ConfirmDialogV2 aberto={janela === 'excluir'} titulo={`Excluir "${sel?.nome ?? ''}"?`} destrutivo carregando={excluir.isPending} rotuloConfirmar="Excluir a versão"
-        mensagem={<>A Iris para de atender nos {meus.length === 1 ? 'número que usa' : 'números que usam'} esta versão e a chave do Google guardada nela é apagada. Os textos e as configurações se perdem; se quiser guardar, exporte o arquivo antes (em Avançado).</>}
+      <ConfirmDialogV2 aberto={janela === 'excluir'} titulo={`Excluir "${sel?.nome ?? ''}"?`} destrutivo carregando={excluir.isPending} rotuloConfirmar="Excluir a IA"
+        mensagem={<>A Iris para de atender nos {meus.length === 1 ? 'número que usa' : 'números que usam'} esta IA e a chave do Google guardada nela é apagada. Os textos e as configurações se perdem; se quiser guardar, exporte o arquivo antes (em Avançado).</>}
         aoCancelar={() => setJanela(null)}
-        aoConfirmar={async () => { if (!sel) return; try { await excluir.mutateAsync(sel.id); setSelId(null); setJanela(null); avisar('ok', 'A versão foi excluída.'); } catch (e) { setJanela(null); avisar('erro', (e as Error).message); } }} />
+        aoConfirmar={async () => { if (!sel) return; try { await excluir.mutateAsync(sel.id); setSelId(null); setJanela(null); avisar('ok', 'A IA foi excluída.'); } catch (e) { setJanela(null); avisar('erro', (e as Error).message); } }} />
       <ConfirmDialogV2 aberto={janela === 'trocar'} titulo="Sair sem salvar?" rotuloConfirmar="Sair sem salvar" destrutivo
         mensagem={<>As mudanças em "{rasc?.nome}" ainda não foram salvas e vão se perder.</>}
         aoCancelar={() => { setJanela(null); setDestino(null); }}
@@ -199,14 +254,14 @@ function SecResumo({ v, itens, faltam, numeros, meus, atendendo, versoes, irPara
   return (
     <>
       <div className="kpis irs-kpis">
-        <Kpi rotulo="Conversas com ela agora" icone={<IconeTile nome="balao" />} valor={m?.conversasAtivas ?? 0} nota={v.ativa ? `em ${atendendo} ${atendendo === 1 ? 'número' : 'números'}` : 'versão desligada'} />
+        <Kpi rotulo="Conversas agora" icone={<IconeTile nome="balao" />} valor={m?.conversasAtivas ?? 0} nota={v.ativa ? `em ${atendendo} ${atendendo === 1 ? 'número' : 'números'}` : 'IA desligada'} />
         <Kpi rotulo="Respostas hoje" icone={<IconeTile nome="envia" />} valor={m?.respostasHoje ?? 0} nota={`teto de ${v.config.modelo.maxChamadasDia} por dia`} />
         <Kpi rotulo="Retomadas hoje" icone={<IconeTile nome="repete" />} valor={m?.retomadasHoje ?? 0} nota="quem parou e ela chamou de novo" />
         <Kpi rotulo="Passadas para a equipe" icone={<IconeTile nome="pessoas" />} valor={m?.passadasEquipe7d ?? 0} nota="nos últimos 7 dias" />
       </div>
 
       <Bloco titulo={faltam ? `Para ligar, falta${faltam > 1 ? 'm' : ''} ${faltam} ${faltam === 1 ? 'passo' : 'passos'}` : 'Pronta para ligar'}
-        desc="A Iris só pode atender quando tudo isso estiver resolvido."
+        desc="Ela só pode atender quando tudo isso estiver resolvido."
         acao={<Liga titulo={v.ativa ? 'Ligada' : 'Desligada'} ligado={v.ativa} aoMudar={aoAtivar} travado={!v.ativa && faltam ? 'Resolva os passos antes' : undefined} />}>
         <ul className="irs-pronto">
           {itens.map((i) => (
@@ -233,12 +288,12 @@ function BlocoNumeros({ v, numeros, meus, versoes }: { v: VersaoIris; numeros: N
   const nomeVersao = (id: string | null) => versoes.find((x) => x.id === id)?.nome ?? null;
   const tentar = async (p: Promise<unknown>) => { setErro(null); try { await p; } catch (e) { setErro((e as Error).message); } };
   return (
-    <Bloco titulo="Em quais números ela atende" desc="Cada número do Atendimento usa uma versão. O modo teste faz ela responder só os números de teste, para conferir antes de abrir para todos.">
+    <Bloco titulo="Em quais números ela atende" desc="Cada número do Atendimento é atendido por uma IA. O modo teste faz ela responder só os números de teste, para conferir antes de abrir para todos.">
       {erro && <p className="irs-erro" role="alert">{erro}</p>}
       {numeros.length === 0 ? <p className="irs-vazio">Nenhum número do Atendimento ainda. Conecte em Configurações → WhatsApp.</p> : (
         <div className="irs-tab-rolo">
           <table className="irs-tab">
-            <thead><tr><th scope="col">Número</th><th scope="col">Versão</th><th scope="col">Iris neste número</th><th scope="col">Modo teste</th></tr></thead>
+            <thead><tr><th scope="col">Número</th><th scope="col">IA</th><th scope="col">Iris neste número</th><th scope="col">Modo teste</th></tr></thead>
             <tbody>
               {numeros.map((n) => {
                 const daqui = n.versaoId === v.id;
@@ -249,7 +304,7 @@ function BlocoNumeros({ v, numeros, meus, versoes }: { v: VersaoIris; numeros: N
                     <td>
                       <label className="irs-check">
                         <input type="checkbox" checked={daqui} onChange={(e) => void tentar(vincular.mutateAsync({ id: v.id, canais: e.target.checked ? [...meus.map((x) => x.id), n.id] : meus.filter((x) => x.id !== n.id).map((x) => x.id) }))} />
-                        {daqui ? 'Esta versão' : outra ? `Usa "${outra}"` : 'Nenhuma'}
+                        {daqui ? 'Esta IA' : outra ? `Usa "${outra}"` : 'Nenhuma'}
                       </label>
                     </td>
                     <td>{daqui ? <Toggle ligado={n.ligado} rotulo={`Iris no número ${n.nome}`} aoMudar={(a) => void tentar(ligar.mutateAsync({ canal: n.id, ligado: a }))} /> : <span className="irs-sub-l">—</span>}</td>
@@ -266,7 +321,7 @@ function BlocoNumeros({ v, numeros, meus, versoes }: { v: VersaoIris; numeros: N
           </table>
         </div>
       )}
-      <p className="irs-dica">Para ela atender num número: a versão ligada, o número marcado com esta versão e a Iris ligada nele. Com o modo teste, só os números de teste recebem resposta.</p>
+      <p className="irs-dica">Para ela atender num número: a IA ligada, o número marcado com esta IA e ela ligada nele. Com o modo teste, só os números de teste recebem resposta.</p>
       <JanelaNumerosTeste numero={testeDe} aoFechar={() => setTesteDe(null)} aoSalvar={async (lista) => { if (!testeDe) return; await tentar(teste.mutateAsync({ canal: testeDe.id, teste: true, numeros: lista })); setTesteDe(null); }} />
     </Bloco>
   );
@@ -300,15 +355,15 @@ function SecTestar({ v, sujo, irPara }: { v: VersaoIris; sujo: boolean; irPara: 
     catch (e) { setBolhas([...hist, { de: 'iris', texto: '', nota: `Não respondeu: ${(e as Error).message}` }]); }
   };
   if (!v.chaveDefinidaEm) return (
-    <Bloco titulo="Conversar para testar">
+    <Bloco titulo="Conversa de teste">
       <EstadoVazio titulo="Falta a chave do Google" descricao="Para conversar com ela, guarde a chave do Gemini em Avançado." acao={{ rotulo: 'Ir para Avançado', onClick: () => irPara('avancado') }} />
     </Bloco>
   );
   return (
-    <Bloco titulo="Conversar para testar" desc="Você faz o papel do cliente. É a mesma Iris dos números, com a configuração SALVA, mas nada vai para o WhatsApp."
+    <Bloco titulo="Conversa de teste" desc="É a mesma IA dos números, com a configuração SALVA, mas nada vai para o WhatsApp."
       acao={bolhas.length > 0 && <BotaoSec mini onClick={() => setBolhas([])}>Começar de novo</BotaoSec>}>
       {sujo && <p className="irs-erro" role="note">Há mudanças não salvas: o teste usa a versão salva.</p>}
-      {isPrevia && <p className="irs-dica" role="note">Na prévia não há Gemini: as respostas seguem um roteiro de exemplo. No sistema de verdade é a Iris respondendo com a configuração desta versão.</p>}
+      {isPrevia && <p className="irs-dica" role="note">Na prévia não há Gemini: as respostas seguem um roteiro de exemplo. No sistema de verdade é ela respondendo com a configuração desta IA.</p>}
       <div className="irs-chat" aria-live="polite">
         {bolhas.length === 0 && <p className="irs-vazio">Escreva como um cliente escreveria. Ex.: "oi, vi o anúncio da revisão".</p>}
         {bolhas.map((b, n) => (
@@ -375,15 +430,15 @@ function SecAvancado({ v, c, set, aviso, aoDuplicar, aoExcluir }: {
       </Bloco>
       <Bloco titulo="Arquivo e cópias">
         <div className="irs-acoes-linha">
-          <div><b>Exportar esta versão</b><span>Um arquivo com toda a configuração, para guardar ou levar para outro sistema. Não leva a chave nem os números.</span></div>
+          <div><b>Exportar esta IA</b><span>Um arquivo com toda a configuração, para guardar ou levar para outro sistema. Não leva a chave nem os números.</span></div>
           <BotaoSec onClick={exportar}>Exportar arquivo</BotaoSec>
         </div>
         <div className="irs-acoes-linha">
-          <div><b>Duplicar</b><span>Cria outra versão igual a esta (com as mudanças da tela), desligada e sem chave. Bom para uma campanha diferente.</span></div>
+          <div><b>Duplicar</b><span>Cria outra IA igual a esta (com as mudanças da tela), desligada e sem chave. Bom para uma campanha diferente.</span></div>
           <BotaoSec onClick={aoDuplicar}>Duplicar</BotaoSec>
         </div>
         <div className="irs-acoes-linha perigo">
-          <div><b>Excluir esta versão</b><span>Para de atender nos números dela e apaga a chave guardada.</span></div>
+          <div><b>Excluir esta IA</b><span>Para de atender nos números dela e apaga a chave guardada.</span></div>
           <BotaoSec className="btn-perigo" onClick={aoExcluir}>Excluir</BotaoSec>
         </div>
       </Bloco>
@@ -401,17 +456,17 @@ function JanelaNova({ aberta, atual, criando, aoFechar, aoCriar }: {
   useEffect(() => { if (aberta) { setNome(''); setBase(atual ? 'copia' : 'pre'); } }, [aberta]); // eslint-disable-line react-hooks/exhaustive-deps
   const empresa = atual?.config.identidade.empresa || 'Reviza';
   const opcoes: { v: typeof base; t: string; d: string; off?: boolean }[] = [
-    { v: 'pre', t: 'A Iris pré-configurada', d: 'Como a Iris do Atenvo: revisão de juros, cartão RMC, clientes fechados, documentos e retomadas.' },
-    { v: 'copia', t: `Uma cópia de "${atual?.nome ?? ''}"`, d: 'Tudo igual à versão aberta, para mudar só o que for diferente.', off: !atual },
+    { v: 'pre', t: 'Como a Iris pré-configurada', d: 'Igual à Iris do Atenvo: revisão de juros, cartão RMC, clientes fechados, documentos e retomadas.' },
+    { v: 'copia', t: `Uma cópia de "${atual?.nome ?? ''}"`, d: 'Tudo igual à IA aberta, para mudar só o que for diferente.', off: !atual },
     { v: 'branco', t: 'Em branco', d: 'Só o esqueleto: sem assuntos, sem perguntas e só os textos de abertura.' },
   ];
   return (
-    <ModalV2 aberto={aberta} aoFechar={aoFechar} titulo="Nova versão da Iris" largura={520}
+    <ModalV2 aberto={aberta} aoFechar={aoFechar} titulo="Nova IA" largura={520}
       rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec>
         <BotaoPrimario disabled={!nome.trim() || criando} onClick={() => aoCriar(nome.trim(), base === 'copia' ? 'duplicada' : base === 'pre' ? 'pre_configurada' : 'nova',
           base === 'copia' && atual ? atual.config : base === 'pre' ? irisPreConfigurada(empresa) : irisEmBranco(empresa))}>{criando ? 'Criando…' : 'Criar'}</BotaoPrimario></>}>
       <label className="irs-campo largo"><span className="irs-rot">Nome</span>
-        <input className="inp" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Ex.: Iris · campanha do cartão RMC" autoFocus />
+        <input className="inp" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Ex.: Luna · campanha do cartão RMC" autoFocus />
       </label>
       <div className="irs-opcoes col" role="radiogroup" aria-label="Começar de">
         {opcoes.map((o) => (
@@ -420,7 +475,7 @@ function JanelaNova({ aberta, atual, criando, aoFechar, aoCriar }: {
           </button>
         ))}
       </div>
-      <p className="irs-dica">A versão nova nasce desligada e sem chave.</p>
+      <p className="irs-dica">A IA nova nasce desligada e sem chave.</p>
     </ModalV2>
   );
 }
@@ -433,9 +488,9 @@ function JanelaImportar({ aberta, aoFechar, criando, aoCriar }: { aberta: boolea
   const abrir = (f: File | undefined) => { if (!f) return; if (f.size > 2_000_000) { setTxt('{}'); return; } void f.text().then(setTxt); };
   let mensagem: ReactNode = null;
   if (lido && !lido.ok) mensagem = <p className="irs-erro" role="alert">{lido.erro}</p>;
-  if (lido && lido.ok) mensagem = <p className="irs-ok">Arquivo "{lido.nome}" lido: {lido.config.produtos.filter((p) => p.ativo).length} assuntos, {lido.config.textos.length} textos. Entra como versão nova, desligada.</p>;
+  if (lido && lido.ok) mensagem = <p className="irs-ok">Arquivo "{lido.nome}" lido: {lido.config.produtos.filter((p) => p.ativo).length} assuntos, {lido.config.textos.length} textos. Entra como IA nova, desligada.</p>;
   return (
-    <ModalV2 aberto={aberta} aoFechar={aoFechar} titulo="Importar uma versão" largura={520}
+    <ModalV2 aberto={aberta} aoFechar={aoFechar} titulo="Importar uma IA" largura={520}
       rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec>
         <BotaoPrimario disabled={!lido || !lido.ok || criando} onClick={() => { if (lido && lido.ok) aoCriar(nome.trim() || lido.nome, lido.descricao, lido.config); }}>{criando ? 'Importando…' : 'Importar'}</BotaoPrimario></>}>
       <p className="irs-dica">O arquivo vem de "Exportar arquivo" (em Avançado). Ele nunca traz a chave nem os números.</p>
@@ -446,7 +501,7 @@ function JanelaImportar({ aberta, aoFechar, criando, aoCriar }: { aberta: boolea
       <textarea className="inp irs-area" rows={4} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="…ou cole o conteúdo do arquivo aqui" aria-label="Conteúdo do arquivo" />
       {mensagem}
       {lido && lido.ok && (
-        <label className="irs-campo largo"><span className="irs-rot">Nome da versão</span>
+        <label className="irs-campo largo"><span className="irs-rot">Nome da IA</span>
           <input className="inp" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={lido.nome} maxLength={80} />
         </label>
       )}
