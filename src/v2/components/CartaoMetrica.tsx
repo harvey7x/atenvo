@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { MetricChart, monotonePath, type ChartView, type SeriesPoint } from '@/components/ui/metric-chart';
 import { Icon, PeriodSelect, type PeriodOption } from '@/components/ui/metric-controls';
 // REGRA do dono (24/11): todo gráfico em BARRAS, como as dos cartões do Painel — sem o modo linha e sem o seletor
@@ -285,7 +285,7 @@ const CORES_SERIE = {
 } as const;
 const CORES_SERIE_CASA = {
   dark: ['#F48349', '#E4E4E7', '#8A8A93', '#FAB882', '#52525B'], // 23/11: cinzas neutros e o pêssego da logo no lugar do castanho (o escuro estava amarronzado)
-  light: ['#ED642E', '#292523', '#A39D97', '#9C6A4C', '#D6D1CC'],
+  light: ['#ED642E', '#3A3532', '#ADA69F', '#F4A26F', '#D9D3CD'], // 24/11: grafite no lugar do quase-preto, o pêssego da logo no lugar do bronze
 } as const;
 const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number, casa: boolean): string => {
   const pal = (casa ? CORES_SERIE_CASA : CORES_SERIE)[tema];
@@ -316,7 +316,7 @@ function tetoBonito(max: number): number {
    curvas esticam com o cartão (SVG sem proporção fixa); pontos, guia, rótulos e balão são HTML por
    cima, para não deformar. */
 const VB_W = 1000; const VB_H = 300;
-function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
+function GraficoSeries({ series, rotulos, eixo, view, titulo, destaque = null }: {
   series: { nome: string; cor: string; valores: number[] }[];
   /** o texto de cada ponto no balão */
   rotulos: string[];
@@ -324,6 +324,8 @@ function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
   eixo: string[];
   view: ChartView;
   titulo: string;
+  /** a série com o mouse em cima na legenda (índice em `series`): só ela fica acesa */
+  destaque?: number | null;
 }) {
   const uid = useId().replace(/:/g, '');
   const [ativo, setAtivo] = useState<number | null>(null);
@@ -334,6 +336,9 @@ function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
   const yPct = (v: number) => (1 - v / teto) * 100;
   const fmt = (v: number) => v.toLocaleString('pt-BR');
   const passoEixo = Math.ceil(n / 8);
+  /* barras (24/11): total em cima de cada coluna (até 16 colunas) e a linha da média, como no "Recebido por mês" */
+  const comTotais = view === 'bar' && n <= 16;
+  const mediaBarras = view === 'bar' && n >= 3 ? Math.round(totais.reduce((a, b) => a + b, 0) / n) : 0;
 
   const aoMover = (e: PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -383,29 +388,38 @@ function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
             })}
           </svg>
         ) : (
-          <div key={`b-${n}-${series.length}`} className="rvo-barras" aria-hidden>
-            {rotulos.map((_, i) => (
-              <div key={i} className={'rvo-col' + (ativo === i ? ' on' : '')}>
-                <div className="rvo-pilha" style={{ height: `${(totais[i] / teto) * 100}%`, animationDelay: `${Math.min(i, 12) * 25}ms` }}>
-                  {series.map((s, k) => (s.valores[i] ?? 0) > 0 && (
-                    <i key={k} style={{ flex: `${s.valores[i]} 0 0`, background: s.cor }} />
-                  ))}
+          <div key={`b-${n}-${series.length}`} aria-hidden
+            className={'rvo-barras' + (ativo != null ? ' com-ativo' : '') + (destaque != null ? ' com-destaque' : '')}>
+            {mediaBarras > 0 && <i className="rvo-media" style={{ top: `${yPct(mediaBarras)}%` }} />}
+            {rotulos.map((_, i) => {
+              const alt = (totais[i] / teto) * 100;
+              return (
+                <div key={i} className={'rvo-col' + (ativo === i ? ' on' : '')}>
+                  {comTotais && totais[i] > 0 && (
+                    <span className="rvo-tot" style={{ bottom: `calc(${alt}% + 6px)`, animationDelay: `${Math.min(i, 12) * 25 + 300}ms` }}>{fmt(totais[i])}</span>
+                  )}
+                  <div className="rvo-pilha" style={{ height: `${alt}%`, animationDelay: `${Math.min(i, 12) * 25}ms` }}>
+                    {series.map((s, k) => (s.valores[i] ?? 0) > 0 && (
+                      <i key={k} className={destaque === k ? 'dest' : undefined}
+                        style={{ flex: `${s.valores[i]} 0 0`, '--c': s.cor } as CSSProperties} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         {ativo != null && (
           <>
-            <i className="rvo-guia" style={{ left: `${xPct(ativo)}%` }} />
+            {view === 'curve' && <i className="rvo-guia" style={{ left: `${xPct(ativo)}%` }} />}
             {view === 'curve' && series.map((s, k) => (
               <i key={k} className="rvo-ponto" style={{ left: `${xPct(ativo)}%`, top: `${yPct(s.valores[ativo] ?? 0)}%`, background: s.cor }} />
             ))}
-            <div className={'rvo-balao' + (xPct(ativo) > 55 ? ' esq' : '')} style={{ left: `${xPct(ativo)}%` }}>
+            <div className={'rvo-balao' + (view === 'bar' ? ' bar' : '') + (xPct(ativo) > 55 ? ' esq' : '')} style={{ left: `${xPct(ativo)}%` }}>
               <b className="rvo-balao-t">{rotulos[ativo]}</b>
               {series.map((s, k) => (
-                <span key={k} className="rvo-balao-l"><i style={{ background: s.cor }} /><span>{s.nome}</span><b>{fmt(s.valores[ativo] ?? 0)}</b></span>
+                <span key={k} className={'rvo-balao-l' + ((s.valores[ativo] ?? 0) === 0 ? ' zero' : '')}><i style={{ background: s.cor }} /><span>{s.nome}</span><b>{fmt(s.valores[ativo] ?? 0)}</b></span>
               ))}
               {series.length > 1 && <span className="rvo-balao-l rvo-balao-tot"><span>Total</span><b>{fmt(totais[ativo])}</b></span>}
             </div>
@@ -414,7 +428,7 @@ function GraficoSeries({ series, rotulos, eixo, view, titulo }: {
       </div>
       <div className="rvo-eixo" aria-hidden>
         {eixo.map((t, i) => ((i % passoEixo === 0 || i === n - 1) && (i === n - 1 || n - 1 - i >= passoEixo) ? (
-          <span key={i} data-lado={view === 'curve' ? (i === 0 ? 'ini' : i === n - 1 ? 'fim' : 'meio') : 'meio'} style={{ left: `${xPct(i)}%` }}>{t}</span>
+          <span key={i} className={ativo === i ? 'on' : undefined} data-lado={view === 'curve' ? (i === 0 ? 'ini' : i === n - 1 ? 'fim' : 'meio') : 'meio'} style={{ left: `${xPct(i)}%` }}>{t}</span>
         ) : null))}
       </div>
     </div>
@@ -442,6 +456,7 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
   const moldura = useMoldura();
   const view = SO_BARRAS;
   const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
+  const [emDestaque, setEmDestaque] = useState<string | null>(null);
   const alternar = (id: string) => setOcultas((prev) => {
     const prox = new Set(prev);
     if (prox.has(id)) prox.delete(id);
@@ -488,7 +503,9 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
             const ligada = !ocultas.has(s.id);
             return (
               <li key={s.id}>
-                <button type="button" className="rvm-leg-bt" aria-pressed={ligada} onClick={() => alternar(s.id)}
+                <button type="button" className="rvm-leg-bt" aria-pressed={ligada} onClick={() => { alternar(s.id); setEmDestaque(null); }}
+                  onMouseEnter={() => ligada && setEmDestaque(s.id)} onMouseLeave={() => setEmDestaque(null)}
+                  onFocus={() => ligada && setEmDestaque(s.id)} onBlur={() => setEmDestaque(null)}
                   title={ligada ? `Esconder ${s.rotulo}` : `Mostrar ${s.rotulo}`}>
                   <i style={{ background: s.hex }} />
                   <span className="rvm-leg-nome">{s.rotulo}</span>
@@ -501,7 +518,8 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
         </ul>
       </div>
       {temDado
-        ? <GraficoSeries series={grafico} rotulos={pontos.map((p) => p.rotulo)} eixo={eixo ?? pontos.map((p) => p.rotulo)} view={view} titulo={titulo} />
+        ? <GraficoSeries series={grafico} rotulos={pontos.map((p) => p.rotulo)} eixo={eixo ?? pontos.map((p) => p.rotulo)} view={view} titulo={titulo}
+            destaque={emDestaque && visiveis.some((s) => s.id === emDestaque) ? visiveis.findIndex((s) => s.id === emDestaque) : null} />
         : <div className="rvo rvo-vazio">{vazio}</div>}
       <footer className="rvm-pe">
         <span className="rvm-delta">{rodape}</span>
@@ -511,7 +529,7 @@ export function CartaoSeries({ titulo, ajuda, sub, acao, pontos, series, unidade
             <span className="pmc-stats__sep">·</span>
             <span><span className="pmc-stats__value">{n(min)}</span> mín</span>
             <span className="pmc-stats__sep">·</span>
-            <span><span className="pmc-stats__value">{n(media)}</span> média por ponto</span>
+            <span className="rvm-stat-media"><i className="rvm-tracejado" aria-hidden /><span className="pmc-stats__value">{n(media)}</span> média por ponto</span>
           </span>
         )}
       </footer>

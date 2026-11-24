@@ -182,10 +182,35 @@
 .v2 .rvo-grade.rvo-base { border-top: 1px solid rgba(var(--tint), .14); }
 .v2 .rvo-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .v2 .rvo-barras { position: absolute; inset: 0; display: flex; align-items: flex-end; pointer-events: none; }
-.v2 .rvo-col { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; border-radius: 6px; transition: background-color .12s ease; }
-.v2 .rvo-col.on { background: rgba(var(--tint), .04); }
-.v2 .rvo-pilha { display: flex; flex-direction: column-reverse; gap: 1.5px; width: min(30px, 56%); min-height: 0; border-radius: 6px 6px 2px 2px; overflow: hidden; }
-.v2 .rvo-pilha i { display: block; min-height: 2px; }
+/* barras empilhadas (24/11, "mais bonito"): cada pedaço é uma peça própria com canto arredondado e degradê leve
+   (como as barrinhas dos cartões), o de cima com o topo bem redondo; o total em cima da coluna; passar o mouse num
+   dia apaga os outros; passar o mouse num nome da legenda acende só aquela série. */
+.v2 .rvo-col { position: relative; flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.v2 .rvo-pilha { display: flex; flex-direction: column-reverse; gap: 2px; width: min(44px, 52%); min-height: 0; transition: opacity .16s ease; }
+.v2 .rvo-pilha i {
+  display: block; min-height: 3px; border-radius: 3px;
+  background: var(--c); background: linear-gradient(180deg, var(--c) 0%, color-mix(in srgb, var(--c) 80%, #fff) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2); transition: opacity .16s ease;
+}
+.v2 .rvo-pilha i:last-of-type { border-top-left-radius: 8px; border-top-right-radius: 8px; }
+html[data-tema="dark"] .v2 .rvo-pilha i { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, #fff) 0%, var(--c) 100%); box-shadow: none; }
+.v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-pilha { opacity: .36; }
+.v2 .rvo-barras.com-destaque .rvo-pilha i:not(.dest) { opacity: .16; }
+/* no escuro, laranja transparente vira marrom: o que apaga vira cinza (sem cor) em vez de transparente */
+html[data-tema="dark"] .v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-pilha { opacity: 1; filter: grayscale(1) brightness(.5); }
+html[data-tema="dark"] .v2 .rvo-barras.com-destaque .rvo-pilha i:not(.dest) { opacity: 1; filter: grayscale(1) brightness(.32); }
+.v2 .rvo-tot {
+  position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none;
+  font-size: 11px; font-weight: 500; line-height: 1; color: var(--txt-3); font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 1px 4px; border-radius: 4px; background: var(--pmc-card, var(--vidro-a));   /* a linha da média não risca o número */
+  transition: color .16s ease, opacity .16s ease;
+}
+.v2 .rvo-col.on .rvo-tot { color: var(--txt); font-weight: 600; }
+.v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-tot, .v2 .rvo-barras.com-destaque .rvo-tot { opacity: .4; }
+/* a linha da média passa por trás das colunas; o tracejadinho igual no rodapé diz o que ela é */
+.v2 .rvo-media { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(var(--tint), .34); pointer-events: none; }
+.v2 .pmc-root.rvm .rvm-stat-media { display: inline-flex; align-items: center; gap: 4px; }
+.v2 .pmc-root.rvm .rvm-tracejado { width: 14px; height: 0; border-top: 1.5px dashed rgba(var(--tint), .45); margin-right: 2px; }
 .v2 .rvo-guia { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid rgba(var(--tint), .22); pointer-events: none; }
 .v2 .rvo-ponto {
   position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; pointer-events: none;
@@ -200,6 +225,9 @@
   font-size: 12px; color: var(--txt-2);
 }
 .v2 .rvo-balao.esq { transform: translateX(calc(-100% - 12px)); }
+.v2 .rvo-balao.bar { transform: translateX(32px); }
+.v2 .rvo-balao.bar.esq { transform: translateX(calc(-100% - 32px)); }
+.v2 .rvo-balao-l.zero { opacity: .42; }
 .v2 .rvo-balao-t { font-size: 12px; font-weight: 600; color: var(--txt); margin-bottom: 1px; }
 .v2 .rvo-balao-l { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .v2 .rvo-balao-l i { width: 7px; height: 7px; flex: none; border-radius: 2px; }
@@ -210,10 +238,12 @@
 .v2 .rvo-eixo span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; font-size: 10.5px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
 .v2 .rvo-eixo span[data-lado="ini"] { transform: none; }
 .v2 .rvo-eixo span[data-lado="fim"] { transform: translateX(-100%); }
+.v2 .rvo-eixo span.on { color: var(--txt); font-weight: 600; }
 @media (prefers-reduced-motion: no-preference) {
   .v2 .rvo-svg { animation: rvo-revela .9s cubic-bezier(.4, 0, .2, 1) backwards; }
   .v2 .rvo-pilha { transform-origin: bottom; animation: rvo-cresce .55s cubic-bezier(.2, .8, .2, 1) backwards; }
   .v2 .rvo-balao { animation: rvo-surge .14s ease-out backwards; }
+  .v2 .rvo-tot { animation: rvo-surge .3s ease-out backwards; }
   .v2 .rvo-guia, .v2 .rvo-ponto, .v2 .rvo-balao { transition: left .1s ease-out, top .1s ease-out; }
 }
 @keyframes rvo-revela { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
