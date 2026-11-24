@@ -10,11 +10,13 @@ type V = Parameters<typeof prontidao>[0];
 const versao = (over: Partial<V> = {}): V => ({ id: 'v1', nome: 'Iris', descricao: '', origem: 'pre_configurada', ativa: false, chaveDefinidaEm: null, criadoEm: '', atualizadoEm: '', config: irisPreConfigurada(), ...over });
 
 describe('Iris pré-configurada', () => {
-  it('nenhum texto fala da CAF e todos entram para aprovar', () => {
+  it('são os 94 textos de hoje do Atenvo, sem nada da CAF, aprovados como lá', () => {
     const c = irisPreConfigurada('Reviza');
-    expect(c.textos.length).toBeGreaterThan(60);
-    expect(c.textos.some((t) => /\bCAF\b/.test(t.texto))).toBe(false);
-    expect(c.textos.every((t) => !t.aprovado)).toBe(true);
+    expect(c.textos).toHaveLength(94);
+    expect(c.textos.some((t) => /\bCAF\b|Uruguai|45\.651|91\.310|30 ?%/.test(t.texto))).toBe(false);
+    expect(c.textos.filter((t) => t.aprovado)).toHaveLength(41);
+    expect(c.textos.find((t) => t.id === 'T40')?.texto).toContain('{cnpj}');
+    expect(c.textos.filter((t) => t.grupo === 'senha').map((t) => t.id)).toEqual(['T90', 'T91', 'T92', 'T93', 'T94', 'T95']);
     expect(exemplo('Aqui é a {assistente}, {rotulo} da {empresa}.', c)).toBe('Aqui é a Iris, atendente virtual da Reviza.');
   });
   it('os fatos da empresa nascem em branco (nada é inventado)', () => {
@@ -27,6 +29,13 @@ describe('Iris pré-configurada', () => {
     expect(c.qualificacao.perguntas).toHaveLength(0);
     expect(new Set(c.textos.map((t) => t.grupo))).toEqual(new Set(['abertura']));
   });
+  it('senha do gov.br: ligada por padrão, como no Atenvo; desligada tira o roteiro', () => {
+    const c = irisPreConfigurada();
+    expect(c.documentos.senhaGovbr).toBe(true);
+    expect(textosDaVersao(c).some((t) => t.grupo === 'senha')).toBe(true);
+    c.documentos.senhaGovbr = false;
+    expect(textosDaVersao(c).some((t) => t.grupo === 'senha')).toBe(false);
+  });
   it('textos dos assuntos desligados ficam fora da versão', () => {
     const c = irisPreConfigurada();
     c.produtos = c.produtos.map((p) => (p.id === 'rmc' ? { ...p, ativo: false } : p));
@@ -36,10 +45,10 @@ describe('Iris pré-configurada', () => {
 });
 
 describe('pronta para ligar', () => {
-  it('a pré-configurada sem chave, sem fatos e sem textos aprovados não liga', () => {
+  it('a pré-configurada sem chave e sem fatos não liga; rascunho só avisa', () => {
     const itens = prontidao(versao(), [{ id: 'n1', nome: 'Principal', numero: null, conectado: true, versaoId: 'v1', ligado: false, modoTeste: true, numerosTeste: [] }]);
-    const falta = itens.filter((i) => !i.ok).map((i) => i.id).sort();
-    expect(falta).toEqual(['chave', 'empresa', 'textos']);
+    expect(itens.filter((i) => i.obrigatorio && !i.ok).map((i) => i.id).sort()).toEqual(['chave', 'empresa']);
+    expect(itens.find((i) => i.id === 'textos')?.obrigatorio).toBe(false);
   });
   it('com tudo preenchido e aprovado fica pronta', () => {
     const c = irisPreConfigurada();

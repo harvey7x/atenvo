@@ -17,7 +17,7 @@ import { temRecurso } from './recursos';
 import { TEXTOS_BASE } from './irisTextosBase';
 
 /* ============================== formato ============================== */
-export type GrupoTexto = 'abertura' | 'analise' | 'documentos' | 'equipe' | 'produto_revisao' | 'produto_rmc' | 'fechados'
+export type GrupoTexto = 'abertura' | 'analise' | 'documentos' | 'senha' | 'equipe' | 'produto_revisao' | 'produto_rmc' | 'fechados'
   | 'objecoes' | 'retomadas' | 'acompanhamento' | 'outros';
 export interface TextoIris {
   id: string; grupo: GrupoTexto; quando: string; tipo: 'texto' | 'audio'; texto: string;
@@ -45,7 +45,9 @@ export interface IrisConfig {
   };
   produtos: ProdutoIris[];
   qualificacao: { perguntas: PerguntaIris[]; naoElegivel: string; arquivarNaoElegivel: boolean };
-  documentos: { ativo: boolean; itens: DocumentoIris[]; mesesComprovante: number; aceitaTerceiro: boolean; ajudaInssPorLigacao: boolean };
+  documentos: { ativo: boolean; itens: DocumentoIris[]; mesesComprovante: number; aceitaTerceiro: boolean; ajudaInssPorLigacao: boolean;
+    /** como na Iris do Atenvo (desde 18/11): para revisão e portabilidade, oferece que o cliente passe a senha do gov.br */
+    senhaGovbr: boolean };
   equipe: {
     ligacao: boolean; mensagem: boolean; perguntaPeriodo: boolean;
     distribuicao: 'equipe_do_numero' | 'rodizio' | 'mesma_pessoa'; responsavelFixo: string | null;
@@ -60,7 +62,7 @@ export interface IrisConfig {
     tetoDia: number; tetoSemana: number; tentarDepoisDoNao: boolean };
   horarios: { dias: number[]; inicio: string; fim: string; manha: [string, string]; tarde: [string, string];
     janelaEnvio: [string, string]; feriados: boolean; foraDoHorario: 'responde_e_avisa' | 'espera' };
-  proibido: { valores: boolean; prazosExatos: boolean; prometerAprovacao: boolean; urgencia: boolean; pedirSenha: boolean;
+  proibido: { valores: boolean; prazosExatos: boolean; prometerAprovacao: boolean; urgencia: boolean; naoRepeteSenha: boolean;
     frases: string[]; termos: string[] };
   modelo: { conversa: string; documentos: string; dificil: string; maxChamadasDia: number };
 }
@@ -82,6 +84,7 @@ export const GRUPOS_TEXTO: { id: GrupoTexto; rotulo: string; desc: string }[] = 
   { id: 'produto_revisao', rotulo: 'Revisão de juros', desc: 'As perguntas e explicações da revisão do empréstimo pessoal.' },
   { id: 'produto_rmc', rotulo: 'Cartão RMC/RCC', desc: 'O cartão consignado que desconta direto do benefício.' },
   { id: 'documentos', rotulo: 'Documentos', desc: 'O pedido, a ajuda e a confirmação dos documentos.' },
+  { id: 'senha', rotulo: 'Senha do gov.br', desc: 'O roteiro aprovado para quando a documentação do INSS precisa da senha.' },
   { id: 'equipe', rotulo: 'Passar para a equipe', desc: 'Ligação, mensagem, horário de quem cuida do caso.' },
   { id: 'objecoes', rotulo: 'Dúvidas e objeções', desc: 'As respostas para o que o cliente costuma perguntar ou temer.' },
   { id: 'fechados', rotulo: 'Clientes já fechados', desc: 'Para quem já é cliente e pergunta do processo.' },
@@ -159,9 +162,9 @@ export function irisPreConfigurada(empresa = 'Reviza'): IrisConfig {
         { id: 'identidade', rotulo: 'RG ou CNH (frente e verso)', ativo: true, obrigatorio: true, dica: 'Foto do celular serve, com a frente e o verso.' },
         { id: 'comprovante', rotulo: 'Comprovante de residência', ativo: true, obrigatorio: true, dica: 'Recente. Se estiver no nome de outra pessoa da casa, a gente faz uma declaração.' },
         { id: 'email', rotulo: 'E-mail', ativo: true, obrigatorio: true, dica: 'Para o atendente mandar o contrato.' },
-        { id: 'extrato_inss', rotulo: 'Extrato de empréstimos do INSS (Meu INSS)', ativo: true, obrigatorio: false, dica: 'Quem não souber tirar, o atendente ajuda por ligação. A Iris nunca pede senha.' },
+        { id: 'extrato_inss', rotulo: 'Extrato de empréstimos do INSS (Meu INSS)', ativo: true, obrigatorio: false, dica: 'Quem não souber tirar, ela oferece que um atendente entre com a senha do gov.br e pegue, ou uma ligação.' },
       ],
-      mesesComprovante: 2, aceitaTerceiro: true, ajudaInssPorLigacao: true,
+      mesesComprovante: 2, aceitaTerceiro: true, ajudaInssPorLigacao: true, senhaGovbr: true,
     },
     equipe: {
       ligacao: true, mensagem: true, perguntaPeriodo: true,
@@ -173,7 +176,7 @@ export function irisPreConfigurada(empresa = 'Reviza'): IrisConfig {
     retomadas: { ativo: true, parouNoMeioHoras: 3, segundaTentativaHoras: 24, toques: true, diasDosToques: [1, 3, 6], tetoDia: 1, tetoSemana: 3, tentarDepoisDoNao: true },
     horarios: { dias: [1, 2, 3, 4, 5], inicio: '09:00', fim: '18:00', manha: ['09:00', '12:00'], tarde: ['13:00', '18:00'], janelaEnvio: ['09:00', '19:30'], feriados: true, foraDoHorario: 'responde_e_avisa' },
     proibido: {
-      valores: true, prazosExatos: true, prometerAprovacao: true, urgencia: true, pedirSenha: true,
+      valores: true, prazosExatos: true, prometerAprovacao: true, urgencia: true, naoRepeteSenha: true,
       frases: ['última chance', 'é rapidinho', 'pode confiar', 'garantido'], termos: [],
     },
     modelo: { conversa: 'gemini-3.6-flash', documentos: 'gemini-3.6-flash', dificil: 'gemini-pro-latest', maxChamadasDia: 500 },
@@ -202,6 +205,9 @@ export const VARIAVEIS: { chave: string; desc: string }[] = [
   { chave: 'empresa', desc: 'o nome da empresa' }, { chave: 'primeiro_nome', desc: 'o primeiro nome do cliente' },
   { chave: 'tratamento', desc: 'o senhor / a senhora' }, { chave: 'atendente', desc: 'quem cuida do caso' },
   { chave: 'financeiras', desc: 'a lista das financeiras' }, { chave: 'prazo_processo', desc: 'o prazo médio do processo' },
+  { chave: 'honorarios', desc: 'quanto e quando o cliente paga' }, { chave: 'razao_social', desc: 'a razão social' },
+  { chave: 'cnpj', desc: 'o CNPJ' }, { chave: 'endereco', desc: 'o endereço' }, { chave: 'cidade', desc: 'a cidade' },
+  { chave: 'advogado', desc: 'o advogado responsável' }, { chave: 'oab', desc: 'a OAB do advogado' },
 ];
 /** O texto como o cliente leria, com dados de exemplo no lugar do cliente e do atendente. */
 export function exemplo(texto: string, c: IrisConfig): string {
@@ -212,6 +218,9 @@ export function exemplo(texto: string, c: IrisConfig): string {
     primeiro_nome: 'Maria', tratamento: c.tom.tratamento === 'senhor' ? 'A senhora' : 'Você', pronome: 'ela', atendente: atd,
     periodo: 'de manhã', turno: 'de manhã e à tarde', opcoes: 'de manhã ou de tarde', dia: 'Amanhã', quando: 'de manhã',
     financeiras: eLista(fin), financeiras_ou: ouLista(fin), prazo_processo: c.empresa.prazoProcesso || '[prazo do processo]',
+    saudacao: 'Maria', honorarios: c.empresa.honorarios || '[quanto e quando paga]', razao_social: c.empresa.razaoSocial || '[razão social]',
+    cnpj: c.empresa.cnpj || '[CNPJ]', endereco: c.empresa.endereco || '[endereço]', cidade: c.empresa.cidade || '[cidade]',
+    advogado: c.empresa.advogado || '[advogado]', oab: c.empresa.oab || '[OAB]',
   };
   return texto.replace(/\{(\w+)\}/g, (m, k: string) => mapa[k] ?? m);
 }
@@ -239,8 +248,9 @@ export function prontidao(v: VersaoIris, numeros: NumeroIris[]): ItemProntidao[]
       detalhe: faltaEmpresa.length ? `Falta: ${faltaEmpresa.join(', ')}.` : 'Ela só diz o que está cadastrado aqui.' },
     { id: 'produtos', titulo: 'Pelo menos um assunto que ela atende', ok: ativos.size > 0, secao: 'oferece', obrigatorio: true,
       detalhe: ativos.size ? `${ativos.size} ${ativos.size === 1 ? 'assunto ligado' : 'assuntos ligados'}.` : 'Ligue o que a empresa oferece.' },
-    { id: 'textos', titulo: 'Textos aprovados', ok: pendentes === 0, secao: 'textos', obrigatorio: true,
-      detalhe: pendentes ? `${pendentes} ${pendentes === 1 ? 'texto ainda não foi aprovado' : 'textos ainda não foram aprovados'}.` : 'Tudo o que ela fala foi aprovado.' },
+    // como no Atenvo: rascunho não é usado (ela segue sem ele), então não impede ligar — só avisa
+    { id: 'textos', titulo: 'Rascunhos de texto', ok: pendentes === 0, secao: 'textos', obrigatorio: false,
+      detalhe: pendentes ? `${pendentes} ${pendentes === 1 ? 'texto ainda é rascunho' : 'textos ainda são rascunho'}: ela não usa até alguém aprovar (igual ao Atenvo).` : 'Todos os textos que ela usa estão aprovados.' },
     { id: 'equipe', titulo: 'Quem recebe os clientes', ok: recebem > 0 || c.equipe.distribuicao === 'equipe_do_numero', secao: 'equipe', obrigatorio: true,
       detalhe: c.equipe.distribuicao === 'equipe_do_numero' ? 'Vai para a equipe dona de cada número.' : recebem ? `${recebem} ${recebem === 1 ? 'pessoa recebe' : 'pessoas recebem'}.` : 'Escolha quem recebe os clientes prontos.' },
     { id: 'numeros', titulo: 'Números escolhidos', ok: meus.length > 0, secao: 'resumo', obrigatorio: true,
@@ -255,6 +265,7 @@ export function textosDaVersao(c: IrisConfig): TextoIris[] {
     : t.grupo === 'produto_rmc' ? ativos.has('rmc')
     : t.grupo === 'fechados' ? ativos.has('fechados')
     : t.grupo === 'documentos' ? c.documentos.ativo
+    : t.grupo === 'senha' ? c.documentos.ativo && c.documentos.senhaGovbr
     : t.grupo === 'acompanhamento' || t.grupo === 'retomadas' ? c.retomadas.ativo
     : true));
 }

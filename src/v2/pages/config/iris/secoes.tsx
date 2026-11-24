@@ -226,7 +226,9 @@ export function SecDocumentos({ c, set }: P) {
         <Bloco titulo="Regras da conferência">
           <Numero rotulo="Comprovante de residência de até" valor={d.mesesComprovante} min={1} max={12} sufixo="meses" aoMudar={(n) => set((x) => ({ ...x, documentos: { ...x.documentos, mesesComprovante: n } }))} />
           <Liga titulo="Aceita comprovante no nome de outra pessoa da casa" desc="Ela avisa que a empresa faz uma declaração." ligado={d.aceitaTerceiro} aoMudar={(v) => set((x) => ({ ...x, documentos: { ...x.documentos, aceitaTerceiro: v } }))} />
-          <Liga titulo="Quem não sabe tirar o extrato do INSS: o atendente ajuda por ligação" desc="Ela oferece a ajuda e marca o período. Nunca pede senha." ligado={d.ajudaInssPorLigacao} aoMudar={(v) => set((x) => ({ ...x, documentos: { ...x.documentos, ajudaInssPorLigacao: v } }))} />
+          <Liga titulo="Senha do gov.br (Meu INSS)" ligado={d.senhaGovbr} aoMudar={(v) => set((x) => ({ ...x, documentos: { ...x.documentos, senhaGovbr: v } }))}
+            desc="Como a Iris do Atenvo: para revisão e portabilidade a documentação do INSS é maior. Ela explica, manda a lista e oferece que o cliente passe a senha para um atendente entrar e pegar os documentos — com o roteiro aprovado (Textos → Senha do gov.br). Se o cliente não quiser ou não tiver, oferece ligação, agência ou o vídeo para recuperar." />
+          <Liga titulo="Quem não sabe tirar o extrato do INSS: o atendente ajuda por ligação" desc="Ela oferece a ajuda e marca o período." ligado={d.ajudaInssPorLigacao} aoMudar={(v) => set((x) => ({ ...x, documentos: { ...x.documentos, ajudaInssPorLigacao: v } }))} />
         </Bloco>
       )}
     </>
@@ -303,13 +305,13 @@ export function SecTextos({ c, set }: P) {
   return (
     <>
       <div className="irs-nota">
-        <b>Os textos fixos dela.</b> Vieram da Iris do Atenvo com o nome da empresa no lugar de "CAF". Ela só usa um texto depois de aprovado. Os de áudio viram nota de voz com a voz dela quando são aprovados.
+        <b>Os textos fixos dela.</b> São os textos de hoje da Iris do Atenvo, com o nome e os dados da empresa no lugar dos da CAF, e aprovados como lá. Ela só usa um texto aprovado: rascunho fica de fora até alguém aprovar. Os de áudio viram nota de voz com a voz dela.
         <span className="irs-vars">Pode usar: {VARIAVEIS.map((v) => <code key={v.chave} title={v.desc}>{`{${v.chave}}`}</code>)}</span>
       </div>
       <div className="irs-textos">
         <nav className="irs-grupos" aria-label="Grupos de textos">
           <button type="button" className={'irs-grupo' + (grupo === 'pendentes' ? ' on' : '')} onClick={() => setGrupo('pendentes')}>
-            Falta aprovar <span className={pendentes.length ? 'irs-cont alerta' : 'irs-cont'}>{pendentes.length}</span>
+            Rascunhos <span className={pendentes.length ? 'irs-cont alerta' : 'irs-cont'}>{pendentes.length}</span>
           </button>
           {GRUPOS_TEXTO.filter((g) => contar(g.id) > 0 || g.id === 'outros').map((g) => (
             <button key={g.id} type="button" className={'irs-grupo' + (grupo === g.id ? ' on' : '')} onClick={() => setGrupo(g.id)}>
@@ -319,7 +321,7 @@ export function SecTextos({ c, set }: P) {
         </nav>
         <div className="irs-textos-lista">
           <div className="irs-textos-cab">
-            <div><h3>{grupo === 'pendentes' ? 'Falta aprovar' : grupoInfo?.rotulo}</h3><p>{grupo === 'pendentes' ? 'Os textos que esta IA usa e ainda não foram aprovados.' : grupoInfo?.desc}</p></div>
+            <div><h3>{grupo === 'pendentes' ? 'Rascunhos' : grupoInfo?.rotulo}</h3><p>{grupo === 'pendentes' ? 'Textos desta IA que ainda são rascunho: ela não usa até alguém aprovar.' : grupoInfo?.desc}</p></div>
             <div className="irs-textos-acoes">
               {lista.some((t) => !t.aprovado) && <BotaoSec mini onClick={() => set((x) => ({ ...x, textos: x.textos.map((t) => (lista.some((l) => l.id === t.id) ? { ...t, aprovado: true } : t)) }))}>Aprovar {lista.filter((t) => !t.aprovado).length} daqui</BotaoSec>}
               {grupo !== 'pendentes' && <BotaoSec mini onClick={() => set((x) => ({ ...x, textos: [...x.textos, { id: novoId('X').toUpperCase(), grupo: grupo as GrupoTexto, quando: 'Texto novo', tipo: 'texto', texto: '', aprovado: false, origem: 'novo' }] }))}>＋ Texto</BotaoSec>}
@@ -332,7 +334,7 @@ export function SecTextos({ c, set }: P) {
                 <span className="irs-texto-id">{t.id}</span>
                 <input className="irs-texto-quando" aria-label="Quando é usado" value={t.quando} maxLength={120} onChange={(e) => mudarT(t.id, (x) => ({ ...x, quando: e.target.value }))} />
                 <button type="button" className={'irs-tipo ' + t.tipo} onClick={() => mudarT(t.id, (x) => ({ ...x, tipo: x.tipo === 'texto' ? 'audio' : 'texto', aprovado: false }))} title="Trocar entre texto e áudio">{t.tipo === 'audio' ? 'Áudio' : 'Texto'}</button>
-                {t.aprovado ? <BadgeStatus tom="ok">Aprovado</BadgeStatus> : <BadgeStatus tom="atencao">{t.origem === 'atenvo' ? 'Adaptado do Atenvo' : 'Novo'}</BadgeStatus>}
+                {t.aprovado ? <BadgeStatus tom="ok">Aprovado</BadgeStatus> : <BadgeStatus tom="atencao">{t.origem === 'atenvo' ? 'Rascunho (como no Atenvo)' : t.origem === 'novo' ? 'Novo' : 'Editado'}</BadgeStatus>}
                 {!usados.has(t.id) && <span className="irs-fora">não usado nesta IA</span>}
               </header>
               <textarea className="inp irs-area" aria-label={`Texto ${t.id}`} rows={Math.min(5, Math.max(2, Math.ceil(t.texto.length / 90)))} value={t.texto} maxLength={1200}
@@ -427,7 +429,7 @@ export function SecNunca({ c, set }: P) {
         <Liga titulo="Nunca dá prazo exato" desc="Só o prazo médio cadastrado, sempre como média." ligado={p.prazosExatos} aoMudar={(v) => mud('prazosExatos', v)} />
         <Liga titulo="Nunca promete aprovação ou resultado" ligado={p.prometerAprovacao} aoMudar={(v) => mud('prometerAprovacao', v)} />
         <Liga titulo="Nunca pressiona" desc={'Nada de "última chance", "é rapidinho", "só hoje".'} ligado={p.urgencia} aoMudar={(v) => mud('urgencia', v)} />
-        <Liga titulo="Nunca pede nem aceita senha" desc="Do gov.br, do banco ou de qualquer coisa. Se o cliente mandar, ela não guarda e avisa." ligado={p.pedirSenha} aoMudar={(v) => mud('pedirSenha', v)} travado="Regra de segurança: sempre ligada" />
+        <Liga titulo="Nunca repete nem anota a senha" desc="Quando o cliente manda a senha do gov.br, ela não escreve de volta, não guarda no que ela anota e avisa a equipe que a senha chegou." ligado={p.naoRepeteSenha} aoMudar={(v) => mud('naoRepeteSenha', v)} travado="Regra de segurança: sempre ligada" />
       </Bloco>
       <Bloco titulo="Palavras e frases">
         <Etiquetas rotulo="Frases que ela nunca usa" valores={p.frases} aoMudar={(v) => mud('frases', v)} />
