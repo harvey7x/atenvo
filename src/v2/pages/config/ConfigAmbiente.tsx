@@ -23,6 +23,7 @@ import { RevizaRegistros } from '../RevizaRegistros';
 import { ConfigWhatsApp } from './ConfigWhatsApp';
 import { ConfigIntegracoes } from './ConfigIntegracoes';
 import { ConfigEquipes } from './ConfigEquipes';
+import { ConfigEntradas } from './ConfigEntradas';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
@@ -69,6 +70,7 @@ export default function ConfigAmbiente() {
   if (secao === 'integracoes') {
     if (servico === 'asaas') return (<><Cabecalho titulo="Asaas" sub="Pagamentos por Pix, boleto e cartão, com baixa das parcelas quando o cliente paga." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigAsaas /></>);
     if (servico === 'whatsapp-oficial') return (<><Cabecalho titulo="WhatsApp oficial" sub="A API oficial do WhatsApp, da Meta: conectar o número, acompanhar a saúde dele e cuidar dos modelos de mensagem." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigWhatsAppOficial /></>);
+    if (servico === 'receber' && temRecurso('atendimento')) return (<><Cabecalho titulo="Receber de outros sistemas" sub="Um endereço para cada sistema de fora (como a URA): o que ele mandar vira conversa no WhatsApp do Atendimento e lead no Kanban." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigEntradas /></>);
     if (servico) return <Navigate to="/config/integracoes" replace />;
     return (<><Cabecalho titulo="Integrações" sub="Os serviços de fora que trabalham junto com o sistema. Conecte e configure cada um aqui." /><ConfigIntegracoes /></>);
   }

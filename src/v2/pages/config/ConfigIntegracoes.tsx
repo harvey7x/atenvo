@@ -13,6 +13,7 @@ import { ROTULO_AMBIENTE_ASAAS, useAsaas } from '../../data/config/integracoes';
 import { useConexoesWA } from '../../data/config/conexoes';
 import { useOficial } from '../../data/config/oficial';
 import { temRecurso } from '../../data/config/recursos';
+import { useEntradas } from '../../data/config/entradas';
 import '../painel/painel.css';
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -56,6 +57,9 @@ export function ConfigIntegracoes() {
   const asaas = useAsaas(temAsaas);
   const wa = useConexoesWA();
   const oficial = useOficial(temOficial);
+  const temAtd = temRecurso('atendimento');
+  const entradasQ = useEntradas();
+  const entradasOn = (entradasQ.data ?? []).filter((e) => e.ativo).length;
   const ofN = oficial.dados.numeros.length;
   const ofModelos = oficial.dados.modelos.filter((m) => m.situacao === 'aprovado').length;
   const a = asaas.dados;
@@ -79,6 +83,13 @@ export function ConfigIntegracoes() {
           acao={waTot
             ? <BotaoSec mini onClick={() => ir('/config/whatsapp')}>Gerenciar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/whatsapp')}>Conectar</BotaoPrimario>} />
+        <Quadro atraso={0.06} icone={<IcTomada />} nome="Receber de outros sistemas" categoria="Dados"
+          descricao="Um endereço (webhook) para sistemas de fora, como a URA, mandarem os clientes: cada um vira conversa no WhatsApp do Atendimento e lead no Kanban."
+          estado={!temAtd ? 'breve' : entradasOn > 0 ? 'conectado' : 'desconectado'}
+          detalhe={!temAtd ? undefined : entradasQ.isLoading ? 'Consultando…' : entradasOn ? `${entradasOn} ${entradasOn === 1 ? 'endereço recebendo' : 'endereços recebendo'}` : undefined}
+          acao={!temAtd ? undefined : (entradasQ.data ?? []).length
+            ? <BotaoSec mini onClick={() => ir('/config/integracoes/receber')}>Configurar</BotaoSec>
+            : <BotaoPrimario mini onClick={() => ir('/config/integracoes/receber')}>Criar endereço</BotaoPrimario>} />
         <Quadro atraso={0.08} icone={<IcOficial />} nome="WhatsApp oficial" categoria="Mensagens"
           descricao="A API oficial do WhatsApp, da Meta: o número não depende de celular ligado e envia por modelos de mensagem aprovados."
           estado={!temOficial ? 'breve' : ofN > 0 ? 'conectado' : 'desconectado'}
@@ -90,7 +101,7 @@ export function ConfigIntegracoes() {
           descricao="Receber no Atendimento as mensagens e os contatos que chegam pelos anúncios e pelas páginas." />
         <Quadro atraso={0.16} icone={<IcPlanilha />} nome="Google Planilhas" categoria="Dados" estado="breve"
           descricao="Levar a carteira e os pagamentos para uma planilha que se atualiza sozinha." />
-        <Quadro atraso={0.2} icone={<IcTomada />} nome="Outros sistemas" categoria="Dados" estado="breve"
+        <Quadro atraso={0.2} icone={<IcTomada />} nome="Avisar outros sistemas" categoria="Dados" estado="breve"
           descricao="Avisar outro sistema quando um pagamento entra ou quando um cliente muda." />
       </div>
     </div>

@@ -199,6 +199,13 @@ export function criarSupabasePrevia() {
   const salvarOficial = () => { try { localStorage.setItem(LS_OFICIAL, JSON.stringify(T.wa_oficial)); } catch { /* idem */ } };
   // equipes do Atendimento (23/11): gerente, pessoas e números de cada uma — sobrevive ao recarregar,
   // para dar para ver a regra no "Ver como" (a gerente Bianca vê a equipe; a atendente Carla, só as dela)
+  // receber de outros sistemas (23/11): o endereço da URA e o que já chegou por ele (exemplo)
+  T.atd_entradas = [{ id: 'ent-ura', nome: 'URA', chave: '4f9c2a7e1b8d3f60c5a1e9b7d2f4c8a6e3b1d9f7c5a2e8b4', canal_id: 'atd-principal', ativo: true, criado_em: '2026-11-20T12:00:00Z', ultimo_evento_em: new Date(Date.now() - 12 * 60_000).toISOString(), total_eventos: 3 }];
+  T.atd_entrada_eventos = [
+    { id: 3, entrada_id: 'ent-ura', recebido_em: new Date(Date.now() - 12 * 60_000).toISOString(), resultado: 'ok', telefone: '5551987770003', nome: 'Terezinha M. Alves', mensagem: 'Olá! Obrigado pelo interesse.', detalhe: 'cliente que já existia', conversa_id: 'wa-terezinha' },
+    { id: 2, entrada_id: 'ent-ura', recebido_em: new Date(Date.now() - 95 * 60_000).toISOString(), resultado: 'ok', telefone: '5551987770004', nome: 'Sebastião R. Nunes', mensagem: 'Olá! Obrigado pelo interesse.', detalhe: 'cliente novo', conversa_id: 'wa-sebastiao' },
+    { id: 1, entrada_id: 'ent-ura', recebido_em: new Date(Date.now() - 26 * 3600_000).toISOString(), resultado: 'sem_telefone', telefone: null, nome: 'Sem número', mensagem: null, detalhe: 'não veio um telefone válido', conversa_id: null },
+  ];
   const LS_EQUIPES = 'previa-equipes-v1';
   T.equipes = [
     { id: 'eq-vendas', nome: 'Vendas', gerente_id: 'u-bianca', membros: ['u-carla', 'u-eduardo'], canais: ['atd-principal'], created_at: '2026-11-10T12:00:00Z' },

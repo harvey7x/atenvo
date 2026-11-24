@@ -256,3 +256,19 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 
 .v2 .cfge-aviso { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); padding: 11px 14px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(var(--tint), .035); }
 .v2 .cfge-aviso b { color: var(--txt); font-weight: 600; }
+
+/* ---------- Receber de outros sistemas (23/11) ---------- */
+.v2 .cfgr-tab td { vertical-align: middle; }
+.v2 .cfgr-url { display: block; max-width: 320px; overflow-wrap: anywhere; font-size: 11px; color: var(--txt-3); line-height: 1.35; }
+.v2 .cfgr-instr { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .cfgr-dl { margin: 0; display: grid; gap: 8px; }
+.v2 .cfgr-dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 12.5px; }
+.v2 .cfgr-dl dt { color: var(--txt-3); }
+.v2 .cfgr-dl dd { margin: 0; color: var(--txt); line-height: 1.45; }
+.v2 .cfgr-exemplo { border: 1px solid var(--linha); border-radius: 10px; overflow: hidden; }
+.v2 .cfgr-exemplo-cab { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; font-size: 11.5px; color: var(--txt-3); border-bottom: 1px solid var(--linha); background: rgba(var(--tint), .03); }
+.v2 .cfgr-exemplo pre { margin: 0; padding: 10px 12px; font: 11.5px/1.5 ui-monospace, Menlo, monospace; color: var(--txt); white-space: pre-wrap; overflow-wrap: anywhere; }
+.v2 .cfgr-nota { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgr-endereco { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; background: rgba(var(--tint), .03); }
+.v2 .cfgr-endereco code { flex: 1; min-width: 0; font: 12px/1.45 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; color: var(--txt); }
+@media (max-width: 860px) { .v2 .cfgr-instr { grid-template-columns: 1fr; } }
