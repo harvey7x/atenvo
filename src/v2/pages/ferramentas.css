@@ -220,3 +220,11 @@ html[data-barra-alfa]:not(#rv-fer) .v2 .conv-tipo span { font-size: 12px; }
 html[data-barra-alfa]:not(#rv-fer) .v2 .conv-tipo b { font-size: 14px; font-weight: 600; }
 /* Unificador: a dica do "Identificar bancos" é uma linha curta */
 html[data-barra-alfa]:not(#rv-fer) .v2 .ferr-modo-dica { font-size: 12px; }
+
+/* Coletor INSS (25/11): o guia único de instalação em PDF, no topo do bloco de instalação */
+.v2 .clg-guia { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 18px 4px; padding: 12px 14px;
+  border-radius: 10px; background: rgba(var(--tint), .05); border: 1px solid var(--linha); }
+.v2 .clg-guia > div { flex: 1 1 260px; min-width: 0; }
+.v2 .clg-guia b { display: block; font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .clg-guia p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .ph .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
