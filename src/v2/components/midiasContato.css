@@ -107,3 +107,46 @@
 
 /* vídeo aberto */
 .mdc-video { display: block; width: 100%; max-height: 70vh; border-radius: 8px; background: #000; }
+
+/* ---- documentos reconhecidos pela IA (IaPropria.tsx › DocumentosDaConversa; 25/11) ----
+   verde = chegou, âmbar = pedir de novo, neutro = falta. Nada de laranja translúcido. */
+.v2 .mdc-ia { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linha); }
+.v2 .mdc-ia-cab { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.v2 .mdc-ia-cab .ctx-t { margin: 0; flex: 1; }
+.v2 .mdc-ia-cab .q { font-size: 11px; color: var(--txt-2); white-space: nowrap; }
+.v2 .mdc-ia-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.v2 .mdc-ia-lista li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; column-gap: 6px; font-size: 11.5px; line-height: 1.35; }
+.v2 .mdc-ia-lista .mk {
+  width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px dashed rgba(var(--tint), .35); color: var(--txt-3);
+}
+.v2 .mdc-ia-lista .mk svg { width: 10px; height: 10px; }
+.v2 .mdc-ia-lista .nm { color: var(--txt); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .mdc-ia-lista .sit { font-size: 10.5px; color: var(--txt-3); white-space: nowrap; }
+.v2 .mdc-ia-lista .obs { grid-column: 2 / -1; font-size: 10.5px; color: var(--txt-2); line-height: 1.4; }
+.v2 .mdc-ia-lista .e-chegou .mk { border: 0; background: var(--cor-ok-suave, var(--verde-bg)); color: var(--cor-ok-txt, var(--verde)); }
+.v2 .mdc-ia-lista .e-chegou .sit { color: var(--cor-ok-txt, var(--verde)); }
+.v2 .mdc-ia-lista .e-pedir_de_novo .mk { border: 0; background: var(--cor-alerta-suave, var(--ambar-bg)); color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .mdc-ia-lista .e-pedir_de_novo .sit { color: var(--cor-alerta-txt, var(--ambar)); font-weight: 600; }
+.v2 .mdc-ia-lista .e-falta .nm { color: var(--txt-2); }
+.v2 .mdc-ia .lnk { border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(var(--tint), .3); text-underline-offset: 2px; }
+.v2 .mdc-ia .lnk:hover { text-decoration-color: currentColor; }
+.v2 .mdc-ia .lnk:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; border-radius: 3px; }
+.v2 .mdc-ia-outros { margin: 8px 0 0; font-size: 11px; line-height: 1.45; color: var(--txt-2); }
+.v2 .mdc-ia-outros .lnk { color: inherit; }
+.v2 .mdc-ia-outros b { font-weight: 600; color: var(--txt-2); }
+.v2 .mdc-ia-outros .ruim { color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .mdc-ia-lendo { margin: 8px 0 0; font-size: 11px; color: var(--txt-3); animation: mdc-pulsa 1.2s ease-in-out infinite; }
+.v2 .mdc-ia .ria-acoes { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .v2 .mdc-ia-lendo { animation: none; } }
+
+/* o tipo no documento e na foto (tela "Mídia, documentos e links") */
+.v2 .mdc-doc .mdc-tipo { font-size: 10.5px; font-weight: 500; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .mdc-doc .mdc-tipo.ruim { color: var(--cor-alerta-txt, var(--ambar)); }
+.v2 .mdc-mini .mdc-tipo-f {
+  position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 2px 4px; border-radius: 4px; text-align: left;
+  font-size: 9px; font-weight: 600; line-height: 1.25; color: #fff; background: rgba(0, 0, 0, .66);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2 .mdc-mini .mdc-tipo-f.ruim { color: #FCD34D; }
+.v2 .mdc-ia .ria-tx { margin: 2px 0 0; }

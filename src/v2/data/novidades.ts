@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'documentos-ia-25-11', titulo: 'Documentos reconhecidos pela IA', onde: 'WhatsApp › painel do cliente › Mídia, documentos e links', quando: '25/11', recurso: 'ia-propria',
+    texto: 'O "Identificar os arquivos" faz a IA olhar as fotos e os PDFs que o cliente mandou e dizer o que é cada um (RG ou CNH, comprovante de endereço, extrato de empréstimos…). Logo abaixo aparece o que já chegou, o que falta e o que precisa ser pedido de novo porque não dá para ler. A IA não copia nome, número nem valor nenhum.',
+    rota: '/whatsapp',
+  },
+  {
     id: 'sugerir-resposta-25-11', titulo: 'Sugerir resposta com IA', onde: 'WhatsApp › caixa de mensagem', quando: '25/11', recurso: 'ia-propria',
     texto: 'Ao lado de Scripts, o botão com o brilho ("Sugerir resposta") faz a IA escrever um rascunho lendo a conversa e os scripts da empresa. Nada é enviado sozinho: confira, ajuste se quiser e envie. Se não gostar, "Desfazer" volta o que estava escrito.',
     rota: '/whatsapp',

@@ -172,3 +172,56 @@ export function montarTextoScripts(scripts: { titulo: string | null; conteudo: s
   }
   return linhas.join('\n');
 }
+
+/* ---------- "Identificar documentos" (25/11): a IA diz o que é cada foto/PDF que o CLIENTE mandou ---------- */
+export const TIPOS_DOCUMENTO = ['identidade', 'comprovante_endereco', 'extrato_consignado', 'extrato_pagamento', 'carta_concessao', 'contracheque', 'extrato_bancario', 'contrato', 'outro'] as const;
+export type TipoDocumento = typeof TIPOS_DOCUMENTO[number];
+export const MAX_DOCS_POR_VEZ = 8;
+export const MAX_BYTES_DOC = 5 * 1024 * 1024;
+export const INSTRUCOES_DOCUMENTO = `Você confere documentos que um cliente mandou pelo WhatsApp para uma empresa de crédito consignado e revisão de empréstimos (aposentados e pensionistas do INSS).
+Diga SÓ que tipo de documento é, se dá para ler e, se for documento de identidade, qual lado aparece. NÃO copie nomes, números, CPF nem valores.
+Tipos possíveis:
+- identidade: RG, CNH ou outro documento com foto
+- comprovante_endereco: conta de luz, água, telefone, internet, gás ou outro comprovante de endereço
+- extrato_consignado: histórico/extrato de empréstimos consignados do INSS (Meu INSS)
+- extrato_pagamento: extrato de pagamento / histórico de créditos do benefício do INSS
+- carta_concessao: carta de concessão do benefício do INSS
+- contracheque: contracheque ou holerite
+- extrato_bancario: extrato de conta ou de empréstimo de banco
+- contrato: contrato, proposta ou procuração
+- outro: qualquer outra coisa (foto pessoal, print de conversa etc.)
+Responda só com JSON: {"tipo": "<um dos tipos>", "lado": "frente" | "verso" | "frente_e_verso" | null, "legivel": true | false, "observacao": "<até 12 palavras, sem dados pessoais>"}`;
+export const ESQUEMA_DOC_GEMINI = {
+  type: 'OBJECT',
+  properties: {
+    tipo: { type: 'STRING', enum: [...TIPOS_DOCUMENTO] },
+    lado: { type: 'STRING', enum: ['frente', 'verso', 'frente_e_verso'], nullable: true },
+    legivel: { type: 'BOOLEAN' },
+    observacao: { type: 'STRING' },
+  },
+  required: ['tipo', 'legivel'],
+};
+export interface DocIdentificado { tipo: TipoDocumento; lado: 'frente' | 'verso' | 'frente_e_verso' | null; legivel: boolean; observacao: string }
+export function lerDocumento(texto: string): DocIdentificado | null {
+  let j: Record<string, unknown> | null = null;
+  try { j = JSON.parse((texto ?? '').replace(/^```(?:json)?|```$/g, '').trim()); } catch { return null; }
+  if (!j || typeof j !== 'object') return null;
+  const tipo = String(j.tipo ?? '') as TipoDocumento;
+  if (!(TIPOS_DOCUMENTO as readonly string[]).includes(tipo)) return null;
+  const lado = ['frente', 'verso', 'frente_e_verso'].includes(String(j.lado)) ? (j.lado as DocIdentificado['lado']) : null;
+  // a observação nunca leva número (CPF, conta, valores, datas): troca qualquer sequência de 4+ dígitos/sinais por •••
+  const observacao = String(j.observacao ?? '').replace(/\d[\d.,\-/ ]{2,}\d/g, '•••').trim().slice(0, 120);
+  return { tipo, lado: tipo === 'identidade' ? lado : null, legivel: j.legivel !== false, observacao };
+}
+/** PDF sem IA de visão (OpenAI): o nome do arquivo às vezes já diz o que é */
+export function tipoPeloNome(nome: string | null | undefined): TipoDocumento | null {
+  const n = (nome ?? '').toLowerCase();
+  if (/contracheque|holerite/.test(n)) return 'contracheque';
+  if (/contrato|procura/.test(n)) return 'contrato';
+  if (/consign|emprest/.test(n)) return 'extrato_consignado';
+  if (/extrato.*pag|hiscre|credito/.test(n)) return 'extrato_pagamento';
+  if (/concess/.test(n)) return 'carta_concessao';
+  if (/(^|[^a-z])(rg|cnh)([^a-z]|$)|identidade/.test(n)) return 'identidade';
+  if (/comprov|endere|conta.?de.?(luz|agua|água)|fatura/.test(n)) return 'comprovante_endereco';
+  return null;
+}

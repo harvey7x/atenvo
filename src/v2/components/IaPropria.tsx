@@ -7,11 +7,12 @@
    Sem a chave de IA conectada, os botões ficam desligados com "conecte a sua chave de IA" (o administrador vai direto
    para Configurações › Integrações; as outras pessoas são avisadas de que é com o administrador).
    Só na Reviza e com o recurso 'ia-propria' ligado na instalação. Dados: @/data/iaPropria. */
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { isRevizaMode } from '@/lib/supabase';
-import { quandoFoiGerado, traduzErroIa, transcricaoDemo, useGerarResumo, useIaDisponivel, useResumoAtendimento, useTranscreverAudio } from '@/data/iaPropria';
+import { quandoFoiGerado, traduzErroIa, transcricaoDemo, useDocsDemo, useGerarResumo, useIaDisponivel, useIdentificarDocumentos, useResumoAtendimento, useTranscreverAudio } from '@/data/iaPropria';
+import { rotuloDoDoc, situacaoDosDocs, type DocIa, type EstadoDoc } from '@/data/documentosIa';
 import type { WaMessage } from '@/data/whatsappDemo';
 import { temRecurso } from '../data/config/recursos';
 import { BotaoSec } from './Botao';
@@ -131,6 +132,94 @@ function TranscreverBotao({ m, aoTranscrever }: { m: WaMessage; aoTranscrever: (
       </button>
       {!configurada && disp.isSuccess && <><span className="transc-sep" aria-hidden>·</span><SemChave curto /></>}
       {erro && <span className="transc-erro" role="alert">{erro}</span>}
+    </div>
+  );
+}
+
+/* ================= Documentos reconhecidos pela IA (25/11) ================= */
+/** o documento de cada mensagem: o que o servidor gravou ou, na demonstração, o que ficou no navegador */
+export function useDocDe(demo: boolean): (m: WaMessage) => DocIa | null {
+  const ligada = iaPropriaLigada();
+  const docsDemo = useDocsDemo(demo && ligada);
+  return useCallback((m: WaMessage) => (!ligada ? null : m.doc ?? (demo && m.id ? docsDemo[m.id] ?? null : null)), [ligada, demo, docsDemo]);
+}
+
+const IcCerto = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
+const IcAtencao = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 7v6" /><path d="M12 17h.01" /></svg>;
+const ESTADO_TXT: Record<EstadoDoc, string> = { chegou: 'chegou', pedir_de_novo: 'pedir de novo', falta: 'falta' };
+
+/** "Documentos da revisão" no painel do cliente: o que chegou, o que falta e o que precisa ser pedido de novo */
+export function DocumentosDaConversa(props: { conversaId: string; msgs: WaMessage[]; demo: boolean; aoIrParaMensagem: (id: string) => void }) {
+  if (!iaPropriaLigada() || !props.conversaId) return null;
+  return <DocumentosBloco key={props.conversaId} {...props} />;
+}
+
+function DocumentosBloco({ conversaId, msgs, demo, aoIrParaMensagem }: { conversaId: string; msgs: WaMessage[]; demo: boolean; aoIrParaMensagem: (id: string) => void }) {
+  const disp = useIaDisponivel();
+  const docDe = useDocDe(demo);
+  const ident = useIdentificarDocumentos();
+  const [erro, setErro] = useState<string | null>(null);
+  const [aindaTem, setAindaTem] = useState(false);
+  const sit = useMemo(() => situacaoDosDocs(msgs, docDe), [msgs, docDe]);
+  if (!sit.algumIdentificado && sit.semIdentificar === 0) return null; // o cliente não mandou foto nem documento
+  const configurada = disp.data?.configurada === true;
+  const chegaram = sit.revisao.filter((l) => l.estado === 'chegou').length;
+  const identificar = () => {
+    if (!configurada || ident.isPending) return;
+    setErro(null);
+    ident.mutate({ conversaId, msgsDemo: demo ? msgs : undefined }, {
+      onSuccess: (r) => setAindaTem(r.faltamMais),
+      onError: (e) => setErro(traduzErroIa(e)),
+    });
+  };
+  const n = sit.semIdentificar;
+  return (
+    <div className="mdc-ia" data-docs-ia aria-busy={ident.isPending || undefined}>
+      <div className="mdc-ia-cab">
+        <span className="ctx-t">Documentos da revisão</span>
+        {sit.algumIdentificado && <span className="q num" title="Documentos da revisão que já chegaram">{chegaram} de {sit.revisao.length}</span>}
+      </div>
+      {sit.algumIdentificado && (
+        <ul className="mdc-ia-lista">
+          {sit.revisao.map((l) => (
+            <li key={l.tipo} className={'e-' + l.estado}>
+              <span className="mk">{l.estado === 'chegou' ? <IcCerto /> : l.estado === 'pedir_de_novo' ? <IcAtencao /> : null}</span>
+              <span className="nm">{l.rotulo}</span>
+              {l.mensagemId
+                ? <button type="button" className="sit lnk" title="Ver este arquivo na conversa" onClick={() => aoIrParaMensagem(l.mensagemId!)}>{ESTADO_TXT[l.estado]}</button>
+                : <span className="sit">{ESTADO_TXT[l.estado]}</span>}
+              {l.estado === 'pedir_de_novo' && l.obs && <span className="obs">{l.obs}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {sit.outros.length > 0 && (
+        <p className="mdc-ia-outros">
+          <b>Também chegou:</b>{' '}
+          {sit.outros.map((o, i) => (
+            <span key={o.mensagemId}>
+              {i > 0 && ', '}
+              <button type="button" className="lnk" title={o.doc.obs || 'Ver na conversa'} onClick={() => aoIrParaMensagem(o.mensagemId)}>{rotuloDoDoc(o.doc)}</button>
+              {!o.doc.legivel && <span className="ruim"> (não dá para ler)</span>}
+            </span>
+          ))}
+        </p>
+      )}
+      {ident.isPending ? (
+        <p className="mdc-ia-lendo" role="status">Olhando os arquivos… pode levar até 1 minuto.</p>
+      ) : n > 0 ? (
+        <>
+          {!sit.algumIdentificado && <p className="ria-tx">A IA olha as fotos e os PDFs que o cliente mandou e diz o que é cada um, se dá para ler e o que ainda falta.</p>}
+          <div className="ria-acoes">
+            <BotaoSec mini disabled={!configurada} onClick={identificar}>
+              {sit.algumIdentificado ? `Identificar mais ${n}` : n === 1 ? 'Identificar o arquivo' : `Identificar os ${n} arquivos`}
+            </BotaoSec>
+            {(aindaTem || n > 8) && <span className="ria-dica">de 8 em 8</span>}
+          </div>
+          {!configurada && disp.isSuccess && <SemChave />}
+        </>
+      ) : null}
+      {erro && !ident.isPending && <p className="ria-erro" role="alert">{erro}</p>}
     </div>
   );
 }

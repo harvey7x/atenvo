@@ -2,11 +2,13 @@
    "quando tu abre o perfil da pessoa aparece as mídias também, os documentos" — o mesmo do WhatsApp).
    Resumo no painel de dados + tela própria dentro do painel, com abas. Tudo vem do histórico da conversa
    aberta (lib/midiasConversa); a URL de cada arquivo é assinada sob demanda, como na bolha. */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { urlAssinadaMidiaWa, urlDownloadMidiaWa } from '@/data/whatsapp';
 import { nomeArquivoMidia } from '@/data/midiaNome';
 import type { WaMessage } from '@/data/whatsappDemo';
+import { rotuloDoDoc, type DocIa } from '@/data/documentosIa';
+import { useDocDe } from './IaPropria';
 import { AudioBolha, Ic, IcDoc } from './BolhaWa';
 import { ModalV2 } from './ModalV2';
 import { BotaoSec } from './Botao';
@@ -48,23 +50,26 @@ async function urlParaAbrir(m: WaMessage, demo: boolean): Promise<string | null>
   return urlAssinadaMidiaWa(m.anexoPath);
 }
 
-function Miniatura({ it, demo, aoAbrir, grande }: { it: ItemMidia; demo: boolean; aoAbrir: (it: ItemMidia, url: string | null) => void; grande?: boolean }) {
+function Miniatura({ it, demo, aoAbrir, grande, doc }: { it: ItemMidia; demo: boolean; aoAbrir: (it: ItemMidia, url: string | null) => void; grande?: boolean; doc?: DocIa | null }) {
   const { url, carregando, erro } = useUrlMidia(it.m, demo);
   const video = it.m.tipo === 'video';
-  const rotulo = (video ? 'Abrir vídeo' : 'Abrir foto') + (it.ts > 1e10 ? ' de ' + dataCurta(it.ts) : '');
+  const rotulo = (doc ? rotuloDoDoc(doc) + (doc.legivel ? '' : ', não dá para ler') + ': abrir' : video ? 'Abrir vídeo' : 'Abrir foto') + (it.ts > 1e10 ? ' de ' + dataCurta(it.ts) : '');
   return (
     <button type="button" className={'mdc-mini' + (grande ? ' g' : '') + (carregando ? ' carregando' : '') + (erro ? ' erro' : '')} title={rotulo} aria-label={rotulo} onClick={() => aoAbrir(it, url)}>
       {url && !video && <img src={url} alt="" loading="lazy" draggable={false} />}
       {url && video && <video src={url} muted preload="metadata" playsInline />}
       {!url && !carregando && <span className="sem">{video ? 'Vídeo' : 'Foto'}</span>}
       {video && <span className="play" aria-hidden><IcPlayCheio /></span>}
+      {grande && doc && doc.tipo !== 'outro' && <span className={'mdc-tipo-f' + (doc.legivel ? '' : ' ruim')} aria-hidden>{rotuloDoDoc(doc)}</span>}
     </button>
   );
 }
 
 /** bloco do painel de dados: contagem + as últimas fotos (ou os últimos documentos) */
-export function MidiasResumo({ midias, demo, aoAbrirAba, aoAbrirFoto }: {
+export function MidiasResumo({ midias, demo, aoAbrirAba, aoAbrirFoto, rodape }: {
   midias: MidiasDaConversa; demo: boolean; aoAbrirAba: (a: AbaMidia) => void; aoAbrirFoto: (it: ItemMidia, url: string | null) => void;
+  /** "Documentos da revisão" (IA da empresa), quando ligada */
+  rodape?: ReactNode;
 }) {
   const primeiraAba: AbaMidia = midias.fotos.length ? 'fotos' : midias.documentos.length ? 'documentos' : midias.audios.length ? 'audios' : 'links';
   return (
@@ -88,11 +93,12 @@ export function MidiasResumo({ midias, demo, aoAbrirAba, aoAbrirFoto }: {
           })}
         </div>
       )}
+      {rodape}
     </div>
   );
 }
 
-function LinhaDoc({ it, demo, aoIr }: { it: ItemMidia; demo: boolean; aoIr: (id: string) => void }) {
+function LinhaDoc({ it, demo, aoIr, doc }: { it: ItemMidia; demo: boolean; aoIr: (id: string) => void; doc?: DocIa | null }) {
   const m = it.m;
   const [aviso, setAviso] = useState<string | null>(null);
   const nome = m.nome || m.pdf?.name || 'Documento';
@@ -119,7 +125,11 @@ function LinhaDoc({ it, demo, aoIr }: { it: ItemMidia; demo: boolean; aoIr: (id:
     <li className="mdc-doc">
       <button type="button" className="mdc-doc-abrir" onClick={abrir} title={temArquivo ? 'Abrir ' + nome : nome}>
         <span className="ic"><IcDoc /><i>{extensaoDe(m)}</i></span>
-        <span className="inf"><span className="nm">{nome}</span><span className="mt num">{meta}{m.dir === 'out' ? ' · enviado' : ''}</span></span>
+        <span className="inf">
+          <span className="nm">{nome}</span>
+          {doc && <span className={'mdc-tipo' + (doc.legivel ? '' : ' ruim')} title={doc.obs || undefined}>{rotuloDoDoc(doc)}{doc.legivel ? '' : ' · não dá para ler'}</span>}
+          <span className="mt num">{meta}{m.dir === 'out' ? ' · enviado' : ''}</span>
+        </span>
       </button>
       <span className="acoes">
         <button type="button" className="ib" title="Baixar" aria-label={'Baixar ' + nome} onClick={baixar}><IcBaixar /></button>
@@ -162,6 +172,7 @@ export function MidiasPainel({ midias, demo, aba, aoTrocarAba, aoVoltar, aoAbrir
   aoAbrirFoto: (it: ItemMidia, url: string | null) => void; aoIrParaMensagem: (id: string) => void;
 }) {
   const grupos = useMemo(() => agruparPorMes<ItemMidia | ItemLink>(midias[aba] as (ItemMidia | ItemLink)[]), [midias, aba]);
+  const docDe = useDocDe(demo);
   const abasRef = useRef<HTMLDivElement>(null);
   const vazio: Record<AbaMidia, string> = {
     fotos: 'Nenhuma foto ou vídeo nesta conversa.', documentos: 'Nenhum documento nesta conversa.',
@@ -185,8 +196,8 @@ export function MidiasPainel({ midias, demo, aba, aoTrocarAba, aoVoltar, aoAbrir
         {grupos.map((g) => (
           <section key={g.rotulo} className="mdc-grupo">
             <h4>{g.rotulo}</h4>
-            {aba === 'fotos' && <div className="mdc-grade">{(g.itens as ItemMidia[]).map((it) => <Miniatura key={it.chave} it={it} demo={demo} aoAbrir={aoAbrirFoto} grande />)}</div>}
-            {aba === 'documentos' && <ul className="mdc-lista">{(g.itens as ItemMidia[]).map((it) => <LinhaDoc key={it.chave} it={it} demo={demo} aoIr={aoIrParaMensagem} />)}</ul>}
+            {aba === 'fotos' && <div className="mdc-grade">{(g.itens as ItemMidia[]).map((it) => <Miniatura key={it.chave} it={it} demo={demo} aoAbrir={aoAbrirFoto} grande doc={docDe(it.m)} />)}</div>}
+            {aba === 'documentos' && <ul className="mdc-lista">{(g.itens as ItemMidia[]).map((it) => <LinhaDoc key={it.chave} it={it} demo={demo} aoIr={aoIrParaMensagem} doc={docDe(it.m)} />)}</ul>}
             {aba === 'audios' && <ul className="mdc-lista">{(g.itens as ItemMidia[]).map((it) => <LinhaAudio key={it.chave} it={it} demo={demo} aoIr={aoIrParaMensagem} />)}</ul>}
             {aba === 'links' && <ul className="mdc-lista">{(g.itens as ItemLink[]).map((it) => <LinhaLink key={it.chave} it={it} aoIr={aoIrParaMensagem} />)}</ul>}
           </section>

@@ -46,6 +46,8 @@ export interface WaMessage {
   origemBot?: boolean;
   /** v2 (aditivo): transcrição do áudio quando o backend gravar metadados.transcricao. */
   transcricao?: string;
+  /** o que é este arquivo, segundo a IA da empresa (metadados.doc_*, 25/11): RG, comprovante, extrato… */
+  doc?: import('./documentosIa').DocIa | null;
   /** prévia da mensagem citada, para renderizar a mini-caixa dentro da bolha. */
   quoted?: { remetente?: string; tipo?: string; texto?: string };
   /** NOTA INTERNA (tipo 'nota_interna', migration 99): só a equipe vê, nunca vai ao cliente. `automatica` = gravada

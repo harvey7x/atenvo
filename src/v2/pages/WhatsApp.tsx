@@ -47,7 +47,7 @@ import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
 import { MOTIVOS_FECHAMENTO, textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
-import { ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
+import { DocumentosDaConversa, ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
 import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
@@ -1941,7 +1941,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           )}
 
-          <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel} />
+          <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
+            rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
 
           {/* IA com a chave da própria empresa (25/11): só na Reviza, com o recurso 'ia-propria' */}
           <ResumoAtendimento conversaId={current.id} msgs={current.msgs} demo={demo} />

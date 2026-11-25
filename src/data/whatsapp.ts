@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { docDosMetadados } from './documentosIa';
 import { focusManager, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
@@ -215,6 +216,7 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       viaTelefone: m.origem === 'telefone',
       origemBot: m.origem === 'bot' || undefined,
       transcricao: (m.metadados as { transcricao?: string } | null)?.transcricao || undefined,
+      doc: docDosMetadados(m.metadados as Record<string, unknown> | null) ?? undefined,
       status: m.status ?? undefined,
       erro: m.erro_envio ?? undefined,
       tipo: m.tipo,

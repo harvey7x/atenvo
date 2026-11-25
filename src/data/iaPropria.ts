@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import type { WaMessage } from '@/data/whatsappDemo';
+import { arquivoDoCliente, docDosMetadados, type DocIa } from '@/data/documentosIa';
 
 /* ------------------------------------------------------------------
    IA COM A CHAVE DA PRÓPRIA EMPRESA (25/11). No sistema que a Reviza usava antes: "Resumo do atendimento"
@@ -335,4 +337,66 @@ export function useSugerirResposta() {
       return s;
     },
   });
+}
+
+/* ---------- "Identificar documentos" (25/11): a IA diz o que é cada foto/PDF que o cliente mandou ---------- */
+const GUARDA_DOCS = 'previa-ia-documentos';
+const EVENTO_DOCS = 'reviza-docs-ia';
+/** o que a IA "acha" dos arquivos de exemplo da Maria Aparecida (documentos FICTÍCIOS da demonstração) */
+export const DOCS_DEMO: Record<string, DocIa> = {
+  'wm-a2': { tipo: 'extrato_consignado', lado: null, legivel: true, obs: '' },
+  'wm-a4': { tipo: 'identidade', lado: 'frente_e_verso', legivel: true, obs: '' },
+  'wm-5': { tipo: 'comprovante_endereco', lado: null, legivel: true, obs: 'Conta de luz.' },
+  'wm-6': { tipo: 'extrato_bancario', lado: null, legivel: false, obs: 'Foto escura e torta: parte do texto não dá para ler.' },
+};
+export const docsGuardadosDemo = (): Record<string, DocIa> => ler<Record<string, DocIa>>(GUARDA_DOCS, {});
+/** na demonstração, os documentos já identificados (atualiza quando o botão identifica mais) */
+export function useDocsDemo(demo: boolean): Record<string, DocIa> {
+  const [docs, setDocs] = useState<Record<string, DocIa>>(() => (demo ? docsGuardadosDemo() : {}));
+  useEffect(() => {
+    if (!demo) return;
+    const ouvir = () => setDocs(docsGuardadosDemo());
+    window.addEventListener(EVENTO_DOCS, ouvir);
+    return () => window.removeEventListener(EVENTO_DOCS, ouvir);
+  }, [demo]);
+  return docs;
+}
+
+export function useIdentificarDocumentos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { conversaId: string; msgsDemo?: WaMessage[] }): Promise<{ identificados: { mensagemId: string; doc: DocIa }[]; faltamMais: boolean }> => {
+      if (!IA_REAL) {
+        if (!estadoDemo().configurada) throw new Error(MSG_IA.sem_chave);
+        await esperar(1600);
+        const guardados = docsGuardadosDemo();
+        const novos = (v.msgsDemo ?? []).filter((m) => m.id && arquivoDoCliente(m) && !guardados[m.id]).slice(0, 8)
+          .map((m) => ({ mensagemId: m.id!, doc: DOCS_DEMO[m.id!] ?? { tipo: tipoDoNomeDemo(m.nome), lado: null, legivel: true, obs: '' } }));
+        gravar(GUARDA_DOCS, { ...guardados, ...Object.fromEntries(novos.map((n) => [n.mensagemId, n.doc])) });
+        try { window.dispatchEvent(new Event(EVENTO_DOCS)); } catch { /* fora do navegador */ }
+        return { identificados: novos, faltamMais: false };
+      }
+      const r = await comTraducao(chamar({ acao: 'identificar_documentos', conversa_id: v.conversaId }));
+      const lista = Array.isArray(r.identificados) ? (r.identificados as Record<string, unknown>[]) : [];
+      const identificados = lista.map((x) => ({
+        mensagemId: t(x.mensagem_id),
+        doc: docDosMetadados({ doc_tipo: x.tipo, doc_lado: x.lado, doc_legivel: x.legivel, doc_obs: x.observacao }),
+      })).filter((x): x is { mensagemId: string; doc: DocIa } => !!x.mensagemId && !!x.doc);
+      return { identificados, faltamMais: r.faltam_mais === true };
+    },
+    onSuccess: (r) => {
+      if (!IA_REAL || !r.identificados.length) return;
+      const porId = new Map(r.identificados.map((x) => [x.mensagemId, x.doc]));
+      qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (Array.isArray(old) ? old.map((m) => (m.id && porId.has(m.id) ? { ...m, doc: porId.get(m.id) } : m)) : old));
+    },
+    onError: (e) => { if ((e as Error).message === MSG_IA.sem_chave) invalidarChave(qc); },
+  });
+}
+function tipoDoNomeDemo(nome: string | undefined): DocIa['tipo'] {
+  const n = (nome ?? '').toLowerCase();
+  if (/(^|[^a-z])(rg|cnh)([^a-z]|$)|identidade/.test(n)) return 'identidade';
+  if (/comprov|endere|conta.?de.?luz|conta-luz|residen/.test(n)) return 'comprovante_endereco';
+  if (/contrato/.test(n)) return 'contrato';
+  if (/emprest|consign/.test(n)) return 'extrato_consignado';
+  return 'outro';
 }

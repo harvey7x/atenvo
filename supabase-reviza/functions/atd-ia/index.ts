@@ -11,6 +11,7 @@
 //   testar         → confere de novo a chave guardada                                      administrador
 //   remover_chave  → apaga a chave (resumos e transcrições já feitos ficam)                administrador
 //   resumo         → { conversa_id }: o último resumo guardado, sem chamar a IA            quem vê a conversa
+//   identificar_documentos → { conversa_id }: o que é cada foto/PDF que o cliente mandou (até 8 por vez; grava em metadados.doc_*)
 //   sugerir        → { conversa_id, pedido? }: um rascunho de resposta para o atendente revisar (nada é enviado nem guardado)
 //   resumir        → { conversa_id, refazer? }: as últimas 200 mensagens (até ~12 mil caracteres) → resumo curto
 //   transcrever    → { mensagem_id }: o áudio do bucket script-midia (até 10 MB e 5 min) → metadados.transcricao
@@ -21,7 +22,7 @@ import { MODELO_PADRAO } from '../_shared/iris.ts';
 import {
   codigoDoErro, conferirChave, ESQUEMA_RESUMO_GEMINI, extensaoDoMime, finalDaChave, INSTRUCOES_RESUMO, INSTRUCOES_TRANSCRICAO,
   lerResumo, lerTranscricao, MAX_BYTES_AUDIO, MAX_MENSAGENS_RESUMO, MAX_SEGUNDOS_AUDIO, mimeDoAudio, montarTextoConversa,
-  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave, INSTRUCOES_SUGESTAO, MAX_CARACTERES_SUGESTAO, lerSugestao, montarTextoScripts,
+  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave, INSTRUCOES_SUGESTAO, MAX_CARACTERES_SUGESTAO, lerSugestao, montarTextoScripts, ESQUEMA_DOC_GEMINI, INSTRUCOES_DOCUMENTO, MAX_BYTES_DOC, MAX_DOCS_POR_VEZ, lerDocumento, tipoPeloNome, type DocIdentificado,
 } from '../_shared/iaPropria.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -134,6 +135,32 @@ async function gerarSugestao(provedor: Provedor, chave: string, conversa: string
   const sugestao = lerSugestao(texto);
   if (!sugestao) throw new ErroIa('resposta_invalida', 502);
   return sugestao;
+}
+
+/** o que é este arquivo (imagem ou PDF): Gemini lê os dois; na OpenAI só a imagem (PDF fica pelo nome do arquivo) */
+async function identificarDocumento(provedor: Provedor, chave: string, bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<DocIdentificado | null> {
+  let texto = '';
+  if (provedor === 'gemini') {
+    const r = await pedir(`${GEMINI}/models/${encodeURIComponent(MODELO_GEMINI)}:generateContent`, {
+      method: 'POST', headers: cabGemini(chave),
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: paraBase64(bytes) } }, { text: INSTRUCOES_DOCUMENTO }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: ESQUEMA_DOC_GEMINI, temperature: 0, maxOutputTokens: 256 } }),
+    }, chave, 60_000);
+    texto = textoGemini(r);
+  } else {
+    if (!mime.startsWith('image/')) return null;
+    texto = await comModelos(MODELOS_OPENAI, async (modelo) => {
+      const r = await pedir(`${OPENAI}/chat/completions`, {
+        method: 'POST', headers: { ...cabOpenai(chave), 'content-type': 'application/json' },
+        body: JSON.stringify({ model: modelo, temperature: 0, response_format: { type: 'json_object' }, messages: [
+          { role: 'system', content: INSTRUCOES_DOCUMENTO },
+          { role: 'user', content: [{ type: 'image_url', image_url: { url: `data:${mime};base64,${paraBase64(bytes)}`, detail: 'low' } }] },
+        ] }),
+      }, chave, 60_000);
+      return String(((r.choices as { message?: { content?: string } }[] | undefined)?.[0]?.message?.content) ?? '');
+    });
+  }
+  return lerDocumento(texto);
 }
 
 async function transcreverAudio(provedor: Provedor, chave: string, bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<string> {
@@ -267,6 +294,42 @@ Deno.serve(async (req) => {
       const pedidoExtra = String(corpo.pedido ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
       const sugestao = await gerarSugestao(k.provedor, k.chave, texto, montarTextoScripts((scr ?? []) as { titulo: string | null; conteudo: string | null }[]), pedidoExtra);
       return json({ sugestao });
+    }
+
+    /* ---------- documentos que o CLIENTE mandou: o que é cada um (até 8 por vez, só os ainda não vistos) ---------- */
+    if (acao === 'identificar_documentos') {
+      const conversaId = String(corpo.conversa_id ?? '');
+      if (!UUID.test(conversaId)) return erro('conversa_nao_encontrada');
+      const { data: conv } = await comLogin.from('conversas').select('id, organizacao_id').eq('id', conversaId).maybeSingle();
+      if (!conv) return erro('conversa_nao_encontrada', 404);
+      const eu = await quemChama(admin, comLogin, conv.organizacao_id as string);
+      if (!eu) return erro('conversa_nao_encontrada', 404);
+      orgParaErro = eu.orgId;
+      const k = await chaveDa(admin, eu.orgId);
+      if (!k) return erro('sem_chave');
+      const { data: msgs, error: eM } = await admin.from('mensagens').select('id, tipo, metadados')
+        .eq('conversa_id', conversaId).eq('direcao', 'entrada').in('tipo', ['imagem', 'documento'])
+        .is('metadados->>doc_tipo', null).not('metadados->>anexo_path', 'is', null)
+        .order('enviada_em', { ascending: false }).limit(MAX_DOCS_POR_VEZ + 1);
+      if (eM) return erro('falha_ler', 500);
+      const lote = (msgs ?? []).slice(0, MAX_DOCS_POR_VEZ);
+      const feitos: { mensagem_id: string; tipo: string; lado: string | null; legivel: boolean; observacao: string }[] = [];
+      for (const m of lote) {
+        const meta = (m.metadados ?? {}) as Record<string, unknown>;
+        const caminho = typeof meta.anexo_path === 'string' ? meta.anexo_path : '';
+        if (!caminho.startsWith(`${eu.orgId}/`) || caminho.includes('..')) continue;
+        const mime = String(meta.mime ?? (m.tipo === 'imagem' ? 'image/jpeg' : 'application/pdf'));
+        let doc: DocIdentificado | null = null;
+        if (Number(meta.tamanho) <= MAX_BYTES_DOC && (mime.startsWith('image/') || mime === 'application/pdf')) {
+          const { data: arq } = await admin.storage.from('script-midia').download(caminho);
+          if (arq && arq.size <= MAX_BYTES_DOC) doc = await identificarDocumento(k.provedor, k.chave, new Uint8Array(await arq.arrayBuffer()), mime);
+        }
+        if (!doc) { const t = tipoPeloNome(meta.nome as string); if (t) doc = { tipo: t, lado: null, legivel: true, observacao: 'pelo nome do arquivo' }; }
+        const novo = { ...meta, doc_tipo: doc?.tipo ?? 'outro', doc_lado: doc?.lado ?? null, doc_legivel: doc?.legivel ?? true, doc_obs: doc?.observacao ?? '', doc_em: new Date().toISOString() };
+        await admin.from('mensagens').update({ metadados: novo }).eq('id', m.id);
+        feitos.push({ mensagem_id: m.id as string, tipo: novo.doc_tipo, lado: novo.doc_lado, legivel: novo.doc_legivel, observacao: novo.doc_obs });
+      }
+      return json({ identificados: feitos, faltam_mais: (msgs ?? []).length > MAX_DOCS_POR_VEZ });
     }
 
     /* ---------- áudio: transcrever ---------- */
