@@ -120,13 +120,13 @@ export function criarBanco(): Banco {
   const agora = Date.now();
   const dados = gsCarregar();
   const comerciais = [...new Set(dados.linhas.map((l) => l.comercial).filter(Boolean))].sort();
-  const usuario = { id: 'u-matheus', email: 'matheus@reviza.local', user_metadata: { name: 'Matheus' } };
+  const usuario = { id: 'u-matheus', email: 'matheus@reviza.local', user_metadata: { name: 'Matheo' } };
 
   /* AMBIENTES (11/11): quem entra em Cobranças, em Atendimento ou nos dois — o seletor do topo e a tela
      Usuários mostram. Dois comerciais também atendem; duas atendentes só no Atendimento; a Bruna só Cobranças. */
   const NOS_DOIS = new Set(['Eduardo', 'Paty']);
   const profiles: Linha[] = [
-    { id: usuario.id, nome: 'Matheus', email: usuario.email, papel: 'admin', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T12:00:00Z', modulos: ['cobrancas', 'atendimento'] },
+    { id: usuario.id, nome: 'Matheo', email: usuario.email, papel: 'admin', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T12:00:00Z', modulos: ['cobrancas', 'atendimento'] },
     { id: 'u-bruna', nome: 'Bruna', email: 'bruna@reviza.local', papel: 'financeiro', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T15:00:00Z', modulos: ['cobrancas'] },
     ...comerciais.map((c, i) => ({
       id: `u-${slug(c)}`, nome: c, email: `${slug(c)}@reviza.local`, papel: 'comercial', ativo: true, deve_trocar_senha: false,
@@ -260,16 +260,16 @@ export function criarBanco(): Banco {
       registros: [
         { id: 12, quando: iso(agora - 0.1 * H), ator_id: 'u-carla', ator_nome: 'Carla', ator_papel: 'atendente', acao: 'moveu', entidade: 'card do Kanban', entidade_id: null, rotulo: 'Terezinha de Jesus', detalhe: 'de "Em atendimento" para "Documentação"', mudancas: [{ c: 'etapa', de: 'Em atendimento', para: 'Documentação' }] },
         { id: 11, quando: iso(agora - 0.2 * H), ator_id: 'u-bianca', ator_nome: 'Bianca', ator_papel: 'atendente', acao: 'assumiu', entidade: 'conversa', entidade_id: null, rotulo: 'João Batista Ramos', detalhe: 'passou a responder pelo número Atendimento principal', mudancas: [] },
-        { id: 10, quando: iso(agora - 2 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'conectou', entidade: 'whatsapp', entidade_id: null, rotulo: 'Campanha de novembro', detalhe: 'WhatsApp do Atendimento conectado', mudancas: [] },
-        { id: 9, quando: iso(agora - 4 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-bruna', rotulo: 'Bruna', detalhe: 'redefiniu a senha (troca no próximo acesso)', mudancas: [] },
-        { id: 8, quando: iso(agora - 27 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-paty', rotulo: 'Paty', detalhe: 'ambientes da pessoa', mudancas: [{ c: 'modulos', de: 'Cobranças', para: 'Cobranças · Atendimento' }] },
+        { id: 10, quando: iso(agora - 2 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'conectou', entidade: 'whatsapp', entidade_id: null, rotulo: 'Campanha de novembro', detalhe: 'WhatsApp do Atendimento conectado', mudancas: [] },
+        { id: 9, quando: iso(agora - 4 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-bruna', rotulo: 'Bruna', detalhe: 'redefiniu a senha (troca no próximo acesso)', mudancas: [] },
+        { id: 8, quando: iso(agora - 27 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'alterou', entidade: 'usuário', entidade_id: 'u-paty', rotulo: 'Paty', detalhe: 'ambientes da pessoa', mudancas: [{ c: 'modulos', de: 'Cobranças', para: 'Cobranças · Atendimento' }] },
         { id: 7, quando: iso(agora - 0.3 * H), ator_id: 'u-eduardo', ator_nome: 'Eduardo', ator_papel: 'comercial', acao: 'lançou', entidade: 'pagamento', entidade_id: null, rotulo: 'Maria Aparecida Souza', detalhe: 'informou pagamento de R$ 65,00 (out/26)', mudancas: [] },
         { id: 6, quando: iso(agora - 1.2 * H), ator_id: 'u-bruna', ator_nome: 'Bruna', ator_papel: 'financeiro', acao: 'confirmou', entidade: 'pagamento', entidade_id: null, rotulo: 'José Carlos Pereira', detalhe: 'pagamento de R$ 110,00 (out/26)', mudancas: [] },
         { id: 5, quando: iso(agora - 3 * H), ator_id: 'u-paty', ator_nome: 'Paty', ator_papel: 'comercial', acao: 'editou', entidade: 'cliente', entidade_id: null, rotulo: 'Antônia Ferreira Lima', detalhe: 'atualizou o cadastro (2 campos)', mudancas: [{ c: 'telefone', de: '5199990001', para: '5199990002' }, { c: 'valor', de: '300', para: '350' }] },
-        { id: 4, quando: iso(agora - 5 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'alterou', entidade: 'comissão', entidade_id: null, rotulo: 'Eduardo', detalhe: 'comissão de 50% da mensalidade (antes 40%)', mudancas: [] },
+        { id: 4, quando: iso(agora - 5 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'alterou', entidade: 'comissão', entidade_id: null, rotulo: 'Eduardo', detalhe: 'comissão de 50% da mensalidade (antes 40%)', mudancas: [] },
         { id: 3, quando: iso(agora - 26 * H), ator_id: 'u-bruna', ator_nome: 'Bruna', ator_papel: 'financeiro', acao: 'direcionou', entidade: 'cliente', entidade_id: null, rotulo: 'Sebastião R. Nunes', detalhe: 'para o ciclo dia 05', mudancas: [{ c: 'dia', de: null, para: '5' }] },
-        { id: 2, quando: iso(agora - 30 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'configurou', entidade: 'régua', entidade_id: null, rotulo: null, detalhe: 'ligou a régua automática', mudancas: [] },
-        { id: 1, quando: iso(agora - 52 * H), ator_id: 'u-matheus', ator_nome: 'Matheus', ator_papel: 'admin', acao: 'cadastrou', entidade: 'usuário', entidade_id: null, rotulo: 'Carla', detalhe: 'papel Atendente · Atendimento', mudancas: [] },
+        { id: 2, quando: iso(agora - 30 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'configurou', entidade: 'régua', entidade_id: null, rotulo: null, detalhe: 'ligou a régua automática', mudancas: [] },
+        { id: 1, quando: iso(agora - 52 * H), ator_id: 'u-matheus', ator_nome: 'Matheo', ator_papel: 'admin', acao: 'cadastrou', entidade: 'usuário', entidade_id: null, rotulo: 'Carla', detalhe: 'papel Atendente · Atendimento', mudancas: [] },
       ],
       comissoes: [],
       comissoes_hist: [],

@@ -29,6 +29,7 @@ import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
 import { useConfiguracaoPendente } from '../data/cobranca/configuracao';
 import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/remarketing';
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
+import { PREFIXO_ATD, useMarcarNotificacaoAtendimento, useNotificacoesAtendimento } from '@/data/notificacoesAtendimento';
 import { secaoDoPapel } from '../data/cobranca/secoes';
 import { rotaAtendimentoPermitida } from '../data/modulos';
 import { temRecurso, temCadastroAtendimento } from '../data/config/recursos';
@@ -215,6 +216,7 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Atendentes de IA', admin: true }] : []),
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('aviso-espera') ? [{ slug: 'config/aviso-espera', rotulo: 'Aviso de espera', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
   { rotulo: 'Minha conta', itens: temRecurso('atendimento') ? [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] : [] },
@@ -723,13 +725,24 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const notifsCobQ = useNotificacoesCob(fonteCob && temCob);
   const marcarAtenvo = useMarcarNotificacao();
   const marcarCob = useMarcarNotifCob();
-  const marcarNotif = fonteCob ? marcarCob : marcarAtenvo;
+  // os avisos do Atendimento (atd_notificacoes: @ numa nota, cliente esperando além da meta) no mesmo sino (25/11)
+  const temAtdSino = isRevizaMode && temRecurso('atendimento') && !!papelSessao?.ambientes.includes('atendimento');
+  const notifsAtdQ = useNotificacoesAtendimento(temAtdSino);
+  const marcarAtd = useMarcarNotificacaoAtendimento();
+  const marcarNotif = fonteCob ? {
+    mutate: (a: { id?: string; todas?: boolean }) => {
+      if (a.todas) { if (temCob) marcarCob.mutate(a); if (temAtdSino) marcarAtd.mutate(a); return; }
+      if (a.id?.startsWith(PREFIXO_ATD)) marcarAtd.mutate(a); else marcarCob.mutate(a);
+    },
+  } : marcarAtenvo;
   // sintética de WhatsApp só pra quem TEM a seção Conversas na matriz (financeiro/cadastro ficam fora)
   const veConversas = isRevizaMode && temCob && papelSessao?.papel != null && papelSessao.papel !== 'financeiro' && papelSessao.papel !== 'cadastro';
   const conversasWa = useConversasWA(veConversas).data ?? [];
   const waNaoLidas = conversasWa.reduce((s, c) => s + (c.nao_lidas || 0), 0);
   const avisosNaoLidosSino = useAvisosNaoLidos(temCob).data ?? 0;
-  const notifsBase: Notificacao[] = fonteCob ? (temCob ? (notifsCobQ.data ?? []) : []) : (notifsAtenvoQ.data ?? []);
+  const notifsBase: Notificacao[] = fonteCob
+    ? [...(temCob ? (notifsCobQ.data ?? []) : []), ...(temAtdSino ? (notifsAtdQ.data ?? []) : [])].sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''))
+    : (notifsAtenvoQ.data ?? []);
   // linhas agregadas (não são "marcáveis" — somem quando lidas na origem)
   const sinteticas: Notificacao[] = fonteCob && temCob ? [
     ...(avisosNaoLidosSino > 0 ? [{ id: 'sn-avisos', tipo: 'avisos', titulo: `${avisosNaoLidosSino} aviso${avisosNaoLidosSino === 1 ? '' : 's'} do administrativo`, corpo: 'Clique para abrir os Avisos.', rota: '/cobrancas/avisos', lidaEm: null, criadoEm: new Date().toISOString() }] : []),

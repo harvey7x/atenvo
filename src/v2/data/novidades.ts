@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'aviso-espera-25-11', titulo: 'Aviso de cliente esperando além da meta', onde: 'Configurações › Aviso de espera · sino do topo', quando: '25/11', recurso: 'aviso-espera', soAdmin: true,
+    texto: 'Escolha a meta de resposta (por exemplo, 30 minutos). Passou disso sem resposta, o sino do responsável pela conversa avisa; passou do segundo tempo, avisa os gestores. Conversa sem responsável vai direto para os gestores. Chega desligado: ligue em Configurações › Aviso de espera.',
+    rota: '/config/aviso-espera',
+  },
+  {
+    id: 'sino-atendimento-25-11', titulo: 'Os avisos do Atendimento no sino', onde: 'Sino do topo', quando: '25/11', recurso: 'atendimento',
+    texto: 'O sino do topo agora também mostra os avisos do Atendimento: quando alguém marca você com @ numa nota interna e quando um cliente seu passa da meta sem resposta. Clicando, abre a conversa.',
+    rota: '/whatsapp',
+  },
+  {
     id: 'documentos-ia-25-11', titulo: 'Documentos reconhecidos pela IA', onde: 'WhatsApp › painel do cliente › Mídia, documentos e links', quando: '25/11', recurso: 'ia-propria',
     texto: 'O "Identificar os arquivos" faz a IA olhar as fotos e os PDFs que o cliente mandou e dizer o que é cada um (RG ou CNH, comprovante de endereço, extrato de empréstimos…). Logo abaixo aparece o que já chegou, o que falta e o que precisa ser pedido de novo porque não dá para ler. A IA não copia nome, número nem valor nenhum.',
     rota: '/whatsapp',

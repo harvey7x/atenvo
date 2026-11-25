@@ -1,0 +1,24 @@
+/* AVISO DE ESPERA (Configurações › Atendimento, 25/11). Base: as famílias do ambiente (cfgi-*, pn-*) e a retomada (rtm-*).
+   Superfícies neutras; o laranja da casa só SÓLIDO (botão principal). */
+.v2 .avs-grade { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .avs-lado { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.v2 .avs-quem { display: flex; flex-direction: column; gap: 8px; }
+.v2 .avs-salvar { justify-content: flex-end; margin-top: 4px; }
+
+.v2 .avs-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.v2 .avs-lista li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .avs-lista li:first-child { border-top: 0; padding-top: 2px; }
+.v2 .avs-nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .avs-nm b { font-size: 13px; font-weight: 600; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .avs-nm small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .avs-t { font-size: 12.5px; font-weight: 600; color: var(--cor-alerta-txt, var(--ambar)); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2 .avs-vazio { margin: 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .avs-mais { margin: 6px 0 0; font-size: 11.5px; color: var(--txt-3); }
+
+/* o exemplo do aviso: a mesma cara de um item do sino */
+.v2 .avs-sino { display: flex; flex-direction: column; gap: 4px; padding: 11px 12px; border: 1px solid var(--lin-fio, var(--linha)); border-radius: 10px; background: rgba(var(--tint), .03); }
+.v2 .avs-sino b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .avs-sino span { font-size: 12px; line-height: 1.45; color: var(--txt-2); }
+.v2 .avs-sino small { font-size: 11px; color: var(--txt-3); }
+
+@media (max-width: 1080px) { .v2 .avs-grade { grid-template-columns: minmax(0, 1fr); } }
