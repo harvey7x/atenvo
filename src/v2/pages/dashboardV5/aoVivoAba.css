@@ -1,0 +1,110 @@
+/* Aba Ao vivo do Dashboard (AoVivoAba.tsx): o quadro das conversas abertas, uma coluna por atendente, equipe ou
+   etiqueta. O quadro rola para o lado SOZINHO (a página nunca) e cada coluna rola para baixo. Cores só dos tokens
+   do tema; o "esperando" é o âmbar do tema em cor sólida (nunca laranja transparente). Prefixo av-. */
+.v2 .av-aba { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.v2 .av-sec { min-width: 0; }
+.v2 .av-sec .d5-sec-sub { max-width: none; }
+.v2 .av-sep { display: inline-block; margin: 0 7px; color: var(--txt-3); }
+.v2 .av-modo { display: flex; align-items: center; gap: 8px; }
+.v2 .av-modo .segm button { font-size: 12.5px; padding: 5px 12px; }
+
+/* filtros */
+.v2 .av-ferr { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; margin: -4px 0 14px; }
+.v2 .av-tgl { display: inline-flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--txt-2); cursor: pointer; user-select: none; }
+.v2 .av-busca { position: relative; flex: 0 1 300px; min-width: 0; }
+.v2 .av-busca svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--txt-3); pointer-events: none; }
+.v2 .av-busca .inp { width: 100%; height: 32px; padding-left: 30px; font-size: 13px; }
+.v2 .av-achados { font-size: 12px; color: var(--txt-3); }
+.v2 .av-nota { margin: -4px 0 12px; font-size: 12px; color: var(--txt-3); line-height: 1.5; }
+
+/* o quadro: rolagem para o lado só aqui dentro */
+.v2 .av-quadro {
+  --av-col: 288px;
+  --av-alt: clamp(340px, calc(100vh - 330px), 780px);
+  display: flex; align-items: flex-start; gap: 12px;
+  width: 100%; min-width: 0; max-width: 100%;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; scroll-padding: 0 2px;
+  padding: 2px 2px 10px;
+}
+.v2 .av-col {
+  flex: 0 0 var(--av-col); width: var(--av-col); min-width: 0;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--linha); border-radius: 14px;
+  background: rgba(var(--tint), .025);
+  scroll-snap-align: start;
+}
+.v2 .av-col-cab {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 11px 12px 10px; border-bottom: 1px solid var(--linha);
+}
+.v2 .av-col-tit { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1 1 auto; margin: 0; font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .av-col.sem .av-col-tit { color: var(--txt-2); }
+.v2 .av-col-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .av-cor { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.v2 .av-col-n {
+  flex: 0 0 auto; min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center;
+  font-size: 12px; font-weight: 600; color: var(--txt); background: rgba(var(--tint), .08);
+}
+.v2 .av-col-esp { flex: 0 0 100%; font-size: 11.5px; color: var(--ambar); font-weight: 500; }
+.v2 .av-col-corpo { max-height: var(--av-alt); overflow-y: auto; overscroll-behavior-y: contain; padding: 8px; }
+.v2 .av-col-vazia { margin: 0; padding: 18px 6px; text-align: center; font-size: 12px; color: var(--txt-3); }
+.v2 .av-cartoes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+/* o cartão da conversa */
+.v2 .av-cartao {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  padding: 9px 10px; border-radius: 10px; border: 1px solid var(--linha);
+  background: rgba(var(--tint), .035); color: var(--txt); font: inherit; cursor: pointer;
+  transition: border-color .14s var(--ease), background-color .14s var(--ease);
+}
+.v2 .av-cartao:hover { border-color: rgba(var(--tint), .2); background: rgba(var(--tint), .06); }
+.v2 .av-cartao:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+.v2 .av-foto {
+  position: relative; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--txt-2);
+  background: rgba(var(--tint), .08); border: 1px solid var(--linha);
+}
+.v2 .av-meio { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2 .av-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.v2 .av-nome { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 600; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .av-hora { flex: 0 0 auto; font-size: 11px; color: var(--txt-3); }
+.v2 .av-cartao.esp .av-hora { color: var(--ambar); font-weight: 600; }
+.v2 .av-prev { display: block; min-width: 0; font-size: 12.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+.v2 .av-prev.vazio { color: var(--txt-3); font-style: italic; }
+.v2 .av-resp { display: inline-block; width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; color: var(--txt-3); }
+.v2 .av-l3 { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 2px; }
+.v2 .av-num, .v2 .av-quem {
+  min-width: 0; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; font-weight: 500; letter-spacing: .02em; color: var(--txt-3);
+  padding: 1px 6px; border-radius: 5px; border: 1px solid var(--linha);
+}
+.v2 .av-quem { color: var(--txt-2); }
+.v2 .av-marcas { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex: 0 0 auto; }
+.v2 .av-ia { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--txt-2); padding: 0 5px; border-radius: 5px; border: 1px solid rgba(var(--tint), .22); line-height: 16px; }
+.v2 .av-esp { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--ambar); }
+.v2 .av-esp i { width: 7px; height: 7px; border-radius: 50%; background: var(--ambar); }
+
+.v2 .av-mais {
+  display: block; width: 100%; margin-top: 8px; padding: 8px; border-radius: 9px;
+  border: 1px dashed rgba(var(--tint), .16); background: none; color: var(--txt-2);
+  font: 500 12px var(--fonte); cursor: pointer;
+}
+.v2 .av-mais span { color: var(--txt-3); font-weight: 400; }
+.v2 .av-mais:hover { color: var(--txt); border-color: rgba(var(--tint), .3); }
+.v2 .av-mais:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+
+/* esqueleto */
+.v2 .av-sk-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.v2 .av-sk .av-col-corpo { overflow: hidden; }
+
+/* celular: a coluna ocupa quase a tela e a próxima aparece na beirada (dá para ver que rola) */
+@media (max-width: 720px) {
+  .v2 .av-quadro { --av-col: min(288px, calc(100vw - 88px)); --av-alt: clamp(320px, calc(100svh - 300px), 640px); }
+  .v2 .av-ferr { gap: 10px 14px; }
+  .v2 .av-busca { flex: 1 1 100%; }
+  .v2 .av-modo { width: 100%; }
+  .v2 .av-modo .segm { flex: 1; }
+  .v2 .av-modo .segm button { flex: 1; padding: 5px 8px; }
+}

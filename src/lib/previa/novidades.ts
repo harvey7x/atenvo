@@ -2,10 +2,15 @@
    atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
    cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
    aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-c';
+export const NOVIDADES_VERSAO = '2026-11-25-d';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
 export const NOVIDADES: Novidade[] = [
+  {
+    titulo: 'Ao vivo: as conversas abertas agora', onde: 'Dashboard › Ao vivo', quando: '25/11',
+    texto: 'Um quadro com uma coluna por atendente, por equipe ou por etiqueta e um cartão por conversa aberta: a última mensagem, por qual número, quando, quem está esperando resposta e onde a IA está atendendo. Atualiza sozinho a cada 30 segundos; clicar no cartão abre a conversa.',
+    ir: '#/dashboard?aba=aovivo',
+  },
   {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
     texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',
