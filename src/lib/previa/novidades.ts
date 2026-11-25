@@ -12,6 +12,16 @@ export const NOVIDADES: Novidade[] = [
     ir: '#/chat-equipe',
   },
   {
+    titulo: 'Tarefas da equipe', onde: 'Atendimento › Tarefas', quando: '25/11',
+    texto: 'Lista ou quadro com responsável, prazo (dia e hora), prioridade, projeto e subtarefas. No topo: abertas, atrasadas, para hoje e concluídas na semana. No WhatsApp, o painel do cliente ganhou "Criar tarefa", já ligada à conversa.',
+    ir: '#/tarefas',
+  },
+  {
+    titulo: 'Ao vivo: as conversas abertas agora', onde: 'Dashboard › Ao vivo', quando: '25/11',
+    texto: 'Um quadro com uma coluna por atendente, por equipe ou por etiqueta e um cartão por conversa aberta: a última mensagem, por qual número, quando, quem está esperando resposta e onde a IA está atendendo. Atualiza sozinho a cada 30 segundos; clicar no cartão abre a conversa.',
+    ir: '#/dashboard?aba=aovivo',
+  },
+  {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
     texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',
     ir: '#/dashboard?aba=atendentes',

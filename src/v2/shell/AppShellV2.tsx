@@ -98,6 +98,8 @@ const GRUPOS: GrupoNav[] = [
       // Pós-venda (dono 21/11): os clientes FECHADOS num atendimento próprio, fora da lista do WhatsApp
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
+      // Tarefas da equipe (25/11): só com a peça do servidor (migration 101) nesta instalação
+      ...(temRecurso('tarefas') ? [{ slug: 'tarefas', rotulo: 'Tarefas' }] : []),
       { slug: 'scripts', rotulo: 'Scripts' },
       // Chat da equipe (dono 25/11, como o "Chat Interno" do sistema de antes): conversa entre colegas, com o número
       // de não lidas no item — só onde o recurso está ligado (config/recursos.ts)
@@ -374,6 +376,7 @@ const APELIDOS: Record<string, string[]> = {
   'cobrancas/usuarios': ['equipe', 'acessos', 'permissoes', 'senhas'],
   whatsapp: ['whatsapp', 'inbox', 'chat', 'mensagens', 'atendimento'],
   presenciais: ['agenda', 'visitas', 'atendimento presencial'],
+  tarefas: ['afazeres', 'pendencias', 'lembretes', 'checklist', 'prazos'],
   scripts: ['respostas prontas', 'modelos', 'textos'],
   'chat-equipe': ['chat interno', 'equipe', 'colegas', 'recado', 'mensagem para colega', 'grupo'],
   kanban: ['funil', 'quadro', 'vendas', 'pipeline'],
