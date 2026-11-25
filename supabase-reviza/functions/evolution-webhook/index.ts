@@ -103,6 +103,7 @@ import { corsHeaders, json } from './cors.ts';
 import { adminClient } from './client.ts';
 import { classificarEntrega, eventoDoStatus, type EntregaStatus } from './entrega.ts';
 import { formularioOf, ehRespostaAutoFormulario, ehSaidaAutoFormulario, JANELA_AUTO_FORMULARIO_MS, META_AUTO_FORMULARIO } from './formulario.ts';
+import { anuncioOf } from './anuncio.ts';
 import { decidirClean, ehComandoClean, ehEcoDaLimpeza, ehTextoDaRespostaClean, enviadorEvolution, executarClean, lerConfigClean } from './clean.ts';
 import { despacharAoRunner, DESPACHO_TEXTO, DESPACHO_FORMULARIO } from './dispatch_runner.ts';
 
@@ -580,6 +581,17 @@ Deno.serve(async (req) => {
       if (inboundNovo && contatoId) {
         try { await admin.rpc('wa_janela_registrar', { p_canal: canal.id, p_contato: contatoId, p_quando: nowEntradaIso }); }
         catch { /* janela nunca interrompe a ingestão */ }
+      }
+
+      // ---- 25/11: DE QUAL ANÚNCIO veio a conversa (o cliente tocou no "Enviar mensagem" de um anúncio do Facebook ou do
+      //      Instagram: o WhatsApp manda o ID do anúncio no externalAdReply) → atd_anuncio_origem (migration 96), que o
+      //      Dashboard › Anúncios cruza com o gasto da Meta. Só na entrada NOVA; best-effort: nunca afeta a ingestão. ----
+      if (inboundNovo && conversaId) {
+        const ad = anuncioOf(data as Record<string, unknown>);
+        if (ad) {
+          try { await admin.rpc('atd_anuncio_registrar', { p_conversa: conversaId, p_contato: contatoId ?? null, p_canal: canal.id, p_anuncio: ad, p_quando: nowEntradaIso }); }
+          catch { /* origem do anúncio nunca interrompe a ingestão */ }
+        }
       }
 
       // ---- v34: FORMULÁRIO DO ANÚNCIO → contato. Só no inbound NOVO (reentrega não reaplica).

@@ -20,7 +20,7 @@ import './anunciosAba.css';
 
 const AJ = {
   investido: 'O que a Meta cobrou pelos anúncios no período, lido da conta de anúncios conectada (atualiza de hora em hora).',
-  leads: 'Clientes que começaram a conversa tocando no botão do anúncio (o WhatsApp manda junto qual foi o anúncio). Quem chegou com o texto do anúncio mas sem o código dele fica de fora daqui e aparece no rodapé.',
+  leads: 'Clientes que começaram a conversa tocando no botão "Enviar mensagem" de um anúncio do Facebook ou do Instagram (o WhatsApp manda junto qual foi o anúncio). Quem copiou o texto do anúncio e escreveu direto não aparece aqui: conta nas entradas da Visão geral.',
   cpl: 'Investido ÷ leads. Quanto custou, em média, cada cliente que chamou pelo anúncio.',
   fechados: 'Desses leads, quantos chegaram à etapa de fechado no Kanban. O custo por fechado é o investido ÷ fechados.',
   melhor: 'Entre as campanhas ATIVAS que trouxeram pelo menos 10 leads no período (com poucos leads o custo baixo pode ser sorte), a de MENOR custo por lead. Empate: a que fechou mais.',
@@ -255,7 +255,7 @@ export function AnunciosAba({ d, periodo, hoje, comparacao }: { d: DashAnuncios;
 
       {d.semId > 0 && (
         <p className="d5-an-rodape">
-          Mais {fmtInt(d.semId)} {d.semId === 1 ? 'cliente chegou' : 'clientes chegaram'} com o texto do anúncio, mas sem o código dele (por formulário ou mensagem copiada). Eles contam nas entradas da Visão geral, não aqui.
+          {fmtInt(d.semId)} {d.semId === 1 ? 'desses leads veio' : 'desses leads vieram'} sem o código do anúncio (o WhatsApp nem sempre manda): {d.semId === 1 ? 'aparece' : 'aparecem'} pelo título do anúncio, sem o custo.
         </p>
       )}
     </div>

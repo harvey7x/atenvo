@@ -41,7 +41,7 @@ export interface DashAnuncios {
   campanhas: CampanhaAnuncio[];
   anuncios: AnuncioItem[];
   leads: LeadAnuncio[];
-  /** chegaram com o texto do anúncio mas sem o ID (formulário, cópia do texto) — contados à parte */
+  /** leads de anúncio que vieram SEM o ID do anúncio (o WhatsApp nem sempre manda): entram pelo título, sem o custo */
   semId: number;
   geradoEm: string;
 }
@@ -166,6 +166,11 @@ const MSG: Record<string, string> = {
   sem_contas: 'Este código não enxerga nenhuma conta de anúncios. Dê acesso à conta para o usuário do sistema.',
   conta_nao_encontrada: 'Essa conta de anúncios não apareceu para este código.',
   so_admin: 'Só o administrador conecta a conta de anúncios.',
+  sessao_expirada: 'Passaram mais de 15 minutos desde que o código foi colado. Cole o código de novo.',
+  meta_limite: 'A Meta pediu para esperar um pouco (limite de consultas). Tente de novo em alguns minutos.',
+  meta_indisponivel: 'A Meta não respondeu agora. Tente de novo em alguns minutos.',
+  nao_conectada: 'A conta de anúncios não está conectada.',
+  falha_gravar: 'Não foi possível guardar agora. Tente de novo.',
 };
 const traduz = (e: unknown) => { const m = (e as Error)?.message || String(e); return MSG[m] ?? (m || 'Não foi possível falar com a Meta agora.'); };
 async function chamar(corpo: Record<string, unknown>): Promise<Record<string, unknown>> {
