@@ -1009,3 +1009,12 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
 .fch-det { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--txt-2); }
 .fch-nota { margin: 0; font-size: 11.5px; color: var(--txt-3); }
 @media (max-width: 520px) { .fch-opcoes { grid-template-columns: 1fr; } }
+
+/* Sugerir resposta (25/11): o botão ao lado de Scripts e o aviso de rascunho da IA */
+.v2 .wa-sug-btn svg { width: 16px; height: 16px; }
+.v2 .wa-sug-btn.girando svg { animation: sug-gira 1.2s linear infinite; }
+@keyframes sug-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .v2 .wa-sug-btn.girando svg { animation: none; opacity: .5; } }
+.v2 .sug-aviso { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 6px 10px; border-radius: 8px;
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); font-size: 12px; color: var(--txt-2); }
+.v2 .sug-aviso .lnk { margin-left: auto; border: 0; background: none; padding: 0; font: 12px var(--fonte); color: var(--txt); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }

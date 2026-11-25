@@ -11,6 +11,7 @@
 //   testar         → confere de novo a chave guardada                                      administrador
 //   remover_chave  → apaga a chave (resumos e transcrições já feitos ficam)                administrador
 //   resumo         → { conversa_id }: o último resumo guardado, sem chamar a IA            quem vê a conversa
+//   sugerir        → { conversa_id, pedido? }: um rascunho de resposta para o atendente revisar (nada é enviado nem guardado)
 //   resumir        → { conversa_id, refazer? }: as últimas 200 mensagens (até ~12 mil caracteres) → resumo curto
 //   transcrever    → { mensagem_id }: o áudio do bucket script-midia (até 10 MB e 5 min) → metadados.transcricao
 // "Quem vê a conversa" é decidido pelo BANCO: conversa e mensagem são lidas com o login de quem chamou (RLS), nunca com
@@ -20,7 +21,7 @@ import { MODELO_PADRAO } from '../_shared/iris.ts';
 import {
   codigoDoErro, conferirChave, ESQUEMA_RESUMO_GEMINI, extensaoDoMime, finalDaChave, INSTRUCOES_RESUMO, INSTRUCOES_TRANSCRICAO,
   lerResumo, lerTranscricao, MAX_BYTES_AUDIO, MAX_MENSAGENS_RESUMO, MAX_SEGUNDOS_AUDIO, mimeDoAudio, montarTextoConversa,
-  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave,
+  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave, INSTRUCOES_SUGESTAO, MAX_CARACTERES_SUGESTAO, lerSugestao, montarTextoScripts,
 } from '../_shared/iaPropria.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -106,6 +107,33 @@ async function gerarResumo(provedor: Provedor, chave: string, conversa: string):
   const resumo = lerResumo(texto);
   if (!resumo) throw new ErroIa('resposta_invalida', 502);
   return resumo;
+}
+
+async function gerarSugestao(provedor: Provedor, chave: string, conversa: string, scripts: string, pedidoExtra: string): Promise<string> {
+  const pedido = `Conversa (horário de Brasília; "Cliente" é o cliente, "Equipe" é uma pessoa da empresa e "IA" é a atendente virtual):\n\n${conversa}`
+    + (scripts ? `\n\nTextos prontos da empresa (use como base quando servir):\n${scripts}` : '')
+    + (pedidoExtra ? `\n\nPedido da pessoa da equipe para esta resposta: ${pedidoExtra}` : '')
+    + '\n\nEscreva a próxima mensagem da Equipe para o Cliente.';
+  let texto = '';
+  if (provedor === 'gemini') {
+    const r = await pedir(`${GEMINI}/models/${encodeURIComponent(MODELO_GEMINI)}:generateContent`, {
+      method: 'POST', headers: cabGemini(chave),
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: INSTRUCOES_SUGESTAO }] }, contents: [{ role: 'user', parts: [{ text: pedido }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 512 } }),
+    }, chave, 60_000);
+    texto = textoGemini(r);
+  } else {
+    texto = await comModelos(MODELOS_OPENAI, async (modelo) => {
+      const r = await pedir(`${OPENAI}/chat/completions`, {
+        method: 'POST', headers: { ...cabOpenai(chave), 'content-type': 'application/json' },
+        body: JSON.stringify({ model: modelo, temperature: 0.4, messages: [{ role: 'system', content: INSTRUCOES_SUGESTAO }, { role: 'user', content: pedido }] }),
+      }, chave, 60_000);
+      return String(((r.choices as { message?: { content?: string } }[] | undefined)?.[0]?.message?.content) ?? '');
+    });
+  }
+  const sugestao = lerSugestao(texto);
+  if (!sugestao) throw new ErroIa('resposta_invalida', 502);
+  return sugestao;
 }
 
 async function transcreverAudio(provedor: Provedor, chave: string, bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<string> {
@@ -214,6 +242,31 @@ Deno.serve(async (req) => {
       }, { onConflict: 'conversa_id' });
       if (error) return erro('falha_gravar', 500);
       return json({ resumo, gerado_em: agora, gerado_por: eu.nome, mensagens: usadas, desatualizado: false });
+    }
+
+    /* ---------- conversa: sugerir resposta (rascunho para o atendente; nada é enviado nem guardado) ---------- */
+    if (acao === 'sugerir') {
+      const conversaId = String(corpo.conversa_id ?? '');
+      if (!UUID.test(conversaId)) return erro('conversa_nao_encontrada');
+      const { data: conv } = await comLogin.from('conversas').select('id, organizacao_id').eq('id', conversaId).maybeSingle();
+      if (!conv) return erro('conversa_nao_encontrada', 404);
+      const eu = await quemChama(admin, comLogin, conv.organizacao_id as string);
+      if (!eu) return erro('conversa_nao_encontrada', 404);
+      orgParaErro = eu.orgId;
+      const k = await chaveDa(admin, eu.orgId);
+      if (!k) return erro('sem_chave');
+      const { data: linhas, error: eMsgs } = await admin.from('mensagens')
+        .select('direcao, tipo, conteudo, origem, enviada_em, transcricao:metadados->>transcricao, nome:metadados->>nome')
+        .eq('conversa_id', conversaId).not('tipo', 'in', '(sistema,nota_interna)')
+        .order('enviada_em', { ascending: false }).limit(60);
+      if (eMsgs) return erro('falha_ler', 500);
+      const { texto, usadas } = montarTextoConversa((linhas ?? []) as MsgResumo[], MAX_CARACTERES_SUGESTAO);
+      if (!usadas) return erro('conversa_vazia');
+      const { data: scr } = await admin.from('scripts').select('titulo, conteudo').eq('organizacao_id', eu.orgId).eq('ativo', true)
+        .order('favorito', { ascending: false }).order('atualizado_em', { ascending: false }).limit(40);
+      const pedidoExtra = String(corpo.pedido ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      const sugestao = await gerarSugestao(k.provedor, k.chave, texto, montarTextoScripts((scr ?? []) as { titulo: string | null; conteudo: string | null }[]), pedidoExtra);
+      return json({ sugestao });
     }
 
     /* ---------- áudio: transcrever ---------- */

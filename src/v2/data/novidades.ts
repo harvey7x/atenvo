@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'sugerir-resposta-25-11', titulo: 'Sugerir resposta com IA', onde: 'WhatsApp › caixa de mensagem', quando: '25/11', recurso: 'ia-propria',
+    texto: 'Ao lado de Scripts, o botão com o brilho ("Sugerir resposta") faz a IA escrever um rascunho lendo a conversa e os scripts da empresa. Nada é enviado sozinho: confira, ajuste se quiser e envie. Se não gostar, "Desfazer" volta o que estava escrito.',
+    rota: '/whatsapp',
+  },
+  {
+    id: 'lote2-25-11', titulo: 'Motivo ao fechar a conversa e planilha do Kanban', onde: 'WhatsApp › Fechar conversa · Kanban', quando: '25/11',
+    texto: 'Ao fechar uma conversa, escolha o motivo: ele fica na atividade do atendimento, no painel do cliente. No Kanban, o administrador e o gestor têm o "Exportar planilha", que baixa os cartões da tela para o Excel.',
+    rota: '/kanban',
+  },
+  {
     id: 'coletor-guia-25-11', titulo: 'Coletor INSS: o arquivo de verdade e o guia de instalação', onde: 'Ferramentas › Coletor INSS', quando: '25/11',
     texto: 'O botão "Baixar o Coletor para Windows" baixa o coletor pronto para usar. E tem um guia em PDF, um documento só, com a instalação passo a passo, o primeiro uso e o que fazer em cada aviso.',
     rota: '/ferramentas/coletor-inss',

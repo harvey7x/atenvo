@@ -47,7 +47,8 @@ import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
 import { MOTIVOS_FECHAMENTO, textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
-import { ResumoAtendimento } from '../components/IaPropria';
+import { ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
+import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
@@ -462,6 +463,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [draft, setDraft] = useState('');
   // nota interna (migration 99): modo do compositor, rascunho próprio, quem foi escolhido no @ e o @ em digitação
   const [modoNota, setModoNota] = useState(false);
+  /* SUGERIR RESPOSTA (25/11, IA com a chave da própria empresa): a IA escreve um RASCUNHO; o atendente revisa e envia */
+  const sugerirLigado = iaPropriaLigada();
+  const iaDisp = useIaDisponivel(sugerirLigado);
+  const sugerir = useSugerirResposta();
+  const [sugestaoDe, setSugestaoDe] = useState<{ texto: string; antes: string } | null>(null);
   const [draftNota, setDraftNota] = useState('');
   const [notaEscolhidos, setNotaEscolhidos] = useState<Membro[]>([]);
   const [mencaoAtiva, setMencaoAtiva] = useState<{ inicio: number; termo: string } | null>(null);
@@ -1040,7 +1046,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     [notaAtiva, mencaoAtiva, membrosMencao],
   );
   const listaMencaoAberta = sugestoesMencao.length > 0;
-  useEffect(() => { setModoNota(false); setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }, [currentId]);
+  useEffect(() => { setSugestaoDe(null); setModoNota(false); setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }, [currentId]);
   const atualizarMencao = (ta: HTMLTextAreaElement) => {
     const m = mencaoEmCurso(ta.value, ta.selectionStart ?? ta.value.length);
     setMencaoAtiva((atual) => (atual?.inicio === m?.inicio && atual?.termo === m?.termo ? atual : m));
@@ -1767,6 +1773,12 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 );
               })()}
 
+              {sugestaoDe && !notaAtiva && draft === sugestaoDe.texto && (
+                <div className="sug-aviso" role="status">
+                  <span>Rascunho escrito pela IA: confira antes de enviar.</span>
+                  <button type="button" className="lnk" onClick={() => { setDraft(sugestaoDe.antes); setSugestaoDe(null); textareaRef.current?.focus(); }}>Desfazer</button>
+                </div>
+              )}
               <div className={'cmsg' + (notaAtiva ? ' cmsg-nota' : '')}>
                 <textarea
                   ref={textareaRef} rows={1}
@@ -1825,6 +1837,21 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                       onClick={() => abrirScripts('botao')}
                     >
                       <IcRaio /><span>Scripts</span><span className="ct">{scripts.length}</span>
+                    </button>
+                  )}
+                  {sugerirLigado && iaDisp.data?.configurada && !notaAtiva && (
+                    <button type="button" className={'tool wa-sug-btn' + (sugerir.isPending ? ' girando' : '')} disabled={composerBloqueado || sugerir.isPending}
+                      aria-label={sugerir.isPending ? 'A IA está escrevendo a sugestão' : 'Sugerir resposta com IA'}
+                      title="Sugerir resposta: a IA escreve um rascunho lendo a conversa e os scripts da empresa. Nada é enviado sozinho: confira e envie."
+                      onClick={async () => {
+                        const antes = draft;
+                        try {
+                          const texto = await sugerir.mutateAsync({ conversaId: current.id });
+                          setDraft(texto); setSugestaoDe({ texto, antes });
+                          requestAnimationFrame(() => { const t = textareaRef.current; if (t) { t.focus(); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 220) + 'px'; } });
+                        } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'A IA não conseguiu sugerir agora. Tente de novo.' }); }
+                      }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.4 2.4M15.3 15.3l2.4 2.4M6.3 17.7l2.4-2.4M15.3 8.7l2.4-2.4" /></svg>
                     </button>
                   )}
                   <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>

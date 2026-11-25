@@ -310,3 +310,29 @@ export function useTranscreverAudio() {
     onError: (e) => { if ((e as Error).message === MSG_IA.sem_chave) invalidarChave(qc); },
   });
 }
+
+/* ---------- "Sugerir resposta" (25/11): um rascunho para o ATENDENTE revisar e enviar — nada sai sozinho ---------- */
+const SUGESTOES_DEMO = [
+  'Perfeito, chegou certinho! Agora me manda o comprovante de endereço, pode ser uma conta de luz ou de água dos últimos 2 meses?',
+  'Entendi. Vou conferir aqui o seu histórico e já te explico o que dá para fazer. Enquanto isso, você consegue me mandar a foto do RG, frente e verso?',
+  'Obrigado por avisar! Combinado, a gente te liga depois das 18h. Ficou alguma dúvida até lá?',
+];
+/** um rascunho na demonstração: muda a cada clique, como uma IA de verdade faria */
+export function sugestaoDemo(vez: number): string { return SUGESTOES_DEMO[Math.abs(vez) % SUGESTOES_DEMO.length]; }
+
+let vezDemo = 0;
+export function useSugerirResposta() {
+  return useMutation({
+    mutationFn: async (v: { conversaId: string; pedido?: string }): Promise<string> => {
+      if (!IA_REAL) {
+        if (!estadoDemo().configurada) throw new Error(MSG_IA.sem_chave);
+        await esperar(900);
+        return sugestaoDemo(vezDemo++);
+      }
+      const r = await comTraducao(chamar({ acao: 'sugerir', conversa_id: v.conversaId, ...(v.pedido ? { pedido: v.pedido } : {}) }));
+      const s = typeof r.sugestao === 'string' ? r.sugestao.trim() : '';
+      if (!s) throw new Error(MSG_IA.resposta_invalida ?? 'A IA não devolveu uma resposta. Tente de novo.');
+      return s;
+    },
+  });
+}

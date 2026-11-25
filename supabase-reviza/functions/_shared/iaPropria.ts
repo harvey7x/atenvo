@@ -144,3 +144,31 @@ export function codigoDoErro(status: number, mensagem: string): string {
   if (status === 404) return 'modelo_indisponivel';
   return 'provedor_indisponivel';
 }
+
+/* ---------- "Sugerir resposta" (25/11): um rascunho para o ATENDENTE revisar e enviar; nada sai sozinho ---------- */
+export const MAX_CARACTERES_SUGESTAO = 8_000;
+export const MAX_CARACTERES_SCRIPTS = 4_000;
+export const INSTRUCOES_SUGESTAO = `Você ajuda uma pessoa da equipe de atendimento a responder um cliente no WhatsApp.
+Escreva UMA mensagem para a equipe enviar agora, respondendo a última mensagem do cliente e levando o atendimento adiante.
+Regras:
+- Português do Brasil, tom cordial e simples, frases curtas, no máximo 3 frases. Sem emojis exagerados (no máximo 1).
+- Trate por "você". Use o primeiro nome do cliente só se ele aparecer na conversa. Nunca chute o gênero.
+- Nunca prometa valor, taxa, prazo ou aprovação. Nunca peça pagamento, depósito ou taxa antecipada.
+- Não invente fatos, documentos ou números que não estejam na conversa ou nos textos prontos.
+- Se os textos prontos da empresa tiverem algo que serve, siga o jeito deles de falar.
+- Não repita perguntas que o cliente já respondeu. Se falta um documento, peça um de cada vez.
+- Responda só com o texto da mensagem, sem aspas e sem explicar.`;
+export function lerSugestao(texto: string): string {
+  let t = (texto ?? '').trim().replace(/^["“]|["”]$/g, '').trim();
+  t = t.replace(/^(mensagem|resposta)\s*:\s*/i, '').trim();
+  return t.slice(0, 1200);
+}
+export function montarTextoScripts(scripts: { titulo: string | null; conteudo: string | null }[], teto = MAX_CARACTERES_SCRIPTS): string {
+  const linhas: string[] = []; let total = 0;
+  for (const s of scripts) {
+    const l = `- ${String(s.titulo ?? '').trim()}: ${String(s.conteudo ?? '').replace(/\s+/g, ' ').trim()}`.slice(0, 400);
+    if (total + l.length > teto) break;
+    linhas.push(l); total += l.length;
+  }
+  return linhas.join('\n');
+}
