@@ -198,7 +198,7 @@ export function ColetorInss() {
               <ul className="clg-ajuda">
                 <li>A janela preta do coletor precisa ficar aberta enquanto você usa.</li>
                 <li>O painel não abriu? Clique em <b>Abrir o coletor</b>, no topo desta página — só funciona no notebook onde ele está instalado.</li>
-                <li>Erro na tela do coletor: abra <b>Detalhes técnicos</b> → <b>Copiar tudo</b> e mande no grupo.</li>
+                <li>Erro na tela do coletor: no menu da esquerda do painel, abra <b>Registro técnico</b> → <b>Copiar tudo</b> e mande no grupo.</li>
                 <li>Cada aviso que pode aparecer, e o que fazer, está no <b>Passo 10</b> do guia de instalação (PDF).</li>
               </ul>
             </div>
