@@ -10,10 +10,17 @@
      iris          a atendente virtual, nos números de WhatsApp do Reviza (migration 90 + funções
                    reviza-iris, ia-agente-testar e ia-agente-conversar)
      tempo-resposta o tempo de resposta da equipe com meta no Dashboard › Atendentes (migration 97)
+     chat-equipe   o chat da equipe no Atendimento (25/11): conversas entre colegas, de pessoa para pessoa e em
+                   grupo, com o número de não lidas no menu (migration 102; o tempo real usa a publicação do Supabase)
+     ao-vivo       a aba Ao vivo do Dashboard (25/11): as conversas abertas agora, uma coluna por atendente,
+                   equipe ou etiqueta (migration 98, rotina dash_ao_vivo)
      anuncios      anúncios do Facebook no Atendimento (25/11): a conta de anúncios em Integrações e a aba
                    Anúncios do Dashboard (migration 96 + função meta-anuncios + a origem do anúncio no webhook)
      notas         nota interna com @ na conversa do WhatsApp (25/11): o "Mensagem | Nota interna" do compositor,
                    a nota no fio (só a equipe vê, nunca vai ao cliente) e o aviso para quem foi marcado (migration 99)
+     tarefas       as tarefas da equipe no Atendimento (25/11): o menu Tarefas (lista, quadro e os números do
+                   topo) e o "Criar tarefa" do painel do cliente no WhatsApp (migration 101). Desligado, some do
+                   menu e /tarefas volta ao WhatsApp
      acessos       os CADASTROS do Atendimento antes dele existir (23/11): papel atendente, ambientes por
                    pessoa e equipes com gerente (migrations 91 e 92 + função reviza-admin). Quem só tem o
                    Atendimento entra e vê o aviso de que o Atendimento ainda vai ser ligado
@@ -22,7 +29,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'notas';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

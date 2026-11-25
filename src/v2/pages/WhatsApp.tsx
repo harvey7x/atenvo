@@ -25,6 +25,8 @@ import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDaPrevia } from '../data/config/equipes';
+import { temRecurso } from '../data/config/recursos';
+import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
@@ -1973,6 +1975,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               </span>
             </div>
           </div>
+
+          {/* Tarefas da equipe (25/11): as abertas deste cliente e o "Criar tarefa" ligado a esta conversa */}
+          {temRecurso('tarefas') && <TarefasDaConversa key={current.id} conversaId={current.id} contatoId={current.contatoId ?? null} clienteNome={nomeExibicao(current)} />}
 
           {((atividadesQ.data ?? []).length > 0 || (notasLigadas && notasDaEquipe.length > 0)) && (
             <div className="ctx-b spot">

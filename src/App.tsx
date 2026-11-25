@@ -4,6 +4,7 @@ import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
 import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, Outlet, useParams, type RouteObject } from 'react-router-dom';
 import { isRevizaMode } from '@/lib/supabase';
 import { DESTINO_PADRAO_V2 } from '@/v2/destino';
+import { temRecurso, type Recurso } from '@/v2/data/config/recursos';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 // Guardas do v1 ficam estáticas: são minúsculas e só usam os contextos que já estão no entry.
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -67,6 +68,8 @@ const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
+const ChatEquipeV2 = lazy(() => import('@/v2/pages/ChatEquipe'));
+const TarefasV2 = lazy(() => import('@/v2/pages/Tarefas'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -94,6 +97,10 @@ function RevizaGate({ children }: { children: ReactNode }) {
 }
 function Lz({ children }: { children: ReactNode }) {
   return <Suspense fallback={null}>{children}</Suspense>;
+}
+// tela que depende de uma peça do servidor (config/recursos.ts): sem ela nesta instalação, volta ao WhatsApp
+function ComRecurso({ r, children }: { r: Recurso; children: ReactNode }) {
+  return temRecurso(r) ? <>{children}</> : <Navigate to="/whatsapp" replace />;
 }
 
 // Compat: bookmarks do preview antigo (/v2/<x>) caem na rota oficial equivalente (/<x>).
@@ -153,6 +160,10 @@ const routes: RouteObject[] = [
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
           // Presenciais (dono 29/10): calendário dos atendimentos presenciais + aviso no grupo
           { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
+          // Chat da equipe (dono 25/11): conversa entre colegas; sem o recurso 'chat-equipe' a tela volta ao WhatsApp
+          { path: 'chat-equipe', element: <Lz><ChatEquipeV2 /></Lz> },
+          // Tarefas da equipe (25/11): lista e quadro, prazo, prioridade, responsável e subtarefas (recurso 'tarefas')
+          { path: 'tarefas', element: <ComRecurso r="tarefas"><Lz><TarefasV2 /></Lz></ComRecurso> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
