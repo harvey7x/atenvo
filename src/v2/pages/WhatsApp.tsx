@@ -836,6 +836,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tabEf));
+    // Pós-venda (dono 25/11): pino NÃO conta — a conversa com a mensagem mais recente vem primeiro.
+    if (posVenda) return lista.sort((a, b) => (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, tabEf, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, irisMapa, irisCarteira, eIris, irisFiltro, abas]);
@@ -856,18 +858,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     // primeiro, depois "Em dia" por recência (ordem que visiveis já traz). Chaves
     // __aguarda/__emdia têm rótulo próprio no cabeçalho do grupo e convivem com o
     // recolhimento normal (gruposFechados).
-    // Radar (v5): dentro de "Aguardando resposta", o estágio do Radar manda — pedido do gestor,
-    // último aviso, 2º, 1º, fora do Radar. Fixar desempata DENTRO do mesmo degrau (o último aviso
-    // nunca fica abaixo de dezenas de fixadas); depois, a espera mais antiga.
+    // Dono 25/11: no Pós-venda só vale a mensagem mais recente primeiro — sem pino e sem degrau do Radar.
+    // (visiveis já vem nessa ordem; os dois grupos só dividem "aguardando" de "em dia".)
     if (tabEf === 'fechados' || tabEf === 'pvaguarda') {
-      const degrau = (c: WaContact) => { const r = radarPorConv.get(c.id); return r?.pedido ? 4 : r?.aviso?.estagio ?? 0; };
-      const esperaMs = (c: WaContact) => {
-        const t = Date.parse(radarPorConv.get(c.id)?.aviso?.desde ?? c.aguardandoDesde ?? '');
-        return Number.isFinite(t) ? t : (c.lastAtMs ?? 0);
-      };
-      const porUrgencia = (a: WaContact, b: WaContact) =>
-        degrau(b) - degrau(a) || (!!a.fixada === !!b.fixada ? 0 : a.fixada ? -1 : 1) || esperaMs(a) - esperaMs(b);
-      const aguarda = visiveis.filter(aguardaFechado).sort(porUrgencia);
+      const aguarda = visiveis.filter(aguardaFechado);
       const emDia = visiveis.filter((c) => !aguardaFechado(c));
       const out: [string, WaContact[]][] = [];
       if (aguarda.length > 0) out.push(['__aguarda', aguarda]);
@@ -1316,6 +1310,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                           {(c.unread ?? 0) > 0 && <span className="nl num" title={`${c.unread} não lidas`}>{(c.unread ?? 0) > 99 ? '99+' : c.unread}</span>}
                           {wait && <span className={'cr num' + (atrasado ? ' g' : '')}>{wait.label.replace('Aguardando ', '').replace('há ', '')}</span>}
                         </span>
+                        {!posVenda && (
                         <span
                           role="button" tabIndex={-1}
                           className={'wa-pin' + (c.fixada ? ' on' : '')}
@@ -1323,6 +1318,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                           aria-label={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
                           onClick={(e) => { e.stopPropagation(); void inbox.fixar(!c.fixada, c.id); }}
                         ><IcPin /></span>
+                        )}
                       </button>
                     );
                   })}
@@ -1932,7 +1928,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               {(current.unread ?? 0) > 0
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
-              <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
+              {!posVenda && <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>}
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
               {current.id && (iaEstado?.existe || iaAtiva) && (
@@ -2275,7 +2271,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const mover = useMoverOportunidade();
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
-  const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
+  const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' | 'ganho' }>(null);
   const admSt = useAdmStatus().data;
   const admAtivo = admSt?.ativo ?? false;
   const admAssinar = admSt?.assinar ?? false;
@@ -2296,7 +2292,8 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
     const tipo = classificarMovimento(origem?.resultado ?? 'neutro', destino.resultado);
     if (tipo === 'perdido') { setMotivoNE(''); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }
     if (tipo === 'reabertura') { setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'reabertura' }); return; }
-    void executarMover(destinoId, {});                                 // neutro/ganho: move direto
+    if (tipo === 'ganho') { setMotivoModal({ destinoId, tipo: 'ganho' }); return; }   // 25/11: marcar Fechado pede confirmação
+    void executarMover(destinoId, {});                                 // neutro: move direto
   }
   async function executarMover(destinoId: string, motivos: { motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoNaoElegivel?: string | null; motivoReabertura?: string | null }) {
     if (!alvo?.id || !alvo.atualizadoEm) return;
@@ -2327,21 +2324,27 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
         aberto={!!motivoModal}
         aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
         largura={400}
-        titulo={motivoModal?.tipo === 'perdido' ? 'Motivo da perda' : 'Reabrir oportunidade'}
+        titulo={motivoModal?.tipo === 'perdido' ? 'Motivo da perda' : motivoModal?.tipo === 'ganho' ? 'Marcar como fechado?' : 'Reabrir oportunidade'}
         rodape={
           <>
             <BotaoSec disabled={movBusy} onClick={() => setMotivoModal(null)}>Cancelar</BotaoSec>
             <BotaoPrimario
-              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? !motivoNE : !motivoTxt.trim())}
+              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? !motivoNE : motivoModal.tipo === 'reabertura' ? !motivoTxt.trim() : false)}
               onClick={() => {
                 if (!motivoModal) return;
                 if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: 'nao_elegivel', motivoNaoElegivel: motivoNE });
+                else if (motivoModal.tipo === 'ganho') void executarMover(motivoModal.destinoId, {});
                 else void executarMover(motivoModal.destinoId, { motivoReabertura: motivoTxt.trim() });
-              }}>{movBusy ? 'Movendo…' : 'Confirmar'}</BotaoPrimario>
+              }}>{movBusy ? 'Movendo…' : motivoModal?.tipo === 'ganho' ? 'Sim, fechou' : 'Confirmar'}</BotaoPrimario>
           </>
         }
       >
-        {motivoModal?.tipo === 'perdido' ? (
+        {motivoModal?.tipo === 'ganho' ? (
+          <div className="campo">
+            <p style={{ margin: 0 }}>Confirma que <strong>{lead.name || 'este cliente'}</strong> fechou?</p>
+            <p style={{ margin: '8px 0 0', color: 'var(--txt-3)', fontSize: 13 }}>O cliente vai para o Fechado e para o Pós-venda. Depois de fechado, só o administrativo consegue tirar.</p>
+          </div>
+        ) : motivoModal?.tipo === 'perdido' ? (
           <div className="campo"><label>Por que não é elegível? *</label>
             <select className="inp" value={motivoNE} onChange={(e) => setMotivoNE(e.target.value)}>
               <option value="">Selecione…</option>

@@ -21,11 +21,12 @@ export function classificarMovimento(resOrigem: ColResultado, resDestino: ColRes
   return 'neutro';                                   // neutra→neutra: move direto
 }
 
-/** 29/10: com o administrativo ligado, só ele põe ou tira o cliente do Fechado
- *  (trigger opp_sync_fechamento recusa com 'fechado_pelo_administrativo'). A tela avisa antes. */
+/** 29/10: com o administrativo ligado, só ele TIRA o cliente do Fechado
+ *  (trigger opp_sync_fechamento recusa com 'fechado_pelo_administrativo'). A tela avisa antes.
+ *  25/11 (dono): o atendente também pode PÔR no Fechado — a tela pede confirmação; o banco libera. */
 export function bloqueioAdministrativo(resOrigem: ColResultado, resDestino: ColResultado): string | null {
-  if (resDestino === 'ganho') return 'O Fechado vem do sistema do administrativo: quando o cliente ficar completo lá, ele fecha sozinho aqui.';
-  if (resOrigem === 'ganho') return 'Este cliente está completo no sistema do administrativo. Para tirar do Fechado, mude o caso dele lá.';
+  if (resDestino === 'ganho') return null;
+  if (resOrigem === 'ganho') return 'Este cliente está no Fechado. Para tirar de lá, mude o caso dele no sistema do administrativo.';
   return null;
 }
 
@@ -66,7 +67,7 @@ export function rotuloPerdaCompleto(motivoPerda: string | null, motivoNE: string
 /** Traduz erros do trigger/RLS/lock em mensagens legíveis (nunca SQL bruto). */
 export function traduzErroKanban(msg: string): string {
   const m = (msg || '').toLowerCase();
-  if (m.includes('fechado_pelo_administrativo')) return 'O Fechado vem do sistema do administrativo: mude o caso do cliente lá.';
+  if (m.includes('fechado_pelo_administrativo')) return 'Não deu para mexer no Fechado. Marcar como fechado pode; tirar do Fechado só pelo sistema do administrativo.';
   if (m.includes('assinar_pelo_administrativo')) return 'O Assinar vem do sistema do administrativo: mude o caso do cliente lá.';
   if (m.includes('motivo_perda_desc')) return 'Descreva o motivo (você escolheu "Outro").';
   if (m.includes('motivo_perda')) return 'Selecione o motivo da perda.';

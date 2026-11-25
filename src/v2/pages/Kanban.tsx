@@ -1391,6 +1391,9 @@ export default function KanbanV2() {
             {pend.tipo === 'ganho' && !pend.lead.respNome && (
               <div className="kd-empty">Sem responsável: o fechamento ficará como “sem atribuição”.</div>
             )}
+            {pend.tipo === 'ganho' && admAtivo && (
+              <div className="kd-empty">Depois de fechado, só o administrativo consegue tirar o cliente do Fechado.</div>
+            )}
             {pend.tipo === 'reabertura' && (
               <>
                 <DetRow l="Resultado anterior" v={pend.lead.status === 'ganho' ? 'Ganho' : pend.lead.status === 'perdido' ? 'Perdido' : '—'} />

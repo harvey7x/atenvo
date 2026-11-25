@@ -51,9 +51,10 @@ describe('traduzErroKanban', () => {
 });
 
 describe('travas do administrativo (Fechado 29/10 · Assinar 30/10)', () => {
-  it('Fechado: só o administrativo põe ou tira', () => {
-    expect(bloqueioAdministrativo('neutro', 'ganho')).toMatch(/O Fechado vem do sistema do administrativo/);
-    expect(bloqueioAdministrativo('ganho', 'neutro')).toMatch(/completo no sistema do administrativo/);
+  it('Fechado: atendente pode pôr (25/11); tirar só o administrativo', () => {
+    expect(bloqueioAdministrativo('neutro', 'ganho')).toBeNull();          // 25/11: atendente pode marcar Fechado
+    expect(bloqueioAdministrativo('perdido', 'ganho')).toBeNull();
+    expect(bloqueioAdministrativo('ganho', 'neutro')).toMatch(/Para tirar de lá/);
     expect(bloqueioAdministrativo('neutro', 'neutro')).toBeNull();
   });
   it('Assinar: só o administrativo põe ou tira (pelo nome da coluna)', () => {
