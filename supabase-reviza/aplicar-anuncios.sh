@@ -51,7 +51,7 @@ sql "$TMP/cron.sql"
 
 echo "» 4/4 funções: meta-anuncios (nova) e evolution-webhook (passa a gravar de qual anúncio veio a conversa)"
 mkdir -p "$TMP/supabase/functions"
-for f in meta-anuncios evolution-webhook; do cp -R "$AQUI/functions/$f" "$TMP/supabase/functions/$f"; done
+for f in meta-anuncios evolution-webhook bot-runner; do cp -R "$AQUI/functions/$f" "$TMP/supabase/functions/$f"; done
 cd "$TMP"
 # o agendador não tem login (a prova é o segredo no cabeçalho); a tela é conferida dentro da função (administrador)
 supabase functions deploy meta-anuncios     --project-ref "$REF" --use-api --no-verify-jwt
