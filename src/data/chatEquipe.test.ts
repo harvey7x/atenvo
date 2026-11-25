@@ -13,6 +13,8 @@ const {
 const M = (id: string, autorId: string | null, criadoEm: string, extra: Record<string, unknown> = {}) =>
   ({ id, salaId: 's', autorId, texto: id, criadoEm, editadoEm: null, apagada: false, ...extra });
 
+const ultimaDe = <T,>(xs: T[]): T | undefined => xs[xs.length - 1];
+
 describe('chat da equipe: não lidas', () => {
   const msgs = [
     M('a', 'ana', '2026-11-25T12:00:00Z'), M('b', 'eu', '2026-11-25T12:01:00Z'),
@@ -123,14 +125,14 @@ describe('chat da equipe: demonstração', () => {
     expect(demoChat.naoLidas()).toBe(antes - primeira.naoLidas);
     const ouvinte = vi.fn(); const sair = demoChat.ouvir(ouvinte);
     demoChat.enviar(primeira.id, 'Eu atendo');
-    expect(demoChat.msgs(primeira.id).at(-1)).toMatchObject({ autorId: EU_DEMO, texto: 'Eu atendo' });
+    expect(ultimaDe(demoChat.msgs(primeira.id))).toMatchObject({ autorId: EU_DEMO, texto: 'Eu atendo' });
     await vi.advanceTimersByTimeAsync(4000);
-    const ult = demoChat.msgs(primeira.id).at(-1)!;
+    const ult = ultimaDe(demoChat.msgs(primeira.id))!;
     expect(ult.autorId).not.toBe(EU_DEMO);
     expect(demoChat.salas().find((s) => s.id === primeira.id)!.naoLidas).toBe(1); // a resposta chegou sem eu ler
     demoChat.enviar(primeira.id, 'Obrigado');
     await vi.advanceTimersByTimeAsync(4000);
-    expect(demoChat.msgs(primeira.id).at(-1)!.texto).toBe('Obrigado'); // só uma resposta por conversa
+    expect(ultimaDe(demoChat.msgs(primeira.id))!.texto).toBe('Obrigado'); // só uma resposta por conversa
     expect(ouvinte).toHaveBeenCalled();
     sair(); vi.useRealTimers();
   });

@@ -244,7 +244,7 @@ function Conversa({ sala, eu, aoVoltar }: { sala: SalaChat; eu: string | null; a
               {d.msgs.map((m) => {
                 const minha = m.autorId === eu;
                 return (
-                  <div key={m.id} className={['ce-msg', minha ? 'eu' : 'outro', m.continua ? 'cont' : '', m.pendente ? 'pendente' : ''].filter(Boolean).join(' ')}>
+                  <div key={m.id} className={['ce-msg', minha ? 'eu' : 'outro', m.continua ? 'ce-cont' : '', m.pendente ? 'pendente' : ''].filter(Boolean).join(' ')}>
                     {!minha && !m.continua && <div className="ce-autor">{m.autorId ? nomeDe.get(m.autorId) ?? 'Colega' : 'Pessoa que saiu da equipe'}</div>}
                     <div className="ce-bolha">
                       {m.apagada ? <span className="ce-apagada">Mensagem apagada</span>

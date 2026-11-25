@@ -65,7 +65,7 @@
 .v2 .ce-dia span { font-size: 11px; font-weight: 500; color: var(--txt-2); padding: 3px 10px; border-radius: 99px; background: var(--base); box-shadow: inset 0 0 0 1px var(--linha); }
 
 .v2 .ce-msg { display: flex; flex-direction: column; align-items: flex-start; margin-top: 10px; }
-.v2 .ce-msg.cont { margin-top: 3px; }
+.v2 .ce-msg.ce-cont { margin-top: 3px; }
 .v2 .ce-msg.eu { align-items: flex-end; }
 .v2 .ce-autor { font-size: 11.5px; font-weight: 600; color: var(--txt-3); margin: 0 0 3px 4px; }
 .v2 .ce-bolha {
@@ -73,9 +73,9 @@
   font-size: 13.5px; line-height: 1.45; color: var(--txt); overflow-wrap: anywhere;
 }
 .v2 .ce-msg.outro .ce-bolha { background: var(--surface, transparent); box-shadow: inset 0 0 0 1px var(--linha); border-top-left-radius: 5px; }
-.v2 .ce-msg.outro.cont .ce-bolha { border-top-left-radius: 14px; }
+.v2 .ce-msg.outro.ce-cont .ce-bolha { border-top-left-radius: 14px; }
 .v2 .ce-msg.eu .ce-bolha { background: rgba(var(--tint), .08); border-top-right-radius: 5px; }
-.v2 .ce-msg.eu.cont .ce-bolha { border-top-right-radius: 14px; }
+.v2 .ce-msg.eu.ce-cont .ce-bolha { border-top-right-radius: 14px; }
 .v2 .ce-msg.pendente .ce-bolha { opacity: .62; }
 .v2 .ce-texto { white-space: pre-wrap; display: flex; flex-direction: column; gap: 6px; }
 .v2 .ce-texto > span { display: block; }
