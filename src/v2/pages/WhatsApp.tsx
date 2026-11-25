@@ -46,6 +46,7 @@ import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
+import { MOTIVOS_FECHAMENTO, textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
 import { ResumoAtendimento } from '../components/IaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
@@ -608,6 +609,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
+  // MOTIVO AO FECHAR (25/11, recurso 'motivos-fechamento'): o motivo escolhido e o detalhe
+  const [motivoFech, setMotivoFech] = useState<MotivoFechamento | null>(null);
+  const [motivoFechDet, setMotivoFechDet] = useState('');
+  const registrarFechamento = useRegistrarFechamento();
   const [devolverConfirm, setDevolverConfirm] = useState(false);
   // "Responder por" (dono 29/10): trocar de número pede confirmação — o cliente passa a receber de outro celular
   const [trocaCanal, setTrocaCanal] = useState<{ id: string; alias: string } | null>(null);
@@ -2001,7 +2006,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
-                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Central de Avisos' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Central de Avisos' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo === 'fechado' ? 'fechou a conversa' : a.tipo}
                     {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
                   </li>
@@ -2334,6 +2339,38 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         }}
         aoCancelar={() => setTrocaCanal(null)}
       />
+      {temRecurso('motivos-fechamento') ? (
+        <ModalV2 aberto={fecharConfirm} aoFechar={() => setFecharConfirm(false)} titulo="Fechar conversa" largura={460}
+          rodape={<>
+            <BotaoSec onClick={() => setFecharConfirm(false)}>Cancelar</BotaoSec>
+            <BotaoPrimario disabled={!textoDoMotivo(motivoFech, motivoFechDet) || registrarFechamento.isPending}
+              onClick={async () => {
+                const motivo = textoDoMotivo(motivoFech, motivoFechDet); if (!motivo) return;
+                setFecharConfirm(false);
+                if (statusFechada) await aplicarStatus(statusFechada.id);
+                try { await registrarFechamento.mutateAsync({ conversaId: current.id, motivo }); }
+                catch { aoAvisar({ tom: 'erro', texto: 'A conversa foi fechada, mas o motivo não foi guardado.' }); }
+                setMotivoFech(null); setMotivoFechDet('');
+              }}>Fechar conversa</BotaoPrimario>
+          </>}>
+          <div className="fch-corpo" data-fechar-motivo>
+            <p className="fch-sub">{statusFechada ? `A conversa fica como "${statusFechada.nome}". Dá para reabrir depois, mudando o status.` : 'A conversa sai da lista de abertas.'} Por que está fechando?</p>
+            <div className="fch-opcoes" role="radiogroup" aria-label="Motivo do fechamento">
+              {MOTIVOS_FECHAMENTO.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={motivoFech === m} className={motivoFech === m ? 'on' : undefined} onClick={() => setMotivoFech(m)}>
+                  <span className="bolinha" aria-hidden />{m}
+                </button>
+              ))}
+            </div>
+            <label className="fch-det">
+              <span>{motivoFech === 'Outro motivo' ? 'Qual é o motivo?' : 'Detalhe (opcional)'}</span>
+              <input className="inp" value={motivoFechDet} maxLength={240} placeholder={motivoFech === 'Outro motivo' ? 'Escreva o motivo' : 'Ex.: já fechou com outra empresa'}
+                onChange={(e) => setMotivoFechDet(e.target.value)} />
+            </label>
+            <p className="fch-nota">O motivo fica na atividade do atendimento, no painel do cliente.</p>
+          </div>
+        </ModalV2>
+      ) : (
       <ConfirmDialogV2
         aberto={fecharConfirm}
         titulo="Fechar conversa"
@@ -2342,6 +2379,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         aoConfirmar={() => { setFecharConfirm(false); if (statusFechada) aplicarStatus(statusFechada.id); }}
         aoCancelar={() => setFecharConfirm(false)}
       />
+      )}
       <ConfirmDialogV2
         aberto={devolverConfirm}
         titulo="Devolver para a fila"

@@ -1,59 +1,8 @@
 /* O QUE HÁ DE NOVO nesta prévia (25/11, dono: "os HTML que tu tá mandando estão desatualizados, é o mesmo do sistema
-   atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
-   cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
-   aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-l';
+   atual"). Lê a MESMA lista da página Atendimento › O que mudou (src/v2/data/novidades.ts): na prévia aparecem todas.
+   A lista abre sozinha a cada versão nova (a versão é a lista de ids) e cada item leva direto ao lugar. */
+import { NOVIDADES as LISTA } from '@/v2/data/novidades';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
-export const NOVIDADES: Novidade[] = [
-  {
-    titulo: 'Retomada automática', onde: 'Configurações › Retomada automática', quando: '25/11',
-    texto: 'Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban, com até 12 mensagens, horário, ritmo por número e o histórico do que foi. Se ele responder, para. Chega desligada, e os textos que vêm escritos são de exemplo.',
-    ir: '#/config/retomada',
-  },
-  {
-    titulo: 'IA com a chave da própria Reviza', onde: 'Configurações › Integrações › Inteligência artificial', quando: '25/11',
-    texto: 'Escolher Google Gemini ou OpenAI e colar a chave que a Reviza cria na conta dela (o custo é da Reviza). No WhatsApp, o painel do cliente ganha o "Resumo do atendimento" e os áudios ganham "Transcrever". Para ver: Conectar › "Usar uma chave de exemplo" e abrir a conversa da Maria Aparecida.',
-    ir: '#/config/integracoes/ia',
-  },
-  {
-    titulo: 'Nota interna com @ na conversa', onde: 'WhatsApp › conversa do cliente', quando: '25/11',
-    texto: 'Em cima da caixa de mensagem, troque para "Nota interna" e escreva um recado para a equipe. A nota fica na conversa só para a equipe e nunca vai para o cliente. Digite @ para marcar um colega: ele recebe um aviso.',
-    ir: '#/whatsapp?conversa=wa-maria',
-  },
-  {
-    titulo: 'Chat da equipe', onde: 'Atendimento › Chat da equipe', quando: '25/11',
-    texto: 'Conversa entre colegas, de pessoa para pessoa ou em grupo, com o número de não lidas no menu e o "Visto". Colar o link de uma conversa de cliente vira um cartão que abre a conversa. Na prévia, um colega responde sozinho.',
-    ir: '#/chat-equipe',
-  },
-  {
-    titulo: 'Tarefas da equipe', onde: 'Atendimento › Tarefas', quando: '25/11',
-    texto: 'Lista ou quadro com responsável, prazo (dia e hora), prioridade, projeto e subtarefas. No topo: abertas, atrasadas, para hoje e concluídas na semana. No WhatsApp, o painel do cliente ganhou "Criar tarefa", já ligada à conversa.',
-    ir: '#/tarefas',
-  },
-  {
-    titulo: 'Ao vivo: as conversas abertas agora', onde: 'Dashboard › Ao vivo', quando: '25/11',
-    texto: 'Um quadro com uma coluna por atendente, por equipe ou por etiqueta e um cartão por conversa aberta: a última mensagem, por qual número, quando, quem está esperando resposta e onde a IA está atendendo. Atualiza sozinho a cada 30 segundos; clicar no cartão abre a conversa.',
-    ir: '#/dashboard?aba=aovivo',
-  },
-  {
-    titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
-    texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',
-    ir: '#/dashboard?aba=atendentes',
-  },
-  {
-    titulo: 'Anúncios do Facebook', onde: 'Dashboard › Anúncios', quando: '25/11',
-    texto: 'Quanto foi investido, quantos clientes cada campanha trouxe, custo por lead e por fechado, a campanha que está rodando melhor e o rastreio de cada cliente. Para ver com dinheiro: Conectar › "Usar um código de exemplo".',
-    ir: '#/dashboard?aba=anuncios',
-  },
-  {
-    titulo: 'Conectar a conta de anúncios', onde: 'Configurações › Integrações › Anúncios do Facebook', quando: '25/11',
-    texto: 'Colar o código de acesso da Meta (gerado pela própria Reviza) e escolher a conta. O sistema só lê os números.',
-    ir: '#/config/integracoes/anuncios',
-  },
-  {
-    titulo: 'Mídia, documentos e links do cliente', onde: 'WhatsApp › painel do cliente', quando: '25/11',
-    texto: 'Como no WhatsApp: as fotos, os documentos, os áudios e os links da conversa, separados por mês, com abrir, baixar e "ver na conversa".',
-    ir: '#/whatsapp?conversa=wa-maria&midias=fotos',
-  },
-];
+export const NOVIDADES: Novidade[] = LISTA.map((n) => ({ titulo: n.titulo, onde: n.onde, texto: n.texto, quando: n.quando, ir: '#' + n.rota }));
+export const NOVIDADES_VERSAO = LISTA.map((n) => n.id).join('|');

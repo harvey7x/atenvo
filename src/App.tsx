@@ -69,6 +69,7 @@ const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
 const ChatEquipeV2 = lazy(() => import('@/v2/pages/ChatEquipe'));
+const NovidadesV2 = lazy(() => import('@/v2/pages/Novidades'));
 const TarefasV2 = lazy(() => import('@/v2/pages/Tarefas'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
@@ -162,6 +163,8 @@ const routes: RouteObject[] = [
           { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
           // Chat da equipe (dono 25/11): conversa entre colegas; sem o recurso 'chat-equipe' a tela volta ao WhatsApp
           { path: 'chat-equipe', element: <Lz><ChatEquipeV2 /></Lz> },
+          // O que mudou (25/11): as novidades do sistema, cada uma com o botão que leva até ela
+          { path: 'novidades', element: <Lz><NovidadesV2 /></Lz> },
           // Tarefas da equipe (25/11): lista e quadro, prazo, prioridade, responsável e subtarefas (recurso 'tarefas')
           { path: 'tarefas', element: <ComRecurso r="tarefas"><Lz><TarefasV2 /></Lz></ComRecurso> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },

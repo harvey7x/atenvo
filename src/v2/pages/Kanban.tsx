@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { baixarCsv, csvDe, dataBr, nomeComData } from '../lib/planilha';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
@@ -434,6 +435,16 @@ export default function KanbanV2() {
     return true;
   };
   const nFiltrosAtivos = (filtroBenef.size ? 1 : 0) + (filtroBanco.size ? 1 : 0) + ((filtroDataDe || filtroDataAte) ? 1 : 0) + (filtroResp ? 1 : 0) + (filtroOrigem ? 1 : 0);
+  const exportarPlanilha = () => {
+    const nomeCol = new Map(colunas.map((c) => [c.id, c.nome]));
+    const linhas: (string | number | null)[][] = [['Cliente', 'Telefone', 'E-mail', 'Etapa', 'Responsável', 'Origem', 'Etiquetas', 'Banco', 'Benefício', 'Valor', 'Entrou em', 'Última mudança', 'Observações']];
+    for (const l of leadsVisiveis) {
+      linhas.push([l.nome, l.telefone, l.email, (l.colunaId ? nomeCol.get(l.colunaId) : '') ?? '', l.respNome, l.origem,
+        [...new Set([...(l.etiquetas ?? []), ...(l.contatoEtiquetas ?? [])])].join(', '), l.instituicao, l.tipoBeneficio, l.valor,
+        dataBr(l.entradaEm || l.criadoEm), dataBr(l.movimentadoEm), l.observacoes]);
+    }
+    baixarCsv(nomeComData('kanban'), csvDe(linhas));
+  };
   const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp) && passaAvancados(l)), [leads, term, termDig, filtroOrigem, filtroResp, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
@@ -982,6 +993,8 @@ export default function KanbanV2() {
               <input className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads..." />
             </div>
           )}
+          {/* Exportar planilha (25/11): o que está na tela agora (busca e filtros valem), para o Excel */}
+          {podeConfig && !vazioFunil && <BotaoSec onClick={exportarPlanilha} title="Baixa uma planilha com os cartões que estão na tela agora (a busca e os filtros valem)">Exportar planilha</BotaoSec>}
           {podeConfig && <BotaoSec onClick={abrirNovaColuna}>Nova coluna</BotaoSec>}
           <BotaoPrimario onClick={() => abrirNovoLead()}>＋ Novo lead</BotaoPrimario>
         </div>

@@ -35,6 +35,7 @@ import { temRecurso, temCadastroAtendimento } from '../data/config/recursos';
 import { areaDaRota, areaLiberada } from '../data/config/areas';
 import { useConversasWA } from '../data/wa/wa';
 import { chatEquipeLigado, useChatNaoLidas } from '@/data/chatEquipe';
+import { idsVistos, naoVistas, novidadesPara } from '../data/novidades';
 import { tempoRelativo } from '../lib/tempo';
 import { usePapel } from '../data/cobranca/sessao';
 import { useAvisosNaoLidos } from '../data/cobranca/avisos';
@@ -120,6 +121,8 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
       { slug: 'ferramentas/conversor', rotulo: 'Conversor de arquivos' },
       { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
+      // O que mudou (25/11): as novidades, com o número das que esta pessoa ainda não viu
+      { slug: 'novidades', rotulo: 'O que mudou' },
     ],
   },
   {
@@ -876,6 +879,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // só para quem tem o Atendimento (quem é só das Cobranças nem consulta)
   const chatAtivo = chatEquipeLigado() && !acessoCarregando && modulosDisponiveis.some((m) => m.id === 'atendimento');
   const chatNaoLidas = useChatNaoLidas(chatAtivo).data ?? 0;
+  // O QUE MUDOU: quantas novidades esta pessoa ainda não abriu (neste navegador); a página marca como vistas
+  const [vistasTique, setVistasTique] = useState(0);
+  useEffect(() => { const f = () => setVistasTique((x) => x + 1); window.addEventListener('reviza-novidades', f); return () => window.removeEventListener('reviza-novidades', f); }, []);
+  const novidadesNovas = useMemo(() => naoVistas(novidadesPara(currentOrg?.role === 'admin', temRecurso), idsVistos()), [currentOrg?.role, vistasTique]); // eslint-disable-line react-hooks/exhaustive-deps
   // busca de CLIENTES na paleta ⌘K: só para quem tem Cobranças — na ALFA, de qualquer ambiente (a paleta cobre
   // o sistema da pessoa); quem é só do Atendimento nunca busca a carteira
   const buscaClientes = (isRevizaMode || isDemoMode) && temCob && !acessoCarregando && modulosDisponiveis.some((m) => m.id === 'cobrancas');
@@ -926,7 +933,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
     // contador onde há trabalho: Conversas de Cobranças = mensagens não lidas (o mesmo número do sino)
-    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/conversas' ? waNaoLidas : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : i.slug === 'chat-equipe' ? chatNaoLidas : undefined,
+    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/conversas' ? waNaoLidas : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : i.slug === 'chat-equipe' ? chatNaoLidas : i.slug === 'novidades' ? novidadesNovas : undefined,
     badgeTitulo: i.slug === 'whatsapp' ? plural(badgePop, 'mensagem nova', 'mensagens novas')
       : i.slug === 'chat-equipe' ? plural(chatNaoLidas, 'mensagem da equipe não lida', 'mensagens da equipe não lidas')
       : i.slug === 'cobrancas/conversas' ? plural(waNaoLidas, 'mensagem não lida', 'mensagens não lidas')
@@ -1013,6 +1020,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         )}
         {i.slug === 'cobrancas/novos' && pendentesAprovacao > 0 && (
           <span className="badge-n lab num" title={`${pendentesAprovacao} aguardando aprovação`}>{pendentesAprovacao}</span>
+        )}
+        {i.slug === 'novidades' && novidadesNovas > 0 && (
+          <span className="badge-n lab num" title={plural(novidadesNovas, 'novidade que você ainda não viu', 'novidades que você ainda não viu')}>{novidadesNovas}</span>
         )}
         {i.slug === 'chat-equipe' && chatNaoLidas > 0 && (
           <span className="badge-n lab num" title={plural(chatNaoLidas, 'mensagem da equipe não lida', 'mensagens da equipe não lidas')}>{chatNaoLidas}</span>
