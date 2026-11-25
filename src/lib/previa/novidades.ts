@@ -2,10 +2,15 @@
    atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
    cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
    aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-c';
+export const NOVIDADES_VERSAO = '2026-11-25-i';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
 export const NOVIDADES: Novidade[] = [
+  {
+    titulo: 'Retomada automática', onde: 'Configurações › Retomada automática', quando: '25/11',
+    texto: 'Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban, com até 12 mensagens, horário, ritmo por número e o histórico do que foi. Se ele responder, para. Chega desligada, e os textos que vêm escritos são de exemplo.',
+    ir: '#/config/retomada',
+  },
   {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
     texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',

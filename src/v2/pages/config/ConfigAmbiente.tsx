@@ -10,6 +10,7 @@
      registros     tudo o que cada pessoa fez (a tela que ficava em Cobranças)                  (admin)
      iris          a atendente virtual: chave do Google, personalidade, conhecimento, canais    (admin)
      atendimento   regras e etiquetas do Atendimento                                            (admin)
+     retomada      mensagens automáticas quando o cliente para de responder, por etapa do Kanban (admin)
      conta · notificacoes · preferencias      o que é da própria pessoa                         (todos)
    As quatro últimas são as seções da tela de Configurações de antes, uma por vez (abaFixa). */
 import { lazy, Suspense } from 'react';
@@ -27,12 +28,13 @@ import { ConfigEntradas } from './ConfigEntradas';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
 import { ConfigAnuncios } from './ConfigAnuncios';
+import { ConfigRetomada } from './ConfigRetomada';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -64,7 +66,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')) || (servico === 'anuncios' && !(temRecurso('anuncios') && temRecurso('atendimento'))))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
@@ -80,6 +82,7 @@ export default function ConfigAmbiente() {
   if (secao === 'equipes') return (<><Cabecalho titulo="Equipes" sub="As equipes do Atendimento: quem é o gerente, quem faz parte e qual é o WhatsApp de cada uma." /><ConfigEquipes /></>);
   if (secao === 'registros') return (<><Cabecalho titulo="Registros" sub="Tudo o que cada pessoa fez no sistema: quem, o quê, quando e o que mudou." /><RevizaRegistros /></>);
   if (secao === 'iris') return (<><Cabecalho titulo="Atendentes de IA" sub="A Iris e as outras IAs do Atendimento: o que cada uma sabe e faz, e em quais números atende." /><Suspense fallback={null}><Iris /></Suspense></>);
+  if (secao === 'retomada') return (<><Cabecalho titulo="Retomada automática" sub="Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban. Se ele responder, a sequência para." /><ConfigRetomada /></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
 }

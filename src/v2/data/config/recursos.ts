@@ -10,6 +10,9 @@
      iris          a atendente virtual, nos números de WhatsApp do Reviza (migration 90 + funções
                    reviza-iris, ia-agente-testar e ia-agente-conversar)
      tempo-resposta o tempo de resposta da equipe com meta no Dashboard › Atendentes (migration 97)
+     retomada      a retomada automática (25/11): mensagens que vão sozinhas quando o cliente para de responder,
+                   por etapa do Kanban (migration 103 + função retomada-processar + agendador a cada minuto).
+                   Chega DESLIGADA: só envia quando o administrador ligar em Configurações › Retomada automática
      anuncios      anúncios do Facebook no Atendimento (25/11): a conta de anúncios em Integrações e a aba
                    Anúncios do Dashboard (migration 96 + função meta-anuncios + a origem do anúncio no webhook)
      acessos       os CADASTROS do Atendimento antes dele existir (23/11): papel atendente, ambientes por
@@ -20,7 +23,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'retomada';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

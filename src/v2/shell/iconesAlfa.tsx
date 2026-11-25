@@ -63,6 +63,8 @@ export const ICONES_ALFA: Record<string, ReactNode> = {
   iris: ic(<><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></>),
   // Regras do atendimento: a lista de regras conferida
   atendimento: ic(<><path d="M3 5h.01" /><path d="M3 12h.01" /><path d="M3 19h.01" /><path d="M8 5h13" /><path d="M8 12h13" /><path d="M8 19h13" /></>),
+  // Retomada automática: as setas que voltam (a mensagem que vai de novo quando o cliente para de responder)
+  retomada: ic(<><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></>),
   integracoes: ic(<><path d="M12 22v-5" /><path d="M9 8V2" /><path d="M15 8V2" /><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" /></>),
 
   /* ---- Ferramentas ---- */

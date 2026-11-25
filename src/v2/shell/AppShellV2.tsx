@@ -205,6 +205,7 @@ const CFG_GRUPOS: GrupoNav[] = [
   { rotulo: 'Atendimento', itens: [
     ...(temRecurso('iris') ? [{ slug: 'config/iris', rotulo: 'Atendentes de IA', admin: true }] : []),
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
   { rotulo: 'Minha conta', itens: temRecurso('atendimento') ? [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] : [] },
