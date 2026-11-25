@@ -52,7 +52,6 @@ import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Segmentado, Skeleton } from '../components';
 import { IcNota } from '../components/NotaInterna';
 import { useCriarNota, useNotasLocais, mesclarNotas, mencaoEmCurso, filtrarMembros, inserirMencao, juntarNomes, validarNota, EQUIPE_DEMO_NOTAS, NOTA_MAX, type Membro } from '@/data/notasInternas';
-import { temRecurso } from '../data/config/recursos';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
