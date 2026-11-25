@@ -236,3 +236,7 @@
 .v2 .tf-ctx-sub .tf-av { width: 16px; height: 16px; font-size: 7.5px; }
 .v2 .tf-ctx-vazio { margin-top: 4px; font-size: 11.5px; color: var(--txt-3); }
 .v2 .tf-ctx-mais { margin-top: 6px; }
+
+/* a situação nunca quebra em duas linhas ("Em andamento") */
+.v2 .tf-c-st { white-space: nowrap; }
+.v2 .tf-c-st > * { white-space: nowrap; }
