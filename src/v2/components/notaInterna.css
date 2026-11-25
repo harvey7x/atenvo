@@ -1,0 +1,88 @@
+/* ==========================================================================
+   NOTA INTERNA COM @ (25/11, migration 99) — compositor em modo nota, lista do @ e o cartão da nota no fio.
+   Cor própria da nota: um neutro QUENTE (papel), nunca laranja translúcido — o laranja do sistema só aparece sólido.
+   Os seletores com :not(#nt-a):not(#nt-b) são de propósito: o compositor já tem três camadas de estilo por cima
+   (inbox-pro, barra-alfa e linear, com :not(#id)); a nota precisa vencer todas sem mexer nelas.
+   ========================================================================== */
+.v2 {
+  --nota-fundo: #1E1C19;
+  --nota-fio: rgba(255, 238, 214, .11);
+  --nota-fio-forte: rgba(255, 238, 214, .22);
+  --nota-tinta: #A8998A;
+}
+:root[data-tema="light"] .v2 {
+  --nota-fundo: #F7F3EC;
+  --nota-fio: #E7DFD1;
+  --nota-fio-forte: #D3C7B3;
+  --nota-tinta: #7D6E5B;
+}
+
+/* ---------- troca "Mensagem | Nota interna" ---------- */
+.v2 .wa-modo { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; min-width: 0; }
+.v2 .wa-modo .segm button { font-size: 12px; }
+
+/* ---------- compositor em modo nota ---------- */
+.v2 .wa-composer { position: relative; }
+html:not(#nt-a):not(#nt-b) .v2 .cmsg.cmsg-nota { background: var(--nota-fundo); border-color: var(--nota-fio-forte); box-shadow: none; }
+html:not(#nt-a):not(#nt-b) .v2 .cmsg.cmsg-nota:focus-within { border-color: var(--nota-fio-forte); box-shadow: 0 0 0 3px rgba(var(--tint), .06); }
+html:not(#nt-a):not(#nt-b) .v2 .cmsg.cmsg-nota textarea { background: transparent; color: var(--txt); }
+html:not(#nt-a):not(#nt-b) .v2 .cmsg.cmsg-nota textarea::placeholder { color: var(--txt-3); }
+.v2 .cmsg .nota-tools { min-height: 32px; padding-left: 6px; }
+.v2 .cmsg .nota-dica { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .cmsg .nota-dica svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--nota-tinta); }
+html:not(#nt-a):not(#nt-b) .v2 .cmsg .env-b.env-nota {
+  width: auto; min-width: 0; padding: 0 14px; gap: 0; font-family: var(--fonte); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+
+/* ---------- lista do @ (em cima do compositor) ---------- */
+.v2 .wa-mencoes {
+  position: absolute; left: 16px; bottom: calc(100% - 6px); z-index: 40;
+  width: 260px; max-width: calc(100% - 32px); max-height: 260px; overflow-y: auto;
+  background: var(--surface, var(--base)); border: 1px solid rgba(var(--tint), .12); border-radius: 10px;
+  box-shadow: var(--shadow-pop, 0 10px 30px rgba(0, 0, 0, .25)); padding: 4px;
+}
+.v2 .wa-mencoes-t { font-size: 11px; font-weight: 600; color: var(--txt-3); padding: 6px 9px 4px; }
+.v2 .wa-mencao {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 36px; padding: 5px 9px; border: 0; border-radius: 7px;
+  background: none; color: var(--txt); font-family: var(--fonte); font-size: 13px; text-align: left; cursor: pointer;
+}
+.v2 .wa-mencao.on, .v2 .wa-mencao:hover { background: rgba(var(--tint), .08); }
+.v2 .wa-mencao .av {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 650; color: var(--txt-2); background: rgba(var(--tint), .08); border: 1px solid var(--linha);
+}
+.v2 .wa-mencao .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- a nota no fio: no meio, fora do lado do cliente e do nosso ---------- */
+.v2 .wa-msgs .wa-nota {
+  align-self: center; width: min(560px, 92%); box-sizing: border-box; margin: 4px 0;
+  background: var(--nota-fundo); border: 1px solid var(--nota-fio); border-radius: 10px; padding: 8px 12px 9px;
+  color: var(--txt); font-size: 13px; line-height: 1.5;
+}
+.v2 .wa-nota-cab { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; color: var(--txt-3); margin-bottom: 3px; }
+.v2 .wa-nota-cab b { color: var(--txt-2); font-weight: 600; }
+.v2 .wa-nota-ic { display: inline-flex; color: var(--nota-tinta); flex-shrink: 0; }
+.v2 .wa-nota-ic svg { width: 14px; height: 14px; }
+.v2 .wa-nota-quem { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .wa-nota-so { margin-left: auto; flex-shrink: 0; padding-left: 8px; white-space: nowrap; }
+.v2 .wa-nota-tx { white-space: pre-wrap; overflow-wrap: anywhere; }
+.v2 .wa-nota-men { font-weight: 650; color: var(--txt); background: rgba(var(--tint), .08); border-radius: 4px; padding: 0 3px; }
+/* "ver na conversa" / "ver a última" acende a nota como acende a bolha */
+.v2 .wa-nota.mdc-piscar { outline: 2px solid var(--accent); outline-offset: 3px; animation: mdc-acende 1.7s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) { .v2 .wa-nota.mdc-piscar { animation: none; } }
+
+/* ---------- painel do cliente: "Notas da equipe" na Atividade ---------- */
+.v2 .ativ-notas { margin-bottom: 6px; }
+.v2 .ativ-notas .k { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .ativ-notas .k svg { width: 13px; height: 13px; color: var(--nota-tinta); }
+
+/* ---------- celular ---------- */
+@media (max-width: 760px) {
+  .v2 .wa-msgs .wa-nota { width: 100%; }
+  .v2 .wa-nota-so { display: none; }
+  .v2 .wa-mencoes { left: 10px; right: 10px; width: auto; max-width: none; }
+  .v2 .wa-mencao { min-height: 44px; font-size: 14px; }
+  .v2 .wa-modo .segm { flex: 1 1 auto; }
+  .v2 .wa-modo .segm button { flex: 1 1 0; min-height: 36px; }
+  html:not(#nt-a):not(#nt-b) .v2 .cmsg .env-b.env-nota { height: 44px; }
+}

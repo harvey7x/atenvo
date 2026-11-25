@@ -2,10 +2,15 @@
    atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
    cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
    aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-c';
+export const NOVIDADES_VERSAO = '2026-11-25-e';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
 export const NOVIDADES: Novidade[] = [
+  {
+    titulo: 'Nota interna com @ na conversa', onde: 'WhatsApp › conversa do cliente', quando: '25/11',
+    texto: 'Em cima da caixa de mensagem, troque para "Nota interna" e escreva um recado para a equipe. A nota fica na conversa só para a equipe e nunca vai para o cliente. Digite @ para marcar um colega: ele recebe um aviso.',
+    ir: '#/whatsapp?conversa=wa-maria',
+  },
   {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
     texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',

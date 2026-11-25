@@ -9,6 +9,8 @@
 --   · a resposta vai para quem escreveu; a do celular (sem autor no sistema) vai para o responsável pela conversa.
 --   · horário comercial (padrão): só contam os minutos de segunda a sexta, das 8h às 18h (Brasília). Tempo corrido: tudo.
 --   · AGUARDANDO = conversa aberta cuja última mensagem é do cliente, sem resposta de ninguém (nem da IA), há até 30 dias.
+--   · NOTA INTERNA da equipe e aviso do SISTEMA (tipo 'nota_interna'/'sistema') não são resposta nem mensagem do cliente:
+--     ficam fora de tudo (25/11, junto da migration 99 — sem isto uma nota com @ contava como resposta de pessoa).
 -- Nada aqui muda dados.
 
 create or replace function public.atd_minutos_uteis(p_de timestamptz, p_ate timestamptz, p_h_ini integer default 8, p_h_fim integer default 18)
@@ -63,6 +65,7 @@ begin
        and m.criado_em >= ((v_desde - 3)::timestamp at time zone 'America/Sao_Paulo')
        and m.criado_em <  ((p_fim + 3)::timestamp at time zone 'America/Sao_Paulo')
        and not (m.direcao = 'saida' and m.status::text = 'falhou')
+       and m.tipo::text not in ('sistema', 'nota_interna')  -- nota da equipe e aviso do sistema não chegam ao cliente
   ),
   marcadas as (  -- grp = quantas mensagens NOSSAS já houve até aqui: a resposta de uma espera é a saída de grp + 1
     select q.*, lag(q.direcao) over w as dir_antes,
@@ -138,6 +141,7 @@ begin
       from public.mensagens m
      where m.organizacao_id = v_org and m.criado_em >= now() - interval '30 days'
        and not (m.direcao = 'saida' and m.status::text = 'falhou')
+       and m.tipo::text not in ('sistema', 'nota_interna')
      order by m.conversa_id, m.criado_em desc
   ),
   esperando as (
@@ -145,7 +149,7 @@ begin
            (select min(case when m2.direcao = 'entrada' then coalesce(m2.recebida_em, m2.criado_em) end)
               from public.mensagens m2
              where m2.conversa_id = u.conversa_id and m2.direcao = 'entrada'
-               and m2.criado_em > coalesce((select max(m3.criado_em) from public.mensagens m3 where m3.conversa_id = u.conversa_id and m3.direcao = 'saida' and m3.status::text <> 'falhou'), '-infinity'::timestamptz)) as desde,
+               and m2.criado_em > coalesce((select max(m3.criado_em) from public.mensagens m3 where m3.conversa_id = u.conversa_id and m3.direcao = 'saida' and m3.status::text <> 'falhou' and m3.tipo::text not in ('sistema', 'nota_interna')), '-infinity'::timestamptz)) as desde,
            coalesce(nullif(btrim(c.nome), ''), c.telefone, 'Sem nome') as contato
       from ultimas u
       join public.conversas cv on cv.id = u.conversa_id
