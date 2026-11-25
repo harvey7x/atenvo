@@ -51,10 +51,10 @@ export function alternarAmbiente(atual: readonly Ambiente[], a: Ambiente): Ambie
 
 /* Telas do Atendimento na Reviza (dono 11/11: "Eu só vou querer WhatsApp, presenciais, script, Kanban,
    dashboard, unificador de documentos, conversor de arquivos e coletor do INSS" — e Configurações, onde
-   ficam os usuários). Lista do que ENTRA, não do que sai: qualquer outra tela do Atenvo aberta pela URL
+   ficam os usuários; 25/11: + Tarefas, das funções do sistema que a Reviza usava antes). Lista do que ENTRA, não do que sai: qualquer outra tela do Atenvo aberta pela URL
    volta ao WhatsApp (Pendências, Painel da Equipe e Central de Avisos inclusive — "não vou querer").
    Integrações fica sem item no menu: é por ela que Configurações → Canais e o "Conectar número…" do
    WhatsApp ligam os números. A raiz ('/') passa: ela mesma manda para o início do ambiente. */
-export const ROTAS_ATENDIMENTO = ['/whatsapp', '/pos-venda', '/presenciais', '/scripts', '/kanban', '/dashboard', '/ferramentas', '/configuracoes', '/integracoes'] as const;
+export const ROTAS_ATENDIMENTO = ['/whatsapp', '/pos-venda', '/presenciais', '/tarefas', '/scripts', '/kanban', '/dashboard', '/ferramentas', '/configuracoes', '/integracoes'] as const;
 export const rotaAtendimentoPermitida = (pathname: string) =>
   pathname === '/' || ROTAS_ATENDIMENTO.some((r) => pathname === r || pathname.startsWith(`${r}/`));

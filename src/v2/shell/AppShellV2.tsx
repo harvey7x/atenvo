@@ -97,6 +97,8 @@ const GRUPOS: GrupoNav[] = [
       // Pós-venda (dono 21/11): os clientes FECHADOS num atendimento próprio, fora da lista do WhatsApp
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
+      // Tarefas da equipe (25/11): só com a peça do servidor (migration 101) nesta instalação
+      ...(temRecurso('tarefas') ? [{ slug: 'tarefas', rotulo: 'Tarefas' }] : []),
       { slug: 'scripts', rotulo: 'Scripts' },
     ],
   },
@@ -370,6 +372,7 @@ const APELIDOS: Record<string, string[]> = {
   'cobrancas/usuarios': ['equipe', 'acessos', 'permissoes', 'senhas'],
   whatsapp: ['whatsapp', 'inbox', 'chat', 'mensagens', 'atendimento'],
   presenciais: ['agenda', 'visitas', 'atendimento presencial'],
+  tarefas: ['afazeres', 'pendencias', 'lembretes', 'checklist', 'prazos'],
   scripts: ['respostas prontas', 'modelos', 'textos'],
   kanban: ['funil', 'quadro', 'vendas', 'pipeline'],
   dashboard: ['indicadores', 'metricas', 'relatorios', 'campanhas'],
