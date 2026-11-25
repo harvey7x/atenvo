@@ -1,0 +1,23 @@
+/* Tempo de resposta da equipe (TempoResposta.tsx) — topo da aba Atendentes. Laranja só sólido (a barra da meta). */
+.v2 .tr { display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px; }
+.v2 .tr-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .tr-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .tr-meta .inp { width: 58px; height: 30px; padding: 0 8px; text-align: center; font-size: 13px; }
+.v2 .tr-lk { color: var(--txt-2); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.v2 .tr-lk:hover { color: var(--txt); }
+.v2 .tr-tab th[scope="row"], .v2 .tr-fila th[scope="row"] { font-weight: 400; }
+.v2 .tr-nome { font-weight: 500; color: var(--txt); }
+.v2 .tr-nome.sem { font-weight: 400; color: var(--txt-3); }
+.v2 .tr-fora { color: var(--rubro, #c0392b); font-weight: 600; }
+.v2 .tr-pct { display: inline-flex; align-items: center; gap: 8px; }
+.v2 .tr-barra { display: block; width: 90px; height: 6px; border-radius: 3px; background: rgba(var(--tint), .08); overflow: hidden; }
+.v2 .tr-barra i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.v2 .tr-nota { margin: 10px 0 0; font-size: 11.5px; color: var(--txt-3); line-height: 1.5; }
+.v2 .tr-cli { border: 0; background: none; padding: 0; font: 500 13px var(--fonte); color: var(--txt); cursor: pointer; text-align: left; }
+.v2 .tr-cli:hover { text-decoration: underline; text-underline-offset: 2px; }
+.v2 .tr-cli:focus-visible { outline: 2px solid var(--txt); outline-offset: 2px; border-radius: 3px; }
+.v2 .tr-sem { color: var(--txt-3); font-size: 12px; }
+.v2 .tr-mais { display: flex; justify-content: center; padding-top: 12px; }
+.v2 .tr-sk { display: flex; flex-direction: column; gap: 16px; }
+.v2 .tr-fila td { white-space: nowrap; }
+@media (max-width: 720px) { .v2 .tr-ctl { width: 100%; } }

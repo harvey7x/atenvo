@@ -220,9 +220,12 @@ export function normalizarDashV5(bruto: unknown): DashV5 {
 export const DASH_V5_MAX_DIAS = 45;
 
 /** Erro da RPC em português (nunca SQL cru na tela). */
+/** a aba chama uma rotina que esta instalação ainda não tem no servidor (Reviza: Campanhas e Atendentes do Atenvo) */
+export const MSG_ABA_NAO_LIGADA = 'Esta parte do Dashboard ainda não foi ligada no servidor desta instalação.';
 export function traduzErroDashV5(e: unknown): string {
   const m = (e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e ?? '')).toLowerCase();
   const codigo = typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : '';
+  if (codigo === 'PGRST202' || m.includes('could not find the function')) return MSG_ABA_NAO_LIGADA;
   // 57014 = statement_timeout (o papel authenticated tem 8 s): período longo com cache frio
   if (codigo === '57014' || m.includes('statement timeout') || m.includes('canceling statement')) {
     return 'A consulta demorou demais. Tente de novo em instantes ou escolha um período menor.';

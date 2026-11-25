@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
+import { DASH_V5_MAX_DIAS, DASH_V5_REAL, MSG_ABA_NAO_LIGADA, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { useDashAtendentesAba, useDashCampanhas } from '@/data/dashboardV5.abas';
 import { useDashAnuncios } from '@/data/anuncios';
 import { temRecurso } from '../data/config/recursos';
@@ -18,6 +18,7 @@ import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
 import { Campanhas, CampanhasSkeleton } from './dashboardV5/Campanhas';
 import { AtendentesAba, AtendentesAbaSkeleton } from './dashboardV5/AtendentesAba';
 import { AnunciosAba, AnunciosAbaSkeleton } from './dashboardV5/AnunciosAba';
+import { TempoResposta } from './dashboardV5/TempoResposta';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
@@ -77,6 +78,8 @@ function CarregandoDash() {
 /** Erro da aba quando não há nem dado velho; com dado velho, só o aviso em cima. */
 function ErroAba({ q }: { q: { isError: boolean; error: unknown; refetch: () => unknown; data: unknown } }) {
   if (!q.isError) return null;
+  // a rotina não existe neste servidor: é um aviso calmo, não um erro para tentar de novo
+  if ((q.error as Error)?.message === MSG_ABA_NAO_LIGADA) return <p className="d5-aviso" role="status">{MSG_ABA_NAO_LIGADA}</p>;
   if (q.data) {
     return (
       <p className="d5-aviso" role="status">
@@ -217,6 +220,8 @@ export default function DashboardV2() {
 
       {aba === 'atendentes' && (
         <>
+          {/* 25/11: tempo de resposta da equipe com meta — consulta própria, aparece mesmo se o resto da aba não estiver ligado */}
+          {temRecurso('tempo-resposta') && <TempoResposta periodo={periodo} hoje={hoje} comparacao={comparacao} />}
           <ErroAba q={qAt} />
           {qAt.data
             ? <AtendentesAba d={qAt.data} periodo={periodo} hoje={hoje} />
