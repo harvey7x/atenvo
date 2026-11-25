@@ -98,7 +98,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   );
 
   return (
-    <div ref={raizRef} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
+    <div ref={raizRef} data-mid={m.id} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
       )}

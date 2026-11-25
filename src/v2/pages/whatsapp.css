@@ -388,7 +388,7 @@
 .v2 .doc2 { display: flex; align-items: center; gap: 9px; min-width: 200px; }
 .v2 .doc2 .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(var(--tint), .08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .v2 .doc2 .ic svg { width: 15px; height: 15px; color: var(--txt-2); }
-.v2 .doc2 .inf { min-width: 0; flex: 1; }
+.v2 .doc2 .inf { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; } /* nome em cima, tipo·tamanho embaixo (eram spans colados: "x.pdfPDF · 305 KB") */
 .v2 .doc2 .nm { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .doc2 .mt { font-size: 10px; color: var(--txt-3); }
 .v2 .doc2 .acts { display: flex; gap: 8px; margin-top: 3px; }

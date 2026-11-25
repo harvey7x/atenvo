@@ -43,6 +43,8 @@ import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
+import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
+import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Skeleton } from '../components';
@@ -583,6 +585,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [celPainel, setCelPainel] = useState<'lista' | 'conversa' | 'ficha'>('lista');
   const abrirFichaCel = () => { setCtxAberto(true); setCelPainel('ficha'); };
   const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string } | null>(null);
+  /* "Mídia, documentos e links" (dono 25/11): null = painel de dados normal; uma aba = a tela de arquivos no lugar dele */
+  const [midiasAba, setMidiasAba] = useState<AbaMidia | null>(null);
+  const [videoAberto, setVideoAberto] = useState<{ url: string | null; nome?: string; mensagemId?: string } | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
@@ -620,7 +625,24 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [pop]);
-  useEffect(() => { setEditMode(false); }, [currentId]);
+  useEffect(() => { setEditMode(false); setMidiasAba(null); setVideoAberto(null); }, [currentId]);
+  const midias = useMemo(() => midiasDaConversa(current?.msgs), [current?.msgs]);
+  const abrirFotoDoPainel = (it: ItemMidia, url: string | null) => {
+    if (it.m.tipo === 'video') { setVideoAberto({ url, nome: it.m.nome, mensagemId: it.m.id }); return; }
+    if (url) setLightbox({ url, nome: it.m.nome, mensagemId: it.m.id });
+  };
+  /* "Ver na conversa": rola SÓ o fio (nunca scrollIntoView — ele arrasta a página e some o topo) e acende a bolha */
+  const irParaMensagem = (id: string) => {
+    setVideoAberto(null);
+    const box = msgsRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(id)}"]`);
+    if (!box || !el) return;
+    if (celPainel === 'ficha') setCelPainel('conversa');
+    const topo = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTo({ top: Math.max(0, topo - box.clientHeight / 2 + el.offsetHeight / 2), behavior: 'smooth' });
+    el.classList.remove('mdc-piscar'); void el.offsetWidth; el.classList.add('mdc-piscar');
+    window.setTimeout(() => el.classList.remove('mdc-piscar'), 1800);
+  };
   /* autoscroll do chat ao trocar/receber */
   useEffect(() => {
     const el = msgsRef.current;
@@ -1698,6 +1720,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       {temConversa && (
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">
+          {midiasAba ? (
+            <MidiasPainel midias={midias} demo={demo} aba={midiasAba} aoTrocarAba={setMidiasAba} aoVoltar={() => setMidiasAba(null)}
+              aoAbrirFoto={abrirFotoDoPainel} aoIrParaMensagem={irParaMensagem} />
+          ) : (<>
           <div className="ctx-topo spot">
             <button type="button" className="ib2 wa-cel-volta ctx-volta" title="Voltar para a conversa" aria-label="Voltar para a conversa" onClick={() => setCelPainel('conversa')}><IcVoltar /></button>
             <div className="av2">{initials(nomeExibicao(current))}<FotoCliente atualizar nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
@@ -1734,6 +1760,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <div className="campo"><label>Observações</label><textarea className="inp" rows={2} value={editForm.observacoes} onChange={(e) => setEditForm((f) => ({ ...f, observacoes: e.target.value }))} /></div>
             </div>
           )}
+
+          <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel} />
 
           <div className="ctx-b spot">
             <div className="ctx-t">Status</div>
@@ -1835,6 +1863,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             <div className="cx-l"><span className="k"><IcWa /></span><span className="v">{current.origin}</span></div>
             <div className="cx-l"><span className="k">Última interação</span><span className="v num">{current.lastInter || current.time}</span></div>
           </div>
+          </>)}
          </div>
         </aside>
       )}
@@ -2259,6 +2288,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
+      {videoAberto && <VideoAberto url={videoAberto.url} nome={videoAberto.nome} aoFechar={() => setVideoAberto(null)}
+        aoIrParaMensagem={videoAberto.mensagemId ? () => irParaMensagem(videoAberto.mensagemId!) : undefined} />}
       {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} mensagemId={lightbox.mensagemId} contatoId={current?.contatoId ?? null} aoFechar={() => setLightbox(null)} />}
     </div>
   );
