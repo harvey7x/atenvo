@@ -40,7 +40,7 @@ export function useNotificacoesAtendimento(habilitado: boolean) {
       const { data, error } = await supabase!.from('atd_notificacoes')
         .select('id, tipo, titulo, corpo, rota, lida_em, criado_em')
         .eq('organizacao_id', currentOrg.id)
-        .or(`lida_em.is.null,criado_em.gte.${desde}`)
+        .or(`lida_em.is.null,criado_em.gte."${desde}"`) // a data entre aspas: tem ":" e "." (como o sino do Atenvo)
         .order('criado_em', { ascending: false }).limit(40);
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => ({
