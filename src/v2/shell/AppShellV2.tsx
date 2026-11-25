@@ -221,6 +221,7 @@ const TITULOS_PAGINA: Record<string, string> = {
   integracoes: 'Integrações',
   'config/integracoes/asaas': 'Integrações',
   'config/integracoes/whatsapp-oficial': 'Integrações',
+  'config/integracoes/anuncios': 'Integrações',
   ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES, ...CFG_GRUPOS.flatMap((g) => g.itens)].map((i) => [i.slug, i.rotulo])),
 };
 const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';

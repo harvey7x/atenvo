@@ -14,6 +14,7 @@ import { useConexoesWA } from '../../data/config/conexoes';
 import { useOficial } from '../../data/config/oficial';
 import { temRecurso } from '../../data/config/recursos';
 import { useEntradas } from '../../data/config/entradas';
+import { useContaAnuncios } from '@/data/anuncios';
 import '../painel/painel.css';
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -58,6 +59,8 @@ export function ConfigIntegracoes() {
   const wa = useConexoesWA();
   const oficial = useOficial(temOficial);
   const temAtd = temRecurso('atendimento');
+  const temAnuncios = temAtd && temRecurso('anuncios');
+  const anuncios = useContaAnuncios();
   const entradasQ = useEntradas();
   const entradasOn = (entradasQ.data ?? []).filter((e) => e.ativo).length;
   const ofN = oficial.dados.numeros.length;
@@ -97,8 +100,15 @@ export function ConfigIntegracoes() {
           acao={!temOficial ? undefined : ofN
             ? <BotaoSec mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Configurar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/integracoes/whatsapp-oficial')}>Conectar</BotaoPrimario>} />
-        <Quadro atraso={0.12} icone={<IcAnuncio />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"
-          descricao="Receber no Atendimento as mensagens e os contatos que chegam pelos anúncios e pelas páginas." />
+        {temAtd && <Quadro atraso={0.1} icone={<IcAnuncio />} nome="Anúncios do Facebook" categoria="Anúncios"
+          descricao="A conta de anúncios da Meta: quanto foi investido, quantos clientes cada campanha trouxe, o custo por lead e qual campanha está rodando melhor."
+          estado={!temAnuncios ? 'breve' : anuncios.data?.conectada ? 'conectado' : 'desconectado'}
+          detalhe={!temAnuncios ? undefined : anuncios.isLoading ? 'Consultando…' : anuncios.data?.conectada ? (anuncios.data.nome ?? 'Conta conectada') : undefined}
+          acao={!temAnuncios ? undefined : anuncios.data?.conectada
+            ? <BotaoSec mini onClick={() => ir('/config/integracoes/anuncios')}>Gerenciar</BotaoSec>
+            : <BotaoPrimario mini onClick={() => ir('/config/integracoes/anuncios')}>Conectar</BotaoPrimario>} />}
+        <Quadro atraso={0.12} icone={<IcMensagem />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"
+          descricao="Receber no Atendimento as mensagens e os contatos que chegam pelo Direct, pelo Messenger e pelos comentários." />
         <Quadro atraso={0.16} icone={<IcPlanilha />} nome="Google Planilhas" categoria="Dados" estado="breve"
           descricao="Levar a carteira e os pagamentos para uma planilha que se atualiza sozinha." />
         <Quadro atraso={0.2} icone={<IcTomada />} nome="Avisar outros sistemas" categoria="Dados" estado="breve"

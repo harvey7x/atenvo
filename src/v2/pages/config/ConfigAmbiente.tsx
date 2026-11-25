@@ -26,6 +26,7 @@ import { ConfigEquipes } from './ConfigEquipes';
 import { ConfigEntradas } from './ConfigEntradas';
 import { ConfigAsaas } from './ConfigAsaas';
 import { ConfigWhatsAppOficial } from './ConfigWhatsAppOficial';
+import { ConfigAnuncios } from './ConfigAnuncios';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
@@ -64,12 +65,13 @@ export default function ConfigAmbiente() {
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
   if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
-  if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')))) return <Navigate to="/config/integracoes" replace />;
+  if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')) || (servico === 'anuncios' && !(temRecurso('anuncios') && temRecurso('atendimento'))))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
   if (secao === 'integracoes') {
     if (servico === 'asaas') return (<><Cabecalho titulo="Asaas" sub="Pagamentos por Pix, boleto e cartão, com baixa das parcelas quando o cliente paga." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigAsaas /></>);
     if (servico === 'whatsapp-oficial') return (<><Cabecalho titulo="WhatsApp oficial" sub="A API oficial do WhatsApp, da Meta: conectar o número, acompanhar a saúde dele e cuidar dos modelos de mensagem." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigWhatsAppOficial /></>);
+    if (servico === 'anuncios') return (<><Cabecalho titulo="Anúncios do Facebook" sub="A conta de anúncios da Meta: o Dashboard mostra quanto foi investido, o custo de cada lead e qual campanha está rodando melhor." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigAnuncios /></>);
     if (servico === 'receber' && temRecurso('atendimento')) return (<><Cabecalho titulo="Receber de outros sistemas" sub="Um endereço para cada sistema de fora (como a URA): o que ele mandar vira conversa no WhatsApp do Atendimento e lead no Kanban." voltar={{ rotulo: 'Integrações', para: '/config/integracoes' }} /><ConfigEntradas /></>);
     if (servico) return <Navigate to="/config/integracoes" replace />;
     return (<><Cabecalho titulo="Integrações" sub="Os serviços de fora que trabalham junto com o sistema. Conecte e configure cada um aqui." /><ConfigIntegracoes /></>);

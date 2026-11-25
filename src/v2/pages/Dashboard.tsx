@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { useDashAtendentesAba, useDashCampanhas } from '@/data/dashboardV5.abas';
+import { useDashAnuncios } from '@/data/anuncios';
+import { temRecurso } from '../data/config/recursos';
 import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
 import { CardVidro, EstadoErro, Segmentado } from '../components';
@@ -15,6 +17,7 @@ import { Robo, RoboSkeleton } from './dashboardV5/Robo';
 import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
 import { Campanhas, CampanhasSkeleton } from './dashboardV5/Campanhas';
 import { AtendentesAba, AtendentesAbaSkeleton } from './dashboardV5/AtendentesAba';
+import { AnunciosAba, AnunciosAbaSkeleton } from './dashboardV5/AnunciosAba';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
@@ -30,10 +33,13 @@ import './dashboardV5/dashboardV5.css';
 const ABAS = [
   { valor: 'geral', rotulo: 'Visão geral' },
   { valor: 'campanhas', rotulo: 'Campanhas' },
+  { valor: 'anuncios', rotulo: 'Anúncios' }, // 25/11: os anúncios do Facebook — investido, custo por lead, qual campanha roda melhor (só com o recurso 'anuncios')
   { valor: 'atendentes', rotulo: 'Atendentes' },
 ] as const;
 type AbaDash = typeof ABAS[number]['valor'];
-const ehAba = (v: string | null): v is AbaDash => ABAS.some((a) => a.valor === v);
+/** as abas desta instalação: Anúncios só com o recurso ligado (a parte do servidor existe) */
+const abasVisiveis = () => ABAS.filter((a) => a.valor !== 'anuncios' || temRecurso('anuncios'));
+const ehAba = (v: string | null): v is AbaDash => abasVisiveis().some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
 const MAX_DIF = DASH_V5_MAX_DIAS - 1;
@@ -116,11 +122,12 @@ export default function DashboardV2() {
   const q = useDashV5(periodo);
   const qCamp = useDashCampanhas(periodo, aba === 'campanhas');
   const qAt = useDashAtendentesAba(periodo, aba === 'atendentes');
+  const qAn = useDashAnuncios(periodo, aba === 'anuncios');
   const d = q.data;
   const carregando = !d;
 
   // esmaecer na troca de período: o da aba aberta
-  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : qAt;
+  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : aba === 'anuncios' ? qAn : qAt;
   const trocando = qAtivo.isPlaceholderData && qAtivo.isFetching;
 
   // o trecho do anterior que a busca comparou: sai do MESMO instante com que o hook cortou
@@ -149,7 +156,7 @@ export default function DashboardV2() {
 
       <nav className="d5-abas" aria-label="Seções do dashboard">
         <Segmentado<AbaDash>
-          opcoes={ABAS.map((a) => ({ valor: a.valor, rotulo: a.rotulo }))}
+          opcoes={abasVisiveis().map((a) => ({ valor: a.valor, rotulo: a.rotulo }))}
           valor={aba} aoMudar={setAba} rotulo="Seção do dashboard" />
       </nav>
 
@@ -196,6 +203,15 @@ export default function DashboardV2() {
           {qCamp.data
             ? <Campanhas d={qCamp.data} periodo={periodo} hoje={hoje} />
             : !qCamp.isError && <CampanhasSkeleton />}
+        </>
+      )}
+
+      {aba === 'anuncios' && (
+        <>
+          <ErroAba q={qAn} />
+          {qAn.data
+            ? <AnunciosAba d={qAn.data} periodo={periodo} hoje={hoje} comparacao={comparacao} />
+            : !qAn.isError && <AnunciosAbaSkeleton />}
         </>
       )}
 

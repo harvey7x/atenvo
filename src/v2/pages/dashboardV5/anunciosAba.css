@@ -1,0 +1,71 @@
+/* Aba Anúncios do Dashboard (AnunciosAba.tsx). Laranja só sólido: barra das campanhas e o selo
+   "Rodando melhor"; o resto nos neutros do tema (d5-*). */
+.v2 .d5-an { display: flex; flex-direction: column; gap: 16px; }
+
+/* faixa "conecte a conta" */
+.v2 .d5-an-conectar { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+.v2 .d5-an-conectar .ic { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .d5-an-conectar .ic svg { width: 18px; height: 18px; }
+.v2 .d5-an-conectar .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2 .d5-an-conectar .tx b { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .d5-an-conectar .tx span { font-size: 12.5px; color: var(--txt-2); line-height: 1.5; max-width: 72ch; }
+@media (max-width: 720px) { .v2 .d5-an-conectar { flex-wrap: wrap; } .v2 .d5-an-conectar .p-btn { width: 100%; justify-content: center; } }
+
+/* linha da conta conectada */
+.v2 .d5-an-conta { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--txt-2); }
+.v2 .d5-an-conta .ic { display: inline-flex; color: var(--txt-2); }
+.v2 .d5-an-conta .ic svg { width: 14px; height: 14px; }
+.v2 .d5-an-conta > span:nth-child(2) { color: var(--txt); font-weight: 500; }
+.v2 .d5-an-conta .q { color: var(--txt-3); }
+.v2 .d5-an-conta .lk { margin-left: auto; border: 0; background: none; padding: 0; font: 12px var(--fonte); color: var(--txt-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.v2 .d5-an-conta .lk:hover { color: var(--txt); }
+.v2 .d5-an-sem { color: var(--txt-3); font-size: 11.5px; }
+
+/* rodando melhor */
+.v2 .d5-an-melhor { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; }
+.v2 .d5-an-melhor .selo {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .02em;
+}
+.v2 .d5-an-melhor .selo button { color: inherit; }
+.v2 .d5-an-melhor .nm { font-size: 14.5px; font-weight: 600; color: var(--txt); }
+.v2 .d5-an-melhor .nums { display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--txt-2); margin-left: auto; }
+.v2 .d5-an-melhor .nums b { color: var(--txt); font-weight: 600; }
+.v2 .d5-an-melhor .cmp { color: var(--txt-3); }
+
+/* tabela das campanhas */
+.v2 .d5-an-tab th[scope="row"] { font-weight: 400; min-width: 220px; }
+.v2 .d5-an-camp { display: flex; flex-direction: column; gap: 3px; }
+.v2 .d5-an-camp .nm { font-weight: 500; color: var(--txt); }
+.v2 .d5-an-camp .mt { font-size: 11px; color: var(--txt-3); }
+.v2 .d5-an-barra { display: block; height: 4px; border-radius: 2px; background: rgba(var(--tint), .08); overflow: hidden; margin-top: 3px; max-width: 220px; }
+.v2 .d5-an-barra i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.v2 .d5-an-tab tr.d5-an-on .d5-an-camp .nm::after { content: 'rodando melhor'; margin-left: 8px; font-size: 10px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+
+/* anúncios */
+.v2 .d5-an-ads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.v2 .d5-an-ads li { display: grid; grid-template-columns: minmax(160px, 1.3fr) minmax(80px, 1fr) 90px 120px; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--d5-fio, var(--linha)); }
+.v2 .d5-an-ads li:last-child { border-bottom: 0; }
+.v2 .d5-an-ads .tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .d5-an-ads .nm { font-size: 13px; font-weight: 500; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .d5-an-ads .mt { font-size: 11px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .d5-an-ads .d5-an-barra.larga { max-width: none; height: 8px; border-radius: 4px; margin: 0; }
+.v2 .d5-an-ads .d5-an-barra.larga i { border-radius: 4px; }
+.v2 .d5-an-ads .vl { font-size: 12.5px; color: var(--txt-2); text-align: center; }
+.v2 .d5-an-ads .vl b { color: var(--txt); font-weight: 600; }
+.v2 .d5-an-ads .vl small { font-size: 11px; color: var(--txt-3); }
+@media (max-width: 720px) {
+  .v2 .d5-an-ads li { grid-template-columns: 1fr auto; }
+  .v2 .d5-an-ads .d5-an-barra.larga { grid-column: 1 / -1; order: 3; }
+}
+
+/* rastreio */
+.v2 .d5-an-ras th[scope="row"] { font-weight: 400; }
+.v2 .d5-an-cli { border: 0; background: none; padding: 0; font: 500 13px var(--fonte); color: var(--txt); cursor: pointer; text-align: left; }
+.v2 .d5-an-cli:hover { text-decoration: underline; text-underline-offset: 2px; }
+.v2 .d5-an-cli:focus-visible { outline: 2px solid var(--txt); outline-offset: 2px; border-radius: 3px; }
+.v2 .d5-an-etapa { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--linha); color: var(--txt-2); white-space: nowrap; }
+.v2 .d5-an-etapa.ok { border-color: transparent; background: rgba(var(--verde-rgb, 34, 160, 90), .14); color: var(--verde, #1e8a44); }
+.v2 .d5-an-ras td { white-space: nowrap; }
+.v2 .d5-an-mais { display: flex; justify-content: center; padding-top: 12px; }
+.v2 .d5-an-rodape { margin: 0; font-size: 12px; color: var(--txt-3); line-height: 1.5; max-width: 90ch; }
