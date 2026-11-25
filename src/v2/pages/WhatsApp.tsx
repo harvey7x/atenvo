@@ -25,6 +25,8 @@ import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDaPrevia } from '../data/config/equipes';
+import { temRecurso } from '../data/config/recursos';
+import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
@@ -48,7 +50,9 @@ import { ResumoAtendimento } from '../components/IaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
-import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Skeleton } from '../components';
+import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Segmentado, Skeleton } from '../components';
+import { IcNota } from '../components/NotaInterna';
+import { useCriarNota, useNotasLocais, mesclarNotas, mencaoEmCurso, filtrarMembros, inserirMencao, juntarNomes, validarNota, EQUIPE_DEMO_NOTAS, NOTA_MAX, type Membro } from '@/data/notasInternas';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
@@ -428,6 +432,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
   const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => donosDaPrevia(seedWa()), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
   const { demo, contacts, current, currentId, relogioMs } = inbox;
+  // NOTA INTERNA (migration 99): a nota escrita nesta tela entra no fio na hora (na demonstração, fica só aqui)
+  const notasLocais = useNotasLocais(current.id || null);
+  const msgsFio = useMemo(() => mesclarNotas(current.msgs, notasLocais), [current.msgs, notasLocais]);
   // visibilidade (22/10): os satélites da conversa aberta (atividades, agendadas, IA) só para conversa
   // que está na lista do usuário — deep-link/sessão para conversa de outro não busca nada dela
   const idVisivel = vis.veTodos ? currentId : (current.id || '');
@@ -452,6 +459,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
   /* ---------- UI ---------- */
   const [draft, setDraft] = useState('');
+  // nota interna (migration 99): modo do compositor, rascunho próprio, quem foi escolhido no @ e o @ em digitação
+  const [modoNota, setModoNota] = useState(false);
+  const [draftNota, setDraftNota] = useState('');
+  const [notaEscolhidos, setNotaEscolhidos] = useState<Membro[]>([]);
+  const [mencaoAtiva, setMencaoAtiva] = useState<{ inicio: number; termo: string } | null>(null);
+  const [mencaoIdx, setMencaoIdx] = useState(0);
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
   // lembra a última aba usada (quem trabalha pelo "Meus" reabre no "Meus")
   const [tab, setTab] = useState<TabId>(() => {
     try { const t = localStorage.getItem(abaKey); return TABS.some(([id]) => id === t) ? (t as TabId) : (posVenda ? 'fechados' : 'todos'); } catch { return posVenda ? 'fechados' : 'todos'; }
@@ -653,7 +668,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   useEffect(() => {
     const el = msgsRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [currentId, current.msgs.length]);
+  }, [currentId, msgsFio.length]);
 
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
@@ -997,14 +1012,71 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  }, [draft]);
+  }, [draft, draftNota, modoNota]);
   const sendDisabled = draft.trim() === '' || inbox.semDestino || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const midiaDisabled = inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio({ id: c.id, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom, ativo: true }).ok);
   const agendarDisabled = inbox.semDestino || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || canaisAgendaveis.length === 0));
+
+  /* ---------- NOTA INTERNA com @ (25/11, migration 99) ----------
+     O compositor troca entre "Mensagem" (vai para o cliente) e "Nota interna" (fica na conversa só para a equipe).
+     Cada modo tem o seu rascunho: um texto da nota nunca vira mensagem por engano ao trocar de modo. A nota não
+     depende do número do WhatsApp (não é enviada): número desconectado, "não incomodar" etc. não a bloqueiam. */
+  const notasLigadas = temRecurso('notas');
+  const notaAtiva = modoNota && notasLigadas && !!current.id;
+  const criarNota = useCriarNota();
+  // quem pode ser marcado: as pessoas ativas da empresa (na demonstração, a equipe de exemplo), sem a própria pessoa
+  const membrosMencao = useMemo<Membro[]>(
+    () => (WA_REAL ? usuarios : EQUIPE_DEMO_NOTAS).filter((u) => u.id !== user?.id).map((u) => ({ id: u.id, nome: u.nome })),
+    [usuarios, user?.id],
+  );
+  const sugestoesMencao = useMemo(
+    () => (notaAtiva && mencaoAtiva ? filtrarMembros(membrosMencao, mencaoAtiva.termo) : []),
+    [notaAtiva, mencaoAtiva, membrosMencao],
+  );
+  const listaMencaoAberta = sugestoesMencao.length > 0;
+  useEffect(() => { setModoNota(false); setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }, [currentId]);
+  const atualizarMencao = (ta: HTMLTextAreaElement) => {
+    const m = mencaoEmCurso(ta.value, ta.selectionStart ?? ta.value.length);
+    setMencaoAtiva((atual) => (atual?.inicio === m?.inicio && atual?.termo === m?.termo ? atual : m));
+    setMencaoIdx(0);
+  };
+  const escolherMencao = (p: Membro) => {
+    const ta = textareaRef.current;
+    if (!ta || !mencaoAtiva) return;
+    const r = inserirMencao(draftNota, mencaoAtiva.inicio, ta.selectionStart ?? draftNota.length, p.nome);
+    setDraftNota(r.texto);
+    setNotaEscolhidos((l) => (l.some((x) => x.id === p.id) ? l : [...l, p]));
+    setMencaoAtiva(null);
+    window.requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(r.cursor, r.cursor); });
+  };
+  const trocarModo = (m: 'mensagem' | 'nota') => {
+    setModoNota(m === 'nota'); setMencaoAtiva(null);
+    window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
+  };
+  const salvarNota = () => {
+    if (!current.id || criarNota.isPending) return;
+    const erro = validarNota(draftNota);
+    if (erro) { aoAvisar({ tom: 'erro', texto: erro }); return; }
+    const conversaId = current.id;
+    criarNota.mutate(
+      { conversaId, texto: draftNota, escolhidos: notaEscolhidos, autorNome: user?.name?.trim() || 'Você' },
+      {
+        onSuccess: (r) => {
+          if (currentIdRef.current === conversaId) { setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }
+          aoAvisar({ tom: 'ok', texto: r.marcados.length
+            ? `Nota salva. ${juntarNomes(r.marcados.map((x) => x.nome))} ${r.marcados.length === 1 ? 'vai' : 'vão'} receber o aviso.`
+            : 'Nota salva. Só a equipe vê.' });
+        },
+        onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Não foi possível salvar a nota.' }),
+      },
+    );
+  };
+  // notas da equipe nesta conversa (as automáticas do sistema ficam de fora da conta)
+  const notasDaEquipe = useMemo(() => msgsFio.filter((m) => m.tipo === 'nota_interna' && !m.nota?.automatica), [msgsFio]);
   // itens do fio memoizados: construirItensConversa formata Intl.DateTimeFormat por mensagem;
   // sem memo isso refazia a cada tecla do composer / tick de 60s. Só depende das mensagens.
-  const itensConversa = useMemo(() => construirItensConversa(current.msgs, (m) => m.tsISO ?? null), [current.msgs]);
+  const itensConversa = useMemo(() => construirItensConversa(msgsFio, (m) => m.tsISO ?? null), [msgsFio]);
   // ---- PEÇA 3: HANDOFF como EVENTO no fio ----
   // "A IA pediu um humano" é o alerta operacional crítico — entra como DIVISOR no ponto
   // certo do fluxo: antes da primeira mensagem após precisa_humano_em; sem timestamp (ou
@@ -1654,7 +1726,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 </div>
               ))}
 
-              {inbox.replyTo && (
+              {inbox.replyTo && !notaAtiva && (
                 <div className="reply-box">
                   <div>
                     <div className="rem">Respondendo a {inbox.replyTo.remetente}</div>
@@ -1664,16 +1736,76 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 </div>
               )}
 
-              <div className="cmsg">
+              {/* NOTA INTERNA (migration 99): Mensagem vai para o cliente; Nota interna fica só para a equipe */}
+              {notasLigadas && !!current.id && (
+                <div className="wa-modo">
+                  <Segmentado<'mensagem' | 'nota'>
+                    rotulo="O que escrever" valor={notaAtiva ? 'nota' : 'mensagem'} aoMudar={trocarModo}
+                    opcoes={[{ valor: 'mensagem', rotulo: 'Mensagem' }, { valor: 'nota', rotulo: 'Nota interna' }]}
+                  />
+                </div>
+              )}
+              {listaMencaoAberta && (() => {
+                const idx = Math.min(mencaoIdx, sugestoesMencao.length - 1);
+                return (
+                  <div className="wa-mencoes" id="wa-mencoes" role="listbox" aria-label="Marcar alguém da equipe">
+                    <div className="wa-mencoes-t">Marcar alguém da equipe</div>
+                    {sugestoesMencao.map((p, i) => (
+                      <button
+                        key={p.id} type="button" role="option" aria-selected={i === idx} className={'wa-mencao' + (i === idx ? ' on' : '')}
+                        onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setMencaoIdx(i)} onClick={() => escolherMencao(p)}
+                      >
+                        <span className="av" aria-hidden>{initials(p.nome)}</span><span className="nm">{p.nome}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className={'cmsg' + (notaAtiva ? ' cmsg-nota' : '')}>
                 <textarea
-                  ref={textareaRef} rows={1} value={draft} placeholder={placeholder} disabled={composerBloqueado}
-                  onChange={(e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+                  ref={textareaRef} rows={1}
+                  value={notaAtiva ? draftNota : draft}
+                  placeholder={notaAtiva ? 'Nota só para a equipe. Use @ para marcar alguém.' : placeholder}
+                  disabled={notaAtiva ? false : composerBloqueado}
+                  maxLength={notaAtiva ? NOTA_MAX : undefined}
+                  aria-label={notaAtiva ? 'Nota interna para a equipe' : undefined}
+                  aria-autocomplete={notaAtiva ? 'list' : undefined}
+                  aria-controls={listaMencaoAberta ? 'wa-mencoes' : undefined}
+                  onChange={(e) => {
+                    if (notaAtiva) { setDraftNota(e.target.value); atualizarMencao(e.target); } else setDraft(e.target.value);
+                    e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                  }}
+                  onSelect={notaAtiva ? (e) => atualizarMencao(e.currentTarget) : undefined}
+                  onBlur={notaAtiva ? () => setMencaoAtiva(null) : undefined}
                   onKeyDown={(e) => {
+                    if (notaAtiva) {
+                      if (listaMencaoAberta) {
+                        const n = sugestoesMencao.length;
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setMencaoIdx((i) => (Math.min(i, n - 1) + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
+                          return;
+                        }
+                        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                          e.preventDefault(); escolherMencao(sugestoesMencao[Math.min(mencaoIdx, n - 1)]); return;
+                        }
+                        // Esc fecha só a lista (não sai do modo de foco da página)
+                        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMencaoAtiva(null); return; }
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); salvarNota(); }
+                      return;
+                    }
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); return; }
                     // "/" com a mensagem vazia abre o painel de scripts (a via mais rápida do teclado)
                     if (e.key === '/' && draft === '' && scripts.length > 0 && !composerBloqueado) { e.preventDefault(); abrirScripts('barra'); }
                   }}
                 />
+                {notaAtiva ? (
+                  <div className="tools nota-tools">
+                    <span className="nota-dica"><IcNota />Só a equipe vê. O cliente não recebe.</span>
+                  </div>
+                ) : (
                 <div className="tools">
                   <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
                   <button type="button" className="tool" title="Enviar vídeo" disabled={midiaDisabled} onClick={() => setVideoModal(true)}><IcVideo /></button>
@@ -1694,9 +1826,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   <button type="button" className="tool" title="Compartilhar contato" disabled={midiaDisabled} onClick={() => setCtModal(true)}><IcContato /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
                 </div>
+                )}
                 {/* Responder por (dono 29/10): compacto, no vão ao lado do relógio. Mostra o número atual;
                     trocar abre a lista e pede confirmação (o cliente passa a receber de outro celular). */}
-                {(() => {
+                {!notaAtiva && (() => {
                   const sel = demo ? null : inbox.canalSel;
                   const nome = demo ? inbox.replyChip : inbox.realCanais.length === 0 ? 'Nenhum número conectado' : sel?.alias ?? 'Escolher número';
                   const cloud = sel?.transporte === 'cloud_api';
@@ -1713,7 +1846,16 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     </button>
                   );
                 })()}
-                <button type="button" className={'env-b' + (draft.trim() ? ' pronto' : '')} title="Enviar" aria-label="Enviar mensagem" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+                {notaAtiva ? (
+                  <button
+                    type="button" className={'env-b env-nota' + (draftNota.trim() ? ' pronto' : '')} title="Salvar a nota (Enter). Shift+Enter quebra a linha."
+                    aria-label="Salvar nota interna" disabled={!draftNota.trim() || criarNota.isPending} onClick={salvarNota}
+                  >
+                    {criarNota.isPending ? 'Salvando…' : 'Salvar nota'}
+                  </button>
+                ) : (
+                  <button type="button" className={'env-b' + (draft.trim() ? ' pronto' : '')} title="Enviar" aria-label="Enviar mensagem" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+                )}
               </div>
             </div>
           </>
@@ -1837,9 +1979,25 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           </div>
 
-          {(atividadesQ.data ?? []).length > 0 && (
+          {/* Tarefas da equipe (25/11): as abertas deste cliente e o "Criar tarefa" ligado a esta conversa */}
+          {temRecurso('tarefas') && <TarefasDaConversa key={current.id} conversaId={current.id} contatoId={current.contatoId ?? null} clienteNome={nomeExibicao(current)} />}
+
+          {((atividadesQ.data ?? []).length > 0 || (notasLigadas && notasDaEquipe.length > 0)) && (
             <div className="ctx-b spot">
               <div className="ctx-t">Atividade do atendimento</div>
+              {/* notas internas da equipe nesta conversa (migration 99): quantas e um atalho para a última */}
+              {notasLigadas && notasDaEquipe.length > 0 && (
+                <div className="cx-l ativ-notas">
+                  <span className="k"><IcNota />Notas da equipe</span>
+                  <span className="v">
+                    <button type="button" className="lk cx-lk" title="Mostrar a última nota interna na conversa"
+                      onClick={() => { const ult = notasDaEquipe[notasDaEquipe.length - 1]; if (ult?.id) irParaMensagem(ult.id); }}>
+                      <span className="num">{notasDaEquipe.length}</span> · ver a última
+                    </button>
+                  </span>
+                </div>
+              )}
+              {(atividadesQ.data ?? []).length > 0 && (
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
@@ -1849,6 +2007,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   </li>
                 ))}
               </ul>
+              )}
             </div>
           )}
 

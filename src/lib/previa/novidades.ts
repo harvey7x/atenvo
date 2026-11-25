@@ -2,7 +2,7 @@
    atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
    cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
    aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-f';
+export const NOVIDADES_VERSAO = '2026-11-25-k';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
 export const NOVIDADES: Novidade[] = [
@@ -10,6 +10,26 @@ export const NOVIDADES: Novidade[] = [
     titulo: 'IA com a chave da própria Reviza', onde: 'Configurações › Integrações › Inteligência artificial', quando: '25/11',
     texto: 'Escolher Google Gemini ou OpenAI e colar a chave que a Reviza cria na conta dela (o custo é da Reviza). No WhatsApp, o painel do cliente ganha o "Resumo do atendimento" e os áudios ganham "Transcrever". Para ver: Conectar › "Usar uma chave de exemplo" e abrir a conversa da Maria Aparecida.',
     ir: '#/config/integracoes/ia',
+  },
+  {
+    titulo: 'Nota interna com @ na conversa', onde: 'WhatsApp › conversa do cliente', quando: '25/11',
+    texto: 'Em cima da caixa de mensagem, troque para "Nota interna" e escreva um recado para a equipe. A nota fica na conversa só para a equipe e nunca vai para o cliente. Digite @ para marcar um colega: ele recebe um aviso.',
+    ir: '#/whatsapp?conversa=wa-maria',
+  },
+  {
+    titulo: 'Chat da equipe', onde: 'Atendimento › Chat da equipe', quando: '25/11',
+    texto: 'Conversa entre colegas, de pessoa para pessoa ou em grupo, com o número de não lidas no menu e o "Visto". Colar o link de uma conversa de cliente vira um cartão que abre a conversa. Na prévia, um colega responde sozinho.',
+    ir: '#/chat-equipe',
+  },
+  {
+    titulo: 'Tarefas da equipe', onde: 'Atendimento › Tarefas', quando: '25/11',
+    texto: 'Lista ou quadro com responsável, prazo (dia e hora), prioridade, projeto e subtarefas. No topo: abertas, atrasadas, para hoje e concluídas na semana. No WhatsApp, o painel do cliente ganhou "Criar tarefa", já ligada à conversa.',
+    ir: '#/tarefas',
+  },
+  {
+    titulo: 'Ao vivo: as conversas abertas agora', onde: 'Dashboard › Ao vivo', quando: '25/11',
+    texto: 'Um quadro com uma coluna por atendente, por equipe ou por etiqueta e um cartão por conversa aberta: a última mensagem, por qual número, quando, quem está esperando resposta e onde a IA está atendendo. Atualiza sozinho a cada 30 segundos; clicar no cartão abre a conversa.',
+    ir: '#/dashboard?aba=aovivo',
   },
   {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',

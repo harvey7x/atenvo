@@ -48,6 +48,9 @@ export interface WaMessage {
   transcricao?: string;
   /** prévia da mensagem citada, para renderizar a mini-caixa dentro da bolha. */
   quoted?: { remetente?: string; tipo?: string; texto?: string };
+  /** NOTA INTERNA (tipo 'nota_interna', migration 99): só a equipe vê, nunca vai ao cliente. `automatica` = gravada
+   *  pelo próprio sistema (ligação registrada, pedido do gestor), sem autor. */
+  nota?: { autorNome?: string; mencoesNomes: string[]; automatica: boolean };
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

@@ -6,6 +6,7 @@ import { traduzErroEnvio } from '@/data/scripts';
 import { initials } from '@/lib/avatar';
 import { ackOf, fmtTam, mmss, ONDA } from '../lib/waUi';
 import { TranscreverAudio, transcricaoGuardada } from './IaPropria';
+import { NotaInterna } from './NotaInterna';
 
 /* ------------------------------------------------------------------
    Bolha de mensagem do inbox (extraída de src/v2/pages/WhatsApp.tsx,
@@ -66,6 +67,8 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.anexoPath, precisaUrl]);
+  // NOTA INTERNA da equipe (migration 99): cartão próprio no meio do fio, nunca uma bolha do lado do cliente/nosso
+  if (m.tipo === 'nota_interna') return <NotaInterna m={m} />;
   // mídia do fluxo do robô não tem anexo no bucket privado: toca direto da URL pública (antes caía em "indisponível")
   const url = m.localUrl ?? urlAssinada ?? (m.anexoPath ? null : m.midiaUrl ?? null);
   // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
