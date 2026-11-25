@@ -4,6 +4,8 @@
    · Asaas     → /config/integracoes/asaas (conectar e configurar os pagamentos)
    · WhatsApp por QR Code → /config/whatsapp (os números já são conectados lá)
    · WhatsApp oficial     → /config/integracoes/whatsapp-oficial (a API oficial, da Meta)
+   · Inteligência artificial (chave própria) → /config/integracoes/ia (a chave de IA da própria empresa: Resumo do
+     atendimento e Transcrever áudio no WhatsApp)
    · "Em breve" são lugares guardados — sem botão, para ninguém achar que funciona.
    Sem logomarca de terceiros: cada serviço tem um ícone da família do sistema. */
 import type { ReactNode } from 'react';
@@ -15,6 +17,8 @@ import { useOficial } from '../../data/config/oficial';
 import { temRecurso } from '../../data/config/recursos';
 import { useEntradas } from '../../data/config/entradas';
 import { useContaAnuncios } from '@/data/anuncios';
+import { nomeProvedor, useChaveIa } from '@/data/iaPropria';
+import { IcIa } from './ConfigChaveIa';
 import '../painel/painel.css';
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -61,6 +65,8 @@ export function ConfigIntegracoes() {
   const temAtd = temRecurso('atendimento');
   const temAnuncios = temAtd && temRecurso('anuncios');
   const anuncios = useContaAnuncios();
+  const temIa = temAtd && temRecurso('ia-propria');
+  const ia = useChaveIa(temIa);
   const entradasQ = useEntradas();
   const entradasOn = (entradasQ.data ?? []).filter((e) => e.ativo).length;
   const ofN = oficial.dados.numeros.length;
@@ -107,6 +113,13 @@ export function ConfigIntegracoes() {
           acao={!temAnuncios ? undefined : anuncios.data?.conectada
             ? <BotaoSec mini onClick={() => ir('/config/integracoes/anuncios')}>Gerenciar</BotaoSec>
             : <BotaoPrimario mini onClick={() => ir('/config/integracoes/anuncios')}>Conectar</BotaoPrimario>} />}
+        {temAtd && <Quadro atraso={0.11} icone={<IcIa />} nome="Inteligência artificial (chave própria)" categoria="IA"
+          descricao="Use a sua própria chave do Google Gemini ou da OpenAI para o resumo do atendimento e a transcrição dos áudios no WhatsApp. O custo passa a ser da sua conta."
+          estado={!temIa ? 'breve' : ia.data?.configurada ? 'conectado' : 'desconectado'}
+          detalhe={!temIa ? undefined : ia.isLoading ? 'Consultando…' : ia.data?.configurada ? `${nomeProvedor(ia.data.provedor)}${ia.data.final ? ` · termina em …${ia.data.final}` : ''}` : undefined}
+          acao={!temIa ? undefined : ia.data?.configurada
+            ? <BotaoSec mini onClick={() => ir('/config/integracoes/ia')}>Gerenciar</BotaoSec>
+            : <BotaoPrimario mini onClick={() => ir('/config/integracoes/ia')}>Conectar</BotaoPrimario>} />}
         <Quadro atraso={0.12} icone={<IcMensagem />} nome="Facebook e Instagram" categoria="Mensagens" estado="breve"
           descricao="Receber no Atendimento as mensagens e os contatos que chegam pelo Direct, pelo Messenger e pelos comentários." />
         <Quadro atraso={0.16} icone={<IcPlanilha />} nome="Google Planilhas" categoria="Dados" estado="breve"

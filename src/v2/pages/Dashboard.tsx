@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, MSG_ABA_NAO_LIGADA, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { useDashAtendentesAba, useDashCampanhas } from '@/data/dashboardV5.abas';
 import { useDashAnuncios } from '@/data/anuncios';
+import { useDashAoVivo } from '@/data/aoVivo';
 import { temRecurso } from '../data/config/recursos';
 import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
@@ -18,6 +19,7 @@ import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
 import { Campanhas, CampanhasSkeleton } from './dashboardV5/Campanhas';
 import { AtendentesAba, AtendentesAbaSkeleton } from './dashboardV5/AtendentesAba';
 import { AnunciosAba, AnunciosAbaSkeleton } from './dashboardV5/AnunciosAba';
+import { AoVivoAba, AoVivoAbaSkeleton } from './dashboardV5/AoVivoAba';
 import { TempoResposta } from './dashboardV5/TempoResposta';
 import './dashboardV5/dashboardV5.css';
 
@@ -33,13 +35,14 @@ import './dashboardV5/dashboardV5.css';
 
 const ABAS = [
   { valor: 'geral', rotulo: 'Visão geral' },
+  { valor: 'aovivo', rotulo: 'Ao vivo' }, // 25/11: as conversas abertas AGORA, uma coluna por atendente, equipe ou etiqueta (só com o recurso 'ao-vivo')
   { valor: 'campanhas', rotulo: 'Campanhas' },
   { valor: 'anuncios', rotulo: 'Anúncios' }, // 25/11: os anúncios do Facebook — investido, custo por lead, qual campanha roda melhor (só com o recurso 'anuncios')
   { valor: 'atendentes', rotulo: 'Atendentes' },
 ] as const;
 type AbaDash = typeof ABAS[number]['valor'];
-/** as abas desta instalação: Anúncios só com o recurso ligado (a parte do servidor existe) */
-const abasVisiveis = () => ABAS.filter((a) => a.valor !== 'anuncios' || temRecurso('anuncios'));
+/** as abas desta instalação: Anúncios e Ao vivo só com o recurso ligado (a parte do servidor existe) */
+const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')));
 const ehAba = (v: string | null): v is AbaDash => abasVisiveis().some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
@@ -126,11 +129,12 @@ export default function DashboardV2() {
   const qCamp = useDashCampanhas(periodo, aba === 'campanhas');
   const qAt = useDashAtendentesAba(periodo, aba === 'atendentes');
   const qAn = useDashAnuncios(periodo, aba === 'anuncios');
+  const qAo = useDashAoVivo(aba === 'aovivo');
   const d = q.data;
   const carregando = !d;
 
   // esmaecer na troca de período: o da aba aberta
-  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : aba === 'anuncios' ? qAn : qAt;
+  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : aba === 'anuncios' ? qAn : aba === 'aovivo' ? qAo : qAt;
   const trocando = qAtivo.isPlaceholderData && qAtivo.isFetching;
 
   // o trecho do anterior que a busca comparou: sai do MESMO instante com que o hook cortou
@@ -148,7 +152,8 @@ export default function DashboardV2() {
     <div className="d5-pg" aria-busy={trocando || undefined}>
       <Cabecalho
         preset={preset} setPreset={setPreset} periodo={periodo}
-        rotulo={rotuloPeriodoV5(preset, periodo, hoje)}
+        rotulo={aba === 'aovivo' ? 'Agora, ao vivo: atualiza sozinho a cada 30 segundos' : rotuloPeriodoV5(preset, periodo, hoje)}
+        semPeriodo={aba === 'aovivo'}
         ini={ini} fim={fim} setIni={setIni} setFim={setFim} hoje={hoje}
         mesCaf={mesCaf} setMesCaf={setMesCaf}
         geradoEm={(qAtivo.data as { geradoEm?: string } | undefined)?.geradoEm ?? d?.geradoEm ?? null}
@@ -206,6 +211,15 @@ export default function DashboardV2() {
           {qCamp.data
             ? <Campanhas d={qCamp.data} periodo={periodo} hoje={hoje} />
             : !qCamp.isError && <CampanhasSkeleton />}
+        </>
+      )}
+
+      {aba === 'aovivo' && (
+        <>
+          <ErroAba q={qAo} />
+          {qAo.data
+            ? <AoVivoAba d={qAo.data} />
+            : !qAo.isError && <AoVivoAbaSkeleton />}
         </>
       )}
 

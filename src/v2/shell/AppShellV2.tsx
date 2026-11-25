@@ -34,6 +34,7 @@ import { rotaAtendimentoPermitida } from '../data/modulos';
 import { temRecurso, temCadastroAtendimento } from '../data/config/recursos';
 import { areaDaRota, areaLiberada } from '../data/config/areas';
 import { useConversasWA } from '../data/wa/wa';
+import { chatEquipeLigado, useChatNaoLidas } from '@/data/chatEquipe';
 import { tempoRelativo } from '../lib/tempo';
 import { usePapel } from '../data/cobranca/sessao';
 import { useAvisosNaoLidos } from '../data/cobranca/avisos';
@@ -97,7 +98,12 @@ const GRUPOS: GrupoNav[] = [
       // Pós-venda (dono 21/11): os clientes FECHADOS num atendimento próprio, fora da lista do WhatsApp
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
+      // Tarefas da equipe (25/11): só com a peça do servidor (migration 101) nesta instalação
+      ...(temRecurso('tarefas') ? [{ slug: 'tarefas', rotulo: 'Tarefas' }] : []),
       { slug: 'scripts', rotulo: 'Scripts' },
+      // Chat da equipe (dono 25/11, como o "Chat Interno" do sistema de antes): conversa entre colegas, com o número
+      // de não lidas no item — só onde o recurso está ligado (config/recursos.ts)
+      ...(chatEquipeLigado() ? [{ slug: 'chat-equipe', rotulo: 'Chat da equipe' }] : []),
     ],
   },
   {
@@ -223,6 +229,7 @@ const TITULOS_PAGINA: Record<string, string> = {
   'config/integracoes/asaas': 'Integrações',
   'config/integracoes/whatsapp-oficial': 'Integrações',
   'config/integracoes/anuncios': 'Integrações',
+  'config/integracoes/ia': 'Integrações',
   ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES, ...CFG_GRUPOS.flatMap((g) => g.itens)].map((i) => [i.slug, i.rotulo])),
 };
 const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';
@@ -371,7 +378,9 @@ const APELIDOS: Record<string, string[]> = {
   'cobrancas/usuarios': ['equipe', 'acessos', 'permissoes', 'senhas'],
   whatsapp: ['whatsapp', 'inbox', 'chat', 'mensagens', 'atendimento'],
   presenciais: ['agenda', 'visitas', 'atendimento presencial'],
+  tarefas: ['afazeres', 'pendencias', 'lembretes', 'checklist', 'prazos'],
   scripts: ['respostas prontas', 'modelos', 'textos'],
+  'chat-equipe': ['chat interno', 'equipe', 'colegas', 'recado', 'mensagem para colega', 'grupo'],
   kanban: ['funil', 'quadro', 'vendas', 'pipeline'],
   dashboard: ['indicadores', 'metricas', 'relatorios', 'campanhas'],
   'ferramentas/unificador': ['pdf', 'juntar', 'documentos'],
@@ -863,6 +872,10 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // a barra lateral desenha o ambiente para onde a pessoa VAI (sem piscar o menu do ambiente que ela não tem)
   const moduloDaBarra: ModuloId = semAcessoAoAmbiente ? (modulosDisponiveis[0]?.id ?? moduloAtivo) : moduloAtivo;
   const modulo = MODULOS.find((m) => m.id === moduloDaBarra) ?? MODULOS[0];
+  // CHAT DA EQUIPE: o número de não lidas no item do menu — uma contagem leve + o tempo real (sem ele, a cada 30 s);
+  // só para quem tem o Atendimento (quem é só das Cobranças nem consulta)
+  const chatAtivo = chatEquipeLigado() && !acessoCarregando && modulosDisponiveis.some((m) => m.id === 'atendimento');
+  const chatNaoLidas = useChatNaoLidas(chatAtivo).data ?? 0;
   // busca de CLIENTES na paleta ⌘K: só para quem tem Cobranças — na ALFA, de qualquer ambiente (a paleta cobre
   // o sistema da pessoa); quem é só do Atendimento nunca busca a carteira
   const buscaClientes = (isRevizaMode || isDemoMode) && temCob && !acessoCarregando && modulosDisponiveis.some((m) => m.id === 'cobrancas');
@@ -913,8 +926,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
     // contador onde há trabalho: Conversas de Cobranças = mensagens não lidas (o mesmo número do sino)
-    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/conversas' ? waNaoLidas : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : undefined,
+    badge: i.slug === 'whatsapp' ? badgePop : i.slug === 'cobrancas/conversas' ? waNaoLidas : i.slug === 'cobrancas/avisos' ? avisosNaoLidos : i.slug === 'cobrancas/novos' ? pendentesAprovacao : i.slug === 'chat-equipe' ? chatNaoLidas : undefined,
     badgeTitulo: i.slug === 'whatsapp' ? plural(badgePop, 'mensagem nova', 'mensagens novas')
+      : i.slug === 'chat-equipe' ? plural(chatNaoLidas, 'mensagem da equipe não lida', 'mensagens da equipe não lidas')
       : i.slug === 'cobrancas/conversas' ? plural(waNaoLidas, 'mensagem não lida', 'mensagens não lidas')
       : i.slug === 'cobrancas/avisos' ? plural(avisosNaoLidos, 'aviso não lido', 'avisos não lidos')
       : i.slug === 'cobrancas/novos' ? `${pendentesAprovacao} aguardando aprovação` : undefined,
@@ -999,6 +1013,9 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         )}
         {i.slug === 'cobrancas/novos' && pendentesAprovacao > 0 && (
           <span className="badge-n lab num" title={`${pendentesAprovacao} aguardando aprovação`}>{pendentesAprovacao}</span>
+        )}
+        {i.slug === 'chat-equipe' && chatNaoLidas > 0 && (
+          <span className="badge-n lab num" title={plural(chatNaoLidas, 'mensagem da equipe não lida', 'mensagens da equipe não lidas')}>{chatNaoLidas}</span>
         )}
       </NavLink>
   );
@@ -1234,7 +1251,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 a cada troca de rota e quando a intro abre o palco */}
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
-            <div className={/^\/(kanban|whatsapp|pos-venda)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
+            <div className={/^\/(kanban|whatsapp|pos-venda|chat-equipe)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               {acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
                 : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar ao WhatsApp'} />
                 : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />

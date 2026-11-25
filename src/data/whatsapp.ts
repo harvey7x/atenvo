@@ -236,7 +236,18 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       contato: (m.metadados?.contato?.nome && m.metadados?.contato?.telefone)
         ? { nome: String(m.metadados.contato.nome), telefone: String(m.metadados.contato.telefone) }
         : undefined,
+      // nota interna da equipe (migration 99: origem 'nota', com autor e marcados) ou automática do sistema
+      nota: m.tipo === 'nota_interna' ? notaDosMetadados(m) : undefined,
     } as WaMessage));
+}
+
+function notaDosMetadados(m: DbMsg): NonNullable<WaMessage['nota']> {
+  const meta = (m.metadados ?? {}) as { autor_nome?: unknown; mencoes_nomes?: unknown };
+  return {
+    autorNome: typeof meta.autor_nome === 'string' && meta.autor_nome.trim() ? meta.autor_nome.trim() : undefined,
+    mencoesNomes: Array.isArray(meta.mencoes_nomes) ? meta.mencoes_nomes.filter((x): x is string => typeof x === 'string') : [],
+    automatica: m.origem !== 'nota',
+  };
 }
 
 export function mapConversa(c: DbConv): WaContact {
