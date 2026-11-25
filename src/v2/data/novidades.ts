@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'resumo-dia-25-11', titulo: 'Resumo do dia', onde: 'Dashboard › Resumo do dia', quando: '25/11', recurso: 'resumo-dia', soAdmin: true,
+    texto: 'O dia da equipe numa tela só: quantos clientes escreveram, quantos a equipe e a IA atenderam, o tempo de resposta, quem esperou além da meta, por que as conversas fecharam e cada atendente. Dá para ver hoje, ontem ou outro dia, e ligar o aviso no sino no fim da tarde.',
+    rota: '/dashboard?aba=resumo',
+  },
+  {
     id: 'saude-numeros-25-11', titulo: 'Saúde dos números do WhatsApp', onde: 'Configurações › WhatsApp', quando: '25/11', recurso: 'saude-numeros', soAdmin: true,
     texto: 'Cada número do Atendimento ganha uma nota (Boa, Atenção ou Risco) com o motivo: envios falhando, poucos clientes respondendo (o que faz o WhatsApp bloquear o número), número desconectado ou "conectado, mas nada chega". As barras mostram as mensagens que chegaram em cada dia.',
     rota: '/config/whatsapp',

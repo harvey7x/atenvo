@@ -18,6 +18,8 @@
                    responsável e depois os gestores. Chega DESLIGADO: Configurações › Aviso de espera
      saude-numeros a saúde de cada número do Atendimento em Configurações › WhatsApp (25/11, migration 107, só leitura):
                    enviadas, falhas, recebidas, quem respondeu e o número "conectado, mas nada chega"
+     resumo-dia    Dashboard › Resumo do dia (25/11, migration 108 + agendador a cada 10 min): o dia da equipe numa tela e,
+                   se o administrador ligar, o aviso no sino no fim da tarde (chega DESLIGADO)
      chat-equipe   o chat da equipe no Atendimento (25/11): conversas entre colegas, de pessoa para pessoa e em
                    grupo, com o número de não lidas no menu (migration 102; o tempo real usa a publicação do Supabase)
      ao-vivo       a aba Ao vivo do Dashboard (25/11): as conversas abertas agora, uma coluna por atendente,
@@ -40,7 +42,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null
