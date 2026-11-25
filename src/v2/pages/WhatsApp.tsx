@@ -627,6 +627,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   }, [pop]);
   useEffect(() => { setEditMode(false); setMidiasAba(null); setVideoAberto(null); }, [currentId]);
   const midias = useMemo(() => midiasDaConversa(current?.msgs), [current?.msgs]);
+  // ?midias=fotos|documentos|audios|links abre a tela de arquivos direto (link da prévia e de outras telas)
+  const midiasParam = params.get('midias');
+  useEffect(() => {
+    if (midiasParam && ['fotos', 'documentos', 'audios', 'links'].includes(midiasParam) && currentId) { setCtxAberto(true); setMidiasAba(midiasParam as AbaMidia); }
+  }, [midiasParam, currentId]);
   const abrirFotoDoPainel = (it: ItemMidia, url: string | null) => {
     if (it.m.tipo === 'video') { setVideoAberto({ url, nome: it.m.nome, mensagemId: it.m.id }); return; }
     if (url) setLightbox({ url, nome: it.m.nome, mensagemId: it.m.id });

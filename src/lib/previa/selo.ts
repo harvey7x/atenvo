@@ -7,6 +7,7 @@
    do topo e, se nem assim couber, encolhe (só "Prévia · Ver como"). */
 import { ambientesDoPerfil, ROTULO_AMBIENTE } from '@/v2/data/modulos';
 import { lerMoldura, salvarMoldura } from '@/v2/lib/molduraAlfa';
+import { NOVIDADES, NOVIDADES_VERSAO } from './novidades';
 
 const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom, .ba-veu';
 type PerfilPrevia = { id: string; nome: string; papel: string; ativo: boolean; modulos?: unknown };
@@ -48,6 +49,30 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 #selo-previa.sp-curto .sp-fict,#selo-previa.sp-curto .sp-ver b{display:none}
 @media (max-width:640px){#selo-previa .sp-fict,#selo-previa .sp-ver b,#selo-previa .sp-ad{display:none}#selo-previa{top:12px}#selo-previa .sp-menu{min-width:260px}}
 @media (prefers-reduced-motion:reduce){#selo-previa{transition:none}}
+#selo-previa .sp-nov{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;color:#08090a;
+  background:rgba(244,131,73,.95);font:inherit;font-weight:650;letter-spacing:.01em}
+#selo-previa .sp-nov:hover{background:#f48349}
+#selo-previa .sp-nov:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#selo-previa .sp-nov i{font-style:normal;display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;border-radius:999px;
+  background:#08090a;color:#f48349;font-size:10px}
+#novidades-previa{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:2147483001;width:min(440px,calc(100vw - 32px));
+  max-height:min(78vh,640px);overflow:auto;padding:14px;border-radius:16px;background:rgba(16,17,20,.98);border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 24px 50px rgba(0,0,0,.5);color:#f3f4f6;font:400 12.5px/1.45 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
+#novidades-previa[hidden]{display:none}
+#novidades-previa .nv-cab{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+#novidades-previa .nv-cab b{display:block;font-size:14.5px;font-weight:650;color:#fff}
+#novidades-previa .nv-cab span{color:rgba(255,255,255,.55);font-size:11.5px}
+#novidades-previa .nv-x{all:unset;cursor:pointer;margin-left:auto;padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.6);font-size:16px;line-height:1}
+#novidades-previa .nv-x:hover{color:#fff;background:rgba(255,255,255,.08)}
+#novidades-previa ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+#novidades-previa li{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:start}
+#novidades-previa li b{font-size:13px;font-weight:600;color:#fff}
+#novidades-previa li em{grid-column:1;font-style:normal;font-size:11px;color:rgba(244,131,73,.95)}
+#novidades-previa li p{grid-column:1 / -1;margin:3px 0 0;color:rgba(255,255,255,.72)}
+#novidades-previa li button{all:unset;cursor:pointer;grid-row:1 / 3;grid-column:2;align-self:center;padding:6px 12px;border-radius:999px;
+  background:rgba(244,131,73,.95);color:#08090a;font-weight:650;font-size:12px}
+#novidades-previa li button:hover{background:#f48349}
+#novidades-previa li button:focus-visible,#novidades-previa .nv-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
 `;
 
 export function montarSeloPrevia(): void {
@@ -89,8 +114,38 @@ export function montarSeloPrevia(): void {
       ad.append(b);
     }
     marcarAD();
-    el.append(tx, ad, bt, menu);
-    document.body.appendChild(el);
+    // NOVIDADES (25/11): o que há de novo nesta versão da prévia, com um botão que leva a cada lugar. Abre sozinha na 1ª vez de cada versão.
+    const nov = document.createElement('button');
+    nov.type = 'button'; nov.className = 'sp-nov';
+    nov.setAttribute('aria-haspopup', 'dialog');
+    nov.innerHTML = `Novidades <i>${NOVIDADES.length}</i>`;
+    const painel = document.createElement('div');
+    painel.id = 'novidades-previa'; painel.setAttribute('role', 'dialog'); painel.setAttribute('aria-label', 'O que há de novo nesta prévia'); painel.hidden = true;
+    const cabN = document.createElement('div'); cabN.className = 'nv-cab';
+    const tit = document.createElement('div'); tit.innerHTML = '<b>O que há de novo</b><span>Toque em Ver para ir direto ao lugar. Dados fictícios.</span>';
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'nv-x'; x.setAttribute('aria-label', 'Fechar'); x.textContent = '×';
+    cabN.append(tit, x);
+    const lista = document.createElement('ol');
+    for (const n of NOVIDADES) {
+      const li = document.createElement('li');
+      const b = document.createElement('b'); b.textContent = n.titulo;
+      const em = document.createElement('em'); em.textContent = `${n.onde} · ${n.quando}`;
+      const pp = document.createElement('p'); pp.textContent = n.texto;
+      const ver = document.createElement('button'); ver.type = 'button'; ver.textContent = 'Ver';
+      ver.addEventListener('click', () => { fecharNov(); location.hash = n.ir.replace(/^#/, ''); });
+      li.append(b, ver, em, pp); lista.append(li);
+    }
+    painel.append(cabN, lista);
+    const fecharNov = () => { painel.hidden = true; nov.setAttribute('aria-expanded', 'false'); try { localStorage.setItem('previa-novidades-visto', NOVIDADES_VERSAO); } catch { /* privado */ } };
+    const abrirNov = () => { painel.hidden = false; nov.setAttribute('aria-expanded', 'true'); };
+    nov.addEventListener('click', () => (painel.hidden ? abrirNov() : fecharNov()));
+    x.addEventListener('click', fecharNov);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !painel.hidden) fecharNov(); });
+    document.addEventListener('pointerdown', (e) => { if (!painel.hidden && !painel.contains(e.target as Node) && !nov.contains(e.target as Node)) fecharNov(); });
+    el.append(nov, tx, ad, bt, menu);
+    document.body.append(el, painel);
+    let visto = ''; try { visto = localStorage.getItem('previa-novidades-visto') ?? ''; } catch { /* privado */ }
+    if (visto !== NOVIDADES_VERSAO) setTimeout(abrirNov, 1200);
 
     const seta = '<svg class="sp-seta" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const rotular = () => {
