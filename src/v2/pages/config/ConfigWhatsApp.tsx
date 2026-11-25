@@ -16,6 +16,8 @@ import { temRecurso } from '../../data/config/recursos';
 import { useAcoesAtendimento, useConexoesWA, type ConexaoWA, type EstadoConexao } from '../../data/config/conexoes';
 import { useEquipes } from '../../data/config/equipes';
 import type { UsuarioRow } from '../../data/cobranca/usuarios';
+import { SaudeNumeros, TOM_NOTA } from './SaudeNumeros';
+import { ROTULO_NOTA, avaliarSaude, useSaudeNumeros } from '@/data/saudeNumeros';
 import '../painel/painel.css';
 
 const ROT_ESTADO: Record<EstadoConexao, string> = { conectado: 'Conectado', conectando: 'Conectando…', desconectado: 'Desconectado' };
@@ -39,6 +41,8 @@ const SeloAmbiente = ({ a }: { a: Ambiente }) => <span className={`cfgw-amb ${a}
 
 /** o Atendimento existe nesta instalação? (config/recursos.ts) Sem ele, esta é a tela dos números de Cobranças */
 const TEM_ATD = temRecurso('atendimento');
+/** a saúde de cada número do Atendimento (migration 107) */
+const TEM_SAUDE = TEM_ATD && temRecurso('saude-numeros');
 type Filtro = 'todos' | Ambiente;
 type Janela = { tipo: 'conectar'; reconectar?: ConexaoWA } | { tipo: 'gerenciar'; chave: string };
 
@@ -50,6 +54,8 @@ export function ConfigWhatsApp() {
   const avisar = (texto: string, tom: 'ok' | 'erro' = 'ok') => setAviso({ texto, tom });
 
   const lista = q.lista;
+  const saudeQ = useSaudeNumeros(TEM_SAUDE);
+  const saudeDe = (c: ConexaoWA) => { if (c.ambiente !== 'atendimento') return null; const s = (saudeQ.data ?? []).find((x) => x.canalId === c.id); return s ? avaliarSaude(s) : null; };
   // equipes (23/11): cada número do Atendimento é de uma equipe (Configurações → Equipes)
   const equipesQ = useEquipes();
   const equipeDoNumero = (id: string) => (equipesQ.data ?? []).find((e) => e.canais.includes(id))?.nome ?? null;
@@ -105,6 +111,7 @@ export function ConfigWhatsApp() {
                     {TEM_ATD && <th scope="col">Ambiente</th>}
                     <th scope="col">Quem usa</th>
                     <th scope="col">Situação</th>
+                    {TEM_SAUDE && <th scope="col">Saúde</th>}
                     <th scope="col">Última atividade</th>
                     <th scope="col"><span className="pn-vh">Ações</span></th>
                   </tr>
@@ -124,6 +131,7 @@ export function ConfigWhatsApp() {
                         <BadgeStatus tom={TOM_ESTADO[c.estado]}>{ROT_ESTADO[c.estado]}</BadgeStatus>
                         {c.erro && c.estado !== 'conectado' && <span className="pn-us-1a">{c.erro}</span>}
                       </td>
+                      {TEM_SAUDE && <td>{(() => { const a = saudeDe(c); return a ? <span title={a.motivos.join(' ')}><BadgeStatus tom={TOM_NOTA[a.nota]}>{ROTULO_NOTA[a.nota]}</BadgeStatus></span> : <span className="pn-us-amb-tx">—</span>; })()}</td>}
                       <td><span className="pn-us-amb-tx num">{quando(c.ultimaAtividade)}</span></td>
                       <td className="pn-fin-acoes">
                         <span className="pn-us-acoes">
@@ -138,6 +146,8 @@ export function ConfigWhatsApp() {
             </div>
           )}
       </CardVidro>
+
+      {TEM_SAUDE && <SaudeNumeros />}
 
       {TEM_ATD && <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.1s' }}>
         <div className="pn-card-cab"><div><h3>Para que serve cada ambiente</h3><p>Ao conectar um número você escolhe onde ele trabalha. Um número trabalha em um ambiente só.</p></div></div>

@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'saude-numeros-25-11', titulo: 'Saúde dos números do WhatsApp', onde: 'Configurações › WhatsApp', quando: '25/11', recurso: 'saude-numeros', soAdmin: true,
+    texto: 'Cada número do Atendimento ganha uma nota (Boa, Atenção ou Risco) com o motivo: envios falhando, poucos clientes respondendo (o que faz o WhatsApp bloquear o número), número desconectado ou "conectado, mas nada chega". As barras mostram as mensagens que chegaram em cada dia.',
+    rota: '/config/whatsapp',
+  },
+  {
     id: 'aviso-espera-25-11', titulo: 'Aviso de cliente esperando além da meta', onde: 'Configurações › Aviso de espera · sino do topo', quando: '25/11', recurso: 'aviso-espera', soAdmin: true,
     texto: 'Escolha a meta de resposta (por exemplo, 30 minutos). Passou disso sem resposta, o sino do responsável pela conversa avisa; passou do segundo tempo, avisa os gestores. Conversa sem responsável vai direto para os gestores. Chega desligado: ligue em Configurações › Aviso de espera.',
     rota: '/config/aviso-espera',

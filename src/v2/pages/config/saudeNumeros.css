@@ -1,0 +1,8 @@
+/* SAÚDE DOS NÚMEROS (Configurações › WhatsApp, 25/11). Os cartões são os do Painel (CartaoMetrica); aqui só o motivo. */
+.v2 .svn { display: flex; flex-direction: column; gap: 10px; }
+.v2 .svn-motivos { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; line-height: 1.45; color: var(--txt-2); }
+.v2 .svn-motivos.risco > span:first-child { color: var(--cor-erro-txt, var(--rubro)); font-weight: 500; }
+.v2 .svn-motivos.atencao > span:first-child { color: var(--cor-alerta-txt, var(--ambar)); font-weight: 500; }
+/* o motivo é frase inteira: quebra a linha em vez de cortar (o rodapé dos cartões do Painel corta com "…") */
+.v2 .svn .pmc-root.rvm .rvm-delta { white-space: normal; overflow: visible; }
+.v2 .svn .pmc-root.rvm .rvm-pe { align-items: flex-start; }
