@@ -1,0 +1,46 @@
+/* IA com a chave da própria empresa (IaPropria.tsx): "Resumo do atendimento" no painel do cliente (266px) e
+   "Transcrever" embaixo do áudio. Neutros do tema; nada de cor de destaque além do texto. */
+
+/* ---- Resumo do atendimento ---- */
+.v2 .ria-cab { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.v2 .ria-cab .ctx-t { margin: 0; flex: 1; }
+.v2 .ria-quando { font-size: 10.5px; color: var(--txt-3); white-space: nowrap; }
+.v2 .ria-tx { margin: 0 0 9px; font-size: 11.5px; line-height: 1.45; color: var(--txt-3); }
+.v2 .ria-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .ria-dica { font-size: 10.5px; color: var(--txt-3); }
+.v2 .ria-lista { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2 .ria-lista > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .ria-lista dt { font-size: 10.5px; color: var(--txt-3); }
+.v2 .ria-lista dd { margin: 0; font-size: 12px; line-height: 1.45; color: var(--txt); overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; }
+.v2 .ria-docs b { font-weight: 600; color: var(--txt-2); }
+.v2 .ria-docs.falta b { color: var(--txt); }
+.v2 .ria-novas { margin: 9px 0 0; padding: 6px 8px; border-radius: 6px; font-size: 11px; line-height: 1.4; color: var(--txt-2); background: rgba(var(--tint), .06); }
+.v2 .ria-pe { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(var(--tint), .14); }
+.v2 .ria-autor { flex: 1; min-width: 0; font-size: 10.5px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .ria-lnk { flex: none; border: 0; background: none; padding: 0; font: 11px var(--fonte); color: var(--txt-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.v2 .ria-lnk:hover:not(:disabled) { color: var(--txt); }
+.v2 .ria-lnk:disabled { color: var(--txt-3); text-decoration: none; cursor: default; }
+.v2 .ria-lnk:focus-visible, .v2 .transc-btn:focus-visible, .v2 .ria-semchave a:focus-visible, .v2 .ria-semchave-l:focus-visible { outline: 2px solid var(--cor-acento-fio, rgba(var(--tint), .4)); outline-offset: 2px; border-radius: 3px; }
+.v2 .ria-semchave { margin: 9px 0 0; font-size: 11px; line-height: 1.45; color: var(--txt-3); }
+.v2 .ria-semchave a { color: var(--txt); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.v2 .ria-erro { margin: 9px 0 0; font-size: 11px; line-height: 1.45; color: var(--cor-erro-txt, var(--rubro)); }
+/* lendo: três linhas pulsando no lugar do resumo */
+.v2 .ria-lendo { display: flex; flex-direction: column; gap: 6px; }
+.v2 .ria-linha { display: block; height: 9px; border-radius: 4px; background: rgba(var(--tint), .09); animation: ria-pulsa 1.3s ease-in-out infinite; }
+.v2 .ria-linha:nth-child(2) { animation-delay: .15s; }
+.v2 .ria-linha.curta { width: 60%; animation-delay: .3s; }
+.v2 .ria-lendo .ria-dica { margin-top: 3px; }
+@keyframes ria-pulsa { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v2 .ria-linha { animation: none; } }
+
+/* ---- Transcrever (embaixo do player de áudio) ---- */
+.v2 .transc-acao { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 5px; margin-top: 5px; font-size: 11px; line-height: 1.4; }
+.v2 .transc-btn { border: 0; background: none; padding: 0; font: 11px var(--fonte); color: var(--txt-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.v2 .transc-btn:hover:not(:disabled) { color: var(--txt); }
+.v2 .transc-btn:disabled { cursor: progress; text-decoration: none; color: var(--txt-3); }
+.v2 .transc-btn.off { color: var(--txt-3); text-decoration: none; cursor: default; }
+.v2 .transc-sep { color: var(--txt-3); }
+.v2 .ria-semchave-l { color: var(--txt-2); text-decoration: underline; text-underline-offset: 2px; }
+.v2 .ria-semchave-l:hover { color: var(--txt); }
+.v2 .ria-semchave-t { color: var(--txt-3); }
+.v2 .transc-erro { flex-basis: 100%; color: var(--cor-erro-txt, var(--rubro)); }

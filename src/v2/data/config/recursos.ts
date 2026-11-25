@@ -12,6 +12,9 @@
      tempo-resposta o tempo de resposta da equipe com meta no Dashboard › Atendentes (migration 97)
      anuncios      anúncios do Facebook no Atendimento (25/11): a conta de anúncios em Integrações e a aba
                    Anúncios do Dashboard (migration 96 + função meta-anuncios + a origem do anúncio no webhook)
+     ia-propria    a IA com a chave da PRÓPRIA empresa (25/11): Integrações › Inteligência artificial (Google Gemini ou
+                   OpenAI; o custo é da conta da empresa), o "Resumo do atendimento" no painel do cliente e o "Transcrever"
+                   dos áudios no WhatsApp (migration 100 + função atd-ia). Só na Reviza: fora dela não aparece nunca
      acessos       os CADASTROS do Atendimento antes dele existir (23/11): papel atendente, ambientes por
                    pessoa e equipes com gerente (migrations 91 e 92 + função reviza-admin). Quem só tem o
                    Atendimento entra e vê o aviso de que o Atendimento ainda vai ser ligado
@@ -20,7 +23,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ia-propria';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

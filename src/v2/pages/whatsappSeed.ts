@@ -34,6 +34,9 @@ export function seedWa(): WaContact[] {
         OUT('Perfeito, chegou certinho! Agora me manda o RG ou a CNH, frente e verso.', '10:41', { tsISO: iso(agora - 3 * 1440 * min + 29 * min), id: 'wm-a3', origemBot: true }),
         IN('', '09:05', { tsISO: iso(agora - 2 * 1440 * min), id: 'wm-a4', tipo: 'documento', nome: 'RG_frente_e_verso.pdf', mime: 'application/pdf', tamanho: 1_148_204, localUrl: '/demo-midia/rg-ficticio.pdf' }),
         IN('Minha filha disse que dá pra ver por aqui também: https://www.gov.br/inss', '09:07', { tsISO: iso(agora - 2 * 1440 * min + 2 * min), id: 'wm-a5' }),
+        /* áudio SEM transcrição — vitrine do "Transcrever" (IA com a chave da própria empresa, 25/11); o texto inventado
+           sai de TRANSCRICOES_DEMO em data/iaPropria.ts */
+        IN('', '09:12', { tsISO: iso(agora - 2 * 1440 * min + 7 * min), id: 'wm-a6', tipo: 'audio', localUrl: '/demo-midia/voz-cliente-maria.m4a', ...( { seconds: 19 } as Partial<WaMessage>) }),
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
         OUT('Boa tarde, dona Maria! Aqui é o Matheo, da Alfa Group. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', '14:32', { tsISO: iso(agora - 10 * min), id: 'wm-2', origemBot: true }),
         IN('Pode sim, meu filho', '14:35', { tsISO: iso(agora - 7 * min), id: 'wm-3' }),

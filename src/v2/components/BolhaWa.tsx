@@ -5,6 +5,7 @@ import type { WaMessage } from '@/data/whatsappDemo';
 import { traduzErroEnvio } from '@/data/scripts';
 import { initials } from '@/lib/avatar';
 import { ackOf, fmtTam, mmss, ONDA } from '../lib/waUi';
+import { TranscreverAudio, transcricaoGuardada } from './IaPropria';
 
 /* ------------------------------------------------------------------
    Bolha de mensagem do inbox (extraída de src/v2/pages/WhatsApp.tsx,
@@ -48,6 +49,9 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   aoIdentificar?: (m: WaMessage, campo: 'senha' | 'email', selecionado: string) => void;
 }) {
   const raizRef = useRef<HTMLDivElement>(null);
+  // "Transcrever" (IA com a chave da própria empresa): o texto aparece na hora; no servidor ele fica gravado na mensagem
+  const [transcLocal, setTranscLocal] = useState<string | null>(() => (m.tipo === 'audio' ? transcricaoGuardada(m, demo) : null));
+  const transcricao = m.transcricao || transcLocal;
   const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
   // bolha otimista carrega a mídia LOCAL (objectURL) — renderiza na hora, sem URL assinada
@@ -104,7 +108,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       )}
       {/* Identificar senha do INSS / e-mail na mensagem do CLIENTE (texto ou transcrição). mousedown sem
           default: o trecho marcado com o mouse continua selecionado e vira a sugestão. */}
-      {aoIdentificar && m.dir === 'in' && !!(m.text || m.transcricao) && (
+      {aoIdentificar && m.dir === 'in' && !!(m.text || transcricao) && (
         <span className="ident-btns">
           {(['senha', 'email'] as const).map((campo) => (
             <button
@@ -157,7 +161,10 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
           ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
           : m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} localUrl={m.localUrl ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
+          : <>
+              <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} localUrl={m.localUrl ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
+              {!transcricao && <TranscreverAudio m={m} demo={demo} aoTranscrever={setTranscLocal} />}
+            </>
       )}
       {m.tipo === 'documento' && (
         <div className="doc2">
@@ -188,7 +195,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
         </div>
       )}
       {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && !m.contato && <WaTexto texto={m.text} />}
-      {m.transcricao && <div className="transc">“{m.transcricao}”</div>}
+      {transcricao && <div className="transc">“{transcricao}”</div>}
       {falhaActs}
       <div className="hh num">
         {m.viaTelefone && <span className="fone-tag" title="Enviada pelo celular"><IcTel />Enviada pelo celular</span>}

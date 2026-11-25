@@ -44,6 +44,7 @@ import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
+import { ResumoAtendimento } from '../components/IaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
@@ -1767,6 +1768,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           )}
 
           <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel} />
+
+          {/* IA com a chave da própria empresa (25/11): só na Reviza, com o recurso 'ia-propria' */}
+          <ResumoAtendimento conversaId={current.id} msgs={current.msgs} demo={demo} />
 
           <div className="ctx-b spot">
             <div className="ctx-t">Status</div>

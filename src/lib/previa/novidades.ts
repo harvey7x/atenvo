@@ -2,10 +2,15 @@
    atual"). As novidades ficam em lugares específicos do sistema; esta lista abre sozinha a cada versão nova da prévia e
    cada item leva direto ao lugar. Só existe no build de prévia (montada pelo selo). Ao entregar algo novo, ACRESCENTAR
    aqui (no topo) e trocar NOVIDADES_VERSAO. */
-export const NOVIDADES_VERSAO = '2026-11-25-c';
+export const NOVIDADES_VERSAO = '2026-11-25-f';
 
 export interface Novidade { titulo: string; onde: string; texto: string; ir: string; quando: string }
 export const NOVIDADES: Novidade[] = [
+  {
+    titulo: 'IA com a chave da própria Reviza', onde: 'Configurações › Integrações › Inteligência artificial', quando: '25/11',
+    texto: 'Escolher Google Gemini ou OpenAI e colar a chave que a Reviza cria na conta dela (o custo é da Reviza). No WhatsApp, o painel do cliente ganha o "Resumo do atendimento" e os áudios ganham "Transcrever". Para ver: Conectar › "Usar uma chave de exemplo" e abrir a conversa da Maria Aparecida.',
+    ir: '#/config/integracoes/ia',
+  },
   {
     titulo: 'Tempo de resposta da equipe, com meta', onde: 'Dashboard › Atendentes', quando: '25/11',
     texto: 'Meta em minutos, horário comercial ou tempo corrido, quantas respostas ficaram dentro da meta, quem está esperando agora e cada atendente do mais lento ao mais rápido. A IA fica fora da conta.',
