@@ -1,0 +1,150 @@
+/* ============================================================
+   Chat da equipe — conversas (esquerda) + conversa aberta (direita).
+   Celular (até 760 px): um painel por vez. Cores só dos tokens; o laranja (--accent) só sólido.
+   ============================================================ */
+
+.v2 .ce { flex: 1; min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+
+/* ---------- lista ---------- */
+.v2 .ce-lista { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--linha); }
+.v2 .ce-lista-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 14px 10px 16px; }
+.v2 .ce-lista-cab h2 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); white-space: nowrap; }
+.v2 .ce-busca { display: flex; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 0 10px; height: 34px; border: 1px solid var(--linha); border-radius: 10px; color: var(--txt-3); }
+.v2 .ce-busca:focus-within { border-color: rgba(var(--tint), .28); }
+.v2 .ce-busca input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--txt); font: inherit; font-size: 13px; outline: none; }
+.v2 .ce-busca input::placeholder { color: var(--txt-3); }
+.v2 .ce-salas { list-style: none; margin: 0; padding: 2px 8px 12px; overflow-y: auto; flex: 1; min-height: 0; }
+.v2 .ce-sala {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--txt); font: inherit; text-align: left; cursor: pointer; transition: background .12s;
+}
+.v2 .ce-sala:hover { background: rgba(var(--tint), .05); }
+.v2 .ce-sala.on { background: rgba(var(--tint), .08); }
+.v2 .ce-sala:focus-visible { outline: 2px solid rgba(var(--tint), .35); outline-offset: -2px; }
+.v2 .ce-sala-meio { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .ce-sala-l1, .v2 .ce-sala-l2 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .ce-sala-nome { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .ce-sala-hora { flex: none; font-size: 11px; color: var(--txt-3); }
+.v2 .ce-sala-prev { flex: 1; min-width: 0; font-size: 12.5px; color: var(--txt-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .ce-sala.nl .ce-sala-nome { font-weight: 650; }
+.v2 .ce-sala.nl .ce-sala-prev { color: var(--txt); }
+.v2 .ce-sala.nl .ce-sala-hora { color: var(--txt-2); }
+.v2 .ce-nl {
+  flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--accent); color: #fff;
+  font-size: 10.5px; font-weight: 600; line-height: 18px; text-align: center;
+}
+.v2 .ce-nada { padding: 14px 18px; font-size: 12.5px; color: var(--txt-3); }
+.v2 .ce-carregando { display: flex; flex-direction: column; gap: 8px; padding: 6px 14px; }
+.v2 .ce-carregando-conv { padding: 24px; }
+
+.v2 .ce-av {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(var(--tint), .08); color: var(--txt-2); font-size: 12px; font-weight: 600; letter-spacing: .02em;
+}
+.v2 .ce-av.peq { width: 28px; height: 28px; font-size: 10.5px; }
+
+/* ---------- conversa ---------- */
+.v2 .ce-painel { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.v2 .ce-conv { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v2 .ce-vazio-conv { flex: 1; display: grid; place-items: center; position: relative; padding: 24px; }
+.v2 .ce-vazio-conv .ce-voltar { position: absolute; top: 12px; left: 12px; }
+.v2 .ce-cab { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--linha); min-height: 60px; }
+.v2 .ce-cab-txt { min-width: 0; }
+.v2 .ce-cab-txt h3 { font-size: 14px; font-weight: 600; color: var(--txt); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .ce-cab-txt p { font-size: 11.5px; color: var(--txt-3); margin-top: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .ce-voltar {
+  display: none; flex: none; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px;
+  background: transparent; color: var(--txt-2); cursor: pointer; margin-left: -6px;
+}
+.v2 .ce-voltar:hover { background: rgba(var(--tint), .08); color: var(--txt); }
+
+.v2 .ce-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 16px 14px; overscroll-behavior: contain; }
+.v2 .ce-msgs-dentro { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; }
+.v2 .ce-primeira { margin: 36px auto 0; font-size: 13px; color: var(--txt-3); text-align: center; }
+.v2 .ce-dia { display: flex; justify-content: center; margin: 16px 0 8px; position: sticky; top: 0; z-index: 1; }
+.v2 .ce-dia span { font-size: 11px; font-weight: 500; color: var(--txt-2); padding: 3px 10px; border-radius: 99px; background: var(--base); box-shadow: inset 0 0 0 1px var(--linha); }
+
+.v2 .ce-msg { display: flex; flex-direction: column; align-items: flex-start; margin-top: 10px; }
+.v2 .ce-msg.cont { margin-top: 3px; }
+.v2 .ce-msg.eu { align-items: flex-end; }
+.v2 .ce-autor { font-size: 11.5px; font-weight: 600; color: var(--txt-3); margin: 0 0 3px 4px; }
+.v2 .ce-bolha {
+  display: flex; flex-direction: column; max-width: min(560px, 80%); padding: 7px 11px 5px; border-radius: 14px;
+  font-size: 13.5px; line-height: 1.45; color: var(--txt); overflow-wrap: anywhere;
+}
+.v2 .ce-msg.outro .ce-bolha { background: var(--surface, transparent); box-shadow: inset 0 0 0 1px var(--linha); border-top-left-radius: 5px; }
+.v2 .ce-msg.outro.cont .ce-bolha { border-top-left-radius: 14px; }
+.v2 .ce-msg.eu .ce-bolha { background: rgba(var(--tint), .08); border-top-right-radius: 5px; }
+.v2 .ce-msg.eu.cont .ce-bolha { border-top-right-radius: 14px; }
+.v2 .ce-msg.pendente .ce-bolha { opacity: .62; }
+.v2 .ce-texto { white-space: pre-wrap; display: flex; flex-direction: column; gap: 6px; }
+.v2 .ce-texto > span { display: block; }
+.v2 .ce-apagada { font-style: italic; color: var(--txt-3); }
+.v2 .ce-hora { align-self: flex-end; font-size: 10.5px; color: var(--txt-3); margin-top: 2px; white-space: nowrap; }
+.v2 .ce-visto { font-size: 11px; color: var(--txt-3); margin: 3px 4px 0 0; }
+.v2 .ce-visto.on { color: var(--txt-2); font-weight: 500; }
+
+/* cartão do link de conversa de cliente */
+.v2 .ce-cartao {
+  display: flex; align-items: center; gap: 10px; min-width: min(230px, 100%); padding: 8px 10px; border: 0; border-radius: 10px;
+  background: var(--base); box-shadow: inset 0 0 0 1px var(--linha); color: var(--txt); font: inherit; text-align: left; cursor: pointer;
+  white-space: normal; transition: box-shadow .12s;
+}
+.v2 .ce-cartao:hover { box-shadow: inset 0 0 0 1px rgba(var(--tint), .3); }
+.v2 .ce-cartao-ic { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: rgba(var(--tint), .08); color: var(--txt-2); }
+.v2 .ce-cartao-txt { min-width: 0; display: flex; flex-direction: column; }
+.v2 .ce-cartao-txt b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.v2 .ce-cartao-txt small { font-size: 11.5px; color: var(--txt-3); }
+
+/* ---------- escrever ---------- */
+.v2 .ce-compor { border-top: 1px solid var(--linha); padding: 10px 16px 10px; }
+.v2 .ce-compor-linha, .v2 .ce-compor .ce-erro, .v2 .ce-dica { max-width: 760px; margin-left: auto; margin-right: auto; }
+.v2 .ce-compor-linha { display: flex; align-items: flex-end; gap: 8px; }
+.v2 .ce-compor textarea {
+  flex: 1; min-width: 0; resize: none; min-height: 40px; max-height: 168px; padding: 9px 12px; border: 1px solid var(--linha); border-radius: 12px;
+  background: var(--surface, transparent); color: var(--txt); font: inherit; font-size: 13.5px; line-height: 1.45; outline: none;
+}
+.v2 .ce-compor textarea::placeholder { color: var(--txt-3); }
+.v2 .ce-compor textarea:focus { border-color: rgba(var(--tint), .3); }
+.v2 .ce-enviar {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 12px;
+  background: var(--accent); color: #fff; cursor: pointer; transition: opacity .12s;
+}
+.v2 .ce-enviar:disabled { background: rgba(var(--tint), .08); color: var(--txt-3); cursor: default; }
+.v2 .ce-enviar:not(:disabled):hover { opacity: .9; }
+.v2 .ce-dica { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--txt-3); margin-top: 6px; }
+.v2 .ce-erro { font-size: 12px; color: var(--rubro); margin-bottom: 8px; }
+
+/* ---------- nova conversa ---------- */
+.v2 .ce-nova { display: flex; flex-direction: column; gap: 10px; }
+.v2 .ce-nova-dica { font-size: 12.5px; color: var(--txt-2); }
+.v2 .ce-nova .ce-erro { margin: 0; }
+.v2 .ce-nova .ce-nada { padding: 6px 2px; }
+.v2 .ce-nova .ce-carregando { padding: 0; }
+.v2 .ce-pessoas { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--linha); border-radius: 10px; max-height: 268px; overflow-y: auto; }
+.v2 .ce-pessoas button {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--txt); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.v2 .ce-pessoas button:hover { background: rgba(var(--tint), .05); }
+.v2 .ce-pessoas button.on { background: rgba(var(--tint), .08); }
+.v2 .ce-pessoa-nome { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .ce-marca { flex: none; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(var(--tint), .25); color: #fff; }
+.v2 .ce-pessoas button.on .ce-marca { background: var(--accent); box-shadow: none; }
+.v2 .ce-nova-nome { display: flex; flex-direction: column; gap: 6px; }
+.v2 .ce-nova-nome > span { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }
+
+/* ---------- celular: um painel por vez ---------- */
+@media (max-width: 760px) {
+  .v2 .ce { grid-template-columns: minmax(0, 1fr); }
+  .v2 .ce-lista { border-right: 0; }
+  .v2 .ce[data-painel="lista"] .ce-painel { display: none; }
+  .v2 .ce[data-painel="conversa"] .ce-lista { display: none; }
+  .v2 .ce-voltar { display: inline-grid; }
+  .v2 .ce-cab { padding: 9px 12px; min-height: 54px; }
+  .v2 .ce-msgs { padding: 6px 12px 12px; }
+  .v2 .ce-bolha { max-width: 86%; }
+  .v2 .ce-compor { padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .v2 .ce-dica { display: none; }
+  .v2 .ce-compor textarea { font-size: 16px; } /* no iPhone, menos de 16 px dá zoom ao tocar */
+}

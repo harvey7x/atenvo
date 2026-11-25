@@ -67,6 +67,7 @@ const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
+const ChatEquipeV2 = lazy(() => import('@/v2/pages/ChatEquipe'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -153,6 +154,8 @@ const routes: RouteObject[] = [
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
           // Presenciais (dono 29/10): calendário dos atendimentos presenciais + aviso no grupo
           { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
+          // Chat da equipe (dono 25/11): conversa entre colegas; sem o recurso 'chat-equipe' a tela volta ao WhatsApp
+          { path: 'chat-equipe', element: <Lz><ChatEquipeV2 /></Lz> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
