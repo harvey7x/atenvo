@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Aplica NO SERVIDOR DE PRODUÇÃO do Reviza, nesta ordem e cada uma numa transação só:
 #   118  área de chegada das mensagens do sistema anterior (contatos da API e as mensagens de cada um)
+#   122  conexões de lá → números daqui (o administrador escolhe; aí as conversas aparecem na lista)
+#   119  aplicar: clientes, identidade de WhatsApp, conversas e mensagens no Atendimento (gatilhos parados)
 # Preparado em 26/11 ("já pega todo o Kanban deles e integra no nosso… as mensagens também, tudo"). Para rodar:
 #   bash supabase-reviza/aplicar-mensagens-guimoo.sh confirmo
 # Só cria duas tabelas privadas novas. Não envia nada a
@@ -25,7 +27,7 @@ except urllib.error.HTTPError as e:
 PY
 }
 TMP="$(mktemp -d)"
-for m in 118_guimoo_mensagens_chegada; do
+for m in 118_guimoo_mensagens_chegada 122_guimoo_conexoes 119_guimoo_mensagens_aplicar; do
   echo "» banco: migration $m (numa transação só)"
   { echo 'begin;'; cat "$AQUI/migrations/20261126_$m.sql"; echo; echo 'commit;'; } > "$TMP/$m.sql"
   sql "$TMP/$m.sql"

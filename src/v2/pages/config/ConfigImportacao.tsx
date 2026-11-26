@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BotaoSec, CardVidro, EstadoErro } from '../../components';
-import { mesmoNome, SEM_RESPONSAVEL, useEstadoImportacao, useLigarResponsaveis, type RespDeLa } from '@/data/importacaoAnterior';
+import { mesmoNome, nomeConexao, SEM_RESPONSAVEL, useConversasImportadas, useEstadoImportacao, useLigarConexao, useLigarResponsaveis, type ConexaoDeLa, type RespDeLa } from '@/data/importacaoAnterior';
 import '../painel/painel.css';
 import './camposMotivos.css';
 import './importacao.css';
@@ -69,7 +69,6 @@ export function ConfigImportacao() {
         <p className="cfgimp-nota">
           Arquivo lido em {dataHora(e.lidoEm)}. Cada cliente entrou no funil na mesma etapa em que estava lá.
           Quem tinha dois números lá virou um cliente só, com um card em andamento (a etapa mais adiantada) e a venda, se houve, à parte.
-          {e.mensagens === 0 ? ' As conversas de lá ainda não vieram: chegam numa segunda etapa.' : ''}
         </p>
         <div className="cfgimp-acoes"><BotaoSec onClick={() => nav('/kanban')}>Abrir o Kanban</BotaoSec></div>
       </CardVidro>
@@ -125,6 +124,82 @@ export function ConfigImportacao() {
           <p className="cfgimp-nota">Só passam os cards que ainda estão sem dono ou com quem foi escolhido aqui; o que a equipe já trocou fica como está.</p>
         </CardVidro>
       </div>
+
+      <ConversasDeLa aoAvisar={setAviso} />
     </div>
+  );
+}
+
+/* As conversas de lá: quanto já veio e, por conexão de lá, para que número daqui elas vão. A lista do WhatsApp só mostra
+   conversa com número; enquanto o administrador não escolhe, as de lá ficam guardadas (com o card ligado a elas). */
+function ConversasDeLa({ aoAvisar }: { aoAvisar: (a: { texto: string; tom: 'ok' | 'erro' }) => void }) {
+  const q = useConversasImportadas();
+  const ligar = useLigarConexao();
+  const nav = useNavigate();
+  const c = q.data;
+  if (q.isLoading) return <CardVidro className="pn-card"><p className="pn-vazio">Carregando as conversas de lá…</p></CardVidro>;
+  if (q.isError || !c) return <CardVidro className="pn-card"><EstadoErro titulo="Não foi possível carregar as conversas" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={() => void q.refetch()} /></CardVidro>;
+  const faltaBaixar = Math.max(0, c.contatosLa - c.baixados);
+  const semNumero = c.conexoes.reduce((s, x) => s + x.semNumero, 0);
+  const temNumero = c.numeros.length > 0;
+  const passar = async (x: ConexaoDeLa, canalId: string) => {
+    if (!canalId) return;
+    try {
+      const n = await ligar.mutateAsync({ conexao: x.conexao, canalId });
+      const num = c.numeros.find((p) => p.id === canalId);
+      aoAvisar({ tom: 'ok', texto: `${int(n)} ${n === 1 ? 'conversa de' : 'conversas de'} ${nomeConexao(x.conexao)} ${n === 1 ? 'foi' : 'foram'} para ${num?.nome ?? 'o número escolhido'}. Já aparecem no WhatsApp.` });
+    } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message }); }
+  };
+  return (
+    <CardVidro className="pn-card sobe" style={{ animationDelay: '.15s' }}>
+      <div className="pn-card-cab cfgimp-resp-cab">
+        <div>
+          <h3>Conversas de lá</h3>
+          <p>{faltaBaixar > 0
+            ? `${int(c.baixados)} de ${int(c.contatosLa)} contatos já vieram (${int(c.mensagensBaixadas)} mensagens). O resto chega sozinho, devagar, no limite que o sistema de antes permite.`
+            : `Os ${int(c.contatosLa)} contatos de lá já vieram, com ${int(c.mensagensBaixadas)} mensagens.`}</p>
+        </div>
+        {temNumero && semNumero === 0 && c.conversas > 0 && <BotaoSec onClick={() => nav('/whatsapp')}>Abrir o WhatsApp</BotaoSec>}
+      </div>
+      <dl className="cfgimp-resumo cfgimp-resumo-4">
+        <div><dt>Conversas</dt><dd className="num">{int(c.conversas)}</dd></div>
+        <div><dt>Mensagens</dt><dd className="num">{int(c.mensagens)}</dd></div>
+        <div><dt>Abertas</dt><dd className="num">{int(c.conexoes.reduce((s, x) => s + x.abertas, 0))}</dd></div>
+        <div><dt>Sem número</dt><dd className="num">{int(semNumero)}</dd></div>
+      </dl>
+      {!temNumero && c.conversas > 0 && (
+        <p className="cfgimp-aviso" role="note">
+          O WhatsApp daqui mostra só as conversas que têm um número. Conecte os números em Configurações › WhatsApp e volte aqui para
+          escolher qual número fica com as conversas de cada conexão de lá. Até lá elas ficam guardadas, com o card do Kanban ligado a elas.
+        </p>
+      )}
+      {c.conexoes.length > 0 && (
+        <div className="pn-mapa-rolo">
+          <table className="pn-eq pn-fin-tab pn-us-tab cfgw-tab cfgm-tab cfgimp-tab">
+            <thead><tr><th scope="col">Conexão lá</th><th scope="col">Conversas</th><th scope="col">Abertas</th><th scope="col">Vai para o número</th></tr></thead>
+            <tbody>
+              {c.conexoes.map((x) => (
+                <tr key={x.conexao || '_sem'} className={x.canalId && x.semNumero === 0 ? 'ligado' : undefined}>
+                  <td>{nomeConexao(x.conexao)}</td>
+                  <td className="num">{int(x.conversas)}</td>
+                  <td className="num">{int(x.abertas)}</td>
+                  <td>
+                    <select className="inp" value={x.canalId ?? ''} disabled={!temNumero || ligar.isPending} aria-label={`Número daqui para as conversas de ${nomeConexao(x.conexao)}`}
+                      onChange={(ev) => void passar(x, ev.target.value)}>
+                      <option value="">{temNumero ? 'Escolha o número' : 'Nenhum número conectado'}</option>
+                      {c.numeros.map((p) => <option key={p.id} value={p.id} disabled={!p.ativo}>{p.nome}{p.numero ? ` · ${p.numero.slice(-4)}` : ''}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="cfgimp-nota">
+        O que teve mensagem nos últimos 15 dias entra aberto; o resto entra arquivado (a busca acha, e a conversa volta sozinha quando o cliente escrever).
+        Foto, áudio e documento vieram só como aviso (“[Áudio]”, “[Foto]”): o sistema de antes não entrega os arquivos.
+      </p>
+    </CardVidro>
   );
 }

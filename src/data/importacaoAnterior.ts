@@ -69,7 +69,7 @@ const DEMO: EstadoImportacao = {
     { nome: '#4821', qtd: 60, abertos: 33, ligadoA: null, ligadoNome: null },
   ],
   equipe: EQUIPE_DEMO,
-  mensagens: 0,
+  mensagens: 16240,
 };
 function lerDemo(): EstadoImportacao {
   try { const s = localStorage.getItem(G); if (s) return JSON.parse(s) as EstadoImportacao; } catch { /* sem navegador */ }
@@ -124,6 +124,81 @@ export function useLigarResponsaveis() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [C, currentOrg.id] });
       qc.invalidateQueries({ queryKey: ['kanban-leads', currentOrg.id] });
+    },
+  });
+}
+
+/* ---------------- as conversas (migrations 118, 119 e 122) ---------------- */
+export interface ConexaoDeLa { conexao: string; conversas: number; abertas: number; semNumero: number; canalId: string | null; canalNome: string | null }
+export interface NumeroDaqui { id: string; nome: string; numero: string | null; ativo: boolean }
+export interface ConversasImportadas {
+  contatosLa: number; baixados: number; mensagensBaixadas: number; aplicados: number; conversas: number; mensagens: number; ultimaBaixa: string | null;
+  conexoes: ConexaoDeLa[]; numeros: NumeroDaqui[];
+}
+export const SEM_CONEXAO = 'Sem conexão lá';
+export const nomeConexao = (c: string) => (c ? c : SEM_CONEXAO);
+
+const G_CONV = 'previa-importacao-conversas';
+const CONV_DEMO: ConversasImportadas = {
+  contatosLa: 1480, baixados: 1480, mensagensBaixadas: 16240, aplicados: 1480, conversas: 1105, mensagens: 16240, ultimaBaixa: '2026-11-26T15:40:00-03:00',
+  conexoes: [
+    { conexao: 'WhatsApp 4', conversas: 420, abertas: 160, semNumero: 420, canalId: null, canalNome: null },
+    { conexao: 'WhatsApp 6', conversas: 318, abertas: 64, semNumero: 318, canalId: null, canalNome: null },
+    { conexao: 'Atendimento Reviza', conversas: 52, abertas: 9, semNumero: 52, canalId: null, canalNome: null },
+    { conexao: '', conversas: 315, abertas: 40, semNumero: 315, canalId: null, canalNome: null },
+  ],
+  numeros: [{ id: 'demo-chip-1', nome: 'Chip 1', numero: '5551900000001', ativo: true }, { id: 'demo-chip-2', nome: 'Comercial', numero: '5551900000002', ativo: true }],
+};
+function lerConvDemo(): ConversasImportadas {
+  try { const s = localStorage.getItem(G_CONV); if (s) return JSON.parse(s) as ConversasImportadas; } catch { /* sem navegador */ }
+  return structuredClone(CONV_DEMO);
+}
+
+export function useConversasImportadas() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: [C, currentOrg.id, 'conversas'],
+    enabled: !!currentOrg.id,
+    queryFn: async (): Promise<ConversasImportadas> => {
+      if (!IMPORTACAO_REAL) { await espera(120); return lerConvDemo(); }
+      const [a, b] = await Promise.all([supabase!.rpc('atd_guimoo_mensagens_estado'), supabase!.rpc('atd_guimoo_conexoes')]);
+      if (a.error) throw new Error(a.error.message);
+      if (b.error) throw new Error(b.error.message);
+      const m = (a.data ?? {}) as Record<string, unknown>; const c = (b.data ?? {}) as Record<string, unknown>;
+      return {
+        contatosLa: Number(m.contatos_la) || 0, baixados: Number(m.baixados) || 0, mensagensBaixadas: Number(m.mensagens_baixadas) || 0,
+        aplicados: Number(m.aplicados) || 0, conversas: Number(m.conversas) || 0, mensagens: Number(m.mensagens) || 0, ultimaBaixa: (m.ultima_baixa as string) ?? null,
+        conexoes: ((c.conexoes as Record<string, unknown>[]) ?? []).map((x) => ({
+          conexao: String(x.conexao ?? ''), conversas: Number(x.conversas) || 0, abertas: Number(x.abertas) || 0, semNumero: Number(x.sem_numero) || 0,
+          canalId: (x.canal_id as string) ?? null, canalNome: (x.canal_nome as string) ?? null,
+        })),
+        numeros: ((c.numeros as Record<string, unknown>[]) ?? []).map((x) => ({ id: String(x.id), nome: String(x.nome ?? 'Número'), numero: (x.numero as string) ?? null, ativo: x.ativo !== false })),
+      };
+    },
+  });
+}
+
+export function useLigarConexao() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conexao, canalId }: { conexao: string; canalId: string }): Promise<number> => {
+      if (!IMPORTACAO_REAL) {
+        await espera(200);
+        const e = lerConvDemo(); const x = e.conexoes.find((c) => c.conexao === conexao); const n = e.numeros.find((p) => p.id === canalId);
+        if (!x || !n) return 0;
+        const movidas = x.semNumero + (x.canalId && x.canalId !== canalId ? x.conversas - x.semNumero : 0);
+        x.canalId = n.id; x.canalNome = n.nome; x.semNumero = 0;
+        try { localStorage.setItem(G_CONV, JSON.stringify(e)); } catch { /* sem navegador */ }
+        return movidas;
+      }
+      const { data, error } = await supabase!.rpc('atd_guimoo_ligar_conexao', { p_conexao: conexao, p_canal: canalId });
+      if (error) throw new Error(error.message.includes('numero_invalido') ? 'Esse número não é um WhatsApp desta empresa.' : erroLegivel(error.message));
+      return Number((data as { conversas?: number } | null)?.conversas) || 0;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [C, currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
     },
   });
 }
