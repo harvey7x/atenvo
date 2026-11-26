@@ -100,6 +100,8 @@ const GRUPOS: GrupoNav[] = [
       // Pós-venda (dono 21/11): os clientes FECHADOS num atendimento próprio, fora da lista do WhatsApp
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'presenciais', rotulo: 'Presenciais' },
+      // Agenda (26/11): reuniões, ligações e retornos — o calendário que a equipe usava no sistema de antes
+      ...(temRecurso('agenda') ? [{ slug: 'agenda', rotulo: 'Agenda' }] : []),
       // Tarefas da equipe (25/11): só com a peça do servidor (migration 101) nesta instalação
       ...(temRecurso('tarefas') ? [{ slug: 'tarefas', rotulo: 'Tarefas' }] : []),
       { slug: 'scripts', rotulo: 'Scripts' },

@@ -8,6 +8,8 @@ import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { spHoje } from '@/data/relatorios';
 import { fraseDoResumo, qtd, useResumoDia } from '@/data/resumoDia';
 import { acharNaConversa } from '../lib/exportarConversa';
+import { useNavigate } from 'react-router-dom';
+import { diaSP, horaSP, nomeDiaCurto, nomeTipo, useReunioesDaConversa } from '@/data/agenda';
 import { ModalV2 } from './ModalV2';
 import { BotaoPrimario, BotaoSec } from './Botao';
 import { CartaoMetricaFixo, GradeMetricas } from './CartaoMetrica';
@@ -130,5 +132,28 @@ export function EncaminharMensagem({ m, conversas, mascarar, aoEnviar, aoFechar 
         {erro && <p className="wa-desemp-erro" role="alert">{erro}</p>}
       </div>
     </ModalV2>
+  );
+}
+
+/** "Próximas reuniões" deste cliente, no painel do WhatsApp (26/11) — só aparece quando há alguma */
+export function ProximasReunioes({ conversaId, cliente }: { conversaId: string; cliente: string }) {
+  const q = useReunioesDaConversa(conversaId || null);
+  const nav = useNavigate();
+  const l = q.data ?? [];
+  if (!l.length) return null;
+  return (
+    <div className="ctx-b spot wa-prox-reu" data-proximas-reunioes>
+      <div className="ctx-t">Próximas reuniões</div>
+      <ul>
+        {l.slice(0, 3).map((r) => (
+          <li key={r.id}><button type="button" onClick={() => nav('/agenda?reuniao=' + encodeURIComponent(r.id))}>
+            <span className="q num">{nomeDiaCurto(diaSP(r.inicio))} · {horaSP(r.inicio)}</span>
+            <span className="t">{nomeTipo(r.tipo)}: {r.titulo}</span>
+            {r.responsavelNome && <span className="r">com {r.responsavelNome}</span>}
+          </button></li>
+        ))}
+      </ul>
+      <button type="button" className="wa-prox-nova" onClick={() => nav(`/agenda?nova=1&conversa=${encodeURIComponent(conversaId)}&cliente=${encodeURIComponent(cliente)}`)}>Agendar outra</button>
+    </div>
   );
 }

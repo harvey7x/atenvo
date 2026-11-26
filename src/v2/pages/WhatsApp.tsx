@@ -27,7 +27,7 @@ import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDaPrevia } from '../data/config/equipes';
 import { temRecurso } from '../data/config/recursos';
 import { isRevizaMode } from '@/lib/supabase';
-import { BarraSelecao, BuscaNaConversa, DesempenhoChat, EncaminharMensagem } from '../components/ConversaExtras';
+import { BarraSelecao, BuscaNaConversa, DesempenhoChat, EncaminharMensagem, ProximasReunioes } from '../components/ConversaExtras';
 import { baixarTexto, linkDaConversa, nomeArquivoConversa, textoDaConversa } from '../lib/exportarConversa';
 import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
@@ -2004,6 +2004,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           )}
 
+          {isRevizaMode && temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
           <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
             rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
 
@@ -2258,6 +2259,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              {isRevizaMode && temRecurso('agenda') && (
+                <button type="button" className="it" onClick={() => { setPop(null); nav(`/agenda?nova=1&conversa=${encodeURIComponent(current.id)}&cliente=${encodeURIComponent(nomeExibicao(current))}`); }}>Agendar reunião</button>
+              )}
               <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>
               <button type="button" className="it" onClick={() => { setPop(null); void copiarLink(); }}>Copiar link da conversa</button>
               <button type="button" className="it" onClick={() => { setPop(null); exportarConversa(); }}>Exportar conversa</button>
