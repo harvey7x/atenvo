@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Aplica NO SERVIDOR DE PRODUÇÃO do Reviza, nesta ordem e cada uma numa transação só:
-#   120  Dashboard › CRM (rotina atd_dashboard_crm: estados, funil, etiquetas, reuniões, tarefas)
+#   120  Dashboard › CRM (rotina atd_dashboard_crm)  ·  121  fixar só para mim (atd_fixadas_minhas)
 # Preparado em 26/11 ("já pega todo o Kanban deles e integra no nosso… as mensagens também, tudo"). Para rodar:
 #   bash supabase-reviza/aplicar-crm-extra.sh confirmo
-# Só cria uma rotina de leitura. Não envia nada a
+# Só cria peças novas. Não envia nada a
 # ninguém.
 # Depois: pacote com VITE_RECURSOS incluindo "crm-extra".
 set -euo pipefail
@@ -25,7 +25,7 @@ except urllib.error.HTTPError as e:
 PY
 }
 TMP="$(mktemp -d)"
-for m in 120_dashboard_crm; do
+for m in 120_dashboard_crm 121_fixar_so_para_mim; do
   echo "» banco: migration $m (numa transação só)"
   { echo 'begin;'; cat "$AQUI/migrations/20261126_$m.sql"; echo; echo 'commit;'; } > "$TMP/$m.sql"
   sql "$TMP/$m.sql"

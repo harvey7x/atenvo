@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
+import { FIXAR_MINHA_LIGADO, useFixarParaMim, useMinhasFixadas } from '@/data/fixadasMinhas';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAtendimentoActions } from '@/data/atendimento';
 import { useScripts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script, type ScriptCategoria, type VarCtx } from '@/data/scripts';
 import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
@@ -447,7 +448,16 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
 
   const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => donosDaPrevia(seedWa()), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
-  const { demo, contacts, current, currentId, relogioMs } = inbox;
+  const { demo, contacts: contactsBase, current, currentId, relogioMs } = inbox;
+  // fixar só para mim (26/11): a conversa sobe só na MINHA lista — entra como "fixada" na ordenação de sempre
+  const minhasFixadas = useMinhasFixadas();
+  const fixarParaMim = useFixarParaMim();
+  const fixarMinhaLigado = FIXAR_MINHA_LIGADO();
+  const contacts = useMemo(() => (minhasFixadas.size === 0 ? contactsBase
+    : contactsBase.map((c) => (minhasFixadas.has(c.id) && !c.fixada ? { ...c, fixada: true, fixadaMinha: true } : c))), [contactsBase, minhasFixadas]);
+  const alternarFixarMinha = (id: string, fixar: boolean) => {
+    fixarParaMim.mutate({ conversaId: id, fixar }, { onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Não foi possível fixar.' }) });
+  };
   // NOTA INTERNA (migration 99): a nota escrita nesta tela entra no fio na hora (na demonstração, fica só aqui)
   const notasLocais = useNotasLocais(current.id || null);
   const msgsFio = useMemo(() => mesclarNotas(current.msgs, notasLocais), [current.msgs, notasLocais]);
@@ -1558,10 +1568,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                         </span>
                         <span
                           role="button" tabIndex={-1}
-                          className={'wa-pin' + (c.fixada ? ' on' : '')}
-                          title={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
-                          aria-label={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
-                          onClick={(e) => { e.stopPropagation(); void inbox.fixar(!c.fixada, c.id); }}
+                          className={'wa-pin' + (c.fixada ? ' on' : '') + (c.fixadaMinha ? ' minha' : '')}
+                          title={c.fixadaMinha ? 'Fixada só para você · clique para desafixar' : c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          aria-label={c.fixadaMinha ? 'Desafixar (fixada só para você)' : c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          onClick={(e) => { e.stopPropagation(); if (c.fixadaMinha) alternarFixarMinha(c.id, false); else void inbox.fixar(!c.fixada, c.id); }}
                         ><IcPin /></span>
                       </button>
                     );
@@ -2286,7 +2296,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               {(current.unread ?? 0) > 0
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
-              <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
+              <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? (fixarMinhaLigado ? 'Desafixar para todos' : 'Desafixar conversa') : (fixarMinhaLigado ? 'Fixar para todos' : 'Fixar conversa no topo')}</button>
+              {fixarMinhaLigado && !current.fixada && (
+                <button type="button" className="it" onClick={() => { setPop(null); alternarFixarMinha(current.id, !minhasFixadas.has(current.id)); }}>{minhasFixadas.has(current.id) ? 'Desafixar só para mim' : 'Fixar só para mim'}</button>
+              )}
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
               {isRevizaMode && temRecurso('automacoes') && (

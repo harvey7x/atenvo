@@ -106,6 +106,8 @@ export interface WaContact {
   /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
   arquivada?: boolean;
   fixada?: boolean;
+  /** 26/11: fixada só na lista de quem fixou (Reviza, recurso crm-extra) */
+  fixadaMinha?: boolean;
   silenciada?: boolean;
   /** id do contato (para abrir em Contatos e editar). */
   contatoId?: string | null;

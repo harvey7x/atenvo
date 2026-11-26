@@ -660,3 +660,7 @@ html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro :is(.fp-h-t, .fp-sub, .fp-it, .
 html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro .fp-ok { font-size: 12px; }
 html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro .fp-ok .num { font-size: 11px; }
 html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro :is(.fp-nada, .fp-it .oftag, .fp-it .ck) { font-size: 11px; }
+
+/* 26/11: fixada só para mim: o mesmo alfinete, mais claro (o title diz "só para você") */
+.v2 .conv2 .wa-pin.on.minha { opacity: .6; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin.on.minha { opacity: .6; }
