@@ -219,6 +219,7 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('aviso-espera') ? [{ slug: 'config/aviso-espera', rotulo: 'Aviso de espera', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('avisos-equipe') ? [{ slug: 'config/avisos-equipe', rotulo: 'Avisos para a equipe', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('campos') ? [{ slug: 'config/campos', rotulo: 'Campos do cliente', admin: true }, { slug: 'config/motivos', rotulo: 'Motivos de fechamento', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('venda-origem') ? [{ slug: 'config/venda', rotulo: 'Botão de venda', admin: true }, { slug: 'config/origens', rotulo: 'Origem do lead', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('financeiro') ? [{ slug: 'config/produtos', rotulo: 'Produtos e serviços', admin: true }] : []),

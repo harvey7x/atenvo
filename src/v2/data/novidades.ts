@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'avisos-equipe-26-11', titulo: 'Avisos para a equipe', onde: 'Configurações › Avisos para a equipe', quando: '26/11', recurso: 'avisos-equipe', soAdmin: true,
+    texto: 'Os 7 avisos que a equipe usava: novo lead, lead qualificado, lead desqualificado, contrato enviado, contrato assinado, reunião agendada e lead que já é cliente da carteira. Cada um chega no sino de quem o administrador escolher, com o link da conversa (nada sai pelo WhatsApp). Chegam ligados e sem ninguém para receber: escolha as pessoas em cada aviso ou use "Pôr a mesma pessoa em vários avisos". A aba Relatório mostra o que saiu.',
+    rota: '/config/avisos-equipe',
+  },
+  {
     id: 'cofre-26-11', titulo: 'Cofre de conversas', onde: 'Configurações › Cofre de conversas', quando: '26/11', recurso: 'cofre',
     texto: 'O administrador cria uma senha única para o cofre. Depois, no ⋯ de qualquer conversa, "Trancar no cofre" esconde as mensagens, a mídia e o resumo: na lista aparece "Conversa trancada" e, para ler, é preciso digitar a senha (a conversa fica aberta por 15 minutos naquela aba). As mensagens continuam chegando e a IA continua respondendo.',
     rota: '/config/cofre',

@@ -31,6 +31,9 @@
      financeiro    Configurações › Produtos e serviços, o Financeiro no painel do cliente do WhatsApp (lançar a venda ou a
                    cobrança) e o Dashboard › Financeiro (26/11, migration 112)
      cofre         Configurações › Cofre de conversas: uma senha esconde o conteúdo das conversas trancadas (26/11, migration 113)
+     avisos-equipe Configurações › Avisos para a equipe: os 7 avisos dos momentos que importam (novo lead, qualificado,
+                   desqualificado, contrato enviado, contrato assinado, reunião, cliente da carteira) no SINO de quem o
+                   administrador escolher, e o relatório (26/11, migration 114). Chegam ligados e sem destinatários
      chat-equipe   o chat da equipe no Atendimento (25/11): conversas entre colegas, de pessoa para pessoa e em
                    grupo, com o número de não lidas no menu (migration 102; o tempo real usa a publicação do Supabase)
      ao-vivo       a aba Ao vivo do Dashboard (25/11): as conversas abertas agora, uma coluna por atendente,
@@ -53,7 +56,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

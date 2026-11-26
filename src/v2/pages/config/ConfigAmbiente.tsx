@@ -19,6 +19,7 @@
      origens       de onde vieram os leads, as origens cadastradas e a origem de cada número          (admin)
      produtos      o catálogo de produtos e serviços, com o valor de cada um                           (admin)
      cofre         a senha do cofre e as conversas trancadas                                            (admin)
+     avisos-equipe os avisos para a equipe no sino (quem recebe cada um) e o relatório                (admin)
      conta · notificacoes · preferencias      o que é da própria pessoa                         (todos)
    As quatro últimas são as seções da tela de Configurações de antes, uma por vez (abaFixa). */
 import { lazy, Suspense } from 'react';
@@ -45,12 +46,13 @@ import { ConfigVenda } from './ConfigVenda';
 import { ConfigOrigens } from './ConfigOrigens';
 import { ConfigProdutos } from './ConfigProdutos';
 import { ConfigCofre } from './ConfigCofre';
+import { ConfigAvisosEquipe } from './ConfigAvisosEquipe';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre', 'avisos-equipe']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -82,7 +84,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || ((secao === 'campos' || secao === 'motivos') && !(temRecurso('campos') && temRecurso('atendimento'))) || ((secao === 'venda' || secao === 'origens') && !(temRecurso('venda-origem') && temRecurso('atendimento'))) || (secao === 'produtos' && !(temRecurso('financeiro') && temRecurso('atendimento'))) || (secao === 'cofre' && !(temRecurso('cofre') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || ((secao === 'campos' || secao === 'motivos') && !(temRecurso('campos') && temRecurso('atendimento'))) || ((secao === 'venda' || secao === 'origens') && !(temRecurso('venda-origem') && temRecurso('atendimento'))) || (secao === 'produtos' && !(temRecurso('financeiro') && temRecurso('atendimento'))) || (secao === 'cofre' && !(temRecurso('cofre') && temRecurso('atendimento'))) || (secao === 'avisos-equipe' && !(temRecurso('avisos-equipe') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')) || (servico === 'anuncios' && !(temRecurso('anuncios') && temRecurso('atendimento'))) || (servico === 'ia' && !(temRecurso('ia-propria') && temRecurso('atendimento'))))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
@@ -107,6 +109,7 @@ export default function ConfigAmbiente() {
   if (secao === 'origens') return (<><Cabecalho titulo="Origem do lead" sub="De onde cada lead veio. O sistema reconhece o anúncio sozinho; sem origem, o lead aparece como Indefinida." /><ConfigOrigens /></>);
   if (secao === 'produtos') return (<><Cabecalho titulo="Produtos e serviços" sub="O catálogo do que a empresa vende, com o valor de cada item, para lançar no Financeiro do cliente." /><ConfigProdutos /></>);
   if (secao === 'cofre') return (<><Cabecalho titulo="Cofre de conversas" sub="Uma senha única esconde o conteúdo das conversas trancadas. Só quem tem a senha abre." /><ConfigCofre /></>);
+  if (secao === 'avisos-equipe') return (<><Cabecalho titulo="Avisos para a equipe" sub="Avisos automáticos no sino de quem você escolher, quando o cliente chega num momento que importa." /><ConfigAvisosEquipe /></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
 }
