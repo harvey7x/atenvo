@@ -159,18 +159,19 @@ function ConversasDeLa({ aoAvisar }: { aoAvisar: (a: { texto: string; tom: 'ok' 
             ? `${int(c.baixados)} de ${int(c.contatosLa)} contatos já vieram (${int(c.mensagensBaixadas)} mensagens). O resto chega sozinho, devagar, no limite que o sistema de antes permite.`
             : `Os ${int(c.contatosLa)} contatos de lá já vieram, com ${int(c.mensagensBaixadas)} mensagens.`}</p>
         </div>
-        {temNumero && semNumero === 0 && c.conversas > 0 && <BotaoSec onClick={() => nav('/whatsapp')}>Abrir o WhatsApp</BotaoSec>}
+        {c.conversas > 0 && <BotaoSec onClick={() => nav('/whatsapp')}>Abrir o WhatsApp</BotaoSec>}
       </div>
       <dl className="cfgimp-resumo cfgimp-resumo-4">
         <div><dt>Conversas</dt><dd className="num">{int(c.conversas)}</dd></div>
         <div><dt>Mensagens</dt><dd className="num">{int(c.mensagens)}</dd></div>
         <div><dt>Abertas</dt><dd className="num">{int(c.conexoes.reduce((s, x) => s + x.abertas, 0))}</dd></div>
-        <div><dt>Sem número</dt><dd className="num">{int(semNumero)}</dd></div>
+        <div><dt>No histórico</dt><dd className="num">{int(semNumero)}</dd></div>
       </dl>
-      {!temNumero && c.conversas > 0 && (
+      {semNumero > 0 && (
         <p className="cfgimp-aviso" role="note">
-          O WhatsApp daqui mostra só as conversas que têm um número. Conecte os números em Configurações › WhatsApp e volte aqui para
-          escolher qual número fica com as conversas de cada conexão de lá. Até lá elas ficam guardadas, com o card do Kanban ligado a elas.
+          As conversas de lá já aparecem no WhatsApp, no número “Histórico (sistema anterior)”, só para leitura.
+          {temNumero ? ' Escolha abaixo qual número fica com as conversas de cada conexão de lá: aí dá para responder por ele.'
+            : ' Quando conectarem os números em Configurações › WhatsApp, volte aqui e escolha qual número fica com as conversas de cada conexão de lá.'}
         </p>
       )}
       {c.conexoes.length > 0 && (
@@ -186,7 +187,7 @@ function ConversasDeLa({ aoAvisar }: { aoAvisar: (a: { texto: string; tom: 'ok' 
                   <td>
                     <select className="inp" value={x.canalId ?? ''} disabled={!temNumero || ligar.isPending} aria-label={`Número daqui para as conversas de ${nomeConexao(x.conexao)}`}
                       onChange={(ev) => void passar(x, ev.target.value)}>
-                      <option value="">{temNumero ? 'Escolha o número' : 'Nenhum número conectado'}</option>
+                      <option value="">{temNumero ? 'No histórico · escolha o número' : 'No histórico (nenhum número conectado)'}</option>
                       {c.numeros.map((p) => <option key={p.id} value={p.id} disabled={!p.ativo}>{p.nome}{p.numero ? ` · ${p.numero.slice(-4)}` : ''}</option>)}
                     </select>
                   </td>
