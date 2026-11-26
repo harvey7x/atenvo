@@ -567,3 +567,7 @@
 .v2 .kc-campos dd { color: var(--txt); font-weight: 500; }
 html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-campos > div { font-size: 11.5px; }
 .v2 .kb-cols.denso .kc-campos { display: none; }
+/* o botão de venda no detalhe do lead (26/11, Configurações › Botão de venda): o mesmo da conversa do WhatsApp */
+.v2 .kd-venda { all: unset; box-sizing: border-box; cursor: pointer; margin-top: 10px; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 7px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
+.v2 .kd-venda:hover { filter: brightness(1.06); }
+.v2 .kd-venda:focus-visible { outline: 2px solid var(--txt); outline-offset: 2px; }

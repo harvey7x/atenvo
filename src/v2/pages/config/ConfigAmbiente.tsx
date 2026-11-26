@@ -15,6 +15,10 @@
      aviso-espera  o sino avisa quem está esperando além da meta: o responsável e depois os gestores (admin)
      campos        os campos do cliente que a equipe preenche (como o "Nome completo (RG)") e o cartão do Kanban (admin)
      motivos       os motivos do "Fechar conversa" e o histórico de quem fechou e por quê            (admin)
+     venda         o nome do botão que marca a venda, o histórico de vendas e a venda na Meta          (admin)
+     origens       de onde vieram os leads, as origens cadastradas e a origem de cada número          (admin)
+     produtos      o catálogo de produtos e serviços, com o valor de cada um                           (admin)
+     cofre         a senha do cofre e as conversas trancadas                                            (admin)
      conta · notificacoes · preferencias      o que é da própria pessoa                         (todos)
    As quatro últimas são as seções da tela de Configurações de antes, uma por vez (abaFixa). */
 import { lazy, Suspense } from 'react';
@@ -37,12 +41,16 @@ import { ConfigAvisoEspera } from './ConfigAvisoEspera';
 import { ConfigChaveIa } from './ConfigChaveIa';
 import { ConfigCampos } from './ConfigCampos';
 import { ConfigMotivos } from './ConfigMotivos';
+import { ConfigVenda } from './ConfigVenda';
+import { ConfigOrigens } from './ConfigOrigens';
+import { ConfigProdutos } from './ConfigProdutos';
+import { ConfigCofre } from './ConfigCofre';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -74,7 +82,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || ((secao === 'campos' || secao === 'motivos') && !(temRecurso('campos') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || ((secao === 'campos' || secao === 'motivos') && !(temRecurso('campos') && temRecurso('atendimento'))) || ((secao === 'venda' || secao === 'origens') && !(temRecurso('venda-origem') && temRecurso('atendimento'))) || (secao === 'produtos' && !(temRecurso('financeiro') && temRecurso('atendimento'))) || (secao === 'cofre' && !(temRecurso('cofre') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')) || (servico === 'anuncios' && !(temRecurso('anuncios') && temRecurso('atendimento'))) || (servico === 'ia' && !(temRecurso('ia-propria') && temRecurso('atendimento'))))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
@@ -95,6 +103,10 @@ export default function ConfigAmbiente() {
   if (secao === 'aviso-espera') return (<><Cabecalho titulo="Aviso de espera" sub="O sino avisa quando um cliente passa da meta sem resposta: primeiro o responsável pela conversa, depois os gestores." /><ConfigAvisoEspera /></>);
   if (secao === 'campos') return (<><Cabecalho titulo="Campos do cliente" sub="O que a equipe preenche sobre cada cliente no painel do WhatsApp, e o que aparece no cartão do Kanban." /><ConfigCampos /></>);
   if (secao === 'motivos') return (<><Cabecalho titulo="Motivos de fechamento" sub="As opções que aparecem ao fechar uma conversa, e o histórico de quem fechou e por quê." /><ConfigMotivos /></>);
+  if (secao === 'venda') return (<><Cabecalho titulo="Botão de venda" sub="O nome do botão que marca a venda como fechada, no WhatsApp e no Kanban, e quem marcou cada venda." /><ConfigVenda /></>);
+  if (secao === 'origens') return (<><Cabecalho titulo="Origem do lead" sub="De onde cada lead veio. O sistema reconhece o anúncio sozinho; sem origem, o lead aparece como Indefinida." /><ConfigOrigens /></>);
+  if (secao === 'produtos') return (<><Cabecalho titulo="Produtos e serviços" sub="O catálogo do que a empresa vende, com o valor de cada item, para lançar no Financeiro do cliente." /><ConfigProdutos /></>);
+  if (secao === 'cofre') return (<><Cabecalho titulo="Cofre de conversas" sub="Uma senha única esconde o conteúdo das conversas trancadas. Só quem tem a senha abre." /><ConfigCofre /></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
 }

@@ -37,9 +37,9 @@ function Editor({ campo, inicial, aoGravar, aoSair, gravando }: { campo: Campo; 
           {v && !campo.opcoes.includes(v) && <option value={v}>{v}</option>}
         </select>
         : <input {...comum} value={v} maxLength={500} onChange={(e) => setV(e.target.value)}
-          type={campo.tipo === 'data' ? 'date' : campo.tipo === 'email' ? 'email' : campo.tipo === 'telefone' ? 'tel' : 'text'}
-          inputMode={campo.tipo === 'numero' ? 'decimal' : undefined}
-          placeholder={campo.tipo === 'numero' ? 'Ex.: 3' : campo.tipo === 'telefone' ? '(51) 99999-0000' : campo.tipo === 'email' ? 'nome@exemplo.com' : 'Escreva aqui'} />}
+          type={campo.tipo === 'data' ? 'date' : campo.tipo === 'data_hora' ? 'datetime-local' : campo.tipo === 'email' ? 'email' : campo.tipo === 'telefone' ? 'tel' : 'text'}
+          inputMode={campo.tipo === 'numero' ? 'decimal' : campo.tipo === 'inteiro' ? 'numeric' : undefined}
+          placeholder={campo.tipo === 'inteiro' ? 'Ex.: 3' : campo.tipo === 'numero' ? 'Ex.: 2,5' : campo.tipo === 'telefone' ? '(51) 99999-0000' : campo.tipo === 'email' ? 'nome@exemplo.com' : 'Escreva aqui'} />}
       <div className="cpc-ed-ac">
         <button type="button" className="cpc-ok" disabled={gravando} onClick={() => aoGravar(v)}>{gravando ? 'Gravando…' : 'Gravar'}</button>
         <button type="button" className="cpc-limpa" onClick={aoSair}>Cancelar</button>

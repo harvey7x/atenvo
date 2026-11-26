@@ -6,8 +6,9 @@
 import { useState } from 'react';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoErro, EstadoVazio, ModalV2, Toggle } from '../../components';
 import { AcoesNoTopo } from '../comunicacao/MenuMais';
+import { temRecurso } from '../../data/config/recursos';
 import {
-  NOME_MAX, OPCOES_MAX, ROTULO_TIPO, TIPOS_CAMPO, limparOpcoes, useApagarCampo, useCampos, useOrdenarCampos, useSalvarCampo, useUsoDosCampos, validarCampo,
+  NOME_MAX, OPCOES_MAX, ROTULO_TIPO, TIPOS_CAMPO, limparOpcoes, tiposDisponiveis, useApagarCampo, useCampos, useOrdenarCampos, useSalvarCampo, useUsoDosCampos, validarCampo,
   type Campo, type TipoCampo,
 } from '@/data/camposPersonalizados';
 import '../painel/painel.css';
@@ -170,7 +171,7 @@ function JanelaCampo({ campo, campos, usados, cheioNoCartao, aoFechar, aoAvisar 
         <div className="pn-us-campo">
           <label htmlFor="cmp-tipo">Tipo</label>
           <select id="cmp-tipo" className="inp" value={tipo} onChange={(e) => { setTipo(e.target.value as TipoCampo); setErro(''); }}>
-            {TIPOS_CAMPO.map((t) => <option key={t.valor} value={t.valor}>{t.rotulo}</option>)}
+            {(() => { const ok = tiposDisponiveis(temRecurso('venda-origem')); return ok.some((t) => t.valor === tipo) ? ok : [...ok, ...TIPOS_CAMPO.filter((t) => t.valor === tipo)]; })().map((t) => <option key={t.valor} value={t.valor}>{t.rotulo}</option>)}
           </select>
           <span className="cfgc-dica">{TIPOS_CAMPO.find((t) => t.valor === tipo)?.dica}{campo && campo.tipo !== tipo && usados > 0 ? '. Os valores já preenchidos continuam como estão.' : ''}</span>
         </div>

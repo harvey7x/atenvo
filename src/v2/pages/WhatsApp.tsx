@@ -51,7 +51,11 @@ import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
 import { textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
 import { opcoesDeFechamento, useMotivos } from '@/data/motivosFechamento';
+import { rotuloBotao, useConfigVenda } from '@/data/vendaOrigem';
 import { CamposDoCliente } from '../components/CamposDoCliente';
+import { FinanceiroDoCliente } from '../components/FinanceiroDoCliente';
+import { CofrePortao } from '../components/CofrePortao';
+import { useCofreDaConversa } from '@/data/cofre';
 import { DocumentosDaConversa, ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
 import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
@@ -636,6 +640,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   // a lista do "Fechar conversa": a de Configurações › Motivos de fechamento (migration 110) ou a fixa
   const motivosQ = useMotivos();
   const opcoesFech = opcoesDeFechamento(motivosQ.data);
+  // o cofre de conversas (26/11, migration 113): a conversa trancada só mostra o conteúdo com a senha do cofre
+  const cofre = useCofreDaConversa(isRevizaMode && temRecurso('cofre'));
+  const noCofre = (id: string | undefined | null) => !!id && cofre.trancada(id) && !cofre.aberta(id);
   const [motivoFechDet, setMotivoFechDet] = useState('');
   const registrarFechamento = useRegistrarFechamento();
   const [devolverConfirm, setDevolverConfirm] = useState(false);
@@ -1533,7 +1540,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                             {c.iaAtiva && <span className="ia-ic" title="A IA está atendendo esta conversa" aria-label="IA atendendo"><IcBot /></span>}
                             {tabEf === 'iris' && irisMapa.get(c.id)?.atendente_original_nome && <span className="cchip iris-era" title="Atendente original">Era: {irisMapa.get(c.id)?.atendente_original_nome}</span>}
                           </span>
-                          <span className="p">{c.last || '—'}</span>
+                          <span className="p">{noCofre(c.id)
+                            ? <span className="cofre-lista"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>Conversa trancada</span>
+                            : (c.last || '—')}</span>
                           <span className="chips">
                             <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={corSit ? ({ ['--pt-cor']: corSit } as React.CSSProperties) : undefined}><i className="pt" aria-hidden />{sit.texto}</span>
                             {segundo}
@@ -1707,8 +1716,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               </div>
             )}
 
+            {current && cofre.trancada(current.id) && cofre.aberta(current.id) && (
+              <div className="cofre-aberta" role="status">Conversa do cofre aberta nesta aba até {new Date(cofre.ateQuando(current.id) ?? Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.<button type="button" onClick={() => cofre.fechar(current.id)}>Fechar agora</button></div>
+            )}
             <div className="wa-msgs" ref={msgsRef}>
-              {itensFio.map((item, i) =>
+              {current && noCofre(current.id) ? (
+                <CofrePortao aoAbrir={(senha) => cofre.abrir(current.id, senha)}
+                  aoTirar={async (senha) => { const r = await cofre.tirar(current.id, senha); if (r === 'ok') aoAvisar({ tom: 'ok', texto: 'Conversa tirada do cofre.' }); return r; }} />
+              ) : itensFio.map((item, i) =>
                 item.tipo === 'handoff' ? (
                   /* PEÇA 3 — o alerta é perceptível sem gritar: hairline + glifo + bolinha âmbar
                      (a única cor) + tinta levíssima, no ponto do handoff */
@@ -1968,7 +1983,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       {temConversa && (
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">
-          {midiasAba ? (
+          {midiasAba && !noCofre(current.id) ? (
             <MidiasPainel midias={midias} demo={demo} aba={midiasAba} aoTrocarAba={setMidiasAba} aoVoltar={() => setMidiasAba(null)}
               aoAbrirFoto={abrirFotoDoPainel} aoIrParaMensagem={irParaMensagem} />
           ) : (<>
@@ -2012,11 +2027,13 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           {/* campos personalizados do cliente (26/11, migration 110): os de Configurações › Campos do cliente */}
           {isRevizaMode && temRecurso('campos') && <CamposDoCliente key={current.contatoId ?? current.id} contatoId={current.contatoId ?? null} />}
           {isRevizaMode && temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
+          {!noCofre(current.id) && (<>
           <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
             rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
 
           {/* IA com a chave da própria empresa (25/11): só na Reviza, com o recurso 'ia-propria' */}
           <ResumoAtendimento conversaId={current.id} msgs={current.msgs} demo={demo} />
+          </>)}
 
           <div className="ctx-b spot">
             <div className="ctx-t">Status</div>
@@ -2029,6 +2046,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} senhaIdentificada={senhasIdent[current.id]} />
 
           <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
+          {/* Financeiro do cliente (26/11, migration 112): o que comprou e o que está em cobrança, e o "Novo lançamento" */}
+          {isRevizaMode && temRecurso('financeiro') && <FinanceiroDoCliente key={'fin-' + (current.contatoId ?? current.id)} contatoId={current.contatoId ?? null} />}
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
@@ -2269,9 +2288,15 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               {isRevizaMode && temRecurso('agenda') && (
                 <button type="button" className="it" onClick={() => { setPop(null); nav(`/agenda?nova=1&conversa=${encodeURIComponent(current.id)}&cliente=${encodeURIComponent(nomeExibicao(current))}`); }}>Agendar reunião</button>
               )}
-              <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>
+              {!noCofre(current.id) && <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>}
               <button type="button" className="it" onClick={() => { setPop(null); void copiarLink(); }}>Copiar link da conversa</button>
-              <button type="button" className="it" onClick={() => { setPop(null); exportarConversa(); }}>Exportar conversa</button>
+              {!noCofre(current.id) && <button type="button" className="it" onClick={() => { setPop(null); exportarConversa(); }}>Exportar conversa</button>}
+              {cofre.ligado && !cofre.trancada(current.id) && (
+                <button type="button" className="it" onClick={() => { setPop(null); void cofre.trancar(current.id).then(() => aoAvisar({ tom: 'ok', texto: 'Conversa trancada no cofre. Para ler, só com a senha do cofre.' })).catch((x) => aoAvisar({ tom: 'erro', texto: (x as Error).message })); }}>Trancar no cofre</button>
+              )}
+              {cofre.ligado && cofre.trancada(current.id) && cofre.aberta(current.id) && (
+                <button type="button" className="it" onClick={() => { setPop(null); cofre.fechar(current.id); }}>Fechar o cofre desta conversa</button>
+              )}
               {iaBarSinal && (
                 <button type="button" className="it" disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar." onClick={() => { setPop(null); void recomecarIa(); }}>Recomeçar atendimento da IA</button>
               )}
@@ -2652,6 +2677,8 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const mover = useMoverOportunidade();
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
+  // o nome do botão de venda (Configurações › Botão de venda; padrão "Contrato fechado")
+  const nomeVenda = rotuloBotao(useConfigVenda().data);
   const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
   const admSt = useAdmStatus().data;
   const admAtivo = admSt?.ativo ?? false;
@@ -2704,7 +2731,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
       {isRevizaMode && (() => {
         const ganho = colunas.find((c) => c.resultado === 'ganho');
         if (!ganho || colAtual?.resultado === 'ganho' || colAtual?.resultado === 'perdido') return null;
-        return <BotaoMini className="wa-contrato" title={`Contrato fechado: leva o card para ${ganho.nome}`} disabled={movBusy} onClick={() => aoTrocarColuna(ganho.id)}>Contrato fechado</BotaoMini>;
+        return <BotaoMini className="wa-contrato" title={`${nomeVenda}: leva o card para ${ganho.nome}`} disabled={movBusy} onClick={() => aoTrocarColuna(ganho.id)}>{nomeVenda}</BotaoMini>;
       })()}
       <ModalV2
         aberto={!!motivoModal}

@@ -19,6 +19,21 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'cofre-26-11', titulo: 'Cofre de conversas', onde: 'Configurações › Cofre de conversas', quando: '26/11', recurso: 'cofre',
+    texto: 'O administrador cria uma senha única para o cofre. Depois, no ⋯ de qualquer conversa, "Trancar no cofre" esconde as mensagens, a mídia e o resumo: na lista aparece "Conversa trancada" e, para ler, é preciso digitar a senha (a conversa fica aberta por 15 minutos naquela aba). As mensagens continuam chegando e a IA continua respondendo.',
+    rota: '/config/cofre',
+  },
+  {
+    id: 'financeiro-26-11', titulo: 'Produtos e o financeiro do cliente', onde: 'WhatsApp › painel do cliente · Dashboard › Financeiro', quando: '26/11', recurso: 'financeiro',
+    texto: 'O administrador cadastra os produtos e serviços com o valor (Configurações › Produtos e serviços). No painel do cliente, o Financeiro mostra o que ele comprou e o que está em cobrança, e o "Novo lançamento" traz o produto e o valor. O Dashboard ganhou a aba Financeiro: receita, valor por cliente, cobranças em aberto, por responsável, por produto, por mês e os clientes que mais compraram.',
+    rota: '/whatsapp',
+  },
+  {
+    id: 'venda-origem-26-11', titulo: 'Botão de venda e origem do lead', onde: 'Configurações › Botão de venda · › Origem do lead', quando: '26/11', recurso: 'venda-origem', soAdmin: true,
+    texto: 'O nome do botão que marca a venda (o "Contrato fechado") agora é escolhido em Configurações, e ele aparece também no detalhe do lead no Kanban; a aba Histórico mostra quem marcou cada venda. Em Origem do lead: de onde vieram as conversas novas (anúncio, a origem do número de WhatsApp ou "Indefinida"), as origens cadastradas e a origem de cada número. Os campos do cliente ganharam os tipos "Número inteiro" e "Data e hora".',
+    rota: '/config/venda',
+  },
+  {
     id: 'campos-cliente-26-11', titulo: 'Campos do cliente', onde: 'WhatsApp › painel do cliente', quando: '26/11', recurso: 'campos',
     texto: 'Os campos que a equipe preenche sobre cada cliente, como o "Nome completo (RG)", ficam no painel do cliente do WhatsApp: clique no valor para preencher ou mudar. O administrador cria os campos (texto, número, data, lista de opções, sim ou não, telefone, e-mail) em Configurações › Campos do cliente e escolhe até 3 para aparecer no cartão do Kanban.',
     rota: '/whatsapp',

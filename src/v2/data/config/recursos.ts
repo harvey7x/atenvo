@@ -25,6 +25,12 @@
      campos        campos personalizados do cliente e motivos de fechamento configuráveis (26/11, migration 110):
                    Configurações › Campos do cliente e › Motivos de fechamento (com o histórico), o bloco "Campos" no
                    painel do cliente do WhatsApp e os campos marcados no cartão do Kanban
+     venda-origem  Configurações › Botão de venda (nome do botão + histórico de quem marcou; a venda na Meta fica travada
+                   até as Conversões da Meta estarem conectadas) e › Origem do lead (origens, origem de cada número e de onde
+                   vieram as conversas novas); e os tipos "Número inteiro" e "Data e hora" nos campos (26/11, migration 111)
+     financeiro    Configurações › Produtos e serviços, o Financeiro no painel do cliente do WhatsApp (lançar a venda ou a
+                   cobrança) e o Dashboard › Financeiro (26/11, migration 112)
+     cofre         Configurações › Cofre de conversas: uma senha esconde o conteúdo das conversas trancadas (26/11, migration 113)
      chat-equipe   o chat da equipe no Atendimento (25/11): conversas entre colegas, de pessoa para pessoa e em
                    grupo, com o número de não lidas no menu (migration 102; o tempo real usa a publicação do Supabase)
      ao-vivo       a aba Ao vivo do Dashboard (25/11): as conversas abertas agora, uma coluna por atendente,
@@ -47,7 +53,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

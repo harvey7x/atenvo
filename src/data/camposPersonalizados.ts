@@ -13,16 +13,20 @@ import { useOrg } from '@/context/OrgContext';
 
 export const CAMPOS_REAL: boolean = isSupabaseConfigured && !!supabase;
 
-export type TipoCampo = 'texto' | 'numero' | 'data' | 'lista' | 'sim_nao' | 'telefone' | 'email';
+export type TipoCampo = 'texto' | 'numero' | 'inteiro' | 'data' | 'data_hora' | 'lista' | 'sim_nao' | 'telefone' | 'email';
 export const TIPOS_CAMPO: { valor: TipoCampo; rotulo: string; dica: string }[] = [
   { valor: 'texto', rotulo: 'Texto', dica: 'Qualquer texto curto' },
-  { valor: 'numero', rotulo: 'Número', dica: 'Só números, como a quantidade de contratos' },
+  { valor: 'inteiro', rotulo: 'Número inteiro', dica: 'Só números sem vírgula, como a quantidade de contratos' },
+  { valor: 'numero', rotulo: 'Número decimal', dica: 'Números com vírgula, como um valor ou uma taxa' },
   { valor: 'data', rotulo: 'Data', dica: 'Dia, mês e ano' },
+  { valor: 'data_hora', rotulo: 'Data e hora', dica: 'Dia, mês, ano, hora e minuto' },
   { valor: 'lista', rotulo: 'Lista de opções', dica: 'A equipe escolhe uma das opções' },
   { valor: 'sim_nao', rotulo: 'Sim ou não', dica: 'Duas opções: sim ou não' },
   { valor: 'telefone', rotulo: 'Telefone', dica: 'Outro número de contato' },
   { valor: 'email', rotulo: 'E-mail', dica: 'Um endereço de e-mail' },
 ];
+/** os tipos que esta instalação aceita: "Número inteiro" e "Data e hora" vêm com a migration 111 (recurso 'venda-origem') */
+export const tiposDisponiveis = (com111: boolean) => TIPOS_CAMPO.filter((t) => com111 || (t.valor !== 'inteiro' && t.valor !== 'data_hora'));
 export const ROTULO_TIPO: Record<TipoCampo, string> = Object.fromEntries(TIPOS_CAMPO.map((t) => [t.valor, t.rotulo])) as Record<TipoCampo, string>;
 
 export interface Campo {
@@ -62,6 +66,8 @@ export function validarValor(c: Pick<Campo, 'tipo' | 'opcoes'>, bruto: string): 
   if (v.length > VALOR_MAX) return { erro: `Vai até ${VALOR_MAX} letras.` };
   switch (c.tipo) {
     case 'numero': return /^-?\d+([.,]\d+)?$/.test(v) ? { valor: v } : { erro: 'Escreva só o número.' };
+    case 'inteiro': return /^-?\d+$/.test(v) ? { valor: v } : { erro: 'Escreva só o número, sem vírgula.' };
+    case 'data_hora': return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) && !isNaN(new Date(v).getTime()) ? { valor: v } : { erro: 'Escolha o dia e a hora.' };
     case 'data': return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + 'T12:00:00').getTime()) ? { valor: v } : { erro: 'Escolha a data.' };
     case 'sim_nao': return v === 'sim' || v === 'nao' ? { valor: v } : { erro: 'Escolha sim ou não.' };
     case 'lista': return c.opcoes.includes(v) ? { valor: v } : { erro: 'Escolha uma das opções.' };
@@ -76,6 +82,7 @@ export function mostrarValor(c: Pick<Campo, 'tipo'>, v: string | null | undefine
   if (v == null || v === '') return '';
   if (c.tipo === 'sim_nao') return v === 'sim' ? 'Sim' : 'Não';
   if (c.tipo === 'data') { const [a, m, d] = v.split('-'); return d && m && a ? `${d}/${m}/${a}` : v; }
+  if (c.tipo === 'data_hora') { const [dia, hora] = v.split('T'); const [a, m, d] = (dia ?? '').split('-'); return d && m && a && hora ? `${d}/${m}/${a} ${hora}` : v; }
   return v;
 }
 
@@ -257,7 +264,7 @@ export function useSalvarValor() {
         : await supabase!.from('atd_campo_valores').delete().eq('contato_id', v.contatoId).eq('campo_id', v.campoId);
       if (error) {
         const m = error.message;
-        throw new Error(/numero_invalido/.test(m) ? 'Escreva só o número.' : /data_invalida/.test(m) ? 'Escolha a data.' : /opcao_invalida/.test(m) ? 'Essa opção não está mais na lista.' : /row-level|permission/i.test(m) ? 'Você não pode mudar este cliente.' : m);
+        throw new Error(/inteiro_invalido/.test(m) ? 'Escreva só o número, sem vírgula.' : /data_hora_invalida/.test(m) ? 'Escolha o dia e a hora.' : /numero_invalido/.test(m) ? 'Escreva só o número.' : /data_invalida/.test(m) ? 'Escolha a data.' : /opcao_invalida/.test(m) ? 'Essa opção não está mais na lista.' : /row-level|permission/i.test(m) ? 'Você não pode mudar este cliente.' : m);
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [CHAVE_V] }),

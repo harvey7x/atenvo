@@ -1,4 +1,5 @@
 import { ResumoDiaAba } from './dashboardV5/ResumoDiaAba';
+import { FinanceiroAba } from './dashboardV5/FinanceiroAba';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, MSG_ABA_NAO_LIGADA, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
@@ -41,10 +42,11 @@ const ABAS = [
   { valor: 'anuncios', rotulo: 'Anúncios' }, // 25/11: os anúncios do Facebook — investido, custo por lead, qual campanha roda melhor (só com o recurso 'anuncios')
   { valor: 'atendentes', rotulo: 'Atendentes' },
   { valor: 'resumo', rotulo: 'Resumo do dia' }, // 25/11: o dia da equipe numa tela só + o aviso no sino (só com o recurso 'resumo-dia')
+  { valor: 'financeiro', rotulo: 'Financeiro' }, // 26/11: receita, cobranças, por responsável e por produto (só com o recurso 'financeiro')
 ] as const;
 type AbaDash = typeof ABAS[number]['valor'];
 /** as abas desta instalação: Anúncios e Ao vivo só com o recurso ligado (a parte do servidor existe) */
-const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')) && (a.valor !== 'resumo' || temRecurso('resumo-dia')));
+const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')) && (a.valor !== 'resumo' || temRecurso('resumo-dia')) && (a.valor !== 'financeiro' || temRecurso('financeiro')));
 const ehAba = (v: string | null): v is AbaDash => abasVisiveis().some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
@@ -154,8 +156,8 @@ export default function DashboardV2() {
     <div className="d5-pg" aria-busy={trocando || undefined}>
       <Cabecalho
         preset={preset} setPreset={setPreset} periodo={periodo}
-        rotulo={aba === 'aovivo' ? 'Agora, ao vivo: atualiza sozinho a cada 30 segundos' : aba === 'resumo' ? 'Um dia só: escolha o dia logo abaixo' : rotuloPeriodoV5(preset, periodo, hoje)}
-        semPeriodo={aba === 'aovivo' || aba === 'resumo'}
+        rotulo={aba === 'aovivo' ? 'Agora, ao vivo: atualiza sozinho a cada 30 segundos' : aba === 'resumo' ? 'Um dia só: escolha o dia logo abaixo' : aba === 'financeiro' ? 'O período e o responsável ficam logo abaixo' : rotuloPeriodoV5(preset, periodo, hoje)}
+        semPeriodo={aba === 'aovivo' || aba === 'resumo' || aba === 'financeiro'}
         ini={ini} fim={fim} setIni={setIni} setFim={setFim} hoje={hoje}
         mesCaf={mesCaf} setMesCaf={setMesCaf}
         geradoEm={(qAtivo.data as { geradoEm?: string } | undefined)?.geradoEm ?? d?.geradoEm ?? null}
@@ -226,6 +228,7 @@ export default function DashboardV2() {
       )}
 
       {aba === 'resumo' && <ResumoDiaAba hoje={hoje} />}
+      {aba === 'financeiro' && <FinanceiroAba />}
 
       {aba === 'anuncios' && (
         <>

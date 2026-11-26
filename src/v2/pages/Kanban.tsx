@@ -7,6 +7,7 @@ import { useOrg } from '@/context/OrgContext';
 import { isRevizaMode } from '@/lib/supabase';
 import { temRecurso } from '../data/config/recursos';
 import { mostrarValor, useCampos, useValoresNoCartao } from '@/data/camposPersonalizados';
+import { rotuloBotao, useConfigVenda } from '@/data/vendaOrigem';
 import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import {
   KANBAN_REAL, PROGRESSO_KANBAN, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
@@ -1525,6 +1526,7 @@ export default function KanbanV2() {
           aoAbrirConversa={() => {
             nav((detLead.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(detLead.conversaOrigemId ?? '')}`);
           }}
+          aoMarcarVenda={isRevizaMode && !admAtivo ? (colId) => { const id = detLead.id; setDetId(null); void mover(id, colId); } : undefined}
         />
       )}
     </div>
@@ -2159,10 +2161,13 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
    (componente v1 reusado INTEIRO no real — bytes idênticos) e
    RelacionamentoContatoBox. No demo, a ficha vira leitura semeada.
    ================================================================ */
-function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFechar, aoEditar, aoAbrirConversa }: {
+function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFechar, aoEditar, aoAbrirConversa, aoMarcarVenda }: {
   demo: boolean; l: KLead; colunas: KColuna[]; eventosDemo?: OppEvento[]; fichaDemoStatus?: string;
   aoFechar: () => void; aoEditar: () => void; aoAbrirConversa: () => void;
+  /** o botão de venda (Reviza, 26/11): leva o card para a etapa de ganho, com a confirmação de sempre */
+  aoMarcarVenda?: (colunaId: string) => void;
 }) {
+  const nomeVenda = rotuloBotao(useConfigVenda().data);
   const eventosQ = useOportunidadeEventos(demo ? null : l.id);
   const eventos = demo ? (eventosDemo ?? []) : (eventosQ.data ?? []);
   const etiquetasCat = useEtiquetas().data ?? [];
@@ -2193,6 +2198,11 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
               {l.status === 'perdido' && <span className="kd-flag perdido">Perdido</span>}
               {paradoDet && <span className="kd-flag parado">Parado {dpDet}d</span>}
             </div>
+            {aoMarcarVenda && (() => {
+              const ganho = colunas.find((c) => c.resultado === 'ganho');
+              if (!ganho || l.status !== 'em_andamento' || etapaCol?.resultado === 'ganho' || etapaCol?.resultado === 'perdido') return null;
+              return <button type="button" className="kd-venda" title={`${nomeVenda}: leva o card para ${ganho.nome}`} onClick={() => aoMarcarVenda(ganho.id)}>{nomeVenda}</button>;
+            })()}
           </div>
         </div>
       <div className="kb-sec-h">Contato</div>

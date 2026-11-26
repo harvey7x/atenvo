@@ -220,6 +220,9 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('aviso-espera') ? [{ slug: 'config/aviso-espera', rotulo: 'Aviso de espera', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('campos') ? [{ slug: 'config/campos', rotulo: 'Campos do cliente', admin: true }, { slug: 'config/motivos', rotulo: 'Motivos de fechamento', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('venda-origem') ? [{ slug: 'config/venda', rotulo: 'Botão de venda', admin: true }, { slug: 'config/origens', rotulo: 'Origem do lead', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('financeiro') ? [{ slug: 'config/produtos', rotulo: 'Produtos e serviços', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('cofre') ? [{ slug: 'config/cofre', rotulo: 'Cofre de conversas', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
   { rotulo: 'Minha conta', itens: temRecurso('atendimento') ? [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] : [] },
