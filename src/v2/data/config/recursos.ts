@@ -39,6 +39,8 @@
      automacoes    Atendimento › Automações: Sequências (modelos com esperas, aplicados pelo ⋯ da conversa) e Automação por
                    palavras (o card muda de etapa quando o cliente escreve a palavra), com histórico; e o menu leva às
                    Mensagens agendadas (26/11, migration 116)
+     disparos      Atendimento › Automações › Disparos: a mesma mensagem para um grupo (etapa, etiqueta, responsável), cada
+                   uma vira mensagem agendada no ritmo do número (anti-spam), com confirmação; parar a qualquer hora (migration 125)
      webhooks      Configurações › Webhooks: avisar outro sistema (POST assinado com HMAC) quando entra lead, muda de
                    etapa, vira venda, é descartado, marca reunião ou chega formulário (26/11, migration 124)
      formularios   Atendimento › Automações › Formulários: o link que o cliente preenche (/f/<endereço>, sem login), com
@@ -71,7 +73,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe' | 'iris-senha' | 'automacoes' | 'importacao' | 'crm-extra' | 'formularios' | 'webhooks';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe' | 'iris-senha' | 'automacoes' | 'importacao' | 'crm-extra' | 'formularios' | 'webhooks' | 'disparos';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

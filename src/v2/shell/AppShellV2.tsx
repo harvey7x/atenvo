@@ -118,6 +118,7 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'automacoes/sequencias', rotulo: 'Sequências' },
       { slug: 'automacoes/palavras', rotulo: 'Automação por palavras', admin: true },
       ...(temRecurso('formularios') ? [{ slug: 'automacoes/formularios', rotulo: 'Formulários', admin: true }] : []),
+      ...(temRecurso('disparos') ? [{ slug: 'automacoes/disparos', rotulo: 'Disparos', admin: true }] : []),
     ],
   }] : []),
   {

@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'disparos-26-11', titulo: 'Disparos em lote', onde: 'Atendimento › Automações › Disparos', quando: '26/11', recurso: 'disparos', soAdmin: true,
+    texto: 'Escolha quem recebe (etapas, etiquetas, responsável, sem conversa há X dias), escreva a mensagem (com {{nome}} para o primeiro nome) ou use um arquivo dos Scripts, escolha o número e o ritmo (uma mensagem a cada 1 min e meio a 3 min, só no horário e nos dias escolhidos, com máximo por dia). A tela mostra quantos recebem e quando termina; só agenda depois de você confirmar. Cada mensagem vai para Mensagens agendadas, e "Parar" tira da fila o que ainda não saiu. Quem pediu para não receber fica de fora.',
+    rota: '/automacoes/disparos',
+  },
+  {
+    id: 'webhooks-26-11', titulo: 'Webhooks: avisar outro sistema', onde: 'Configurações › Webhooks', quando: '26/11', recurso: 'webhooks', soAdmin: true,
+    texto: 'Cadastre o endereço de outro sistema (planilha, ERP, automação) e escolha os momentos: lead novo, mudança de etapa, venda, descarte, reunião marcada e formulário. Cada aviso vai assinado com o segredo do webhook; se o outro lado falhar, o Reviza tenta de novo até 3 vezes. "Testar" manda um exemplo e a lista mostra o resultado.',
+    rota: '/config/webhooks',
+  },
+  {
     id: 'formularios-26-11', titulo: 'Formulários com agendamento', onde: 'Atendimento › Automações › Formulários', quando: '26/11', recurso: 'formularios', soAdmin: true,
     texto: 'Monte um formulário (as perguntas, a etapa em que o card nasce, as etiquetas e o responsável) e mande o link no anúncio, no Instagram ou no WhatsApp. Quem preencher vira cliente e card no Kanban e, se o agendamento estiver ligado, escolhe um horário livre: a reunião cai na Agenda e o sino avisa a equipe. Nada é enviado para o cliente. A aba Respostas mostra quem preencheu.',
     rota: '/automacoes/formularios',
