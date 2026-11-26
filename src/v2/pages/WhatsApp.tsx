@@ -55,6 +55,8 @@ import { rotuloBotao, useConfigVenda } from '@/data/vendaOrigem';
 import { CamposDoCliente } from '../components/CamposDoCliente';
 import { FinanceiroDoCliente } from '../components/FinanceiroDoCliente';
 import { CofrePortao } from '../components/CofrePortao';
+import { AplicarSequencia } from '../components/AplicarSequencia';
+import '../pages/automacoes.css';
 import { useCofreDaConversa } from '@/data/cofre';
 import { DocumentosDaConversa, ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
 import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
@@ -643,6 +645,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   // o cofre de conversas (26/11, migration 113): a conversa trancada só mostra o conteúdo com a senha do cofre
   const cofre = useCofreDaConversa(isRevizaMode && temRecurso('cofre'));
   const noCofre = (id: string | undefined | null) => !!id && cofre.trancada(id) && !cofre.aberta(id);
+  // Automações › Sequências (26/11, migration 116): aplicar um modelo na conversa
+  const [seqAberta, setSeqAberta] = useState(false);
   const [motivoFechDet, setMotivoFechDet] = useState('');
   const registrarFechamento = useRegistrarFechamento();
   const [devolverConfirm, setDevolverConfirm] = useState(false);
@@ -2285,6 +2289,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              {isRevizaMode && temRecurso('automacoes') && (
+                <button type="button" className="it" onClick={() => { setPop(null); setSeqAberta(true); }}>Aplicar uma sequência</button>
+              )}
               {isRevizaMode && temRecurso('agenda') && (
                 <button type="button" className="it" onClick={() => { setPop(null); nav(`/agenda?nova=1&conversa=${encodeURIComponent(current.id)}&cliente=${encodeURIComponent(nomeExibicao(current))}`); }}>Agendar reunião</button>
               )}
@@ -2590,6 +2597,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao compartilhar o contato.' }); }
           }}
         />
+      )}
+      {seqAberta && current && (
+        <AplicarSequencia conversaId={current.id} cliente={nomeExibicao(current)} canalPadrao={inbox.replyCanalId || current.canalId || null}
+          canais={canaisAgendaveis.map((c) => ({ id: c.id, alias: c.alias, numero: c.numero, status: c.status, envioRestrito: c.envioRestrito }))}
+          aoFechar={() => setSeqAberta(false)} aoAvisar={aoAvisar} />
       )}
       {agendarAberto && (
         <AgendarMensagemModalV2

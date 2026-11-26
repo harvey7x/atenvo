@@ -110,6 +110,15 @@ const GRUPOS: GrupoNav[] = [
       ...(chatEquipeLigado() ? [{ slug: 'chat-equipe', rotulo: 'Chat da equipe' }] : []),
     ],
   },
+  // Automações (26/11, como no sistema que a Reviza usava antes): Mensagens agendadas, Sequências e Automação por palavras
+  ...(isRevizaMode && temRecurso('automacoes') ? [{
+    rotulo: 'Automações',
+    itens: [
+      { slug: 'agendamentos', rotulo: 'Mensagens agendadas' },
+      { slug: 'automacoes/sequencias', rotulo: 'Sequências' },
+      { slug: 'automacoes/palavras', rotulo: 'Automação por palavras', admin: true },
+    ],
+  }] : []),
   {
     rotulo: 'Gestão',
     itens: [

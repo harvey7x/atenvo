@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'automacoes-26-11', titulo: 'Automações: sequências e palavras', onde: 'Atendimento › Automações', quando: '26/11', recurso: 'automacoes',
+    texto: 'Sequências: mensagens em série, com a espera antes de cada uma (texto ou o arquivo de um script). No WhatsApp, o ⋯ da conversa tem "Aplicar uma sequência": cada mensagem vira uma mensagem agendada e, se o cliente responder, o resto para. Automação por palavras (administrador): quando o cliente escreve uma palavra-chave (contém, exato, começa com, termina com ou regex), o card vai sozinho para a etapa escolhida, com palavras para ignorar e o "testar a regra". O menu Automações também leva às Mensagens agendadas.',
+    rota: '/automacoes/sequencias',
+  },
+  {
     id: 'iris-guimoo-26-11', titulo: 'As IAs como no sistema de antes', onde: 'Configurações › Atendentes de IA', quando: '26/11', recurso: 'iris', soAdmin: true,
     texto: 'Em "Nova IA" tem "A Bia do sistema de antes": o roteiro, as regras, as 8 perguntas frequentes e os 63 gatilhos do agente que a Reviza usava, com espera de 15 segundos e áudio sempre. A tela ganhou: Roteiro e regras (texto livre), Quando ela começa (esperar antes de responder e as frases que fazem ela começar), Outras IAs (principal e secundárias que recebem por transferência), áudio nunca/sempre/igual ao cliente, assinatura, o catálogo de produtos, o Copiloto (a IA da empresa revisa a configuração e entrega trechos prontos) e a senha de edição de cada IA.',
     rota: '/config/iris',

@@ -72,6 +72,7 @@ const ChatEquipeV2 = lazy(() => import('@/v2/pages/ChatEquipe'));
 const NovidadesV2 = lazy(() => import('@/v2/pages/Novidades'));
 const TarefasV2 = lazy(() => import('@/v2/pages/Tarefas'));
 const AgendaV2 = lazy(() => import('@/v2/pages/Agenda'));
+const AutomacoesV2 = lazy(() => import('@/v2/pages/Automacoes'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -170,6 +171,8 @@ const routes: RouteObject[] = [
           { path: 'tarefas', element: <ComRecurso r="tarefas"><Lz><TarefasV2 /></Lz></ComRecurso> },
           // Agenda (26/11, igual ao sistema que a Reviza usava antes): dia, semana, mês e lista (recurso 'agenda')
           { path: 'agenda', element: <ComRecurso r="agenda"><Lz><AgendaV2 /></Lz></ComRecurso> },
+          // Atendimento › Automações (26/11): Sequências e Automação por palavras
+          { path: 'automacoes/:secao?', element: <ComRecurso r="automacoes"><Lz><AutomacoesV2 /></Lz></ComRecurso> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
