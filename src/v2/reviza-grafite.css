@@ -444,3 +444,32 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card > .estado { min-height: 220px; justify-content: center; }
 /* tabelas: linhas um pouco mais baixas e constantes (36px), títulos de coluna em 10.5px */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-tab, .cfgw-tab, .pn-us-tab, .kbl-tab, .d5-tab) tbody td { padding-top: 9px; padding-bottom: 9px; }
+
+/* 26/11 (dono, foto do "Novo disparo": "QUEM RECEBE fora da linha… título tem que ser título"). As seções das janelas
+   (Quem recebe · Mensagem · Número e ritmo · Perguntas · O card que nasce · Agendamento) deixam o <legend> cortando a borda:
+   o título entra DENTRO do cartão, na mesma margem do conteúdo, em peso forte, com um fio embaixo; os subtítulos (Etapas,
+   Etiquetas, Responsável…) viram rótulos pequenos e iguais; os chips ficam numa grade regular com o mesmo respiro. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { padding: 0 16px 16px; gap: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > legend {
+  float: left; width: 100%; box-sizing: border-box; margin: 0 0 2px; padding: 12px 0 10px; border-bottom: 1px solid var(--linha);
+  font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--txt);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > legend::after { content: ''; display: block; clear: both; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-us-form > .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-us-form > label.pn-us-campo > span {
+  font-size: 12px; font-weight: 500; color: var(--txt-2); line-height: 1.2;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.frm-etqs, .frm-dias) { gap: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.frm-etq, .frm-dia) { min-height: 32px; padding: 0 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-dia { min-width: 44px; justify-content: center; }
+/* "Começa" (daqui a 1 minuto · em outro horário): o mesmo chip */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aplseq-op { background: #FFFFFF; box-shadow: none; border: 1px solid #D9D5CF; color: var(--txt); font-weight: 500; min-height: 32px; display: inline-flex; align-items: center; border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aplseq-op.on { background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .aplseq-op { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .aplseq-op.on { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+/* a contagem "N pessoas recebem" vira uma faixa discreta, não um parágrafo vermelho solto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta { padding: 9px 12px; border-radius: 8px; background: rgba(var(--tint), .045); border: 1px solid var(--linha); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta.erro { background: rgba(214, 69, 69, .06); border-color: rgba(214, 69, 69, .25); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-amostra { margin-top: -6px; }
