@@ -635,6 +635,22 @@ export function useInboxWhatsApp(opts: {
     catch (e) { setContacts((cur) => patchConversa(cur, id, { fixada: !fix })); otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao fixar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id, orgId]);
+  /* encaminhar (26/11, igual ao sistema que a Reviza usava antes): a mensagem — texto ou a mídia já guardada — vai para
+     OUTRA conversa, pelo número dela. O servidor confere tudo de novo (quem pode, opt-out, número conectado). */
+  const encaminhar = useCallback(async (m: WaMessage, alvoId: string): Promise<string> => {
+    const alvo = contacts.find((c) => c.id === alvoId);
+    if (!alvo) throw new Error('Conversa de destino não encontrada.');
+    const temMidia = !!m.anexoPath && ['imagem', 'video', 'audio', 'documento'].includes(m.tipo ?? '');
+    const texto = m.tipo === 'audio' ? '' : (m.text || '').trim();
+    if (!temMidia && !texto) throw new Error('Esta mensagem não tem o que encaminhar.');
+    if (!WA_REAL) return alvo.name;
+    await sendMut.mutateAsync({
+      conversaId: alvoId, canalId: alvo.canalId ?? null, text: texto || undefined,
+      ...(temMidia ? { midiaPath: m.anexoPath, midiaTipo: m.tipo, midiaMime: m.mime, midiaNome: m.nome, midiaTamanho: m.tamanho ?? undefined } : {}),
+    });
+    return alvo.name;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts]);
   /** patch local otimista de edição (nome/email/observações/responsável) — o await fica na página (acoes.atualizarContato). */
   const aplicarEdicaoLocal = useCallback((patch: Partial<WaContact>) => {
     if (current.id) setContacts((cur) => patchConversa(cur, current.id, patch));
@@ -679,6 +695,6 @@ export function useInboxWhatsApp(opts: {
     enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
     scriptEnviarEtapa, scriptEnviarMidia,
     atribuindo, assumir, devolver, transferir,
-    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa,
+    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa, encaminhar,
   };
 }

@@ -4,12 +4,12 @@
    · DesempenhoChat — o dia do atendimento num quadro (os mesmos números do Dashboard › Resumo do dia).
    O modo privacidade (esconder telefones e mensagens) é só CSS: a classe .wa-privado na raiz da página. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { WaMessage } from '@/data/whatsappDemo';
+import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { spHoje } from '@/data/relatorios';
 import { fraseDoResumo, qtd, useResumoDia } from '@/data/resumoDia';
 import { acharNaConversa } from '../lib/exportarConversa';
 import { ModalV2 } from './ModalV2';
-import { BotaoSec } from './Botao';
+import { BotaoPrimario, BotaoSec } from './Botao';
 import { CartaoMetricaFixo, GradeMetricas } from './CartaoMetrica';
 import './conversaExtras.css';
 
@@ -83,6 +83,52 @@ export function DesempenhoChat({ aberto, aoFechar, aoAbrirResumo }: { aberto: bo
             )}
           </div>
         )}
+    </ModalV2>
+  );
+}
+
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const ROT: Record<string, string> = { imagem: 'Foto', video: 'Vídeo', audio: 'Áudio', documento: 'Documento' };
+/** "Encaminhar" (26/11): escolher a conversa de destino e mandar a mensagem por ela */
+export function EncaminharMensagem({ m, conversas, mascarar, aoEnviar, aoFechar }: {
+  m: WaMessage | null; conversas: WaContact[]; mascarar: (tel: string) => string;
+  aoEnviar: (alvoId: string) => Promise<void>; aoFechar: () => void;
+}) {
+  const [busca, setBusca] = useState('');
+  const [alvo, setAlvo] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  useEffect(() => { setBusca(''); setAlvo(null); setErro(''); }, [m?.id]);
+  const lista = useMemo(() => {
+    const t = semAcento(busca.trim()); const dig = busca.replace(/\D/g, '');
+    return conversas.filter((c) => !t || semAcento(c.name || '').includes(t) || (dig.length >= 3 && (c.phone || '').includes(dig))).slice(0, 40);
+  }, [conversas, busca]);
+  if (!m) return null;
+  const previa = (m.tipo && ROT[m.tipo] ? `${ROT[m.tipo]}${m.nome ? ': ' + m.nome : ''}${m.text && m.tipo !== 'audio' ? ' — ' : ''}` : '') + (m.tipo === 'audio' ? '' : (m.text || ''));
+  // senha (do INSS, do gov.br…) nunca vai para outra conversa: é de um cliente só
+  const temSenha = /senha|password/i.test(`${m.text || ''} ${m.transcricao || ''}`);
+  const enviar = async () => {
+    if (!alvo || temSenha) return;
+    setEnviando(true); setErro('');
+    try { await aoEnviar(alvo); } catch (e) { setErro((e as Error).message || 'Não deu para encaminhar. Tente de novo.'); } finally { setEnviando(false); }
+  };
+  return (
+    <ModalV2 aberto aoFechar={aoFechar} titulo="Encaminhar mensagem" largura={460}
+      rodape={<><BotaoSec onClick={aoFechar} disabled={enviando}>Cancelar</BotaoSec><BotaoPrimario onClick={() => void enviar()} disabled={!alvo || enviando || temSenha}>{enviando ? 'Encaminhando…' : 'Encaminhar'}</BotaoPrimario></>}>
+      <div className="wa-enc">
+        <p className="previa">{previa || 'Mensagem'}</p>
+        {temSenha && <p className="wa-desemp-erro" role="alert">Esta mensagem fala de senha. Ela não pode ser encaminhada para outra conversa.</p>}
+        <input className="inp" placeholder="Buscar a conversa pelo nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar a conversa de destino" autoFocus />
+        <ul className="lista" role="listbox" aria-label="Conversas">
+          {lista.length === 0 && <li className="vazio">Nenhuma conversa encontrada.</li>}
+          {lista.map((c) => (
+            <li key={c.id}><button type="button" aria-pressed={alvo === c.id} onClick={() => setAlvo(c.id)}>
+              <span>{c.name || 'Cliente sem nome'}</span><small className="num">{c.phone ? mascarar(c.phone) : ''}</small>
+            </button></li>
+          ))}
+        </ul>
+        {erro && <p className="wa-desemp-erro" role="alert">{erro}</p>}
+      </div>
     </ModalV2>
   );
 }

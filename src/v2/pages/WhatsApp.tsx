@@ -27,7 +27,7 @@ import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDaPrevia } from '../data/config/equipes';
 import { temRecurso } from '../data/config/recursos';
 import { isRevizaMode } from '@/lib/supabase';
-import { BarraSelecao, BuscaNaConversa, DesempenhoChat } from '../components/ConversaExtras';
+import { BarraSelecao, BuscaNaConversa, DesempenhoChat, EncaminharMensagem } from '../components/ConversaExtras';
 import { baixarTexto, linkDaConversa, nomeArquivoConversa, textoDaConversa } from '../lib/exportarConversa';
 import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
@@ -494,6 +494,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [selOcupado, setSelOcupado] = useState(false);
   const [buscaConv, setBuscaConv] = useState(false);
   const [desempenhoAberto, setDesempenhoAberto] = useState(false);
+  const [encaminharMsg, setEncaminharMsg] = useState<WaMessage | null>(null);
   // aba 'iris' guardada mas sem permissão: cai em 'todos' (sem apagar a preferência)
   const tabEf: TabId = tab === 'iris' && !eIris ? 'todos' : tab;
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
@@ -1356,6 +1357,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   /* ---------- render ---------- */
   return (
     <div className={'wa-pg' + (privado ? ' wa-privado' : '')} data-cel-painel={!temConversa ? 'lista' : foco && celPainel === 'lista' ? 'conversa' : celPainel}>
+      <EncaminharMensagem m={encaminharMsg} mascarar={numeroMascarado} aoFechar={() => setEncaminharMsg(null)}
+        conversas={contacts.filter((c) => c.id !== current.id && vis.podeVer(c.respId, c.canalId) && !c.arquivada)}
+        aoEnviar={async (alvoId) => { const nome = await inbox.encaminhar(encaminharMsg!, alvoId); setEncaminharMsg(null); aoAvisar({ tom: 'ok', texto: `Encaminhada para ${nome}.` }); }} />
       <DesempenhoChat aberto={desempenhoAberto} aoFechar={() => setDesempenhoAberto(false)} aoAbrirResumo={() => { setDesempenhoAberto(false); nav('/dashboard?aba=resumo'); }} />
       {/* ===================== FILA ===================== */}
       {!foco && (
@@ -1721,6 +1725,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     key={item.msg.id ?? item.msg.cid ?? 'i' + i}
                     m={item.msg} demo={demo} nomeCliente={nomeExibicao(current)}
                     retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino} optout={optout}
+                    aoEncaminhar={(m) => setEncaminharMsg(m)}
                     aoResponder={(m) => {
                       inbox.setReplyTo({
                         id: m.id ?? '', idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo,

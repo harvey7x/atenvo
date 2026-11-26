@@ -20,7 +20,7 @@ export interface Novidade {
 export const NOVIDADES: Novidade[] = [
   {
     id: 'guimoo-conversas-26-11', titulo: 'Conversas do jeito que a equipe já usava', onde: 'WhatsApp', quando: '26/11',
-    texto: 'Abas "Fila", "Não respondidas" e "IA". No ⋯ da lista: selecionar várias conversas (marcar como lidas, fixar, arquivar), esconder telefones e mensagens para mostrar a tela a alguém e, para o administrador, o desempenho do chat de hoje. No ⋯ da conversa: buscar na conversa, copiar o link e exportar a conversa. E o botão "Contrato fechado" ao lado da etapa.',
+    texto: 'Abas "Fila", "Não respondidas" e "IA". No ⋯ da lista: selecionar várias conversas (marcar como lidas, fixar, arquivar), esconder telefones e mensagens para mostrar a tela a alguém e, para o administrador, o desempenho do chat de hoje. No ⋯ da conversa: buscar na conversa, copiar o link e exportar a conversa. Em cada mensagem, ao lado do Responder: Encaminhar para outra conversa (mensagem com senha não encaminha). E o botão "Contrato fechado" ao lado da etapa.',
     rota: '/whatsapp',
   },
   {

@@ -22,6 +22,7 @@ export const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h1
 const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
+const IcEncaminhar = () => <Ic><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0-5 5v6" /></Ic>;
 const IcChave = () => <Ic><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9-9" /><path d="m17 6 3 3" /><path d="m15 8 2 2" /></Ic>;
 const IcArroba = () => <Ic><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
@@ -42,8 +43,10 @@ export const IcBot = () => (
    selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
    imagem/vídeo/documento, quoted, ticks, falha, responder.
    ================================================================ */
-export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar }: {
+export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar, aoEncaminhar }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
+  /** encaminhar para outra conversa (26/11) */
+  aoEncaminhar?: (m: WaMessage) => void;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string, mensagemId?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
   /** "Identificar senha / e-mail" (dono 29/10) — só no inbox; o mobile não passa. `selecionado` = trecho marcado no balão */
@@ -108,6 +111,9 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
     <div ref={raizRef} data-mid={m.id} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
+      )}
+      {m.id && aoEncaminhar && !m.nota && ((m.text || '').trim() || m.anexoPath) && (
+        <button type="button" className="resp-btn enc-btn" title="Encaminhar" aria-label="Encaminhar para outra conversa" onClick={() => aoEncaminhar(m)}><IcEncaminhar /></button>
       )}
       {/* Identificar senha do INSS / e-mail na mensagem do CLIENTE (texto ou transcrição). mousedown sem
           default: o trecho marcado com o mouse continua selecionado e vira a sugestão. */}
