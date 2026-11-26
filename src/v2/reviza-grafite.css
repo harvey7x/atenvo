@@ -351,3 +351,11 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 /* 12.8 botão ligado da barra da planilha e o ícone da fase na ficha do WhatsApp: mesma regra (fundo cinza, borda cinza clara) */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-bt.on { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .3); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ctx-fase .ic { background: rgba(255, 255, 255, .06); }
+
+/* 26/11 (varredura visual, regra do dono: "gráficos SEMPRE em barras, laranja só sólido"): as barras de atividade de
+   Agendamentos/Relatórios (.barv) deixam o degradê das camadas de baixo — dias comuns no cinza do trilho, HOJE na cor
+   de dado sólida, sem brilho. A mesma linguagem das barras do Painel e do Dashboard. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .barv { background: rgba(var(--tint), .12); box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv { background: rgba(255, 255, 255, .1); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2 { background: var(--accent); box-shadow: none; }

@@ -1,6 +1,8 @@
 /* ATENDIMENTO › AUTOMAÇÕES (26/11). Neutros do tema; o laranja só nos botões principais. */
 .v2 .aut { display: flex; flex-direction: column; gap: 14px; }
-.v2 .aut .ph .acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.v2 .aut .ph .acoes { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
+.v2 .aut .ph > div:first-child { min-width: 0; flex: 1 1 auto; }
+.v2 .aut .ph .cfga-sub { max-width: 560px; }
 .v2 .aut-barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .v2 .aut-busca { width: 240px; height: 34px; font-size: 13px; margin-left: auto; }
 .v2 .aut-barra > .p-btn:last-child, .v2 .aut-barra > button:last-child:not([role]) { margin-left: auto; }

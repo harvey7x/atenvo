@@ -36,7 +36,7 @@ export function Disparos() {
     <>
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
       <div className="aut-barra">
-        <span className="dsp-sub">Cada mensagem entra em Mensagens agendadas e sai no ritmo do número.</span>
+        <span className="dsp-sub">Cada mensagem entra em <button type="button" className="cfgm-lnk" onClick={() => nav('/agendamentos')}>Mensagens agendadas</button> e sai no ritmo do número.</span>
         <BotaoPrimario onClick={() => setNovo(true)}>＋ Novo disparo</BotaoPrimario>
       </div>
       {q.isLoading ? <p className="pn-vazio">Carregando os disparos…</p>
@@ -44,7 +44,7 @@ export function Disparos() {
         : lista.length === 0 ? <CardVidro className="pn-card"><EstadoVazio titulo="Nenhum disparo" descricao="Mande a mesma mensagem para um grupo de clientes (por etapa, etiqueta ou responsável), num ritmo seguro para o número." acao={{ rotulo: '＋ Novo disparo', onClick: () => setNovo(true) }} /></CardVidro>
         : (
           <CardVidro spot className="pn-card sobe">
-            <div className="pn-card-cab"><div><h3>Disparos</h3><p>Do mais novo para o mais antigo.</p></div><BotaoSec mini onClick={() => nav('/agendamentos')}>Mensagens agendadas</BotaoSec></div>
+            <div className="pn-card-cab"><div><h3>Disparos</h3><p>Do mais novo para o mais antigo.</p></div></div>
             <ul className="dsp-lista">
               {lista.map((d) => {
                 const tot = Math.max(1, d.total);

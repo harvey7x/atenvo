@@ -28,7 +28,7 @@
 .v2 .cfgm-lista li.fixo { grid-template-columns: auto minmax(0, 1fr); }
 .v2 .cfgm-nome { font-size: 13px; color: var(--txt); min-width: 0; overflow-wrap: anywhere; }
 .v2 .cfgm-nome small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--txt-3); }
-.v2 .cfgm-fixo-tx { width: 34px; font-size: 10.5px; color: var(--txt-3); text-align: center; }
+.v2 .cfgm-fixo-tx { width: 44px; font-size: 10.5px; color: var(--txt-3); text-align: center; white-space: nowrap; }
 .v2 .cfgm-hist-cab { align-items: center; }
 .v2 .cfgm-hist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .v2 .cfgm-hist h4 { margin: 0 0 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }

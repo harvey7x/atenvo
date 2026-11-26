@@ -3,7 +3,7 @@
 .v2 .cfga-sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--txt-3); max-width: 720px; }
 /* uma seção por vez (abaFixa): a tela de Configurações sem a coluna das abas */
 .v2 .cfg.cfg-so { display: block; }
-.v2 .cfg.cfg-so > div { max-width: 920px; }
+.v2 .cfg.cfg-so > div { max-width: none; }
 
 /* ---- WhatsApp ---- */
 .v2 .cfgw { display: flex; flex-direction: column; gap: 14px; }
