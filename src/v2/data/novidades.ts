@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'lembrete-reuniao-26-11', titulo: 'Lembrete antes da reunião', onde: 'Configurações › Lembrete de reunião', quando: '26/11', recurso: 'lembrete-reuniao', soAdmin: true,
+    texto: 'Ligado, cada cliente com reunião marcada na Agenda recebe uma mensagem antes (30 min a 1 dia antes, e um segundo aviso se quiser), pelo número da conversa dele. Mudou o horário, o lembrete muda; cancelou, ele sai da fila. Chega desligado: ligar pede confirmação.',
+    rota: '/config/lembrete',
+  },
+  {
     id: 'disparos-26-11', titulo: 'Disparos em lote', onde: 'Atendimento › Automações › Disparos', quando: '26/11', recurso: 'disparos', soAdmin: true,
     texto: 'Escolha quem recebe (etapas, etiquetas, responsável, sem conversa há X dias), escreva a mensagem (com {{nome}} para o primeiro nome) ou use um arquivo dos Scripts, escolha o número e o ritmo (uma mensagem a cada 1 min e meio a 3 min, só no horário e nos dias escolhidos, com máximo por dia). A tela mostra quantos recebem e quando termina; só agenda depois de você confirmar. Cada mensagem vai para Mensagens agendadas, e "Parar" tira da fila o que ainda não saiu. Quem pediu para não receber fica de fora.',
     rota: '/automacoes/disparos',
