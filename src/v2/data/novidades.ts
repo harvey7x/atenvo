@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'importacao-26-11', titulo: 'O Kanban do sistema anterior já está aqui', onde: 'Configurações › Importação do sistema anterior', quando: '26/11', recurso: 'importacao', soAdmin: true,
+    texto: 'Todos os clientes do Kanban do sistema que vocês usavam antes entraram no funil COMERCIAL REVIZA, cada um na mesma etapa, com as etiquetas e a data de entrada; as vendas ficaram em FECHADOS e os descartados em LEAD DESCARTADO. Quem tinha dois números lá virou um cliente só. Os cards guardam quem cuidava deles lá: quando a equipe tiver login, a tela "Importação do sistema anterior" passa os cards de cada responsável para a pessoa daqui, pelo mesmo nome ou escolhendo na lista.',
+    rota: '/config/importacao',
+  },
+  {
     id: 'automacoes-26-11', titulo: 'Automações: sequências e palavras', onde: 'Atendimento › Automações', quando: '26/11', recurso: 'automacoes',
     texto: 'Sequências: mensagens em série, com a espera antes de cada uma (texto ou o arquivo de um script). No WhatsApp, o ⋯ da conversa tem "Aplicar uma sequência": cada mensagem vira uma mensagem agendada e, se o cliente responder, o resto para. Automação por palavras (administrador): quando o cliente escreve uma palavra-chave (contém, exato, começa com, termina com ou regex), o card vai sozinho para a etapa escolhida, com palavras para ignorar e o "testar a regra". O menu Automações também leva às Mensagens agendadas.',
     rota: '/automacoes/sequencias',

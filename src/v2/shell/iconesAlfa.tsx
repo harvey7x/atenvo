@@ -85,6 +85,7 @@ export const ICONES_ALFA: Record<string, ReactNode> = {
   produtos: ic(<><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /><path d="M12 22V12" /><path d="m3.3 7 8.7 5 8.7-5" /></>),
   // Cofre de conversas: o cadeado
   cofre: ic(<><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>),
+  importacao: ic(<><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></>),
   // Avisos para a equipe: o sino com o ponto
   'avisos-equipe': ic(<><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M13.916 2.314A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.74 7.327A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673 9 9 0 0 1-.585-.665" /><circle cx="18" cy="8" r="3" /></>),
   // Mensagens agendadas: o relógio com a mensagem
