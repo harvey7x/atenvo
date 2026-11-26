@@ -236,6 +236,7 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('atendimento') && temRecurso('venda-origem') ? [{ slug: 'config/venda', rotulo: 'Botão de venda', admin: true }, { slug: 'config/origens', rotulo: 'Origem do lead', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('financeiro') ? [{ slug: 'config/produtos', rotulo: 'Produtos e serviços', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('cofre') ? [{ slug: 'config/cofre', rotulo: 'Cofre de conversas', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('webhooks') ? [{ slug: 'config/webhooks', rotulo: 'Webhooks', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('importacao') ? [{ slug: 'config/importacao', rotulo: 'Importação do sistema anterior', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
