@@ -158,6 +158,45 @@ Regras:
 - Se os textos prontos da empresa tiverem algo que serve, siga o jeito deles de falar.
 - Não repita perguntas que o cliente já respondeu. Se falta um documento, peça um de cada vez.
 - Responda só com o texto da mensagem, sem aspas e sem explicar.`;
+/* ---------- COPILOTO da tela das IAs (26/11, como no sistema que a Reviza usava antes: "o copiloto analisa o agente e
+   sugere mudanças; você aplica o que quiser aqui no editor"). Lê a configuração da versão (nunca a chave) e responde. ---------- */
+export const MAX_CARACTERES_COPILOTO = 24_000;
+export const INSTRUCOES_COPILOTO = `Você é o consultor de roteiro de uma atendente virtual (IA) de WhatsApp de um escritório brasileiro.
+A pessoa que fala com você é o administrador da empresa, configurando essa IA. Você recebe a configuração atual da IA (quem ela é,
+o roteiro, as regras, as perguntas frequentes, as frases que fazem ela começar e os ajustes) e a pergunta do administrador.
+Regras:
+- Português do Brasil, simples e direto. Explique o porquê em uma ou duas frases.
+- Quando sugerir uma mudança, entregue o trecho PRONTO para copiar, entre linhas com três crases (\`\`\`), e diga em qual parte ele entra.
+- Aponte problemas concretos: etapas que se contradizem, regras repetidas, promessas de valor ou prazo, pedidos de senha, textos longos
+  demais para o WhatsApp, gatilhos que pegam conversas que não são da campanha.
+- Nunca sugira pedir senha, código, dados de cartão ou de conta. Nunca sugira prometer resultado, valor ou prazo.
+- Não invente fatos da empresa (endereço, advogado, valores): se faltar, diga que falta e onde preencher.
+- No máximo umas 300 palavras, a não ser que peçam um roteiro inteiro.`;
+/** a configuração da versão em texto, para o copiloto (só o que a tela mostra; nunca chave nem número de telefone) */
+export function textoDaConfigIris(c: Record<string, unknown> | null, nome: string): string {
+  if (!c) return `IA "${nome}" sem configuração.`;
+  const o = (v: unknown) => (v && typeof v === 'object' ? v as Record<string, unknown> : {});
+  const t = (v: unknown, n = 4000) => (typeof v === 'string' ? v : '').slice(0, n);
+  const id = o(c.identidade), emp = o(c.empresa), tom = o(c.tom), ini = o(c.inicio), rot = o(c.roteiro), asn = o(c.assinatura), aud = o(c.audioModo), pap = o(c.papel), doc = o(c.documentos), proib = o(c.proibido);
+  const fatos = (Array.isArray(emp.fatos) ? emp.fatos : []).map((f) => o(f)).filter((f) => t(f.pergunta)).map((f) => `- ${t(f.pergunta, 200)} → ${t(f.resposta, 800) || '(sem resposta)'}`);
+  const docs = (Array.isArray(doc.itens) ? doc.itens : []).map((d) => o(d)).filter((d) => d.ativo).map((d) => `${t(d.rotulo, 120)}${d.obrigatorio ? ' (obrigatório)' : ''}`);
+  const linhas = [
+    `IA "${nome}": ${t(id.assistente, 60)}, ${t(id.rotulo, 60)} da ${t(id.empresa, 60)}. Papel: ${t(pap.tipo, 20) === 'secundaria' ? 'secundária (recebe por transferência)' : 'principal'}.`,
+    `O que ela faz: ${t(id.papel, 1500)}`,
+    `Como ela fala: ${t(id.instrucoes, 2000)}`,
+    `Tratamento: ${t(tom.tratamento, 20)}; até ${tom.maxBolhas ?? '?'} mensagens por resposta e ${tom.maxCaracteres ?? '?'} letras cada; áudio: ${t(aud.modo, 20)}; assinatura: ${asn.ativa ? t(asn.texto, 120) : 'desligada'}.`,
+    `Espera antes de responder: ${ini.esperaSeg ?? 0} s. ${ini.soComGatilho ? `Só começa quando a primeira mensagem tem uma destas frases: ${(Array.isArray(ini.gatilhos) ? ini.gatilhos : []).slice(0, 120).join(', ')}` : 'Começa com qualquer mensagem.'}`,
+    `Empresa: endereço ${t(emp.endereco, 200) || '(vazio)'}, ${t(emp.cidade, 100) || '(cidade vazia)'}; advogado ${t(emp.advogado, 100) || '(vazio)'} ${t(emp.oab, 40)}; honorários: ${t(emp.honorarios, 600) || '(vazio)'}; prazo: ${t(emp.prazoProcesso, 200) || '(vazio)'}.`,
+    docs.length ? `Documentos que ela pede: ${docs.join('; ')}.` : 'Ela não pede documentos.',
+    `Palavras proibidas: ${(Array.isArray(proib.termos) ? proib.termos : []).join(', ') || '(nenhuma)'}; frases proibidas: ${(Array.isArray(proib.frases) ? proib.frases : []).join(', ') || '(nenhuma)'}.`,
+    fatos.length ? `Perguntas frequentes:\n${fatos.join('\n')}` : 'Sem perguntas frequentes.',
+    `ROTEIRO:\n${t(rot.texto, 16000) || '(vazio)'}`,
+    `REGRAS:\n${t(rot.regras, 6000) || '(vazio)'}`,
+  ];
+  // é configuração (não conversa de cliente): só esconde o que parece chave de API — a limpeza das conversas estragaria
+  // frases do roteiro como "nunca peça senha: gov.br"
+  return linhas.join('\n\n').replace(/\b(AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,})/g, '[chave oculta]').slice(0, MAX_CARACTERES_COPILOTO);
+}
 export function lerSugestao(texto: string): string {
   let t = (texto ?? '').trim().replace(/^["“]|["”]$/g, '').trim();
   t = t.replace(/^(mensagem|resposta)\s*:\s*/i, '').trim();

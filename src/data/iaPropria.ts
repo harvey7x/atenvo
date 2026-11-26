@@ -44,6 +44,9 @@ export interface ResumoAtendimento {
 
 /* ---------------- mensagens (os códigos que a função atd-ia devolve) ---------------- */
 export const MSG_IA: Record<string, string> = {
+  so_administrador: 'Só o administrador usa o copiloto.',
+  ia_nao_encontrada: 'Esta IA não foi encontrada. Salve a versão e tente de novo.',
+  pergunta_vazia: 'Escreva o que você quer que o copiloto veja.',
   sem_chave: 'A chave de IA ainda não foi conectada. Conecte em Configurações › Integrações › Inteligência artificial.',
   chave_invalida: 'O provedor não aceitou esta chave. Confira se ela foi copiada inteira, sem espaços, e se não foi apagada na conta.',
   chave_sem_permissao: 'A chave existe, mas não tem permissão para usar a IA. Confira as permissões e o projeto da chave na conta do provedor.',
@@ -400,3 +403,26 @@ function tipoDoNomeDemo(nome: string | undefined): DocIa['tipo'] {
   if (/emprest|consign/.test(n)) return 'extrato_consignado';
   return 'outro';
 }
+
+/* ---------- COPILOTO da tela das IAs (26/11, como no sistema que a Reviza usava antes): a IA da EMPRESA (a chave dela, de
+   Integrações › Inteligência artificial) lê a configuração que está na tela e sugere trechos prontos. Nada é aplicado sozinho. ---------- */
+export interface FalaCopiloto { de: 'eu' | 'copiloto'; texto: string }
+const COPILOTO_DEMO = [
+  'Li o roteiro inteiro. Três pontos:\n\n1. A Etapa 1 pede os 3 documentos de uma vez, mas a parte "Como falar" manda pedir um por vez. Sugiro trocar a saudação por:\n\n```\nBom dia! Sou a Bia, IA de pré-análise jurídica da Reviza. Vamos começar a revisão dos juros do seu empréstimo? 😊\nO primeiro documento é o histórico de empréstimo consignado, do Meu INSS. Você consegue baixar?\n```\n\n2. Nas regras está "Nunca diga que é um agente ou robô", mas o roteiro manda confirmar que é uma IA. Fica a do roteiro: apague a linha das regras.\n\n3. O gatilho "oi" faz ela começar em qualquer conversa, mesmo de quem não veio do anúncio. Se ela é só da campanha, tire "oi", "olá" e "bom dia".',
+  'Para o cliente CLT, o roteiro está bom. Só falta dizer o que ela faz quando o cliente não sabe abrir o app da Carteira de Trabalho: sugiro acrescentar, depois do passo 5:\n\n```\nSe o cliente não conseguir abrir o app, pergunte se tem um filho, filha ou familiar que possa ajudar. Se mesmo assim não der, agende uma ligação (regra AGENDA) e transfira para humano.\n```',
+];
+let copilotoVez = 0;
+export function useCopilotoIris() {
+  return useMutation({
+    mutationFn: async (v: { agenteId: string; pergunta: string; historico: FalaCopiloto[]; config: unknown }): Promise<string> => {
+      if (!IA_REAL) {
+        if (!estadoDemo().configurada) throw new Error(MSG_IA.sem_chave);
+        await esperar(1100);
+        return COPILOTO_DEMO[copilotoVez++ % COPILOTO_DEMO.length];
+      }
+      const r = await comTraducao(chamar({ acao: 'copiloto_iris', agente_id: v.agenteId, pergunta: v.pergunta, historico: v.historico.slice(-8), config: v.config }));
+      return t(r.resposta);
+    },
+  });
+}
+

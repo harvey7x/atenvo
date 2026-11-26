@@ -10,6 +10,7 @@
    A versão pré-configurada é a Iris do Atenvo com "CAF" trocado pelo nome da empresa: os FATOS da Reviza (CNPJ, advogado,
    honorários, prazo) nunca são inventados — ficam "falta preencher" e a Iris não liga sem eles. Os textos entram como
    "adaptado do Atenvo, falta aprovar". */
+import { BIA_FAQ, BIA_GATILHOS, BIA_REGRAS, BIA_ROTEIRO } from './irisBiaReviza';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isPrevia, supabase } from '@/lib/supabase';
 import { ORG_REVIZA } from '@/context/OrgContext';
@@ -65,6 +66,19 @@ export interface IrisConfig {
   proibido: { valores: boolean; prazosExatos: boolean; prometerAprovacao: boolean; urgencia: boolean; naoRepeteSenha: boolean;
     frases: string[]; termos: string[] };
   modelo: { conversa: string; documentos: string; dificil: string; maxChamadasDia: number };
+  /* 26/11, "igual" ao sistema que a Reviza usava antes (Agentes › Configurar): */
+  /** quando ela começa: espera antes de responder (o cliente termina de digitar) e as frases que fazem ela começar */
+  inicio: { esperaSeg: number; soComGatilho: boolean; gatilhos: string[] };
+  /** o roteiro e as regras escritos pela empresa, do jeito dela (vão para o motor junto com o resto) */
+  roteiro: { texto: string; regras: string };
+  /** a assinatura no fim das mensagens */
+  assinatura: { ativa: boolean; texto: string };
+  /** áudio: nunca, sempre, ou só quando o cliente manda áudio */
+  audioModo: { modo: 'desligado' | 'sempre' | 'igual_ao_lead' };
+  /** principal (tem número) ou secundária (atende só quando a principal passa a conversa para ela) */
+  papel: { tipo: 'principal' | 'secundaria'; quandoReceber: string[]; descricao: string; podePassarPara: string[] };
+  /** o catálogo de produtos e serviços que ela pode oferecer (Configurações › Produtos e serviços) */
+  catalogo: { usar: boolean; produtoIds: string[]; maxPorResposta: number };
 }
 
 export type OrigemVersao = 'pre_configurada' | 'nova' | 'duplicada' | 'importada';
@@ -180,6 +194,45 @@ export function irisPreConfigurada(empresa = 'Reviza'): IrisConfig {
       frases: ['última chance', 'é rapidinho', 'pode confiar', 'garantido'], termos: [],
     },
     modelo: { conversa: 'gemini-3.6-flash', documentos: 'gemini-3.6-flash', dificil: 'gemini-pro-latest', maxChamadasDia: 500 },
+    inicio: { esperaSeg: 15, soComGatilho: false, gatilhos: [] },
+    roteiro: { texto: '', regras: '' },
+    assinatura: { ativa: false, texto: '{assistente}, da {empresa}' },
+    audioModo: { modo: 'igual_ao_lead' },
+    papel: { tipo: 'principal', quandoReceber: [], descricao: '', podePassarPara: [] },
+    catalogo: { usar: false, produtoIds: [], maxPorResposta: 2 },
+  };
+}
+
+/** A BIA DA REVIZA, como no sistema que a Reviza usava antes (o agente "COMERCIAL REVIZA RS"): o roteiro, as regras, as 8
+ *  perguntas e os 63 gatilhos de lá, com os dados do escritório que estão no roteiro. Nasce desligada e sem chave. */
+export function irisDaBia(): IrisConfig {
+  const base = irisPreConfigurada('Reviza');
+  return {
+    ...base,
+    identidade: {
+      ...base.identidade, assistente: 'Bia', rotulo: 'IA de pré-análise jurídica', empresa: 'Reviza',
+      papel: 'Faz a pré-análise jurídica no WhatsApp: convida o cliente para a revisão dos juros do empréstimo, pede os 3 documentos (histórico de empréstimo consignado, RG ou CNH e comprovante de endereço), confirma os bancos, pede o extrato de cada banco e passa para um especialista humano.',
+      respostaRobo: 'Sou a {assistente}, {rotulo} da {empresa}. Um especialista humano assume depois. Se preferir falar com uma pessoa agora, é só me pedir.',
+    },
+    empresa: {
+      ...base.empresa,
+      endereco: 'Rua Uruguai, 287, sala 21 — Centro Histórico', cidade: 'Porto Alegre/RS', advogado: 'Dr. Gregory Pimentel', oab: 'OAB/RS 121.383',
+      honorarios: 'Você não paga nada antes. Os honorários são de 30% somente sobre o valor que for recuperado. Se não recuperar, não paga nada.',
+      fatos: BIA_FAQ.map((f, n) => ({ id: `faq-${n + 1}`, pergunta: f.pergunta, resposta: f.resposta })),
+      regioes: { modo: 'brasil', estados: [] },
+    },
+    documentos: {
+      ...base.documentos,
+      itens: base.documentos.itens.map((d) => (d.id === 'email' ? { ...d, ativo: false, obrigatorio: false } : d.id === 'extrato_inss' ? { ...d, rotulo: 'Histórico de empréstimo consignado (Meu INSS)', obrigatorio: true } : d)),
+      senhaGovbr: false,
+    },
+    tom: { ...base.tom, tratamento: 'voce', audio: true },
+    horarios: { ...base.horarios, dias: [0, 1, 2, 3, 4, 5, 6], inicio: '00:00', fim: '23:59', janelaEnvio: ['08:00', '20:00'] },
+    proibido: { ...base.proibido, termos: ['simulação'] },
+    inicio: { esperaSeg: 15, soComGatilho: true, gatilhos: [...BIA_GATILHOS] },
+    roteiro: { texto: BIA_ROTEIRO, regras: BIA_REGRAS },
+    assinatura: { ativa: false, texto: '{assistente}, da {empresa}' },
+    audioModo: { modo: 'sempre' },
   };
 }
 
@@ -295,6 +348,8 @@ const MOLDES: Record<string, Record<string, unknown>> = {
   'equipe.atendentes': { usuarioId: '', nome: '', turno: 'dia', recebe: false },
 };
 const OPCIONAIS = new Set(['financeiras']);
+/** os textos longos (o roteiro e as regras da empresa): até 30 mil letras; o resto, até 4 mil */
+const LONGOS = new Set(['roteiro.texto', 'roteiro.regras']);
 function vazioDe(m: unknown): unknown {
   if (Array.isArray(m)) return [];
   if (m && typeof m === 'object') return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, vazioDe(v)]));
@@ -323,7 +378,7 @@ function mesclar(modelo: unknown, veio: unknown, caminho = ''): unknown {
     }
     return saida;
   }
-  if (typeof modelo === 'string') return typeof veio === 'string' ? veio.slice(0, 4000) : (veio === null ? null : modelo);
+  if (typeof modelo === 'string') return typeof veio === 'string' ? veio.slice(0, LONGOS.has(caminho) ? 30000 : 4000) : (veio === null ? null : modelo);
   if (typeof modelo === 'number') return typeof veio === 'number' && Number.isFinite(veio) ? veio : modelo;
   if (typeof modelo === 'boolean') return typeof veio === 'boolean' ? veio : modelo;
   if (modelo === null) return typeof veio === 'string' ? veio.slice(0, 200) : null;
@@ -363,6 +418,8 @@ function colunasDoMotor(c: IrisConfig, descricao: string, origem: OrigemVersao):
       nudges_ativos: c.retomadas.ativo, max_chamadas_dia: c.modelo.maxChamadasDia,
       proibidos: c.proibido.termos, permitir_emojis: c.tom.emojiNaSaudacao, simular_digitacao: true,
       modelo_docs: c.modelo.documentos, modelo_pro: c.modelo.dificil,
+      espera_seg: c.inicio.esperaSeg, gatilhos_inicio: c.inicio.soComGatilho ? c.inicio.gatilhos : [], audio_modo: c.audioModo.modo,
+      assinatura: c.assinatura.ativa ? c.assinatura.texto : null, papel: c.papel.tipo,
     },
   };
 }

@@ -2,6 +2,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import {
   codigoDoErro, conferirChave, finalDaChave, lerResumo, lerTranscricao, mimeDoAudio, montarTextoConversa, ocultarSegredos, paraBase64, semChave,
   type MsgResumo,
+  textoDaConfigIris,
 } from './iaPropria.ts';
 
 Deno.test('chave: confere o jeito antes de gastar uma chamada', () => {
@@ -68,4 +69,20 @@ Deno.test('erro do provedor → código da tela', () => {
   assertEquals(codigoDoErro(403, 'PERMISSION_DENIED'), 'chave_sem_permissao');
   assertEquals(codigoDoErro(404, 'model not found'), 'modelo_indisponivel');
   assertEquals(codigoDoErro(500, 'internal'), 'provedor_indisponivel');
+});
+
+Deno.test('o copiloto lê a configuração (roteiro, perguntas, gatilhos) e esconde o que parece chave', () => {
+  const t = textoDaConfigIris({
+    identidade: { assistente: 'Bia', rotulo: 'IA', empresa: 'Reviza', papel: 'pré-análise', instrucoes: 'curta' },
+    empresa: { fatos: [{ pergunta: 'Custa algo?', resposta: 'Não.' }], endereco: 'Rua Uruguai, 287' },
+    inicio: { esperaSeg: 15, soComGatilho: true, gatilhos: ['juros', 'oi'] },
+    roteiro: { texto: 'Etapa 1 — Recepção. AIzaSyA1234567890abcdefghijklmnopqrstu', regras: 'Nunca peça senha.' },
+    papel: { tipo: 'principal' }, audioModo: { modo: 'sempre' }, assinatura: { ativa: false },
+  }, 'COMERCIAL');
+  assert(t.includes('Etapa 1 — Recepção'));
+  assert(t.includes('Custa algo? → Não.'));
+  assert(t.includes('juros, oi'));
+  assert(t.includes('Espera antes de responder: 15 s'));
+  assert(!t.includes('AIzaSyA1234567890abcdefghijklmnopqrstu'));
+  assertEquals(textoDaConfigIris(null, 'X'), 'IA "X" sem configuração.');
 });

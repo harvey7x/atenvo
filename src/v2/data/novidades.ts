@@ -19,6 +19,11 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'iris-guimoo-26-11', titulo: 'As IAs como no sistema de antes', onde: 'Configurações › Atendentes de IA', quando: '26/11', recurso: 'iris', soAdmin: true,
+    texto: 'Em "Nova IA" tem "A Bia do sistema de antes": o roteiro, as regras, as 8 perguntas frequentes e os 63 gatilhos do agente que a Reviza usava, com espera de 15 segundos e áudio sempre. A tela ganhou: Roteiro e regras (texto livre), Quando ela começa (esperar antes de responder e as frases que fazem ela começar), Outras IAs (principal e secundárias que recebem por transferência), áudio nunca/sempre/igual ao cliente, assinatura, o catálogo de produtos, o Copiloto (a IA da empresa revisa a configuração e entrega trechos prontos) e a senha de edição de cada IA.',
+    rota: '/config/iris',
+  },
+  {
     id: 'avisos-equipe-26-11', titulo: 'Avisos para a equipe', onde: 'Configurações › Avisos para a equipe', quando: '26/11', recurso: 'avisos-equipe', soAdmin: true,
     texto: 'Os 7 avisos que a equipe usava: novo lead, lead qualificado, lead desqualificado, contrato enviado, contrato assinado, reunião agendada e lead que já é cliente da carteira. Cada um chega no sino de quem o administrador escolher, com o link da conversa (nada sai pelo WhatsApp). Chegam ligados e sem ninguém para receber: escolha as pessoas em cada aviso ou use "Pôr a mesma pessoa em vários avisos". A aba Relatório mostra o que saiu.',
     rota: '/config/avisos-equipe',

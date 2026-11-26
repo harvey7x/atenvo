@@ -6,6 +6,7 @@ import {
   type AtendenteIris, type DocumentoIris, type GrupoTexto, type IrisConfig, type PerguntaIris, type TextoIris, type TipoPergunta, type Turno,
 } from '../../../data/config/iris';
 import { Bloco, Escolha, Etiquetas, Faixa, Liga, Numero, Texto, TextoLongo } from './campos';
+import { BlocoAudioAssinatura, BlocoCatalogo } from './secoesExtra';
 
 export type Mudar = (fn: (c: IrisConfig) => IrisConfig) => void;
 interface P { c: IrisConfig; set: Mudar }
@@ -47,8 +48,7 @@ export function SecQuem({ c, set }: P) {
           </div>
         </div>
         <Liga titulo="Emoji só na saudação" desc='Como no Atenvo: "Oi, Maria! Tudo bem? 😊". No resto, nenhum emoji.' ligado={c.tom.emojiNaSaudacao} aoMudar={(v) => set((x) => ({ ...x, tom: { ...x.tom, emojiNaSaudacao: v } }))} />
-        <Liga titulo="Responde também por áudio" desc="Nos momentos certos ela manda nota de voz (com a voz dela, que é sempre a mesma)." ligado={c.tom.audio} aoMudar={(v) => set((x) => ({ ...x, tom: { ...x.tom, audio: v } }))} />
-        {c.tom.audio && (
+        {c.audioModo.modo !== 'desligado' && (
           <div className="irs-sub">
             <Liga titulo="Apresentação em áudio" desc="Quem chega recebe a apresentação dela por voz." ligado={c.tom.apresentacaoEmAudio} aoMudar={(v) => set((x) => ({ ...x, tom: { ...x.tom, apresentacaoEmAudio: v } }))} />
             <Liga titulo="Risada leve no áudio" desc="Só no áudio, nunca no texto." ligado={c.tom.risadaNoAudio} aoMudar={(v) => set((x) => ({ ...x, tom: { ...x.tom, risadaNoAudio: v } }))} />
@@ -56,6 +56,7 @@ export function SecQuem({ c, set }: P) {
           </div>
         )}
       </Bloco>
+      <BlocoAudioAssinatura c={c} set={set} />
     </>
   );
 }
@@ -139,6 +140,7 @@ export function SecOferece({ c, set }: P) {
           )}
         </Bloco>
       ))}
+      <BlocoCatalogo c={c} set={set} />
     </>
   );
 }

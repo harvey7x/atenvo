@@ -266,3 +266,41 @@
 @media (max-width: 520px) { .v2 .irs-slots { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .v2 .irs-slot, .v2 .irs-nav-item, .v2 .irs-opcao, .v2 .irs-barra i { transition: none; } }
 .v2 .irs-nota.irs-nota-forte { border-color: rgba(var(--tint), .16); background: rgba(var(--tint), .045); }
+
+/* AS PARTES NOVAS (26/11): esperar, catálogo, copiloto, senha de edição */
+.v2 .irs-esperas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.v2 .irs-catalogo { display: flex; flex-direction: column; gap: 6px; }
+.v2 .irs-cat { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--linha); cursor: pointer; }
+.v2 .irs-cat.on { background: rgba(var(--tint), .05); border-color: rgba(var(--tint), .25); }
+.v2 .irs-cat input { margin-top: 2px; accent-color: var(--accent); }
+.v2 .irs-cat b { display: block; font-size: 13px; font-weight: 500; color: var(--txt); }
+.v2 .irs-cat small { display: block; margin-top: 2px; font-size: 12px; color: var(--txt-3); }
+.v2 .irs-copiloto { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--linha); border-radius: 14px; padding: 12px; }
+.v2 .irs-cop-fio { display: flex; flex-direction: column; gap: 10px; max-height: 56vh; min-height: 240px; overflow-y: auto; padding: 4px; }
+.v2 .irs-cop-vazio { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 18px 8px; }
+.v2 .irs-cop-vazio b { font-size: 14px; color: var(--txt); }
+.v2 .irs-cop-ic { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--linha); color: var(--txt-2); background: rgba(var(--tint), .04); }
+.v2 .irs-cop-ideias { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 560px; }
+.v2 .irs-cop-ideia { border: 1px solid var(--linha); background: transparent; color: var(--txt-2); font: inherit; font-size: 12.5px; padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+.v2 .irs-cop-ideia:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .irs-cop-fala { max-width: 88%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.55; color: var(--txt); }
+.v2 .irs-cop-fala p { margin: 0 0 6px; white-space: pre-wrap; }
+.v2 .irs-cop-fala p:last-child { margin-bottom: 0; }
+.v2 .irs-cop-fala.eu { align-self: flex-end; background: rgba(var(--tint), .07); }
+.v2 .irs-cop-fala.copiloto { align-self: flex-start; border: 1px solid var(--linha); }
+.v2 .irs-cop-fala.pensando { color: var(--txt-3); }
+.v2 .irs-cop-trecho { margin: 4px 0 8px; border-radius: 9px; background: rgba(var(--tint), .05); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
+.v2 .irs-cop-trecho pre { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 12.5px; color: var(--txt); }
+.v2 .irs-cop-trecho .irs-link { align-self: flex-start; }
+.v2 .irs-cop-form { display: flex; flex-direction: column; gap: 8px; }
+.v2 .irs-cop-form textarea { resize: vertical; min-height: 52px; }
+.v2 .irs-cop-acoes { display: flex; justify-content: flex-end; gap: 8px; }
+.v2 .irs-senha-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; align-items: end; margin-top: 10px; }
+.v2 .irs-senha-acoes { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+.v2 .irs-senha-form .irs-erro { grid-column: 1 / -1; }
+.v2 .irs-portao { margin: 24px auto; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.v2 .irs-portao b { font-size: 15px; color: var(--txt); }
+.v2 .irs-portao p { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
+.v2 .irs-portao form { display: flex; gap: 8px; width: 100%; }
+.v2 .irs-portao form .inp { flex: 1; min-width: 0; }
+@media (max-width: 720px) { .v2 .irs-senha-form { grid-template-columns: minmax(0, 1fr); } }

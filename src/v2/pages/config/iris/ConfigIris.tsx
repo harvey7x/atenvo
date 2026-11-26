@@ -13,7 +13,7 @@ import { formatarTelefone } from '../../../lib/telefone';
 import { ambientesCadastrados } from '../../../data/modulos';
 import { useConexoesWA } from '../../../data/config/conexoes';
 import {
-  MODELOS_GEMINI, exportarVersao, temMotorIris, irisEmBranco, irisPreConfigurada, lerArquivo, prontidao,
+  MODELOS_GEMINI, exportarVersao, temMotorIris, irisDaBia, irisEmBranco, irisPreConfigurada, lerArquivo, prontidao,
   useAtivarVersao, useConversarIris, useCriarVersao, useExcluirVersao, useLigarNumero, useMetricasIris, useModoTesteNumero,
   useNumerosDaVersao, useNumerosIris, useSalvarChaveIris, useSalvarVersao, useTestarChaveIris, useVersoesIris,
   type BolhaTeste, type IrisConfig, type NumeroIris, type VersaoIris,
@@ -21,23 +21,29 @@ import {
 import { Bloco, Liga, Numero } from './campos';
 import { Ic } from './icones';
 import { SecDocumentos, SecEmpresa, SecEquipe, SecHorarios, SecNunca, SecOferece, SecQualificacao, SecQuem, SecRetomadas, SecTextos } from './secoes';
+import { BlocoSenha, PortaoSenha, SecCopiloto, SecInicio, SecOutras, SecRoteiro } from './secoesExtra';
+import { useEdicaoAberta, useSenhasIris } from '@/data/irisSenha';
 import '../../painel/painel.css';
 import './iris.css';
 
-type Secao = 'resumo' | 'quem' | 'empresa' | 'oferece' | 'analise' | 'documentos' | 'equipe' | 'textos' | 'retomadas' | 'horarios' | 'nunca' | 'testar' | 'avancado';
+type Secao = 'resumo' | 'quem' | 'roteiro' | 'empresa' | 'oferece' | 'inicio' | 'analise' | 'documentos' | 'equipe' | 'outras' | 'textos' | 'retomadas' | 'horarios' | 'nunca' | 'testar' | 'copiloto' | 'avancado';
 const SECOES: { id: Secao; rotulo: string; grupo: string; desc: string }[] = [
   { id: 'resumo', rotulo: 'Resumo', grupo: '', desc: 'O que falta para ela atender, em quais números ela está e como ela está indo.' },
   { id: 'quem', rotulo: 'Quem ela é', grupo: 'Identidade', desc: 'O nome, como ela se apresenta, o trabalho dela e o jeito de falar.' },
+  { id: 'roteiro', rotulo: 'Roteiro e regras', grupo: 'Identidade', desc: 'O roteiro e as regras do jeito da empresa, em texto livre. Ela segue isso do começo ao fim.' },
   { id: 'empresa', rotulo: 'A empresa', grupo: 'Identidade', desc: 'Os fatos que ela pode dizer: dados, valores, prazos e de onde atende.' },
   { id: 'oferece', rotulo: 'O que oferece', grupo: 'Identidade', desc: 'Os assuntos que ela atende. O que estiver desligado ela não oferece.' },
+  { id: 'inicio', rotulo: 'Quando ela começa', grupo: 'Atendimento', desc: 'Quanto tempo ela espera o cliente terminar de digitar e as frases que fazem ela começar.' },
   { id: 'analise', rotulo: 'Análise inicial', grupo: 'Atendimento', desc: 'As perguntas que ela faz para saber se o cliente pode ser atendido.' },
   { id: 'documentos', rotulo: 'Documentos', grupo: 'Atendimento', desc: 'O que ela pede depois da análise e como confere cada documento.' },
   { id: 'equipe', rotulo: 'Passar para a equipe', grupo: 'Atendimento', desc: 'Como ela entrega o cliente pronto e quem da equipe recebe.' },
+  { id: 'outras', rotulo: 'Outras IAs', grupo: 'Atendimento', desc: 'Se esta IA é a principal de um número ou uma secundária, que recebe a conversa quando a principal passa.' },
   { id: 'textos', rotulo: 'Textos e áudios', grupo: 'Atendimento', desc: 'As frases fixas dela. Ela só usa um texto depois de aprovado.' },
   { id: 'retomadas', rotulo: 'Retomadas', grupo: 'Ritmo', desc: 'Quando ela volta a chamar quem parou, sem insistir.' },
   { id: 'horarios', rotulo: 'Horários', grupo: 'Ritmo', desc: 'Os dias, os turnos e quando ela pode chamar o cliente.' },
   { id: 'nunca', rotulo: 'O que ela nunca diz', grupo: 'Ritmo', desc: 'As regras e as palavras que ela não usa em hipótese nenhuma.' },
   { id: 'testar', rotulo: 'Conversar para testar', grupo: 'Ferramentas', desc: 'Você faz o papel do cliente e vê como ela responde.' },
+  { id: 'copiloto', rotulo: 'Copiloto', grupo: 'Ferramentas', desc: 'Peça uma revisão: a IA da empresa lê esta configuração e sugere trechos prontos para copiar.' },
   { id: 'avancado', rotulo: 'Avançado', grupo: 'Ferramentas', desc: 'A chave do Google, os modelos, o teto do dia, exportar, duplicar e excluir.' },
 ];
 const ROT_ORIGEM: Record<VersaoIris['origem'], string> = { pre_configurada: 'Pré-configurada', nova: 'Criada aqui', duplicada: 'Cópia', importada: 'Importada' };
@@ -78,6 +84,11 @@ export function ConfigIris() {
   useEffect(() => { if (sel) setRasc({ nome: sel.nome, descricao: sel.descricao, config: sel.config }); else setRasc(null); }, [sel?.id, sel?.atualizadoEm]); // eslint-disable-line react-hooks/exhaustive-deps
   const sujo = !!sel && !!rasc && (rasc.nome !== sel.nome || rasc.descricao !== sel.descricao || !igual(rasc.config, sel.config));
 
+  // a senha de edição (migration 115): a versão protegida só muda depois de "Abrir a edição" (30 min nesta aba)
+  const senhasQ = useSenhasIris();
+  const protegida = sel ? senhasQ.data?.[sel.id] ?? null : null;
+  const edicaoAberta = useEdicaoAberta(sel?.id ?? null);
+  const travada = !!protegida && !edicaoAberta;
   const salvar = useSalvarVersao();
   const criar = useCriarVersao();
   const excluir = useExcluirVersao();
@@ -205,7 +216,13 @@ export function ConfigIris() {
                         catch (e) { avisar('erro', (e as Error).message); }
                       }} />
                   )}
+                  {travada && secao !== 'resumo' && secao !== 'testar' && <PortaoSenha v={sel} />}
+                  {!(travada && secao !== 'resumo' && secao !== 'testar') && (<>
                   {secao === 'quem' && <SecQuem c={rasc.config} set={set} />}
+                  {secao === 'roteiro' && <SecRoteiro c={rasc.config} set={set} />}
+                  {secao === 'inicio' && <SecInicio c={rasc.config} set={set} />}
+                  {secao === 'outras' && <SecOutras c={rasc.config} set={set} v={sel} versoes={versoes} />}
+                  {secao === 'copiloto' && <SecCopiloto v={sel} c={rasc.config} />}
                   {secao === 'empresa' && <SecEmpresa c={rasc.config} set={set} />}
                   {secao === 'oferece' && <SecOferece c={rasc.config} set={set} />}
                   {secao === 'analise' && <SecQualificacao c={rasc.config} set={set} />}
@@ -219,8 +236,9 @@ export function ConfigIris() {
                   {secao === 'avancado' && (
                     <SecAvancado v={sel} c={rasc.config} set={set} aviso={avisar}
                       aoDuplicar={() => void criarVersao(`${rasc.nome} (cópia)`, 'duplicada', rasc.config, rasc.descricao)}
-                      aoExcluir={() => setJanela('excluir')} />
+                      aoExcluir={() => setJanela('excluir')} protegida={protegida} />
                   )}
+                  </>)}
                 </div>
               </div>
               </>
@@ -403,8 +421,9 @@ function SecTestar({ v, sujo, irPara }: { v: VersaoIris; sujo: boolean; irPara: 
 }
 
 /* ------------------------------ avançado ------------------------------ */
-function SecAvancado({ v, c, set, aviso, aoDuplicar, aoExcluir }: {
+function SecAvancado({ v, c, set, aviso, aoDuplicar, aoExcluir, protegida }: {
   v: VersaoIris; c: IrisConfig; set: (fn: (c: IrisConfig) => IrisConfig) => void; aviso: (tom: 'ok' | 'erro', t: string) => void; aoDuplicar: () => void; aoExcluir: () => void;
+  protegida: { definidaEm: string; definidaPor: string | null } | null;
 }) {
   const salvarChave = useSalvarChaveIris();
   const testar = useTestarChaveIris();
@@ -447,6 +466,7 @@ function SecAvancado({ v, c, set, aviso, aoDuplicar, aoExcluir }: {
         <Numero rotulo="Respostas por dia, no máximo, em cada número" valor={c.modelo.maxChamadasDia} min={50} max={5000} aoMudar={(n) => mudM('maxChamadasDia', n)}
           dica="Um freio de custo: passou disso, ela para e a equipe assume até o dia seguinte." />
       </Bloco>
+      <BlocoSenha v={v} protegida={protegida} aviso={aviso} />
       <Bloco titulo="Arquivo e cópias">
         <div className="irs-acoes-linha">
           <div><b>Exportar esta IA</b><span>Um arquivo com toda a configuração, para guardar ou levar para outro sistema. Não leva a chave nem os números.</span></div>
@@ -471,19 +491,21 @@ function JanelaNova({ aberta, atual, criando, aoFechar, aoCriar }: {
   aoCriar: (nome: string, origem: VersaoIris['origem'], config: IrisConfig) => void;
 }) {
   const [nome, setNome] = useState('');
-  const [base, setBase] = useState<'pre' | 'copia' | 'branco'>('pre');
+  const [base, setBase] = useState<'pre' | 'copia' | 'branco' | 'bia'>('pre');
   useEffect(() => { if (aberta) { setNome(''); setBase(atual ? 'copia' : 'pre'); } }, [aberta]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (base === 'bia' && !nome.trim()) setNome('Bia'); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
   const empresa = atual?.config.identidade.empresa || 'Reviza';
   const opcoes: { v: typeof base; t: string; d: string; off?: boolean }[] = [
     { v: 'pre', t: 'Como a Iris pré-configurada', d: 'Igual à Iris do Atenvo: revisão de juros, cartão RMC, clientes fechados, documentos e retomadas.' },
     { v: 'copia', t: `Uma cópia de "${atual?.nome ?? ''}"`, d: 'Tudo igual à IA aberta, para mudar só o que for diferente.', off: !atual },
+    { v: 'bia', t: 'A Bia do sistema de antes', d: 'Como a Reviza usava: o roteiro, as regras, as 8 perguntas frequentes e os 63 gatilhos do agente COMERCIAL REVIZA RS, com espera de 15 s e áudio sempre.' },
     { v: 'branco', t: 'Em branco', d: 'Só o esqueleto: sem assuntos, sem perguntas e só os textos de abertura.' },
   ];
   return (
     <ModalV2 aberto={aberta} aoFechar={aoFechar} titulo="Nova IA" largura={520}
       rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec>
-        <BotaoPrimario disabled={!nome.trim() || criando} onClick={() => aoCriar(nome.trim(), base === 'copia' ? 'duplicada' : base === 'pre' ? 'pre_configurada' : 'nova',
-          base === 'copia' && atual ? atual.config : base === 'pre' ? irisPreConfigurada(empresa) : irisEmBranco(empresa))}>{criando ? 'Criando…' : 'Criar'}</BotaoPrimario></>}>
+        <BotaoPrimario disabled={!nome.trim() || criando} onClick={() => aoCriar(nome.trim(), base === 'copia' ? 'duplicada' : base === 'pre' ? 'pre_configurada' : base === 'bia' ? 'importada' : 'nova',
+          base === 'copia' && atual ? atual.config : base === 'pre' ? irisPreConfigurada(empresa) : base === 'bia' ? irisDaBia() : irisEmBranco(empresa))}>{criando ? 'Criando…' : 'Criar'}</BotaoPrimario></>}>
       <label className="irs-campo largo"><span className="irs-rot">Nome</span>
         <input className="inp" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Ex.: Luna · campanha do cartão RMC" autoFocus />
       </label>

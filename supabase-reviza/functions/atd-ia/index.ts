@@ -22,7 +22,7 @@ import { MODELO_PADRAO } from '../_shared/iris.ts';
 import {
   codigoDoErro, conferirChave, ESQUEMA_RESUMO_GEMINI, extensaoDoMime, finalDaChave, INSTRUCOES_RESUMO, INSTRUCOES_TRANSCRICAO,
   lerResumo, lerTranscricao, MAX_BYTES_AUDIO, MAX_MENSAGENS_RESUMO, MAX_SEGUNDOS_AUDIO, mimeDoAudio, montarTextoConversa,
-  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave, INSTRUCOES_SUGESTAO, MAX_CARACTERES_SUGESTAO, lerSugestao, montarTextoScripts, ESQUEMA_DOC_GEMINI, INSTRUCOES_DOCUMENTO, MAX_BYTES_DOC, MAX_DOCS_POR_VEZ, lerDocumento, tipoPeloNome, type DocIdentificado,
+  type MsgResumo, paraBase64, type Provedor, type Resumo, semChave, INSTRUCOES_SUGESTAO, MAX_CARACTERES_SUGESTAO, lerSugestao, INSTRUCOES_COPILOTO, textoDaConfigIris, montarTextoScripts, ESQUEMA_DOC_GEMINI, INSTRUCOES_DOCUMENTO, MAX_BYTES_DOC, MAX_DOCS_POR_VEZ, lerDocumento, tipoPeloNome, type DocIdentificado,
 } from '../_shared/iaPropria.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -135,6 +135,33 @@ async function gerarSugestao(provedor: Provedor, chave: string, conversa: string
   const sugestao = lerSugestao(texto);
   if (!sugestao) throw new ErroIa('resposta_invalida', 502);
   return sugestao;
+}
+
+/** o copiloto da tela das IAs: a configuração da versão + a conversa com o administrador → a resposta dele */
+async function gerarCopiloto(provedor: Provedor, chave: string, config: string, historico: { de: 'eu' | 'copiloto'; texto: string }[], pergunta: string): Promise<string> {
+  const pedido = `Configuração atual da IA:\n\n${config}\n\n`
+    + (historico.length ? `Conversa até aqui:\n${historico.map((h) => `${h.de === 'eu' ? 'Administrador' : 'Copiloto'}: ${h.texto}`).join('\n')}\n\n` : '')
+    + `Pergunta do administrador agora: ${pergunta}`;
+  let texto = '';
+  if (provedor === 'gemini') {
+    const r = await pedir(`${GEMINI}/models/${encodeURIComponent(MODELO_GEMINI)}:generateContent`, {
+      method: 'POST', headers: cabGemini(chave),
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: INSTRUCOES_COPILOTO }] }, contents: [{ role: 'user', parts: [{ text: pedido }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } }),
+    }, chave, 90_000);
+    texto = textoGemini(r);
+  } else {
+    texto = await comModelos(MODELOS_OPENAI, async (modelo) => {
+      const r = await pedir(`${OPENAI}/chat/completions`, {
+        method: 'POST', headers: { ...cabOpenai(chave), 'content-type': 'application/json' },
+        body: JSON.stringify({ model: modelo, temperature: 0.3, messages: [{ role: 'system', content: INSTRUCOES_COPILOTO }, { role: 'user', content: pedido }] }),
+      }, chave, 90_000);
+      return String(((r.choices as { message?: { content?: string } }[] | undefined)?.[0]?.message?.content) ?? '');
+    });
+  }
+  const t = (texto ?? '').trim();
+  if (!t) throw new ErroIa('resposta_invalida', 502);
+  return t.slice(0, 8000);
 }
 
 /** o que é este arquivo (imagem ou PDF): Gemini lê os dois; na OpenAI só a imagem (PDF fica pelo nome do arquivo) */
@@ -294,6 +321,31 @@ Deno.serve(async (req) => {
       const pedidoExtra = String(corpo.pedido ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
       const sugestao = await gerarSugestao(k.provedor, k.chave, texto, montarTextoScripts((scr ?? []) as { titulo: string | null; conteudo: string | null }[]), pedidoExtra);
       return json({ sugestao });
+    }
+
+    /* ---------- tela das IAs: o copiloto (só o administrador; lê a configuração da versão, nunca a chave) ---------- */
+    if (acao === 'copiloto_iris') {
+      const agenteId = String(corpo.agente_id ?? '');
+      if (!UUID.test(agenteId)) return erro('ia_nao_encontrada');
+      const eu = await quemChama(admin, comLogin);
+      if (!eu) return erro('nao_autorizado', 401);
+      if (!eu.admin) return erro('so_administrador', 403);
+      orgParaErro = eu.orgId;
+      const { data: ag } = await admin.from('ia_agentes').select('id, nome, comportamentos').eq('id', agenteId).eq('organizacao_id', eu.orgId).maybeSingle();
+      if (!ag) return erro('ia_nao_encontrada', 404);
+      const pergunta = String(corpo.pergunta ?? '').replace(/\s+/g, ' ').trim().slice(0, 1500);
+      if (pergunta.length < 2) return erro('pergunta_vazia');
+      const hist = (Array.isArray(corpo.historico) ? corpo.historico : []).slice(-8)
+        .map((h) => (h && typeof h === 'object' ? h as Record<string, unknown> : {}))
+        .map((h) => ({ de: h.de === 'copiloto' ? 'copiloto' as const : 'eu' as const, texto: String(h.texto ?? '').slice(0, 3000) }))
+        .filter((h) => h.texto.trim());
+      // a configuração que está NA TELA (ainda não salva) pode vir junto; senão, a salva
+      const naTela = corpo.config && typeof corpo.config === 'object' ? corpo.config as Record<string, unknown> : null;
+      const salva = ((ag.comportamentos as Record<string, unknown> | null)?.iris as Record<string, unknown> | null) ?? null;
+      const k = await chaveDa(admin, eu.orgId);
+      if (!k) return erro('sem_chave');
+      const resposta = await gerarCopiloto(k.provedor, k.chave, textoDaConfigIris(naTela ?? salva, String(ag.nome ?? 'IA')), hist, pergunta);
+      return json({ resposta });
     }
 
     /* ---------- documentos que o CLIENTE mandou: o que é cada um (até 8 por vez, só os ainda não vistos) ---------- */
