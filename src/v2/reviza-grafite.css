@@ -359,3 +359,22 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv { background: rgba(255, 255, 255, .1); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2,
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2 { background: var(--accent); box-shadow: none; }
+
+/* 26/11 (acabamento, dono: "bem organizado, bem bonito"):
+   · ESTADO VAZIO com presença: ícone maior num quadrado com fio, na cor de dado (sólida); título um pouco maior.
+   · LISTAS (Sequências, Regras, Formulários, Webhooks, Disparos): a linha acende no hover e os botões aparecem com ela.
+   · CARTÕES de métrica e seções: fio mais limpo e o número em peso médio com dígitos alinhados. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado { padding: 34px 20px 30px; gap: 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .ic {
+  width: 48px; height: 48px; margin-bottom: 10px; border-radius: 13px; color: var(--accent); --ic-g: 22px;
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .t { font-size: 14px; letter-spacing: -.01em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .s { max-width: 360px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .acao { margin-top: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li) {
+  margin: 0 -19px; padding-left: 19px; padding-right: 19px; border-radius: 0; transition: background .12s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(var(--tint), .035); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(255, 255, 255, .035); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvm-val { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }

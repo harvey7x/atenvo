@@ -10,6 +10,7 @@ import {
 } from '@/data/formularios';
 import { usePessoasEEtapas } from '@/data/avisosEquipe';
 import { useEtiquetas } from '@/data/atendimento';
+import { CartaoMetricaFixo, GradeMetricas } from '../../components/CartaoMetrica';
 import './formularios.css';
 
 const tz = { timeZone: 'America/Sao_Paulo' } as const;
@@ -29,6 +30,8 @@ export function Formularios() {
   const [janela, setJanela] = useState<{ f: Formulario | null } | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
   const forms = q.data ?? [];
+  const soma = (k: 'd7' | 'd30' | 'reunioes') => Object.values(resumo.data?.porFormulario ?? {}).reduce((s, x) => s + (x[k] || 0), 0);
+  const ligados = forms.filter((f) => f.ativo).length;
   const nomeEtapa = (id: string | null) => (id ? pe?.etapas.find((e) => e.id === id)?.nome : null) ?? 'a etapa de entrada';
   const copiar = async (f: Formulario) => {
     try { await navigator.clipboard.writeText(linkDoFormulario(f.slug)); setAviso({ tom: 'ok', texto: `Link de "${f.nome}" copiado. Cole no anúncio, no Instagram ou onde quiser.` }); }
@@ -37,6 +40,14 @@ export function Formularios() {
   return (
     <>
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
+      {forms.length > 0 && (
+        <GradeMetricas rotulo="Os formulários em números">
+          <CartaoMetricaFixo icone="lista" titulo="Formulários" valor={forms.length} detalhe={<span>{ligados} {ligados === 1 ? 'recebendo respostas' : 'recebendo respostas'}</span>} rodape={<span>{forms.length - ligados ? `${forms.length - ligados} fechado${forms.length - ligados === 1 ? '' : 's'}` : 'Todos abertos'}</span>} />
+          <CartaoMetricaFixo icone="entra" titulo="Respostas" valor={soma('d7')} detalhe={<span>nos últimos 7 dias</span>} rodape={<span>{soma('d30')} em 30 dias</span>} />
+          <CartaoMetricaFixo icone="calendario" titulo="Reuniões marcadas" valor={soma('reunioes')} detalhe={<span>pelo próprio cliente, em 30 dias</span>} rodape={<span>Caem na Agenda</span>} />
+          <CartaoMetricaFixo icone="pessoas" titulo="Com agendamento" valor={forms.filter((f) => f.agenda.ligado).length} detalhe={<span>{forms.filter((f) => f.agenda.ligado).length === 1 ? 'formulário em que o cliente escolhe o horário' : 'formulários em que o cliente escolhe o horário'}</span>} rodape={<span>Os outros só pedem os dados</span>} />
+        </GradeMetricas>
+      )}
       <div className="aut-barra">
         <Segmentado rotulo="Formulários" valor={aba} aoMudar={(v) => setAba(v as 'lista' | 'respostas')} opcoes={[{ valor: 'lista', rotulo: `Formulários (${forms.length})` }, { valor: 'respostas', rotulo: 'Respostas' }]} />
         {aba === 'lista' && <BotaoPrimario onClick={() => setJanela({ f: null })}>＋ Novo formulário</BotaoPrimario>}

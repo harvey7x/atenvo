@@ -14,6 +14,7 @@ import { useEtiquetas } from '@/data/atendimento';
 import { useAnexosDosScripts } from '@/data/automacoes';
 import { DIAS_SEMANA } from '@/data/formularios';
 import './formularios.css';
+import { CartaoMetricaFixo, GradeMetricas } from '../../components/CartaoMetrica';
 import './disparos.css';
 
 const tz = { timeZone: 'America/Sao_Paulo' } as const;
@@ -28,6 +29,8 @@ export function Disparos() {
   const [aviso, setAviso] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
   const [confirmaCancelar, setConfirmaCancelar] = useState<string | null>(null);
   const lista = q.data ?? [];
+  const tot = (k: 'enviadas' | 'agendadas' | 'responderam' | 'falhas') => lista.reduce((s, d) => s + d[k], 0);
+  const taxa = tot('enviadas') ? Math.round((tot('responderam') / tot('enviadas')) * 100) : 0;
   const parar = async (d: Disparo) => {
     try { const n = await cancelar.mutateAsync(d.id); setAviso({ tom: 'ok', texto: `"${d.nome}" parado: ${int(n)} ${n === 1 ? 'mensagem saiu' : 'mensagens saíram'} da fila. As que já foram enviadas ficam.` }); setConfirmaCancelar(null); }
     catch (x) { setAviso({ tom: 'erro', texto: (x as Error).message }); }
@@ -35,6 +38,14 @@ export function Disparos() {
   return (
     <>
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
+      {lista.length > 0 && (
+        <GradeMetricas rotulo="Os disparos em números">
+          <CartaoMetricaFixo icone="envia" titulo="Enviadas" valor={tot('enviadas')} detalhe={<span>em {lista.length} {lista.length === 1 ? 'disparo' : 'disparos'}</span>} rodape={<span>{tot('falhas') ? `${tot('falhas')} ${tot('falhas') === 1 ? 'falha' : 'falhas'}` : 'Sem falhas'}</span>} />
+          <CartaoMetricaFixo icone="relogio" titulo="Na fila" valor={tot('agendadas')} detalhe={<span>ainda vão sair</span>} rodape={<span>No ritmo de cada número</span>} />
+          <CartaoMetricaFixo icone="balao" titulo="Responderam" valor={tot('responderam')} detalhe={<span>clientes que escreveram de volta</span>} rodape={<span>Depois de receber o disparo</span>} />
+          <CartaoMetricaFixo icone="porcento" titulo="Taxa de resposta" valor={`${taxa}%`} detalhe={<span>responderam ÷ enviadas</span>} rodape={<span>{taxa >= 20 ? 'Boa conversa' : tot('enviadas') ? 'Vale rever o texto' : 'Ainda sem envios'}</span>} />
+        </GradeMetricas>
+      )}
       <div className="aut-barra">
         <span className="dsp-sub">Cada mensagem entra em <button type="button" className="cfgm-lnk" onClick={() => nav('/agendamentos')}>Mensagens agendadas</button> e sai no ritmo do número.</span>
         <BotaoPrimario onClick={() => setNovo(true)}>＋ Novo disparo</BotaoPrimario>

@@ -7,6 +7,7 @@ import { AcoesNoTopo } from '../comunicacao/MenuMais';
 import { EVENTOS, ehOk, useApagarWebhook, useEnviosWebhook, useSalvarWebhook, useTestarWebhook, useWebhooks, validarWebhook, type EventoWebhook, type Webhook } from '@/data/webhooks';
 import '../painel/painel.css';
 import './camposMotivos.css';
+import { CartaoMetricaFixo, GradeMetricas } from '../../components/CartaoMetrica';
 import './webhooks.css';
 
 const tz = { timeZone: 'America/Sao_Paulo' } as const;
@@ -23,6 +24,10 @@ export function ConfigWebhooks() {
   const [janela, setJanela] = useState<{ w: Webhook | null } | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
   const lista = q.data ?? [];
+  const env = envios.data ?? [];
+  const okN = env.filter((e) => ehOk(e.status)).length;
+  const falhasN = env.filter((e) => e.resolvido && !ehOk(e.status)).length;
+  const ultimo = lista.map((w) => w.ultimoEnvioEm).filter(Boolean).sort().pop() ?? null;
   const nomeDe = (id: string) => lista.find((w) => w.id === id)?.nome ?? 'webhook apagado';
   const fazerTeste = async (w: Webhook) => {
     try { await testar.mutateAsync(w.id); setAviso({ tom: 'ok', texto: `Teste mandado para "${w.nome}". O resultado aparece em "Últimos envios" em alguns segundos.` }); }
@@ -33,6 +38,14 @@ export function ConfigWebhooks() {
       <AcoesNoTopo><BotaoPrimario onClick={() => setJanela({ w: null })}>＋ Novo webhook</BotaoPrimario></AcoesNoTopo>
       {aviso && <div className={`gs-aviso ${aviso.tom}`} role={aviso.tom === 'erro' ? 'alert' : 'status'}><span>{aviso.texto}</span><button type="button" className="gs-aviso-x" onClick={() => setAviso(null)} aria-label="Fechar">×</button></div>}
 
+      {lista.length > 0 && (
+        <GradeMetricas rotulo="Os webhooks em números">
+          <CartaoMetricaFixo icone="sinal" titulo="Endereços" valor={lista.length} detalhe={<span>{lista.filter((w) => w.ativo).length} {lista.filter((w) => w.ativo).length === 1 ? 'ligado' : 'ligados'}</span>} rodape={<span>{lista.some((w) => w.desligadoMotivo) ? 'Um desligou sozinho: confira' : 'Todos respondendo'}</span>} />
+          <CartaoMetricaFixo icone="certo" titulo="Recebidos" valor={okN} detalhe={<span>dos últimos {env.length} envios</span>} rodape={<span>O outro sistema respondeu 2xx</span>} />
+          <CartaoMetricaFixo icone="alerta" titulo="Falharam" valor={falhasN} detalhe={<span>depois de 3 tentativas</span>} rodape={<span>{falhasN ? 'Veja o motivo na lista' : 'Nenhuma falha definitiva'}</span>} />
+          <CartaoMetricaFixo icone="relogio" titulo="Último envio" valor={ultimo ? quando(ultimo).split(' ')[1] ?? quando(ultimo) : '—'} detalhe={<span>{ultimo ? quando(ultimo).split(' ')[0] : 'nada enviado ainda'}</span>} rodape={<span>Hora de São Paulo</span>} />
+        </GradeMetricas>
+      )}
       {q.isLoading ? <p className="pn-vazio">Carregando…</p>
         : q.isError ? <EstadoErro titulo="Não foi possível carregar os webhooks" descricao="Houve uma falha na consulta. Tente de novo." aoTentarDeNovo={() => void q.refetch()} />
         : lista.length === 0 ? <CardVidro className="pn-card"><EstadoVazio titulo="Nenhum webhook" descricao="Cadastre o endereço de outro sistema (uma planilha, um ERP, uma automação) para ele receber os leads, as vendas e as reuniões na hora." acao={{ rotulo: '＋ Novo webhook', onClick: () => setJanela({ w: null }) }} /></CardVidro>
