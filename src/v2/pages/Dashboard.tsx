@@ -1,5 +1,7 @@
 import { ResumoDiaAba } from './dashboardV5/ResumoDiaAba';
 import { FinanceiroAba } from './dashboardV5/FinanceiroAba';
+import { CrmAba } from './dashboardV5/CrmAba';
+import { isRevizaMode } from '@/lib/supabase';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, MSG_ABA_NAO_LIGADA, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
@@ -43,10 +45,11 @@ const ABAS = [
   { valor: 'atendentes', rotulo: 'Atendentes' },
   { valor: 'resumo', rotulo: 'Resumo do dia' }, // 25/11: o dia da equipe numa tela só + o aviso no sino (só com o recurso 'resumo-dia')
   { valor: 'financeiro', rotulo: 'Financeiro' }, // 26/11: receita, cobranças, por responsável e por produto (só com o recurso 'financeiro')
+  { valor: 'crm', rotulo: 'CRM' }, // 26/11: estados, funil por etapa, etiquetas, próximas reuniões e tarefas (só com o recurso 'crm-extra')
 ] as const;
 type AbaDash = typeof ABAS[number]['valor'];
 /** as abas desta instalação: Anúncios e Ao vivo só com o recurso ligado (a parte do servidor existe) */
-const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')) && (a.valor !== 'resumo' || temRecurso('resumo-dia')) && (a.valor !== 'financeiro' || temRecurso('financeiro')));
+const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')) && (a.valor !== 'resumo' || temRecurso('resumo-dia')) && (a.valor !== 'financeiro' || temRecurso('financeiro')) && (a.valor !== 'crm' || (isRevizaMode && temRecurso('crm-extra'))));
 const ehAba = (v: string | null): v is AbaDash => abasVisiveis().some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
@@ -229,6 +232,7 @@ export default function DashboardV2() {
 
       {aba === 'resumo' && <ResumoDiaAba hoje={hoje} />}
       {aba === 'financeiro' && <FinanceiroAba />}
+      {aba === 'crm' && <CrmAba />}
 
       {aba === 'anuncios' && (
         <>
