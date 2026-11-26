@@ -13,6 +13,13 @@ create table if not exists private.atd_guimoo_conexao_canal (
 );
 revoke all on private.atd_guimoo_conexao_canal from public, anon, authenticated;
 
+-- o número de HISTÓRICO (128): onde as conversas de lá ficam, visíveis no WhatsApp e só para leitura, até a escolha do número
+create or replace function private.atd_guimoo_canal_historico()
+returns uuid language sql stable security definer set search_path = '' as $$
+  select id from public.canais where organizacao_id = 'a1fa0000-0000-4000-8000-000000000001' and identificador = 'historico-sistema-anterior' limit 1
+$$;
+revoke all on function private.atd_guimoo_canal_historico() from public, anon, authenticated;
+
 -- a conexão de lá de cada cliente importado (a do card dele; sem card = '')
 create or replace function private.atd_guimoo_conexao_do_contato(p_contato uuid)
 returns text language sql stable security definer set search_path = '' as $$
@@ -31,17 +38,19 @@ begin
   return jsonb_build_object(
     'conexoes', coalesce((
       select jsonb_agg(jsonb_build_object('conexao', x.conexao, 'conversas', x.conversas, 'abertas', x.abertas, 'sem_numero', x.sem_numero,
-                                          'canal_id', m.canal_id, 'canal_nome', (select coalesce(nullif(btrim(c.nome_interno), ''), c.numero_conectado) from public.canais c where c.id = m.canal_id))
+                                          'canal_id', case when m.canal_id is distinct from private.atd_guimoo_canal_historico() then m.canal_id end,
+                                          'historico', m.canal_id is not null and m.canal_id = private.atd_guimoo_canal_historico(),
+                                          'canal_nome', (select coalesce(nullif(btrim(c.nome_interno), ''), c.numero_conectado) from public.canais c where c.id = m.canal_id))
                        order by x.conexao = '', x.conversas desc)
         from (select private.atd_guimoo_conexao_do_contato(g.contato_id) as conexao, count(distinct g.conversa_id) as conversas,
                      count(distinct g.conversa_id) filter (where cv.arquivada_em is null) as abertas,
-                     count(distinct g.conversa_id) filter (where cv.canal_id is null) as sem_numero
+                     count(distinct g.conversa_id) filter (where cv.canal_id is null or cv.canal_id = private.atd_guimoo_canal_historico()) as sem_numero
                 from private.atd_guimoo_contatos g join public.conversas cv on cv.id = g.conversa_id
                where g.conversa_id is not null group by 1) x
         left join private.atd_guimoo_conexao_canal m on m.conexao = x.conexao), '[]'::jsonb),
     'numeros', coalesce((
       select jsonb_agg(jsonb_build_object('id', c.id, 'nome', coalesce(nullif(btrim(c.nome_interno), ''), c.numero_conectado, 'Número'), 'numero', c.numero_conectado, 'ativo', c.ativo) order by c.nome_interno)
-        from public.canais c where c.organizacao_id = v_org and c.tipo = 'whatsapp'), '[]'::jsonb));
+        from public.canais c where c.organizacao_id = v_org and c.tipo = 'whatsapp' and c.status_integracao::text not in ('removido', 'arquivado')), '[]'::jsonb));
 end $$;
 revoke all on function public.atd_guimoo_conexoes() from public, anon;
 grant execute on function public.atd_guimoo_conexoes() to authenticated, service_role;
@@ -53,7 +62,8 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_org uuid := 'a1fa0000-0000-4000-8000-000000000001'; v_antes uuid; v_n int;
 begin
   if coalesce(public.org_papel(v_org), '') <> 'admin' and not public.is_platform_admin() then raise exception 'sem_permissao'; end if;
-  if p_canal is null or not exists (select 1 from public.canais c where c.id = p_canal and c.organizacao_id = v_org and c.tipo = 'whatsapp') then
+  if p_canal is null or not exists (select 1 from public.canais c where c.id = p_canal and c.organizacao_id = v_org and c.tipo = 'whatsapp'
+                                       and c.status_integracao::text not in ('removido', 'arquivado')) then
     raise exception 'numero_invalido';
   end if;
   select canal_id into v_antes from private.atd_guimoo_conexao_canal where conexao = coalesce(p_conexao, '');

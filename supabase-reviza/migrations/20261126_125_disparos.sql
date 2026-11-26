@@ -146,9 +146,9 @@ begin
       insert into public.conversas (organizacao_id, contato_id, canal_id, canal_origem_id, ultimo_canal_id, status, nao_lidas, ultima_lida_em, arquivada_em)
       values (v_org, a.contato_id, p_canal, p_canal, p_canal, 'aberta', 0, now(), now()) returning id into v_conv;
     else
-      -- conversa sem número (veio do sistema anterior e a conexão ainda não foi escolhida): fica com o número do disparo
+      -- conversa sem número ou no número de histórico (veio do sistema anterior): fica com o número do disparo
       update public.conversas set canal_id = p_canal, canal_origem_id = coalesce(canal_origem_id, p_canal), ultimo_canal_id = coalesce(ultimo_canal_id, p_canal)
-       where id = v_conv and canal_id is null;
+       where id = v_conv and (canal_id is null or canal_id = private.atd_guimoo_canal_historico());
     end if;
     v_primeiro := initcap(split_part(btrim(coalesce(a.nome, '')), ' ', 1));
     v_txt := nullif(btrim(replace(replace(coalesce(p_mensagem->>'texto', ''), '{{nome}}', coalesce(nullif(v_primeiro, ''), 'tudo bem')), '{{nome_completo}}', coalesce(a.nome, ''))), '');
