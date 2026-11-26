@@ -137,10 +137,14 @@ function TrocaAmbiente({ org, atual, ambientes, carregando, aoTrocar, aoMudarAbe
 }
 
 /* ---------- um item do menu (link de rota) ---------- */
+// 26/11: as telas em abas (Funil, Atendimento ao cliente) acendem o item do menu também nas abas irmãs
+const IRMAS: Record<string, string[]> = { 'config/venda': ['config/origens', 'config/motivos', 'config/campos'], 'config/campos': ['config/motivos'], 'config/lembrete': ['config/cofre', 'config/produtos'], 'config/cofre': ['config/produtos'] };
 function ItemLink({ item, aoEscolher }: { item: ItemBarra; aoEscolher?: () => void }) {
   const temBadge = !!item.badge && item.badge > 0;
+  const { pathname } = useLocation();
+  const irma = IRMAS[item.slug]?.some((s) => pathname === '/' + s) ?? false;
   return (
-    <NavLink to={`/${item.slug}`} className={({ isActive }) => (isActive ? 'ba-item on' : 'ba-item')} onClick={aoEscolher}
+    <NavLink to={`/${item.slug}`} className={({ isActive }) => (isActive || irma ? 'ba-item on' : 'ba-item')} aria-current={irma ? 'page' : undefined} onClick={aoEscolher}
       aria-keyshortcuts={item.atalho ? `Meta+${item.atalho} Control+${item.atalho}` : undefined}>
       <span className="ba-item-pri">
         <span className="ba-ico">{item.icone}{temBadge && <i className="ba-ponto" aria-hidden />}</span>

@@ -233,11 +233,9 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('aviso-espera') ? [{ slug: 'config/aviso-espera', rotulo: 'Aviso de espera', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('avisos-equipe') ? [{ slug: 'config/avisos-equipe', rotulo: 'Avisos para a equipe', admin: true }] : []),
-    ...(temRecurso('atendimento') && temRecurso('campos') ? [{ slug: 'config/campos', rotulo: 'Campos do cliente', admin: true }, { slug: 'config/motivos', rotulo: 'Motivos de fechamento', admin: true }] : []),
-    ...(temRecurso('atendimento') && temRecurso('venda-origem') ? [{ slug: 'config/venda', rotulo: 'Botão de venda', admin: true }, { slug: 'config/origens', rotulo: 'Origem do lead', admin: true }] : []),
-    ...(temRecurso('atendimento') && temRecurso('financeiro') ? [{ slug: 'config/produtos', rotulo: 'Produtos e serviços', admin: true }] : []),
-    ...(temRecurso('atendimento') && temRecurso('cofre') ? [{ slug: 'config/cofre', rotulo: 'Cofre de conversas', admin: true }] : []),
-    ...(temRecurso('atendimento') && temRecurso('lembrete-reuniao') ? [{ slug: 'config/lembrete', rotulo: 'Lembrete de reunião', admin: true }] : []),
+    // 26/11: Funil (venda · origem · motivos · campos) e Atendimento ao cliente (lembrete · cofre · produtos) em abas
+    ...(temRecurso('atendimento') && (temRecurso('venda-origem') || temRecurso('campos')) ? [{ slug: temRecurso('venda-origem') ? 'config/venda' : 'config/campos', rotulo: 'Funil', admin: true }] : []),
+    ...(temRecurso('atendimento') && (temRecurso('lembrete-reuniao') || temRecurso('cofre') || temRecurso('financeiro')) ? [{ slug: temRecurso('lembrete-reuniao') ? 'config/lembrete' : temRecurso('cofre') ? 'config/cofre' : 'config/produtos', rotulo: 'Atendimento ao cliente', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('webhooks') ? [{ slug: 'config/webhooks', rotulo: 'Webhooks', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('importacao') ? [{ slug: 'config/importacao', rotulo: 'Importação do sistema anterior', admin: true }] : []),
   ] },
@@ -259,6 +257,8 @@ const TITULOS_PAGINA: Record<string, string> = {
   'config/integracoes/anuncios': 'Integrações',
   'config/integracoes/ia': 'Integrações',
   ...Object.fromEntries([...COB_SECOES_BASE, ...COB_SECOES_REVIZA, ...GRUPOS.flatMap((g) => g.itens), ...COB_SECOES, ...CFG_GRUPOS.flatMap((g) => g.itens)].map((i) => [i.slug, i.rotulo])),
+  // 26/11: as abas das telas combinadas mostram o nome da tela (depois do spread, para valer sobre o rótulo do item)
+  ...{ 'config/venda': 'Funil', 'config/origens': 'Funil', 'config/motivos': 'Funil', 'config/campos': 'Funil', 'config/lembrete': 'Atendimento ao cliente', 'config/cofre': 'Atendimento ao cliente', 'config/produtos': 'Atendimento ao cliente' },
 };
 const tituloDaRota = (pathname: string) => TITULOS_PAGINA[pathname.replace(/^\/+|\/+$/g, '')] ?? '';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;

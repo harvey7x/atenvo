@@ -53,6 +53,8 @@ import { ConfigAvisosEquipe } from './ConfigAvisosEquipe';
 import { ConfigImportacao } from './ConfigImportacao';
 import { ConfigWebhooks } from './ConfigWebhooks';
 import { ConfigLembrete } from './ConfigLembrete';
+import { ConfigFunil } from './ConfigFunil';
+import { ConfigCliente } from './ConfigCliente';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
@@ -109,6 +111,15 @@ export default function ConfigAmbiente() {
   if (secao === 'iris') return (<><Cabecalho titulo="Atendentes de IA" sub="A Iris e as outras IAs do Atendimento: o que cada uma sabe e faz, e em quais números atende." /><Suspense fallback={null}><Iris /></Suspense></>);
   if (secao === 'retomada') return (<><Cabecalho titulo="Retomada automática" sub="Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban. Se ele responder, a sequência para." /><ConfigRetomada /></>);
   if (secao === 'aviso-espera') return (<><Cabecalho titulo="Aviso de espera" sub="O sino avisa quando um cliente passa da meta sem resposta: primeiro o responsável pela conversa, depois os gestores." /><ConfigAvisoEspera /></>);
+  // 26/11: as telas pequenas do funil e do cliente viraram DUAS telas em abas (os endereços antigos abrem a aba certa)
+  const temVenda = temRecurso('venda-origem') && temRecurso('atendimento'); const temCampos = temRecurso('campos') && temRecurso('atendimento');
+  if (secao === 'campos' || secao === 'motivos' || secao === 'venda' || secao === 'origens') {
+    return (<><Cabecalho titulo="Funil" sub="O botão de venda, de onde cada lead vem, os motivos de fechamento e os campos do cliente." /><ConfigFunil aba={secao} temVenda={temVenda} temCampos={temCampos} /></>);
+  }
+  const temCli = { lembrete: temRecurso('lembrete-reuniao') && temRecurso('atendimento'), cofre: temRecurso('cofre') && temRecurso('atendimento'), produtos: temRecurso('financeiro') && temRecurso('atendimento') };
+  if (secao === 'lembrete' || secao === 'cofre' || secao === 'produtos') {
+    return (<><Cabecalho titulo="Atendimento ao cliente" sub="O lembrete antes da reunião, o cofre de conversas e o catálogo de produtos e serviços." /><ConfigCliente aba={secao} tem={temCli} /></>);
+  }
   if (secao === 'campos') return (<><Cabecalho titulo="Campos do cliente" sub="O que a equipe preenche sobre cada cliente no painel do WhatsApp, e o que aparece no cartão do Kanban." /><ConfigCampos /></>);
   if (secao === 'motivos') return (<><Cabecalho titulo="Motivos de fechamento" sub="As opções que aparecem ao fechar uma conversa, e o histórico de quem fechou e por quê." /><ConfigMotivos /></>);
   if (secao === 'venda') return (<><Cabecalho titulo="Botão de venda" sub="O nome do botão que marca a venda como fechada, no WhatsApp e no Kanban, e quem marcou cada venda." /><ConfigVenda /></>);

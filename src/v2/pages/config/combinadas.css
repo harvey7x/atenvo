@@ -1,0 +1,4 @@
+/* telas combinadas de Configurações (26/11): faixa de números + abas + a tela da aba (que já é um .pn/.cfgw por dentro) */
+.v2 .cfgcomb-abas { display: flex; align-items: center; }
+.v2 .cfgcomb-corpo > .pn, .v2 .cfgcomb-corpo > .cfgw { gap: 12px; }
+.v2 .cfgcomb-corpo > .pn > .gs-aviso, .v2 .cfgcomb-corpo > .cfgw > .gs-aviso { margin-top: 0; }
