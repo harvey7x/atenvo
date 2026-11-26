@@ -7,6 +7,8 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 export const FECHAMENTO_REAL: boolean = isSupabaseConfigured && !!supabase;
 
 export const MOTIVOS_FECHAMENTO = [
+  // o motivo que a Reviza já usava na Guimoo (26/11) vem primeiro
+  'Cliente descartado',
   'Atendimento concluído',
   'Cliente desistiu',
   'Sem perfil (não elegível)',
