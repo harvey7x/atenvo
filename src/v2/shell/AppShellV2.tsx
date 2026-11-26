@@ -124,6 +124,8 @@ const GRUPOS: GrupoNav[] = [
     itens: [
       // Kanban sem admin: a equipe vê o quadro (cada um os seus cards); Dashboard só o administrador (como no Atenvo)
       { slug: 'kanban', rotulo: 'Kanban' },
+      // Contatos (26/11): a lista de todos os clientes, como o CRM › Contatos do sistema de antes (cada um vê os seus)
+      { slug: 'contatos', rotulo: 'Contatos' },
       { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
     ],
   },
