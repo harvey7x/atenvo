@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'guimoo-conversas-26-11', titulo: 'Conversas do jeito que a equipe já usava', onde: 'WhatsApp', quando: '26/11',
+    texto: 'Abas "Fila", "Não respondidas" e "IA". No ⋯ da lista: selecionar várias conversas (marcar como lidas, fixar, arquivar), esconder telefones e mensagens para mostrar a tela a alguém e, para o administrador, o desempenho do chat de hoje. No ⋯ da conversa: buscar na conversa, copiar o link e exportar a conversa. E o botão "Contrato fechado" ao lado da etapa.',
+    rota: '/whatsapp',
+  },
+  {
+    id: 'guimoo-dados-26-11', titulo: 'O funil, as etiquetas e as mensagens rápidas da Reviza', onde: 'Kanban · WhatsApp · Scripts · Configurações', quando: '26/11',
+    texto: 'Veio do sistema que a Reviza usava antes: o funil COMERCIAL REVIZA com as 9 etapas, as 16 etiquetas, as mensagens rápidas de texto (por pessoa: Garcia, Emillyn, Felipe), as equipes Club da Luta, Ferrari, Junin e Veteranos e os follow-ups na retomada automática (que continua desligada até o administrador ligar).',
+    rota: '/kanban',
+  },
+  {
     id: 'resumo-dia-25-11', titulo: 'Resumo do dia', onde: 'Dashboard › Resumo do dia', quando: '25/11', recurso: 'resumo-dia', soAdmin: true,
     texto: 'O dia da equipe numa tela só: quantos clientes escreveram, quantos a equipe e a IA atenderam, o tempo de resposta, quem esperou além da meta, por que as conversas fecharam e cada atendente. Dá para ver hoje, ontem ou outro dia, e ligar o aviso no sino no fim da tarde.',
     rota: '/dashboard?aba=resumo',

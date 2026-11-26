@@ -600,20 +600,26 @@ export function useInboxWhatsApp(opts: {
   // da recarga completa de antes; o UPDATE de conversas do realtime confirma (e o confirmar() no
   // sucesso recarimba contra busca que leu antes do commit). Erro = desfaz os campos tocados +
   // recarga completa (raro).
-  const marcarLida = useCallback(async (lida: boolean) => {
-    if (!current.id) return;
-    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { unread: lida ? 0 : 1 })); return; }
+  // por id (26/11): a seleção de várias conversas usa as mesmas ações; sem id = a conversa aberta.
+  // `silencioso` = sem o aviso de sucesso (a seleção avisa uma vez no fim).
+  const marcarLida = useCallback(async (lida: boolean, conversaId?: string) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    const naoLidasAntes = conversaId ? (contacts.find((c) => c.id === conversaId)?.unread ?? 0) : (current.unread ?? 0);
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { unread: lida ? 0 : 1 })); return; }
     // mesma regra da RPC wa_marcar_lida: lida → 0; não lida → greatest(nao_lidas, 1)
-    const otimista = patchOtimistaLista(qc, orgId, current.id, { unread: lida ? 0 : Math.max(current.unread ?? 0, 1) });
-    try { await waMarcarLida(current.id, lida); otimista.confirmar(); }
+    const otimista = patchOtimistaLista(qc, orgId, id, { unread: lida ? 0 : Math.max(naoLidasAntes, 1) });
+    try { await waMarcarLida(id, lida); otimista.confirmar(); }
     catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao marcar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current.id, current.unread, orgId]);
-  const arquivar = useCallback(async (arq: boolean) => {
-    if (!current.id) return;
-    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { arquivada: arq })); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); return; }
-    const otimista = patchOtimistaLista(qc, orgId, current.id, { arquivada: arq });
-    try { await waArquivar(current.id, arq); otimista.confirmar(); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); }
+  }, [current.id, current.unread, orgId, contacts]);
+  const arquivar = useCallback(async (arq: boolean, conversaId?: string, silencioso?: boolean) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    const okTxt = arq ? 'Conversa arquivada' : 'Conversa desarquivada';
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { arquivada: arq })); if (!silencioso) aoAvisar({ tom: 'ok', texto: okTxt }); return; }
+    const otimista = patchOtimistaLista(qc, orgId, id, { arquivada: arq });
+    try { await waArquivar(id, arq); otimista.confirmar(); if (!silencioso) aoAvisar({ tom: 'ok', texto: okTxt }); }
     catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao arquivar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id, orgId]);

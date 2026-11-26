@@ -26,6 +26,9 @@ import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { donosDaPrevia } from '../data/config/equipes';
 import { temRecurso } from '../data/config/recursos';
+import { isRevizaMode } from '@/lib/supabase';
+import { BarraSelecao, BuscaNaConversa, DesempenhoChat } from '../components/ConversaExtras';
+import { baixarTexto, linkDaConversa, nomeArquivoConversa, textoDaConversa } from '../lib/exportarConversa';
 import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -95,8 +98,11 @@ const ABA_PV_KEY = 'atenvo-pv-aba';
 // Pós-venda (/pos-venda), que reaproveita este mesmo inbox em modo 'posvenda' (pedido do dono 19/11).
 const TABS_ATEND = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['ia', 'IA'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
+/* Reviza (26/11): os nomes que a equipe já usava no sistema de antes — "Fila" e "Não respondidas" */
+const ROTULOS_REVIZA: Partial<Record<string, string>> = { naoatrib: 'Fila', pendentes: 'Não respondidas' };
+const rotuloAba = (id: string, rot: string) => (isRevizaMode && ROTULOS_REVIZA[id]) || rot;
 const TABS_PV = [['fechados', 'Todos'], ['pvaguarda', 'Aguardando resposta']] as const;
 type TabId = typeof TABS_ATEND[number][0] | typeof TABS_PV[number][0];
 /* ⚠ do card: só o que o Radar NÃO cobre (dono 29/10: "deixa o Radar como o único aviso de cliente sem
@@ -183,7 +189,7 @@ function horaDaLista(ms: number | null | undefined, agoraMs: number): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO });
 }
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp'; x: number; y: number; acima?: boolean } | null;
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp' | 'lista'; x: number; y: number; acima?: boolean } | null;
 
 /* ==================================================================
    Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO entre a lista de
@@ -481,6 +487,13 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   // aba Iris: só Matheus/Murilo, e só depois da RPC responder (o servidor é a proteção real)
   const { eIris, mapa: irisMapa, carteiraIds: irisCarteira } = useIrisCarteira();
   const [irisFiltro, setIrisFiltro] = useState<'todos' | 'carteira' | 'meus' | 'fechados'>('todos');
+  // 26/11 (igual ao sistema que a Reviza usava antes): modo privacidade, várias conversas de uma vez, buscar na conversa, desempenho
+  const [privado, setPrivado] = useState<boolean>(() => { try { return localStorage.getItem('reviza-wa-privado') === '1'; } catch { return false; } });
+  const alternarPrivado = () => setPrivado((v) => { const n = !v; try { localStorage.setItem('reviza-wa-privado', n ? '1' : '0'); } catch { /* aba privada */ } return n; });
+  const [selecao, setSelecao] = useState<Set<string> | null>(null);
+  const [selOcupado, setSelOcupado] = useState(false);
+  const [buscaConv, setBuscaConv] = useState(false);
+  const [desempenhoAberto, setDesempenhoAberto] = useState(false);
   // aba 'iris' guardada mas sem permissão: cai em 'todos' (sem apagar a preferência)
   const tabEf: TabId = tab === 'iris' && !eIris ? 'todos' : tab;
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
@@ -680,6 +693,34 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     const el = msgsRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [currentId, msgsFio.length]);
+
+  useEffect(() => { setBuscaConv(false); }, [currentId]);
+  /* várias conversas de uma vez (26/11): as mesmas ações do menu ⋯, uma conversa por vez */
+  const acaoLote = async (tipo: 'lida' | 'naolida' | 'fixar' | 'arquivar') => {
+    if (!selecao || !selecao.size) return;
+    const ids = [...selecao];
+    setSelOcupado(true);
+    try {
+      for (const id of ids) {
+        if (tipo === 'lida') await inbox.marcarLida(true, id);
+        else if (tipo === 'naolida') await inbox.marcarLida(false, id);
+        else if (tipo === 'fixar') await inbox.fixar(true, id);
+        else await inbox.arquivar(true, id, true);
+      }
+      const feito = tipo === 'lida' ? 'marcadas como lidas' : tipo === 'naolida' ? 'marcadas como não lidas' : tipo === 'fixar' ? 'fixadas no topo' : 'arquivadas';
+      aoAvisar({ tom: 'ok', texto: `${ids.length} ${ids.length === 1 ? 'conversa' : 'conversas'} ${feito}.` });
+      setSelecao(null);
+    } finally { setSelOcupado(false); }
+  };
+  const exportarConversa = () => {
+    const nome = nomeExibicao(current);
+    baixarTexto(nomeArquivoConversa(nome), textoDaConversa({ nome, telefone: current.phone ? numeroMascarado(current.phone) : null }, msgsFio));
+    aoAvisar({ tom: 'ok', texto: 'Conversa exportada (as notas internas ficam de fora).' });
+  };
+  const copiarLink = async () => {
+    try { await navigator.clipboard.writeText(linkDaConversa(current.id)); aoAvisar({ tom: 'ok', texto: 'Link da conversa copiado.' }); }
+    catch { aoAvisar({ tom: 'erro', texto: 'Não deu para copiar. Tente de novo.' }); }
+  };
 
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
@@ -900,6 +941,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
       : t === 'naolidas' ? (c.unread ?? 0) > 0
+      // IA (26/11): as conversas em que a IA está atendendo agora
+      : t === 'ia' ? (!!c.iaAtiva || c.iaStatus === 'ativa' || c.iaStatus === 'handoff')
       : (c.unread ?? 0) > 0 || !!c.aguardando;
   };
   const tabCounts = useMemo(() => {
@@ -1312,7 +1355,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
   /* ---------- render ---------- */
   return (
-    <div className="wa-pg" data-cel-painel={!temConversa ? 'lista' : foco && celPainel === 'lista' ? 'conversa' : celPainel}>
+    <div className={'wa-pg' + (privado ? ' wa-privado' : '')} data-cel-painel={!temConversa ? 'lista' : foco && celPainel === 'lista' ? 'conversa' : celPainel}>
+      <DesempenhoChat aberto={desempenhoAberto} aoFechar={() => setDesempenhoAberto(false)} aoAbrirResumo={() => { setDesempenhoAberto(false); nav('/dashboard?aba=resumo'); }} />
       {/* ===================== FILA ===================== */}
       {!foco && (
         <aside className="wa-fila">
@@ -1324,12 +1368,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   <IcFunil />{filtrosAtivos && <span className="fbadge num">{resumoFiltros.length}</span>}
                 </button>
                 <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
+                <button type="button" className={'ib2' + (privado || selecao ? ' on' : '')} title="Mais opções da lista" aria-label="Mais opções da lista" onClick={(e) => abrirPop('lista', e)}><IcDots /></button>
               </div>
             </div>
             <div className="wa-busca">
               <IcBusca />
               <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            {privado && <div className="wa-priv-faixa" role="status"><span>Telefones e mensagens escondidos.</span><button type="button" onClick={alternarPrivado}>Mostrar</button></div>}
             {tabEf === 'iris' && (
               <div className="wa-iris-filtros" role="group" aria-label="Filtrar carteira da Iris">
                 {([['todos', 'Todos'], ['carteira', 'Carteira Iris'], ['meus', 'Meus'], ['fechados', 'Fechados']] as const).map(([id, rot]) => (
@@ -1351,13 +1397,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   <button
                     key={id} type="button" role="tab" aria-selected={tabEf === id}
                     className={'wa-aba' + (tabEf === id ? ' on' : '')}
-                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
+                    title={id === 'pendentes' ? (isRevizaMode ? 'Mensagens não lidas e clientes esperando resposta.' : 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.')
+                      : id === 'ia' ? 'Conversas em que a IA está atendendo agora.'
                       : id === 'iris' ? 'Carteira da Iris: leads reatribuídos e seus clientes atendidos pela Iris.'
                       : id === 'pvaguarda' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
                   >
                     {/* Fechados: selo vermelho SÓ com quem aguarda resposta — o total da carteira não alerta nada */}
-                    {rot}{id === 'pvaguarda'
+                    {rotuloAba(id, rot)}{id === 'pvaguarda'
                       ? (tabCounts.pvaguarda ?? 0) > 0 && <span className="n num urg" title={`${tabCounts.pvaguarda} aguardando resposta`}>{tabCounts.pvaguarda}</span>
                       : (tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
                   </button>
@@ -1460,10 +1507,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
-                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
-                        title={dica}
-                        onClick={() => { inbox.selectContact(c.id); setCelPainel('conversa'); }}
+                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '') + (selecao?.has(c.id) ? ' sel' : '')}
+                        title={dica} aria-pressed={selecao ? selecao.has(c.id) : undefined}
+                        onClick={() => {
+                          if (selecao) { setSelecao((s0) => { const n = new Set(s0 ?? []); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; }); return; }
+                          inbox.selectContact(c.id); setCelPainel('conversa');
+                        }}
                       >
+                        {selecao && <span className={'wa-sel-ck' + (selecao.has(c.id) ? ' on' : '')} aria-hidden>{selecao.has(c.id) && <IcOk />}</span>}
                         <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} /></span>
                         <span className="tx">
                           <span className="n">
@@ -1498,6 +1549,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               })
             )}
           </div>
+          {selecao && (
+            <BarraSelecao n={selecao.size} ocupado={selOcupado}
+              aoLida={() => void acaoLote('lida')} aoNaoLida={() => void acaoLote('naolida')} aoFixar={() => void acaoLote('fixar')} aoArquivar={() => void acaoLote('arquivar')}
+              aoTodas={() => setSelecao(new Set(visiveis.map((c) => c.id)))} aoCancelar={() => setSelecao(null)} />
+          )}
         </aside>
       )}
 
@@ -1527,7 +1583,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
-                  {current.phone ? numeroMascarado(current.phone) : 'sem número'}
+                  <span className="tel">{current.phone ? numeroMascarado(current.phone) : 'sem número'}</span>
                   <SituacaoChipTopo lead={current} demo={demo} />
                   {inbox.canalSel
                     ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + numeroMascarado(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'oficial (API do WhatsApp/Meta)' : 'número conectado por QR Code'}${presoNoSel ? `\n\nAtendimento preso neste número: mensagem do cliente em outro número não traz a conversa de volta. Para soltar, responda por outro número aqui pelo painel.` : ''}`}>{canalEhCloud && <IcOk />}{inbox.canalSel.alias}{presoNoSel && <span className="preso" aria-label="Atendimento preso neste número"><IcPin /></span>}</span>
@@ -1589,6 +1645,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
             </div>
+            {buscaConv && <BuscaNaConversa msgs={msgsFio} aoIr={irParaMensagem} aoFechar={() => setBuscaConv(false)} />}
 
             {/* PEÇA 1 — BARRA DE ESTADO DA IA: faixa fixa sob o cabeçalho, visível sempre que há
                 sessão de IA. Superfície SÓLIDA de propósito (faixa de estado, não overlay → sem
@@ -2071,7 +2128,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro vidro-pro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro vidro-pro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' || pop.kind === 'lista' ? 'menu' : undefined}>
           {pop.kind === 'filtro' && (() => {
             const etqs = etiquetasQ.data ?? [];
             const termoEtq = buscaEtqFiltro.trim().toLowerCase();
@@ -2195,12 +2252,24 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>
+              <button type="button" className="it" onClick={() => { setPop(null); void copiarLink(); }}>Copiar link da conversa</button>
+              <button type="button" className="it" onClick={() => { setPop(null); exportarConversa(); }}>Exportar conversa</button>
               {iaBarSinal && (
                 <button type="button" className="it" disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar." onClick={() => { setPop(null); void recomecarIa(); }}>Recomeçar atendimento da IA</button>
               )}
               {statusFechada && current.status !== statusFechada.nome && (
                 <button type="button" className="it" onClick={() => { setPop(null); setFecharConfirm(true); }}>Fechar conversa</button>
               )}
+            </>
+          )}
+          {pop.kind === 'lista' && (
+            <>
+              <button type="button" className="it" onClick={() => { setPop(null); setSelecao(new Set()); }}>Selecionar conversas</button>
+              {isRevizaMode && temRecurso('resumo-dia') && currentOrg.role === 'admin' && (
+                <button type="button" className="it" onClick={() => { setPop(null); setDesempenhoAberto(true); }}>Desempenho do chat</button>
+              )}
+              <button type="button" className="it" onClick={() => { setPop(null); alternarPrivado(); }}>{privado ? 'Mostrar telefones e mensagens' : 'Ocultar telefones e mensagens'}</button>
             </>
           )}
           {pop.kind === 'resp' && (() => {
@@ -2614,6 +2683,12 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
           {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
       </span>
+      {/* Reviza (26/11): o "Contrato fechado" que a equipe usava no sistema de antes — leva o card para a etapa de ganho */}
+      {isRevizaMode && (() => {
+        const ganho = colunas.find((c) => c.resultado === 'ganho');
+        if (!ganho || colAtual?.resultado === 'ganho' || colAtual?.resultado === 'perdido') return null;
+        return <BotaoMini className="wa-contrato" title={`Contrato fechado: leva o card para ${ganho.nome}`} disabled={movBusy} onClick={() => aoTrocarColuna(ganho.id)}>Contrato fechado</BotaoMini>;
+      })()}
       <ModalV2
         aberto={!!motivoModal}
         aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
