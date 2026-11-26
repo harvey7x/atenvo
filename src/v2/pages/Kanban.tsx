@@ -35,6 +35,7 @@ import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox'
 import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { BotaoPrimario, BotaoSec, DrawerV2, EstadoErro, ModalV2 } from '../components';
+import { KanbanLista } from './kanban/KanbanLista';
 import './kanban.css';
 import './kanban-pro.css';
 
@@ -365,6 +366,11 @@ export default function KanbanV2() {
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
+  // Quadro | Lista (26/11, como no CRM do sistema de antes) — fica lembrado no navegador de cada um
+  const listaLigada = isRevizaMode && temRecurso('crm-extra');
+  const [vista, setVistaSt] = useState<'quadro' | 'lista'>(() => { try { return localStorage.getItem('reviza-kb-vista') === 'lista' ? 'lista' : 'quadro'; } catch { return 'quadro'; } });
+  const setVista = (v: 'quadro' | 'lista') => { setVistaSt(v); try { localStorage.setItem('reviza-kb-vista', v); } catch { /* sem navegador */ } };
+  const emLista = listaLigada && vista === 'lista';
   const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
   const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
   // FILTRO COMPLETO do board (dono 27/08): benefício, banco da ficha, período de entrada.
@@ -1019,12 +1025,19 @@ export default function KanbanV2() {
         <>
 
           <div className="kb-barra sobe">
-            <div className="kb-ord" role="group" aria-label="Ordenar os cards">
+            {listaLigada && (
+              <div className="kb-vista" role="radiogroup" aria-label="Ver como">
+                {([['quadro', 'Quadro'], ['lista', 'Lista']] as const).map(([v, r]) => (
+                  <button key={v} type="button" role="radio" aria-checked={vista === v} onClick={() => setVista(v)}>{r}</button>
+                ))}
+              </div>
+            )}
+            {!emLista && <div className="kb-ord" role="group" aria-label="Ordenar os cards">
               <span className="kb-ord-l">Ordenar</span>
               {(['urgencia', 'recencia', 'lembrete'] as SortModo[]).map((m) => (
                 <button key={m} type="button" className={'kb-fchip' + (sortModo === m ? ' on' : '')} aria-pressed={sortModo === m} onClick={() => setSortModo(m)}>{ROTULO_SORT[m]}</button>
               ))}
-            </div>
+            </div>}
             <button type="button" className={'kb-fchip foco' + (foco ? ' on' : '')} aria-pressed={foco}
               title="Mostra só os leads que exigem ação agora — sem esconder o board" onClick={() => setFoco((f) => !f)}>
               <IcAlvo />Foco{foco ? ' ativo' : ''}
@@ -1104,7 +1117,12 @@ export default function KanbanV2() {
         </div>
       )}
 
-      <div className={'kb-quadro' + (bordas.esq ? ' f-esq' : '') + (bordas.dir ? ' f-dir' : '')}>
+      {emLista && !vazioFunil && (
+        <KanbanLista leads={foco ? leadsVisiveis.filter(ehCritico) : leadsVisiveis} colunas={colunas} etiquetas={etiquetas}
+          nomeDe={(l) => tituloTelefone(l.nome) ?? nomeExibicao(l.nome)} colunaDe={colunaDoLead} aoAbrir={setDetId}
+          aoAbrirConversa={(l) => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }} />
+      )}
+      <div className={'kb-quadro' + (bordas.esq ? ' f-esq' : '') + (bordas.dir ? ' f-dir' : '')} style={emLista ? { display: 'none' } : undefined}>
       {bordas.esq && (
         <button type="button" className="kb-seta esq" aria-label="Rolar o quadro para a esquerda" title="Colunas anteriores" onClick={() => rolarQuadro(-1)}><IcSetaLado esq /></button>
       )}

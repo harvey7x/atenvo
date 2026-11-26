@@ -39,6 +39,9 @@
      automacoes    Atendimento › Automações: Sequências (modelos com esperas, aplicados pelo ⋯ da conversa) e Automação por
                    palavras (o card muda de etapa quando o cliente escreve a palavra), com histórico; e o menu leva às
                    Mensagens agendadas (26/11, migration 116)
+     crm-extra     o que faltava das telas do CRM de antes (26/11): Kanban em Quadro | Lista, o Dashboard com contatos por
+                   estado, atendimentos por hora, funil de conversão, etiquetas mais usadas e próximas reuniões, e o
+                   "fixar só para mim" na lista de conversas. Só tela (sem migration, exceto o fixar: migration 120)
      importacao    Configurações › Importação do sistema anterior: o Kanban que veio do arquivo de exportação (clientes e
                    cards na mesma etapa, por etapa, vendas) e passar os cards de cada responsável de lá para alguém da
                    equipe, pelo nome ou escolhendo (26/11, migration 117)
@@ -64,7 +67,7 @@
    mostra como fica com só esses recursos ligados. Fora do Reviza nada muda. */
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
-export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe' | 'iris-senha' | 'automacoes' | 'importacao';
+export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe' | 'iris-senha' | 'automacoes' | 'importacao' | 'crm-extra';
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null

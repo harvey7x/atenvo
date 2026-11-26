@@ -1,0 +1,46 @@
+/* Kanban em lista (26/11) — a mesma linguagem do quadro: linhas finas, títulos centralizados (a 1ª à esquerda) */
+.v2 .kbl { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+.v2 .kbl-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .kbl-etapa { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt-3); }
+.v2 .kbl-etapa select.inp { height: 32px; min-width: 220px; font-size: 12.5px; }
+.v2 .kbl-conta { font-size: 12px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .kbl-rolo { overflow: auto; border: 1px solid var(--kp-line, var(--linha)); border-radius: 12px; background: var(--kp-card, transparent); min-height: 0; }
+.v2 .kbl-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.v2 .kbl-tab thead th { position: sticky; top: 0; z-index: 1; background: var(--kp-col, var(--bg-2, var(--bg))); padding: 9px 12px; border-bottom: 1px solid var(--kp-line, var(--linha));
+  font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); text-align: center; white-space: nowrap; }
+.v2 .kbl-tab thead th:first-child { text-align: left; }
+.v2 .kbl-ord { all: unset; cursor: pointer; letter-spacing: inherit; }
+.v2 .kbl-ord:hover, .v2 .kbl-ord.on { color: var(--txt); }
+.v2 .kbl-ord:focus-visible { outline: 2px solid var(--txt); outline-offset: 2px; border-radius: 3px; }
+.v2 .kbl-tab tbody td { padding: 8px 12px; border-bottom: 1px solid var(--kp-line, var(--linha)); color: var(--txt-2); text-align: center; vertical-align: middle; white-space: nowrap; }
+.v2 .kbl-tab tbody td:first-child { text-align: left; }
+.v2 .kbl-tab tbody tr { cursor: pointer; }
+.v2 .kbl-tab tbody tr:hover td { background: rgba(var(--tint), .035); }
+.v2 .kbl-tab tbody tr:focus-visible { outline: 2px solid var(--txt); outline-offset: -2px; }
+.v2 .kbl-tab tbody tr:last-child td { border-bottom: 0; }
+.v2 .kbl-tab .num { font-variant-numeric: tabular-nums; }
+.v2 .kbl-nome { max-width: 280px; }
+.v2 .kbl-nome span { color: var(--txt); font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 220px; vertical-align: middle; }
+.v2 .kbl-sit { margin-left: 8px; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 5px; border: 1px solid rgba(var(--tint), .14); color: var(--txt-2); vertical-align: middle; }
+.v2 .kbl-sit.ganho { color: var(--ok, #2f9e6b); border-color: currentColor; }
+.v2 .kbl-sit.perdido { color: var(--txt-3); }
+.v2 .kbl-col { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .kbl-col i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.v2 .kbl-vazio { color: var(--txt-3); }
+.v2 .kbl-etqs { display: inline-flex; gap: 4px; justify-content: center; }
+.v2 .kbl-etq { display: inline-flex; align-items: center; gap: 5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 6px;
+  color: var(--kp-txt-2, var(--txt-2)); background: var(--kp-chip, rgba(var(--tint), .05)); border: 1px solid var(--kp-line, var(--linha)); }
+.v2 .kbl-etq i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.v2 .kbl-etq.mais { color: var(--txt-3); }
+.v2 .kbl-conv { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--txt-3); }
+.v2 .kbl-conv:hover { color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .kbl-conv:focus-visible { outline: 2px solid var(--txt); }
+.v2 .kbl-conv svg { width: 15px; height: 15px; }
+.v2 .kbl-nada { padding: 28px; text-align: center; color: var(--txt-3); font-size: 12.5px; }
+.v2 .kbl-mais { display: flex; justify-content: center; }
+.v2 .kbl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* o seletor Quadro | Lista na barra */
+.v2 .kb-vista { display: inline-flex; border: 1px solid var(--kp-line, var(--linha)); border-radius: 8px; overflow: hidden; }
+.v2 .kb-vista button { all: unset; cursor: pointer; padding: 4px 11px; font-size: 12px; color: var(--txt-3); }
+.v2 .kb-vista button[aria-checked="true"] { color: var(--txt); background: rgba(var(--tint), .07); font-weight: 500; }
+.v2 .kb-vista button:focus-visible { outline: 2px solid var(--txt); outline-offset: -2px; }
