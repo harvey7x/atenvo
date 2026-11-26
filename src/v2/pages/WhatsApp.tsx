@@ -2777,7 +2777,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
         }
       >
         {motivoModal?.tipo === 'perdido' ? (
-          <div className="campo"><label>Por que não é elegível? *</label>
+          <div className="campo"><label>Por que não é elegível?</label>
             <select className="inp" value={motivoNE} onChange={(e) => setMotivoNE(e.target.value)}>
               <option value="">Selecione…</option>
               {MOTIVOS_NAO_ELEGIVEL.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -2969,7 +2969,7 @@ function ChecklistDocsCtx({ contatoId, demo }: { contatoId: string | null; demo:
                   <input type="checkbox" checked={it.feito}
                     onChange={(e) => chk.toggle(it.slug, e.target.checked)} />
                   <span className="chk-lb">{it.rotulo}</span>
-                  {!it.obrigatorio && <span className="chk-opt">opcional</span>}
+                  {!it.obrigatorio && <span className="chk-opt">(opcional)</span>}
                 </label>
               ))}
             </div>
@@ -3071,7 +3071,7 @@ function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, 
         ))}
       </div>
       <div className="campo">
-        <label>Motivo da transferência *</label>
+        <label>Motivo da transferência</label>
         <input className="inp" maxLength={280} placeholder="Ex.: atendimento presencial, especialista, ausência…" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       </div>
     </ModalV2>

@@ -634,7 +634,7 @@ function ContatoModal({ modo, alvo, demo, aoFechar, aoSalvar }: {
     >
       <div className="form-grid">
         <div className="campo" style={{ marginBottom: 0 }}>
-          <label htmlFor="cnt-nome">Nome *</label>
+          <label htmlFor="cnt-nome">Nome</label>
           <Input id="cnt-nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" disabled={busy} />
         </div>
         <div className="form-2col">

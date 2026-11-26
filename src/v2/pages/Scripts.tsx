@@ -666,7 +666,7 @@ export default function ScriptsV2() {
           <div className="scr-col">
             <div className="form-2col">
               <div className={errs.titulo ? 'campo invalida' : 'campo'} style={{ marginBottom: 0 }}>
-                <label htmlFor="scr-titulo">Título *</label>
+                <label htmlFor="scr-titulo">Título</label>
                 <Input id="scr-titulo" value={cfg.titulo} onChange={(e) => setCfg((f) => ({ ...f, titulo: e.target.value }))} placeholder="Nome do script" disabled={salvando} />
                 {errs.titulo && <small className="hint">{errs.titulo}</small>}
               </div>
@@ -689,7 +689,7 @@ export default function ScriptsV2() {
               </div>
             </div>
             <div className={errs.canal ? 'campo invalida' : 'campo'} style={{ marginBottom: 0 }}>
-              <label>Canal *</label>
+              <label>Canal</label>
               <div className="scr-canais">
                 <Chip ativo={cfg.wa} onClick={() => setCfg((f) => ({ ...f, wa: !f.wa }))}>WhatsApp</Chip>
                 <Chip ativo={cfg.fb} onClick={() => setCfg((f) => ({ ...f, fb: !f.fb }))}>Facebook</Chip>

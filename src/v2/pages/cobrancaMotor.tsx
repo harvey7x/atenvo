@@ -2738,7 +2738,7 @@ export function NovoCliente({ linhas, comps, comerciais, meuComercial, ocupado, 
           </fieldset>
 
           <div className="nc-campo">
-            <label className="nc-rot" htmlFor="nc-faixa">Benefício <span className="nc-opc">opcional</span></label>
+            <label className="nc-rot" htmlFor="nc-faixa">Benefício <span className="nc-opc">(opcional)</span></label>
             <select id="nc-faixa" className="inp" value={faixa} onChange={(e) => setFaixa(e.target.value as FaixaBeneficio | '')}>
               <option value="">Não sei</option>
               <option value="ate_1sm">Até 1 salário mínimo</option>
@@ -2747,7 +2747,7 @@ export function NovoCliente({ linhas, comps, comerciais, meuComercial, ocupado, 
             <span className="nc-dica">Ajuda quem aprova a sugerir o ciclo</span>
           </div>
           <div className="nc-campo">
-            <label className="nc-rot" htmlFor="nc-obs">Observações <span className="nc-opc">opcional</span></label>
+            <label className="nc-rot" htmlFor="nc-obs">Observações <span className="nc-opc">(opcional)</span></label>
             <input id="nc-obs" className="inp" value={obs} placeholder="Combinados, contexto…" onChange={(e) => setObs(e.target.value)} />
           </div>
         </div>

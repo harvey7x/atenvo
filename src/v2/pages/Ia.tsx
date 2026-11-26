@@ -798,7 +798,7 @@ export default function Ia() {
 
           {/* ------------------- Avançado ------------------- */}
           <CardVidro sobe className="ia-card" atraso={0.26} data-aba="conexao" data-fora-do-reviza>
-            <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">opcional</span>} />
+            <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">(opcional)</span>} />
             <p className="ia-hint">
               Vazio = o motor decide (usa o modelo principal e sobe automático em casos complexos). Preencha só
               se quiser forçar um modelo específico pra cada função.

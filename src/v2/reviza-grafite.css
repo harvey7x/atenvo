@@ -537,3 +537,19 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .08); border-color: var(--rubro); }
 /* 15. Gráfico "Recebido por mês": o mês escolhido em laranja SÓLIDO, sem degradê creme→laranja nem halo. */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar { background: var(--azul); box-shadow: none; }
+/* 16. Sobras da auditoria, parte 2 (dono: "sim"):
+      · toda coluna de ação de tabela ganha cabeçalho visível ("Ações"), como as outras colunas;
+      · "(opcional)" sempre em cinza, peso normal;
+      · Kanban: o título na mesma margem das outras telas (a página já dá o respiro; o quadro não repete);
+      · Novidades: largura total, como as outras telas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 thead th > .pn-vh { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; margin: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.nc-opc, .chk-opt, .ia-hint) { color: var(--txt-3); font-weight: 400; font-size: 11.5px; margin-left: 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .nv-pg { max-width: none; margin: 0; }
+/* 17. Kanban na mesma margem das outras telas (o quadro vinha com 26px); opções da "Nova IA" sempre com fio;
+       mockup do celular (Cobranças › Conversas): a lista reserva a altura da barra de abas, nada passa por trás. */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pg { padding: 20px 24px 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .irs-opcao { background: #FFFFFF; border: 1px solid #D9D5CF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .irs-opcao { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .irs-opcao.on { border-color: var(--azul); }
+html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 90px; }
+html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { padding-bottom: 66px; }

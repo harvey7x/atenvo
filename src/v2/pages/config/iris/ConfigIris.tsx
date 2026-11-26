@@ -497,7 +497,7 @@ function JanelaNova({ aberta, atual, criando, aoFechar, aoCriar }: {
   const empresa = atual?.config.identidade.empresa || 'Reviza';
   const opcoes: { v: typeof base; t: string; d: string; off?: boolean }[] = [
     { v: 'pre', t: 'Como a Iris pré-configurada', d: 'Igual à Iris do Atenvo: revisão de juros, cartão RMC, clientes fechados, documentos e retomadas.' },
-    { v: 'copia', t: `Uma cópia de "${atual?.nome ?? ''}"`, d: 'Tudo igual à IA aberta, para mudar só o que for diferente.', off: !atual },
+    ...(atual ? [{ v: 'copia' as typeof base, t: `Uma cópia de "${atual.nome}"`, d: 'Tudo igual à IA aberta, para mudar só o que for diferente.' }] : []),
     { v: 'bia', t: 'A Bia do sistema de antes', d: 'Como a Reviza usava: o roteiro, as regras, as 8 perguntas frequentes e os 63 gatilhos do agente COMERCIAL REVIZA RS, com espera de 15 s e áudio sempre.' },
     { v: 'branco', t: 'Em branco', d: 'Só o esqueleto: sem assuntos, sem perguntas e só os textos de abertura.' },
   ];
