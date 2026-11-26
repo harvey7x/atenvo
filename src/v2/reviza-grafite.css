@@ -535,3 +535,5 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado { background: #1E1E21 !important; border-color: #35353A !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv { border: 1px solid rgba(var(--rubro-rgb), .35); background: transparent; padding: 0 10px; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .08); border-color: var(--rubro); }
+/* 15. Gráfico "Recebido por mês": o mês escolhido em laranja SÓLIDO, sem degradê creme→laranja nem halo. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar { background: var(--azul); box-shadow: none; }
