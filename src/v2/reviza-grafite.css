@@ -553,3 +553,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .irs-opcao.on { border-color: var(--azul); }
 html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 90px; }
 html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { padding-bottom: 66px; }
+html:root[data-repaginada][data-repaginada] .v2 .kb-pg.kb-pro { padding: 20px 24px 12px; }
+html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 12px; margin-bottom: 86px; }
+html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { margin-bottom: 62px; }
+html[data-barra-alfa]:not(#rv-kb):not(#rv-kb2) .v2 .kb-pro.kb-pg { padding: 20px 24px 12px; }
