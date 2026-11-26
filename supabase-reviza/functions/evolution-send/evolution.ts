@@ -64,4 +64,7 @@ export const evolution = {
   // Cartão de contato (vCard). Shape Evolution v2: contact[] com fullName/wuid (dígitos)/phoneNumber (+E164).
   sendContact: (instanceName: string, number: string, contact: Array<{ fullName: string; wuid: string; phoneNumber: string }>) =>
     call(`/message/sendContact/${instanceName}`, 'POST', { number, contact }, T_ENVIO) as Promise<{ key?: { id?: string } }>,
+  // REAÇÃO (26/11): emoji numa mensagem. reaction '' tira a reação. key = a mensagem reagida (id externo + de quem é).
+  sendReaction: (instanceName: string, remoteJid: string, fromMe: boolean, id: string, reaction: string) =>
+    call(`/message/sendReaction/${instanceName}`, 'POST', { key: { remoteJid, fromMe, id }, reaction }, T_ENVIO) as Promise<{ key?: { id?: string } }>,
 };

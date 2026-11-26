@@ -44,7 +44,10 @@
 .v2 .wa-priv-faixa button { border: 0; background: none; padding: 0; font: inherit; color: var(--txt); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 
 /* encaminhar: o botão logo abaixo do "Responder", do lado de dentro da bolha */
-.v2 .bolha .resp-btn.enc-btn { top: 28px; }
+.v2 .bolha .resp-btn.enc-btn { top: 4px; left: -48px; }
+.v2 .bolha.rec .resp-btn.enc-btn { left: auto; right: -48px; }
+/* os três (Responder · Encaminhar · Reagir) ficam em FILA ao lado da bolha; os de senha/e-mail vão depois deles */
+.v2 .bolha.rec .ident-btns { right: -120px; }
 .wa-enc { display: flex; flex-direction: column; gap: 10px; }
 .wa-enc .previa { margin: 0; padding: 8px 10px; border-radius: 8px; background: rgba(var(--tint), .05); font-size: 12.5px; color: var(--txt-2); line-height: 1.45; max-height: 72px; overflow: hidden; }
 .wa-enc .lista { margin: 0; padding: 0; list-style: none; max-height: 300px; overflow-y: auto; border: 1px solid var(--linha); border-radius: 8px; }
@@ -55,3 +58,19 @@
 .wa-enc .lista button:focus-visible { outline: 2px solid var(--txt); outline-offset: -2px; }
 .wa-enc .lista small { font-size: 11.5px; color: var(--txt-3); font-weight: 400; }
 .wa-enc .vazio { padding: 12px; font-size: 12.5px; color: var(--txt-3); }
+
+/* reagir (26/11): o botão abaixo do Encaminhar, do lado de dentro; os 6 emojis num balão; o selo embaixo da bolha */
+.v2 .bolha .reagir { position: absolute; top: 4px; left: -72px; z-index: 3; }
+.v2 .bolha.rec .reagir { left: auto; right: -72px; }
+.v2 .bolha .reagir .resp-btn.reag-btn { position: static; }
+.v2 .bolha:hover .reagir .resp-btn, .v2 .bolha .reagir.on .resp-btn { opacity: 1; }
+.v2 .bolha .reag-pop { position: absolute; top: -42px; display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--linha); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); white-space: nowrap; }
+.v2 .bolha.env2 .reag-pop { left: 0; }
+.v2 .bolha.rec .reag-pop { right: 0; }
+.v2 .bolha .reag-pop button { all: unset; cursor: pointer; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; }
+.v2 .bolha .reag-pop button:hover, .v2 .bolha .reag-pop button.on { background: rgba(var(--tint), .1); }
+.v2 .bolha .reag-pop button:focus-visible { outline: 2px solid var(--txt); outline-offset: -2px; }
+.v2 .bolha .reacoes { position: absolute; bottom: -12px; display: inline-flex; gap: 2px; padding: 1px 5px; border-radius: 999px; background: var(--surface); border: 1px solid var(--linha); font-size: 12px; line-height: 18px; }
+.v2 .bolha.env2 .reacoes { right: 10px; }
+.v2 .bolha.rec .reacoes { left: 10px; }
+.v2 .bolha:has(.reacoes) { margin-bottom: 14px; }

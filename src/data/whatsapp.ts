@@ -217,6 +217,8 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       origemBot: m.origem === 'bot' || undefined,
       transcricao: (m.metadados as { transcricao?: string } | null)?.transcricao || undefined,
       doc: docDosMetadados(m.metadados as Record<string, unknown> | null) ?? undefined,
+      minhaReacao: ((m.metadados as { minha_reacao?: string } | null)?.minha_reacao) || undefined,
+      reacaoCliente: ((m.metadados as { reacao_cliente?: string } | null)?.reacao_cliente) || undefined,
       status: m.status ?? undefined,
       erro: m.erro_envio ?? undefined,
       tipo: m.tipo,
@@ -960,6 +962,11 @@ export function useSendWaMessage() {
     // pelo realtime (patch na hora + busca-alvo da conversa em useWaConversations).
     onSettled: (_d, _e, input) => qc.invalidateQueries({ queryKey: ['wa-msgs', currentOrg.id, input.conversaId] }),
   });
+}
+
+/** Reação (26/11): emoji numa mensagem da conversa; '' tira. O servidor manda pelo WhatsApp e grava na mensagem. */
+export async function waReagir(conversaId: string, mensagemId: string, emoji: string, canalId?: string | null): Promise<void> {
+  await invoke<{ ok: boolean }>('evolution-send', { action: 'reagir', conversa_id: conversaId, mensagem_id: mensagemId, emoji, ...(canalId ? { canal_id: canalId } : {}) });
 }
 
 /** Assumir / transferir / liberar o responsável do atendimento (via Edge Function segura). */

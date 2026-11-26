@@ -46,6 +46,9 @@ export interface WaMessage {
   origemBot?: boolean;
   /** v2 (aditivo): transcrição do áudio quando o backend gravar metadados.transcricao. */
   transcricao?: string;
+  /** reações (26/11): a nossa (metadados.minha_reacao) e a do cliente (metadados.reacao_cliente) */
+  minhaReacao?: string | null;
+  reacaoCliente?: string | null;
   /** o que é este arquivo, segundo a IA da empresa (metadados.doc_*, 25/11): RG, comprovante, extrato… */
   doc?: import('./documentosIa').DocIa | null;
   /** prévia da mensagem citada, para renderizar a mini-caixa dentro da bolha. */

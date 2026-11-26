@@ -360,6 +360,17 @@ Deno.serve(async (req) => {
       const conteudoMsg = corpo ?? midia?.caption ?? form?.texto ?? null; // legenda da mídia vira o texto exibido
       // v22: mensagens do HEALTH CHECK (wa-health-check) não viram lead/conversa/inbox. Marcador estável no texto.
       if (corpo && /^\s*teste (autom[aá]tico|de entrega) atenvo\b/i.test(corpo)) { await finish('ignorado', { ignorado_motivo: 'health_check' }); return json({ ok: true }); }
+      // REAÇÃO do cliente (26/11): não vira mensagem nova — fica na mensagem que ele reagiu (metadados.reacao_cliente)
+      const reacao = (unwrapMsg(msgObj)?.reactionMessage ?? msgObj?.reactionMessage) as { key?: { id?: string }; text?: string } | undefined;
+      if (!corpo && !midia && !form && reacao?.key?.id) {
+        if (fromMe) { await finish('ignorado', { ignorado_motivo: 'reacao_nossa' }); return json({ ok: true }); }
+        const { data: reagida } = await admin.from('mensagens').select('id, metadados').eq('id_externo', reacao.key.id).maybeSingle();
+        if (reagida) {
+          const metaR = { ...((reagida.metadados ?? {}) as Record<string, unknown>), reacao_cliente: (reacao.text || '').slice(0, 16) || null, reacao_cliente_em: new Date().toISOString() };
+          await admin.from('mensagens').update({ metadados: metaR }).eq('id', reagida.id);
+        }
+        await finish('processado', { ignorado_motivo: reagida ? 'reacao' : 'reacao_sem_alvo' }); return json({ ok: true });
+      }
       if (!corpo && !midia && !form) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // v21: evento SÓ com LID → consulta o mapa CONFIRMADO por (org, canal, lid) e REUTILIZA o PN já vinculado

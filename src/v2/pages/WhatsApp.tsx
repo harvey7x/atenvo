@@ -1726,6 +1726,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     m={item.msg} demo={demo} nomeCliente={nomeExibicao(current)}
                     retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino} optout={optout}
                     aoEncaminhar={(m) => setEncaminharMsg(m)}
+                    aoReagir={inbox.semDestino ? undefined : (m, e) => void inbox.reagir(m, e)}
                     aoResponder={(m) => {
                       inbox.setReplyTo({
                         id: m.id ?? '', idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo,

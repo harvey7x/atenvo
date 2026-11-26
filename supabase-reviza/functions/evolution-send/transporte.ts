@@ -41,6 +41,8 @@ export interface Enviador {
   sendLista(numero: string, corpo: string, tituloBotao: string, secoes: SecaoLista[], quoted?: unknown): Promise<Enviado>;
   /** Cartão de contato (vCard) — SÓ Cloud API (mensagem `contacts`). O adaptador Evolution lança. */
   sendContato(numero: string, nome: string, telefone: string, quoted?: unknown): Promise<Enviado>;
+  /** Reação (emoji) numa mensagem já enviada/recebida. emoji '' = tira a reação. (26/11) */
+  sendReacao(numero: string, idExterno: string, fromMe: boolean, emoji: string): Promise<Enviado>;
 }
 
 export function ehCloudApi(canal: CanalEnvio): boolean {
@@ -256,6 +258,14 @@ function enviadorCloud(phoneNumberId: string): Enviador {
         ...contextoDe(quoted),
       }));
     },
+    async sendReacao(numero, idExterno, _fromMe, emoji) {
+      guard();
+      // Cloud API: mensagem `reaction` com o wamid da mensagem reagida; emoji '' tira a reação
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'reaction', reaction: { message_id: idExterno, emoji },
+      }));
+    },
   };
 }
 
@@ -277,6 +287,7 @@ function enviadorEvolution(instancia: string): Enviador {
     sendContato: (numero, nome, telefone) => evolution.sendContact(instancia, numero, [{
       fullName: nome, wuid: telefone.replace(/\D/g, ''), phoneNumber: `+${telefone.replace(/\D/g, '')}`,
     }]),
+    sendReacao: (numero, idExterno, fromMe, emoji) => evolution.sendReaction(instancia, `${numero}@s.whatsapp.net`, fromMe, idExterno, emoji),
   };
 }
 

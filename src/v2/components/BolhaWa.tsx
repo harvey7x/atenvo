@@ -23,6 +23,25 @@ const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><pat
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
 const IcEncaminhar = () => <Ic><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0-5 5v6" /></Ic>;
+const IcRosto = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" /><path d="M9 9.5h.01M15 9.5h.01" /></Ic>;
+/** os 6 de sempre (os mesmos do WhatsApp) */
+export const EMOJIS_REACAO = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+function BotaoReagir({ m, aoReagir }: { m: WaMessage; aoReagir: (m: WaMessage, emoji: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <span className={'reagir' + (aberto ? ' on' : '')} onMouseLeave={() => setAberto(false)}>
+      <button type="button" className="resp-btn reag-btn" title="Reagir" aria-label="Reagir com emoji" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}><IcRosto /></button>
+      {aberto && (
+        <span className="reag-pop" role="menu" aria-label="Escolher a reação">
+          {EMOJIS_REACAO.map((e) => (
+            <button key={e} type="button" role="menuitem" className={m.minhaReacao === e ? 'on' : undefined} aria-label={'Reagir com ' + e}
+              onClick={() => { setAberto(false); aoReagir(m, m.minhaReacao === e ? '' : e); }}>{e}</button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
 const IcChave = () => <Ic><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9-9" /><path d="m17 6 3 3" /><path d="m15 8 2 2" /></Ic>;
 const IcArroba = () => <Ic><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
@@ -43,10 +62,12 @@ export const IcBot = () => (
    selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
    imagem/vídeo/documento, quoted, ticks, falha, responder.
    ================================================================ */
-export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar, aoEncaminhar }: {
+export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar, aoEncaminhar, aoReagir }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
   /** encaminhar para outra conversa (26/11) */
   aoEncaminhar?: (m: WaMessage) => void;
+  /** reagir com emoji (26/11); '' tira a reação */
+  aoReagir?: (m: WaMessage, emoji: string) => void;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string, mensagemId?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
   /** "Identificar senha / e-mail" (dono 29/10) — só no inbox; o mobile não passa. `selecionado` = trecho marcado no balão */
@@ -112,6 +133,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
       )}
+      {m.id && aoReagir && !m.nota && !falhou && <BotaoReagir m={m} aoReagir={aoReagir} />}
       {m.id && aoEncaminhar && !m.nota && ((m.text || '').trim() || m.anexoPath) && (
         <button type="button" className="resp-btn enc-btn" title="Encaminhar" aria-label="Encaminhar para outra conversa" onClick={() => aoEncaminhar(m)}><IcEncaminhar /></button>
       )}
@@ -211,6 +233,12 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
         {m.time}
         {ack && <span className={'tick ' + ack.cls} title={ack.cls === 'falhou' ? traduzErroEnvio(m.erro ?? '') : ack.title}>{ack.s}</span>}
       </div>
+      {(m.minhaReacao || m.reacaoCliente) && (
+        <span className="reacoes" aria-label="Reações">
+          {m.reacaoCliente && <span className="r" title="Reação do cliente">{m.reacaoCliente}</span>}
+          {m.minhaReacao && <span className="r nossa" title="Reação da equipe">{m.minhaReacao}</span>}
+        </span>
+      )}
     </div>
   );
 }

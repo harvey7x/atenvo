@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     }
     if (!user && !serviceMode) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, sem_assinatura, agendamento_id, reply_to_id, reply_to_id_ext, reply_to_from_me, reply_preview, contato_nome, contato_telefone } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, sem_assinatura, agendamento_id, reply_to_id, reply_to_id_ext, reply_to_from_me, reply_preview, contato_nome, contato_telefone, mensagem_id, emoji } = await req.json().catch(() => ({}));
     // Resposta a uma mensagem específica (quoted reply). `respostaCols` grava o link local
     // (respondida_a_id); o objeto `quoted` (montado após resolver o destino) vai à Evolution.
     const respostaCols: Record<string, unknown> = (typeof reply_to_id === 'string' && reply_to_id) ? { respondida_a_id: reply_to_id } : {};
@@ -388,6 +388,21 @@ Deno.serve(async (req) => {
     const quoted = (typeof reply_to_id_ext === 'string' && reply_to_id_ext)
       ? { key: { id: reply_to_id_ext, remoteJid: `${alvo}@s.whatsapp.net`, fromMe: !!reply_to_from_me }, message: { conversation: (replyPrev?.texto ?? '').toString().slice(0, 300) } }
       : undefined;
+
+    // ===== REAÇÃO (26/11, igual ao sistema que a Reviza usava antes): emoji numa mensagem desta conversa. =====
+    // Não cria mensagem nova: grava na reagida (metadados.minha_reacao). emoji vazio = tira a reação.
+    if (action === 'reagir') {
+      const em = typeof emoji === 'string' ? emoji.trim().slice(0, 16) : '';
+      if (typeof mensagem_id !== 'string' || !mensagem_id) return json({ error: 'Qual mensagem recebe a reação?' }, 400);
+      const { data: reagida } = await admin.from('mensagens').select('id, conversa_id, direcao, id_externo, metadados').eq('id', mensagem_id).maybeSingle();
+      if (!reagida || reagida.conversa_id !== conv.id || !reagida.id_externo) return json({ error: 'Esta mensagem não pode receber reação.' }, 422);
+      try { await tx.sendReacao(alvo, String(reagida.id_externo), reagida.direcao === 'saida', em); }
+      catch (err) { return json({ error: ((err as Error).message || 'O WhatsApp não aceitou a reação.').slice(0, 200) }, 502); }
+      const metaR = { ...((reagida.metadados ?? {}) as Record<string, unknown>), minha_reacao: em || null, minha_reacao_em: new Date().toISOString(), minha_reacao_por: autorId };
+      await admin.from('mensagens').update({ metadados: metaR }).eq('id', reagida.id);
+      console.log(`[send] corr=${corr} reacao ${em ? 'posta' : 'tirada'}`);
+      return json({ ok: true, reacao: em || null });
+    }
 
     // ===== CARTÃO DE CONTATO (vCard) — o atendente compartilha um contato na conversa. =====
     // Sem migration (precedente do quoted): persiste como tipo 'texto' com metadados.contato —

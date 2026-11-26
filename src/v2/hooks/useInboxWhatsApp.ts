@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   WA_REAL, useWaConversations, useWaMensagens, useSendWaMessage, useAtribuirAtendimento,
   useWaCanais, useWaCanalEnvioSaude, useIniciarConversaWa,
-  waMarcarLida, waArquivar, waFixar, removerMensagemFalha, subirMidiaWa,
+  waMarcarLida, waArquivar, waFixar, waReagir, removerMensagemFalha, subirMidiaWa,
   buscarConversasAgora, patchOtimistaLista, pedirBuscaAlvo,
 } from '@/data/whatsapp';
 import { WA_CONTACTS, type WaContact, type WaMessage } from '@/data/whatsappDemo';
@@ -651,6 +651,22 @@ export function useInboxWhatsApp(opts: {
     return alvo.name;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts]);
+  /* reagir (26/11): emoji na mensagem; otimista no histórico aberto, desfaz se o WhatsApp recusar */
+  const reagir = useCallback(async (m: WaMessage, emoji: string) => {
+    if (!m.id || !current.id) return;
+    const patch = (v: string | undefined) => qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (Array.isArray(old) ? old.map((x) => (x.id === m.id ? { ...x, minhaReacao: v } : x)) : old));
+    const antes = m.minhaReacao ?? undefined;
+    setContacts((cur) => cur.map((c) => (c.id !== current.id ? c : { ...c, msgs: c.msgs.map((x) => (x.id === m.id ? { ...x, minhaReacao: emoji || undefined } : x)) })));
+    patch(emoji || undefined);
+    if (!WA_REAL) return;
+    try { await waReagir(current.id, m.id, emoji, replyCanalId || current.canalId); }
+    catch (e) {
+      setContacts((cur) => cur.map((c) => (c.id !== current.id ? c : { ...c, msgs: c.msgs.map((x) => (x.id === m.id ? { ...x, minhaReacao: antes } : x)) })));
+      patch(antes);
+      aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'O WhatsApp não aceitou a reação.' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current.id, current.canalId, replyCanalId]);
   /** patch local otimista de edição (nome/email/observações/responsável) — o await fica na página (acoes.atualizarContato). */
   const aplicarEdicaoLocal = useCallback((patch: Partial<WaContact>) => {
     if (current.id) setContacts((cur) => patchConversa(cur, current.id, patch));
@@ -695,6 +711,6 @@ export function useInboxWhatsApp(opts: {
     enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
     scriptEnviarEtapa, scriptEnviarMidia,
     atribuindo, assumir, devolver, transferir,
-    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa, encaminhar,
+    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa, encaminhar, reagir,
   };
 }
