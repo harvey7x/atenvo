@@ -117,6 +117,7 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'agendamentos', rotulo: 'Mensagens agendadas' },
       { slug: 'automacoes/sequencias', rotulo: 'Sequências' },
       { slug: 'automacoes/palavras', rotulo: 'Automação por palavras', admin: true },
+      ...(temRecurso('formularios') ? [{ slug: 'automacoes/formularios', rotulo: 'Formulários', admin: true }] : []),
     ],
   }] : []),
   {

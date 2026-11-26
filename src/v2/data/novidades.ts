@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'formularios-26-11', titulo: 'Formulários com agendamento', onde: 'Atendimento › Automações › Formulários', quando: '26/11', recurso: 'formularios', soAdmin: true,
+    texto: 'Monte um formulário (as perguntas, a etapa em que o card nasce, as etiquetas e o responsável) e mande o link no anúncio, no Instagram ou no WhatsApp. Quem preencher vira cliente e card no Kanban e, se o agendamento estiver ligado, escolhe um horário livre: a reunião cai na Agenda e o sino avisa a equipe. Nada é enviado para o cliente. A aba Respostas mostra quem preencheu.',
+    rota: '/automacoes/formularios',
+  },
+  {
+    id: 'crm-extra-26-11', titulo: 'Kanban em lista, Dashboard › CRM e fixar só para mim', onde: 'Kanban, Dashboard e WhatsApp', quando: '26/11', recurso: 'crm-extra',
+    texto: 'No Kanban, "Quadro | Lista" mostra os cards numa tabela (ordene pelo título da coluna e filtre pela etapa). O Dashboard ganhou a aba CRM: quantos entraram, quantos viraram venda, o funil por etapa, de que estado são os clientes, as etiquetas mais usadas, as próximas reuniões e as tarefas por pessoa. No WhatsApp, o ⋯ da conversa tem "Fixar só para mim", além do fixar para todos.',
+    rota: '/kanban',
+  },
+  {
     id: 'importacao-26-11', titulo: 'O Kanban do sistema anterior já está aqui', onde: 'Configurações › Importação do sistema anterior', quando: '26/11', recurso: 'importacao', soAdmin: true,
     texto: 'Todos os clientes do Kanban do sistema que vocês usavam antes entraram no funil COMERCIAL REVIZA, cada um na mesma etapa, com as etiquetas e a data de entrada; as vendas ficaram em FECHADOS e os descartados em LEAD DESCARTADO. Quem tinha dois números lá virou um cliente só. Os cards guardam quem cuidava deles lá: quando a equipe tiver login, a tela "Importação do sistema anterior" passa os cards de cada responsável para a pessoa daqui, pelo mesmo nome ou escolhendo na lista.',
     rota: '/config/importacao',

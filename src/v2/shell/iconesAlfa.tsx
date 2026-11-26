@@ -94,6 +94,7 @@ export const ICONES_ALFA: Record<string, ReactNode> = {
   sequencias: ic(<><rect x="3" y="4" width="13" height="5" rx="2" /><rect x="8" y="15" width="13" height="5" rx="2" /><path d="M9.5 9v2.5a2 2 0 0 0 2 2h3" /></>),
   // Automação por palavras: o raio
   palavras: ic(<><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></>),
+  formularios: ic(<><rect width="16" height="18" x="4" y="3" rx="2" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h5" /></>),
   integracoes: ic(<><path d="M12 22v-5" /><path d="M9 8V2" /><path d="M15 8V2" /><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" /></>),
 
   /* ---- Ferramentas ---- */

@@ -75,6 +75,7 @@ const AgendaV2 = lazy(() => import('@/v2/pages/Agenda'));
 const AutomacoesV2 = lazy(() => import('@/v2/pages/Automacoes'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
+const FormularioPublico = lazy(() => import('@/v2/pages/publico/FormularioPublico'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
@@ -120,6 +121,8 @@ const routes: RouteObject[] = [
     ? [{ path: '/progress-metric-card', element: <Lz><ProgressMetricCardDemo /></Lz> }]
     : []),
   { path: '/redefinir-senha', element: <Lz><RedefinirSenhaV2 /></Lz> },
+  // formulário de captação (26/11): a página que o CLIENTE abre, sem login (Automações › Formulários)
+  { path: '/f/:slug', element: <Lz><FormularioPublico /></Lz> },
   { path: '/definir-senha', element: <Lz><DefinirSenhaV2 /></Lz> },
   {
     element: <Lz><RequireAuthV2 /></Lz>,

@@ -14,6 +14,9 @@ import {
   useSalvarRegra, useSalvarSequencia, useSequencias, validarRegra, validarSequencia, type ModoPalavra, type Palavra, type Passo, type RegraPalavras, type Sequencia,
 } from '@/data/automacoes';
 import { usePessoasEEtapas } from '@/data/avisosEquipe';
+import { Formularios } from './automacoes/Formularios';
+import { isRevizaMode } from '@/lib/supabase';
+import { temRecurso } from '../data/config/recursos';
 import './painel/painel.css';
 import './config/config.css';
 import './config/camposMotivos.css';
@@ -27,24 +30,28 @@ export default function Automacoes() {
   const { secao } = useParams();
   const { currentOrg } = useOrg();
   const nav = useNavigate();
-  if (secao !== 'sequencias' && secao !== 'palavras') return <Navigate to="/automacoes/sequencias" replace />;
+  const formsLigado = isRevizaMode && temRecurso('formularios');
+  if (secao !== 'sequencias' && secao !== 'palavras' && !(secao === 'formularios' && formsLigado)) return <Navigate to="/automacoes/sequencias" replace />;
   const gestao = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
   return (
     <div className="aut pn cfgw" data-automacoes>
       <div className="ph sobe">
         <div>
-          <h2>{secao === 'sequencias' ? 'Sequências' : 'Automação por palavras'}</h2>
+          <h2>{secao === 'sequencias' ? 'Sequências' : secao === 'formularios' ? 'Formulários' : 'Automação por palavras'}</h2>
           <p className="cfga-sub">{secao === 'sequencias'
             ? 'Mensagens em série, com esperas entre elas, que você dispara na conversa na hora que escolher. Não começam sozinhas.'
+            : secao === 'formularios' ? 'Um link que o cliente preenche (e pode marcar um horário): ele vira cliente e card no Kanban.'
             : 'O card muda de etapa sozinho quando o cliente, ou a equipe, escreve uma palavra-chave.'}</p>
         </div>
         <div className="acoes">
           <Segmentado rotulo="Automações" valor={secao} aoMudar={(v) => nav('/automacoes/' + v)}
-            opcoes={[{ valor: 'sequencias', rotulo: 'Sequências' }, { valor: 'palavras', rotulo: 'Por palavras' }]} />
+            opcoes={[{ valor: 'sequencias', rotulo: 'Sequências' }, { valor: 'palavras', rotulo: 'Por palavras' }, ...(formsLigado ? [{ valor: 'formularios', rotulo: 'Formulários' }] : [])]} />
           <BotaoSec onClick={() => nav('/agendamentos')}>Mensagens agendadas</BotaoSec>
         </div>
       </div>
-      {secao === 'sequencias' ? <Sequencias gestao={gestao} /> : currentOrg.role === 'admin' ? <Palavras /> : <p className="pn-vazio">Só o administrador mexe nas regras por palavra.</p>}
+      {secao === 'sequencias' ? <Sequencias gestao={gestao} />
+        : secao === 'formularios' ? (currentOrg.role === 'admin' ? <Formularios /> : <p className="pn-vazio">Só o administrador mexe nos formulários.</p>)
+        : currentOrg.role === 'admin' ? <Palavras /> : <p className="pn-vazio">Só o administrador mexe nas regras por palavra.</p>}
     </div>
   );
 }
