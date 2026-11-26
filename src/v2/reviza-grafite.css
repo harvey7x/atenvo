@@ -473,3 +473,65 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta { padding: 9px 12px; border-radius: 8px; background: rgba(var(--tint), .045); border: 1px solid var(--linha); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta.erro { background: rgba(214, 69, 69, .06); border-color: rgba(214, 69, 69, .25); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-amostra { margin-top: -6px; }
+
+/* ===== 26/11 — AUDITORIA PROFUNDA (4 revisores, 55 telas + 41 janelas, claro e escuro). Correções de raiz: ===== */
+/* 1. Botão principal: laranja SÓLIDO (a regra do dono); o degradê com "fio de luz" sai; hover só escurece um pouco. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar {
+  background: var(--azul); box-shadow: none; filter: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul) 88%, #000); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { transform: none; box-shadow: none; background: color-mix(in srgb, var(--azul) 80%, #000); }
+/* 2. Botão principal DESLIGADO: visível (laranja claro com letra escura), não "texto morto". */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-btn.btn-pri:disabled { background: color-mix(in srgb, var(--azul) 22%, #fff); color: color-mix(in srgb, var(--azul) 70%, #000); border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-btn.btn-pri:disabled { background: color-mix(in srgb, var(--azul) 30%, #111); color: color-mix(in srgb, var(--azul) 70%, #fff); }
+/* 3. Mini-gráficos dos cartões e pilhas do gráfico mensal: sólidos, sem brilho (o degradê das camadas de baixo). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvo-pilha i { background: var(--c) !important; box-shadow: none !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvo-svg path[fill^="url("] { opacity: 0; }
+/* 4. Ação em TABELA como texto solto ("Editar", "Gerenciar", "Conectar de novo", "Marcar débito parado", "Preencher",
+      "Excluir", "Esvaziar", "Apagar"): vira botão pequeno com fio, o mesmo das listas; a destrutiva fica vermelha. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq, .cfgc-tab, .pn-us-tab) :is(button.lnk, button.lk, .pn-link, .cfig-rot, button.pn-fin-nao, .num-remover),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) > button:not(.p-btn):not(.pn-fin-ok):not(.fin-btn) {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 7px;
+  border: 1px solid #D9D5CF; background: #FFFFFF; color: var(--txt); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq, .cfgc-tab, .pn-us-tab) :is(button.lnk, button.lk, .pn-link, .cfig-rot, button.pn-fin-nao, .num-remover),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) > button:not(.p-btn):not(.pn-fin-ok):not(.fin-btn) { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.lnk, button.lk, .pn-link):hover { border-color: #B8B2AA; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.pn-fin-nao, .num-remover, .btn-perigo:not(.p-btn)) { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+/* 5. Checkbox nativo no escuro (Avisos, Campos, Equipes, Webhooks, Formulários): acento no tema. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #F2F0EC; color-scheme: dark; }
+/* 6. Chip de variável ({nome}, meia parcela…): um chip de verdade, com fio, nos dois temas (Régua, Envios, Avisos, Scripts, Retomada). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cc-var, .scr-var, .cfga-var, .rtm-var) { background: #FFFFFF; border: 1px solid #D9D5CF; color: var(--txt); border-radius: 6px; padding: 1px 7px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cc-var, .scr-var, .cfga-var, .rtm-var) { background: #26262A; border-color: #3A3A40; color: var(--txt); }
+/* 7. Botão ao lado de um campo ("Pôr", "Adicionar", "Criar"): mesma altura do campo, centrado. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha { align-items: stretch; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha > .p-btn, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha > select.inp { height: auto; min-height: 36px; }
+/* 8. Área de texto com 1 linha (Agenda, Produto, Aviso, Sequência, Presencial): no mínimo 3 linhas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal textarea.inp, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal textarea { min-height: 76px; height: auto; line-height: 1.45; padding-top: 8px; padding-bottom: 8px; resize: vertical; }
+/* 9. Abas: um estilo só (o segmentado preto). As sublinhadas de Envios viram o mesmo pill; a de Retomada idem. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-abas { box-shadow: none; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(var(--tint), .06); width: max-content; max-width: 100%; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba { padding: 5px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on { background: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on::after { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on { background: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rtm-aba.on { background: #1D1C1A; color: #FFFFFF; border-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rtm-aba.on { background: #F2F0EC; color: #111110; border-color: #F2F0EC; }
+/* 10. Menu ⋯ da conversa cortado no último item: cabe na tela e rola quando não cabe. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-pop { max-height: min(420px, calc(100vh - 120px)); }
+/* 11. Barra lateral: o último item não some no esmaecido (reserva o espaço do fade); conectores da árvore começam no 1º item. */
+html[data-barra-alfa] .v2 .ba-grupos { padding-bottom: 52px; }
+html[data-barra-alfa] .v2 .ba-grupo > .ba-item:first-of-type::before, html[data-barra-alfa] .v2 .ba-grupo-itens > :first-child::before { top: 50%; }
+/* 12. Rótulos: "(opcional)" sempre entre parênteses e em cinza; asterisco de obrigatório some (o sistema avisa ao salvar). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal label > em.opc, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal label > small { font-style: normal; color: var(--txt-3); font-weight: 400; }
+/* 13. Cabeçalho da conversa (WhatsApp, Pós-venda): os chips cabem numa linha (rolam para o lado), sem empurrar os botões. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-hchips, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-cab-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+/* 14. Sobras da auditoria: "Marcar débito parado" (Novos) deixa de ser quieto — botão com fio, sempre; "Esvaziar" e
+       "Esvaziar ciclos…" (Gestão › Ciclos) viram botão vermelho com fio, como o "Apagar" das outras janelas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado { color: var(--txt) !important; background: #FFFFFF !important; border-color: #D9D5CF !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado { background: #1E1E21 !important; border-color: #35353A !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv { border: 1px solid rgba(var(--rubro-rgb), .35); background: transparent; padding: 0 10px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .08); border-color: var(--rubro); }
