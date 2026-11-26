@@ -423,3 +423,24 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #1D1C1A !important; border-color: #1D1C1A !important; color: #FFFFFF !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #F2F0EC !important; border-color: #F2F0EC !important; color: #111110 !important; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:disabled[style] { opacity: .55 !important; }
+
+/* 26/11 (dono: "mais preenchido, nada muito solto, profissional, calmo"). RITMO ÚNICO DE ESPAÇO: 12px entre blocos em todo o
+   sistema (era 14–16, com cartões de meia largura flutuando). Cartões de métrica mais baixos. Título da página mais perto do
+   conteúdo. Cartão sem sombra flutuante e sem "pulo" no hover (calma); o relevo é o fio. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn, .cfgw, .rsd, .cfgimp, .cfgwh, .aut) { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pmc-grade, .pn-kpis, .kpis, .rsd-duas, .cfgm-grade, .d5-linha2, .cfgi-grade) { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ph { margin-bottom: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { padding: 14px 16px 12px; min-height: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm.rvm-fixo .rvm-meio { padding: 6px 0 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-val { font-size: 24px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm:hover { transform: none; box-shadow: none; border-color: #CFCAC3; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm:hover { border-color: #3A3A40; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card { padding: 16px 18px 16px !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card-cab { margin-bottom: 12px; }
+/* cartão de meia largura sozinho na linha (Botão de venda, Cofre, Importação) não fica flutuando: a grade estica o par */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-grade, .rsd-duas, .cfgv-grade) { align-items: stretch; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-grade, .rsd-duas) > .pn-card { height: 100%; box-sizing: border-box; }
+/* estado vazio dentro do cartão: altura mínima para o cartão não virar uma tira fina */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card > .estado { min-height: 220px; justify-content: center; }
+/* tabelas: linhas um pouco mais baixas e constantes (36px), títulos de coluna em 10.5px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-tab, .cfgw-tab, .pn-us-tab, .kbl-tab, .d5-tab) tbody td { padding-top: 9px; padding-bottom: 9px; }
