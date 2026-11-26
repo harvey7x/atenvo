@@ -62,7 +62,7 @@ export function DesempenhoChat({ aberto, aoFechar, aoAbrirResumo }: { aberto: bo
   const r = q.data;
   const int = (v: number) => v.toLocaleString('pt-BR');
   return (
-    <ModalV2 aberto={aberto} aoFechar={aoFechar} titulo="Desempenho do chat — hoje" largura={720}
+    <ModalV2 aberto={aberto} aoFechar={aoFechar} titulo="Desempenho do chat — hoje" largura={880}
       rodape={<><BotaoSec onClick={aoAbrirResumo}>Abrir o resumo completo</BotaoSec><BotaoSec onClick={aoFechar}>Fechar</BotaoSec></>}>
       {q.isError ? <p className="wa-desemp-erro">{(q.error as Error).message}</p>
         : !r ? <p className="wa-desemp-erro">Carregando os números de hoje…</p>
@@ -70,8 +70,8 @@ export function DesempenhoChat({ aberto, aoFechar, aoAbrirResumo }: { aberto: bo
           <div className="wa-desemp">
             <p className="frase">{fraseDoResumo(r)}</p>
             <GradeMetricas rotulo="Hoje no atendimento">
-              <CartaoMetricaFixo icone="balao" titulo="Clientes que escreveram" valor={int(r.clientesEscreveram)} detalhe={<span>{qtd(r.conversasNovas, 'conversa nova', 'conversas novas')}</span>} />
-              <CartaoMetricaFixo icone="pessoas" titulo="Atendidos pela equipe" valor={int(r.atendidasEquipe)} detalhe={<span>{qtd(r.enviadasEquipe, 'mensagem', 'mensagens')}</span>} />
+              <CartaoMetricaFixo icone="balao" titulo="Escreveram" valor={int(r.clientesEscreveram)} detalhe={<span>clientes · {qtd(r.conversasNovas, 'conversa nova', 'conversas novas')}</span>} />
+              <CartaoMetricaFixo icone="pessoas" titulo="Atendidos" valor={int(r.atendidasEquipe)} detalhe={<span>pela equipe · {qtd(r.enviadasEquipe, 'mensagem', 'mensagens')}</span>} />
               <CartaoMetricaFixo icone="certo" titulo="Fechadas" valor={int(r.fechadas)} detalhe={<span>{qtd(r.leadsNovos, 'lead novo', 'leads novos')}</span>} />
               <CartaoMetricaFixo icone="alerta" titulo="Além da meta" valor={int(r.esperaramMeta)} detalhe={<span>{r.atendidasIa ? `IA atendeu ${int(r.atendidasIa)}` : 'IA não atendeu'}</span>} />
             </GradeMetricas>

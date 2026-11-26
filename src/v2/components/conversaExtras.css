@@ -8,7 +8,10 @@
 .v2 .wa-busca-conv .ib2 svg { width: 15px; height: 15px; }
 
 /* seleção de várias conversas: o quadradinho no cartão e a barra no pé da lista */
-.v2 .conv2 .wa-sel-ck { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid rgba(var(--tint), .45); display: inline-flex; align-items: center; justify-content: center; align-self: center; margin-right: 2px; }
+/* o quadradinho fica EM CIMA da foto (fora da grade do cartão, que tem a coluna da foto com 36 px) */
+.v2 .conv2 .wa-sel-ck { position: absolute; left: 25px; top: 30px; transform: translateY(-50%); z-index: 2; width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid rgba(var(--tint), .5); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; }
+.v2 .conv2.selecionando .av2 { opacity: .22; }
 .v2 .conv2 .wa-sel-ck.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .v2 .conv2 .wa-sel-ck svg { width: 12px; height: 12px; }
 .v2 .conv2.sel { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
@@ -20,6 +23,11 @@
 
 /* desempenho do chat */
 .wa-desemp { display: flex; flex-direction: column; gap: 14px; }
+/* os 4 números numa linha só, sem o rodapé vazio dos cartões do Painel */
+.wa-desemp .pmc-grade { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.wa-desemp .pmc-root.rvm-fixo { min-height: 0; }
+.wa-desemp .pmc-root.rvm-fixo .rvm-pe { display: none; }
+@media (max-width: 720px) { .wa-desemp .pmc-grade { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 .wa-desemp .frase { margin: 0; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
 .wa-desemp-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .wa-desemp-tab th, .wa-desemp-tab td { padding: 8px 10px; border-bottom: 1px solid var(--linha); text-align: center; font-variant-numeric: tabular-nums; }

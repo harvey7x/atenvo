@@ -1507,7 +1507,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
-                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '') + (selecao?.has(c.id) ? ' sel' : '')}
+                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '') + (selecao ? ' selecionando' : '') + (selecao?.has(c.id) ? ' sel' : '')}
                         title={dica} aria-pressed={selecao ? selecao.has(c.id) : undefined}
                         onClick={() => {
                           if (selecao) { setSelecao((s0) => { const n = new Set(s0 ?? []); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; }); return; }
