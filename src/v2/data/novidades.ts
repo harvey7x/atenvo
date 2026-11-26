@@ -19,6 +19,16 @@ export interface Novidade {
 
 export const NOVIDADES: Novidade[] = [
   {
+    id: 'campos-cliente-26-11', titulo: 'Campos do cliente', onde: 'WhatsApp › painel do cliente', quando: '26/11', recurso: 'campos',
+    texto: 'Os campos que a equipe preenche sobre cada cliente, como o "Nome completo (RG)", ficam no painel do cliente do WhatsApp: clique no valor para preencher ou mudar. O administrador cria os campos (texto, número, data, lista de opções, sim ou não, telefone, e-mail) em Configurações › Campos do cliente e escolhe até 3 para aparecer no cartão do Kanban.',
+    rota: '/whatsapp',
+  },
+  {
+    id: 'motivos-fechamento-26-11', titulo: 'Motivos de fechamento com histórico', onde: 'Configurações › Motivos de fechamento', quando: '26/11', recurso: 'campos', soAdmin: true,
+    texto: 'O administrador escolhe as opções que aparecem ao fechar uma conversa: criar, renomear, pôr na ordem e desligar. Ao lado, o histórico: quantas conversas fecharam por cada motivo e quem fechou, em 7, 30 ou 90 dias, e os últimos fechamentos com o link da conversa.',
+    rota: '/config/motivos',
+  },
+  {
     id: 'agenda-26-11', titulo: 'Agenda', onde: 'Atendimento › Agenda', quando: '26/11', recurso: 'agenda',
     texto: 'Reuniões, ligações, retornos e videochamadas em dia, semana, mês ou lista, como no sistema que a equipe usava antes. Clique num horário vazio para marcar; clique numa reunião para marcar como feita, cliente faltou, cancelar ou abrir a conversa. Quem vai fazer recebe o aviso no sino. No WhatsApp, o ⋯ da conversa tem "Agendar reunião" com o cliente já escolhido.',
     rota: '/agenda',

@@ -49,7 +49,9 @@ import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
-import { MOTIVOS_FECHAMENTO, textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
+import { textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
+import { opcoesDeFechamento, useMotivos } from '@/data/motivosFechamento';
+import { CamposDoCliente } from '../components/CamposDoCliente';
 import { DocumentosDaConversa, ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
 import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
 import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
@@ -631,6 +633,9 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [fecharConfirm, setFecharConfirm] = useState(false);
   // MOTIVO AO FECHAR (25/11, recurso 'motivos-fechamento'): o motivo escolhido e o detalhe
   const [motivoFech, setMotivoFech] = useState<MotivoFechamento | null>(null);
+  // a lista do "Fechar conversa": a de Configurações › Motivos de fechamento (migration 110) ou a fixa
+  const motivosQ = useMotivos();
+  const opcoesFech = opcoesDeFechamento(motivosQ.data);
   const [motivoFechDet, setMotivoFechDet] = useState('');
   const registrarFechamento = useRegistrarFechamento();
   const [devolverConfirm, setDevolverConfirm] = useState(false);
@@ -2004,6 +2009,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           )}
 
+          {/* campos personalizados do cliente (26/11, migration 110): os de Configurações › Campos do cliente */}
+          {isRevizaMode && temRecurso('campos') && <CamposDoCliente key={current.contatoId ?? current.id} contatoId={current.contatoId ?? null} />}
           {isRevizaMode && temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
           <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
             rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
@@ -2463,7 +2470,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           <div className="fch-corpo" data-fechar-motivo>
             <p className="fch-sub">{statusFechada ? `A conversa fica como "${statusFechada.nome}". Dá para reabrir depois, mudando o status.` : 'A conversa sai da lista de abertas.'} Por que está fechando?</p>
             <div className="fch-opcoes" role="radiogroup" aria-label="Motivo do fechamento">
-              {MOTIVOS_FECHAMENTO.map((m) => (
+              {opcoesFech.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={motivoFech === m} className={motivoFech === m ? 'on' : undefined} onClick={() => setMotivoFech(m)}>
                   <span className="bolinha" aria-hidden />{m}
                 </button>

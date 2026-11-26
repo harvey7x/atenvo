@@ -4,6 +4,9 @@ import { baixarCsv, csvDe, dataBr, nomeComData } from '../lib/planilha';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
+import { isRevizaMode } from '@/lib/supabase';
+import { temRecurso } from '../data/config/recursos';
+import { mostrarValor, useCampos, useValoresNoCartao } from '@/data/camposPersonalizados';
 import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import {
   KANBAN_REAL, PROGRESSO_KANBAN, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
@@ -393,6 +396,15 @@ export default function KanbanV2() {
   const vacuoQ = useVacuoRepasses();
   const repassePorOpp = useMemo(() => repassesPorOportunidade(vacuoQ.data ?? []), [vacuoQ.data]);
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
+  // campos do cliente marcados para o cartão (26/11, migration 110): até 3, embaixo do nome
+  const camposLigados = isRevizaMode && temRecurso('campos');
+  const camposQ = useCampos(camposLigados);
+  const camposCartao = useMemo(() => (camposLigados ? (camposQ.data ?? []) : []).filter((c) => c.ativo && c.noCartao).slice(0, 3), [camposQ.data, camposLigados]);
+  const valoresCartaoQ = useValoresNoCartao(useMemo(() => leads.map((l) => l.contatoId ?? ''), [leads]), camposCartao);
+  const camposDoLead = (l: KLead): { nome: string; valor: string }[] => {
+    const v = l.contatoId ? valoresCartaoQ.data?.[l.contatoId] : undefined;
+    return v ? camposCartao.filter((c) => v[c.id]).map((c) => ({ nome: c.nome, valor: mostrarValor(c, v[c.id]) })) : [];
+  };
   // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
   const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
     ? Object.fromEntries(Object.entries(seed.fichaStatus).map(([id, st]) => [id, {
@@ -1134,7 +1146,7 @@ export default function KanbanV2() {
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
                 repasse={repassePorOpp.get(l.id) ?? null}
-                fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                fichaInfo={fichaResumoMap[l.id]} campos={camposDoLead(l)} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
                 aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
                 menuAberto={menu?.kind === 'card' && menu.id === l.id}
@@ -1534,9 +1546,9 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, campos = [], optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; campos?: { nome: string; valor: string }[]; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
@@ -1637,6 +1649,12 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
       {subtitulo && <div className="kc-meta" title={subtitulo}>{subtitulo}</div>}
+      {/* campos do cliente marcados em Configurações › Campos do cliente */}
+      {campos.length > 0 && (
+        <dl className="kc-campos">
+          {campos.map((c) => <div key={c.nome} title={`${c.nome}: ${c.valor}`}><dt>{c.nome}</dt><dd>{c.valor}</dd></div>)}
+        </dl>
+      )}
 
       {/* BANCOS DA FICHA (dono: "muito importante"): o banco do cliente em destaque; REVs em contorno */}
       {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (

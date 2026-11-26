@@ -16,13 +16,15 @@ export const MOTIVOS_FECHAMENTO = [
   'Já é cliente ou contato repetido',
   'Outro motivo',
 ] as const;
-export type MotivoFechamento = typeof MOTIVOS_FECHAMENTO[number];
+export type MotivoFechamento = string;
+/** sempre o último da lista, com o detalhe obrigatório (a lista dos outros é configurável: @/data/motivosFechamento) */
+export const OUTRO_MOTIVO = 'Outro motivo';
 
 /** o texto gravado: o motivo escolhido e, se houver, o detalhe ("Outro motivo" exige o detalhe) */
 export function textoDoMotivo(m: MotivoFechamento | null, detalhe: string): string | null {
   const d = detalhe.trim().replace(/\s+/g, ' ').slice(0, 240);
   if (!m) return null;
-  if (m === 'Outro motivo') return d ? d : null;
+  if (m === OUTRO_MOTIVO) return d ? d : null;
   return d ? `${m} — ${d}` : m;
 }
 

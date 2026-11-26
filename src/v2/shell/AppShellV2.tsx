@@ -219,6 +219,7 @@ const CFG_GRUPOS: GrupoNav[] = [
     ...(temRecurso('atendimento') ? [{ slug: 'config/atendimento', rotulo: 'Regras do atendimento', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('retomada') ? [{ slug: 'config/retomada', rotulo: 'Retomada automática', admin: true }] : []),
     ...(temRecurso('atendimento') && temRecurso('aviso-espera') ? [{ slug: 'config/aviso-espera', rotulo: 'Aviso de espera', admin: true }] : []),
+    ...(temRecurso('atendimento') && temRecurso('campos') ? [{ slug: 'config/campos', rotulo: 'Campos do cliente', admin: true }, { slug: 'config/motivos', rotulo: 'Motivos de fechamento', admin: true }] : []),
   ] },
   // "Minha conta" são telas do Atendimento (conta, notificações, preferências): só com ele no servidor
   { rotulo: 'Minha conta', itens: temRecurso('atendimento') ? [{ slug: 'config/conta', rotulo: 'Conta' }, { slug: 'config/notificacoes', rotulo: 'Notificações' }, { slug: 'config/preferencias', rotulo: 'Preferências' }] : [] },

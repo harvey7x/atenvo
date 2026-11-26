@@ -13,6 +13,8 @@
      atendimento   regras e etiquetas do Atendimento                                            (admin)
      retomada      mensagens automáticas quando o cliente para de responder, por etapa do Kanban (admin)
      aviso-espera  o sino avisa quem está esperando além da meta: o responsável e depois os gestores (admin)
+     campos        os campos do cliente que a equipe preenche (como o "Nome completo (RG)") e o cartão do Kanban (admin)
+     motivos       os motivos do "Fechar conversa" e o histórico de quem fechou e por quê            (admin)
      conta · notificacoes · preferencias      o que é da própria pessoa                         (todos)
    As quatro últimas são as seções da tela de Configurações de antes, uma por vez (abaFixa). */
 import { lazy, Suspense } from 'react';
@@ -33,12 +35,14 @@ import { ConfigAnuncios } from './ConfigAnuncios';
 import { ConfigRetomada } from './ConfigRetomada';
 import { ConfigAvisoEspera } from './ConfigAvisoEspera';
 import { ConfigChaveIa } from './ConfigChaveIa';
+import { ConfigCampos } from './ConfigCampos';
+import { ConfigMotivos } from './ConfigMotivos';
 // a atendente virtual (Iris): a tela de sempre do Atendimento, agora dentro do ambiente Configurações
 const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
-const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera']);
+const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
 function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; voltar?: { rotulo: string; para: string } }) {
@@ -70,7 +74,7 @@ export default function ConfigAmbiente() {
   if (SO_ADMIN.has(secao) && !admin) return <Navigate to={foraDaqui} replace />;
   if (ABA_FIXA[secao] && secao !== 'atendimento' && !temConta) return <Navigate to={foraDaqui} replace />;
   // o que ainda não existe no servidor desta instalação não abre (nem pelo endereço)
-  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
+  if ((secao === 'iris' && !temRecurso('iris')) || (secao === 'atendimento' && !temRecurso('atendimento')) || (secao === 'retomada' && !(temRecurso('retomada') && temRecurso('atendimento'))) || (secao === 'aviso-espera' && !(temRecurso('aviso-espera') && temRecurso('atendimento'))) || ((secao === 'campos' || secao === 'motivos') && !(temRecurso('campos') && temRecurso('atendimento'))) || (secao === 'equipes' && !temCadastroAtendimento())) return <Navigate to="/config/whatsapp" replace />;
   if (secao === 'integracoes' && ((servico === 'asaas' && !temRecurso('asaas')) || (servico === 'whatsapp-oficial' && !temRecurso('wa-oficial')) || (servico === 'anuncios' && !(temRecurso('anuncios') && temRecurso('atendimento'))) || (servico === 'ia' && !(temRecurso('ia-propria') && temRecurso('atendimento'))))) return <Navigate to="/config/integracoes" replace />;
 
   if (secao === 'whatsapp') return (<><Cabecalho titulo="WhatsApp" sub={temRecurso('atendimento') ? 'Os números conectados ao sistema e para qual ambiente cada um trabalha.' : 'Os números de WhatsApp da régua de cobrança, um para cada comercial.'} /><ConfigWhatsApp /></>);
@@ -89,6 +93,8 @@ export default function ConfigAmbiente() {
   if (secao === 'iris') return (<><Cabecalho titulo="Atendentes de IA" sub="A Iris e as outras IAs do Atendimento: o que cada uma sabe e faz, e em quais números atende." /><Suspense fallback={null}><Iris /></Suspense></>);
   if (secao === 'retomada') return (<><Cabecalho titulo="Retomada automática" sub="Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban. Se ele responder, a sequência para." /><ConfigRetomada /></>);
   if (secao === 'aviso-espera') return (<><Cabecalho titulo="Aviso de espera" sub="O sino avisa quando um cliente passa da meta sem resposta: primeiro o responsável pela conversa, depois os gestores." /><ConfigAvisoEspera /></>);
+  if (secao === 'campos') return (<><Cabecalho titulo="Campos do cliente" sub="O que a equipe preenche sobre cada cliente no painel do WhatsApp, e o que aparece no cartão do Kanban." /><ConfigCampos /></>);
+  if (secao === 'motivos') return (<><Cabecalho titulo="Motivos de fechamento" sub="As opções que aparecem ao fechar uma conversa, e o histórico de quem fechou e por quê." /><ConfigMotivos /></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
 }
