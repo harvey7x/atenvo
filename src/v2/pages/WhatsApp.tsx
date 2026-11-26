@@ -3056,16 +3056,17 @@ function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, 
       <div className="campo" style={{ marginBottom: 8 }}>
         <input className="inp" placeholder="Buscar atendente…" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
-      <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10 }}>
+      <div className="wa-transf-lista" role="listbox" aria-label="Atendentes">
         {filtrados.length === 0 && <div className="ctx-nota">Nenhum atendente encontrado.</div>}
         {filtrados.map((u) => (
           <button
-            key={u.id} type="button" disabled={u.id === atualId}
+            key={u.id} type="button" role="option" aria-selected={sel === u.id} disabled={u.id === atualId}
+            className={'wa-transf-item' + (sel === u.id ? ' on' : '')}
             style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(var(--tint),.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(var(--tint),.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
             onClick={() => setSel(u.id)}
           >
             {u.nome}{u.id === meuId ? ' (você)' : ''}{u.id === atualId ? ' · atual' : ''}
-            {u.papel && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--txt-3)' }}>{u.papel === 'gestor' ? 'Supervisor' : u.papel}</span>}
+            {u.papel && <small>{u.papel === 'gestor' ? 'Supervisor' : u.papel === 'admin' ? 'Administrador' : u.papel === 'atendente' ? 'Atendente' : u.papel}</small>}
           </button>
         ))}
       </div>

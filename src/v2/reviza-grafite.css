@@ -378,3 +378,48 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(var(--tint), .035); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(255, 255, 255, .035); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvm-val { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+/* 26/11 (dono: "tela ridícula de feio… não tem botões em branco"): CHIP DE ESCOLHA, uma regra só para o sistema todo.
+   Etapas, etiquetas, responsável e dias (Disparos/Formulários), canal do Script, ambientes do Usuário, etiquetas do Contato,
+   quem recebe o Aviso, filtros do Kanban. Fundo branco e fio visível no claro; grafite e fio claro no escuro; o marcado vira
+   preto com letra branca (a mesma linguagem do "Todos" dos segmentados). Antes, o fio era rgba(tint,.11) sobre fundo quase
+   branco = texto solto. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa, .fp-dia) {
+  background: #FFFFFF; border: 1px solid #D9D5CF; box-shadow: none; color: var(--txt); font-weight: 500; font-size: 12.5px;
+  padding: 6px 12px; border-radius: 8px; line-height: 1.2; transition: background .12s, border-color .12s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa):hover { border-color: #B8B2AA; background: #FBFAF8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on, .frm-dia.on, .cfga-pessoa.on, .chip[aria-pressed="true"]) {
+  background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on) i { outline: 2px solid rgba(255, 255, 255, .5); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .chip.limpar { border-style: dashed; opacity: .8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa input { accent-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa.on input { accent-color: #FFFFFF; }
+/* escuro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa) { background: #1E1E21; border-color: #35353A; color: var(--txt); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa):hover { background: #26262A; border-color: #4A4A50; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on, .frm-dia.on, .cfga-pessoa.on, .chip[aria-pressed="true"]) { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa.on input { accent-color: #111110; }
+/* as seções internas das janelas (Quem recebe · Mensagem · Número e ritmo · Perguntas · O card que nasce) ganham fio e respiro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { padding: 14px 16px 16px; border-color: #E3DFD9; background: #FFFFFF; gap: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { background: #19191B; border-color: #2C2C30; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco legend { padding: 0 8px; color: var(--txt-2); }
+/* a lista de atendentes do "Transferir": cada pessoa é um item com fio, o escolhido fica preto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-lista { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item {
+  all: unset; display: flex; gap: 8px; align-items: center; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--linha); background: var(--vidro-a); color: var(--txt); font-size: 12.5px; cursor: pointer;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:hover { border-color: #B8B2AA; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on { background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on small { color: rgba(255, 255, 255, .7); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:disabled { opacity: .55; cursor: default; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item small { margin-left: auto; font-size: 10.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on small { color: rgba(0, 0, 0, .6); }
+/* o estilo inline antigo do item (Atenvo) sai de cena na Reviza */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item[style] { background: var(--vidro-a) !important; border: 1px solid var(--linha) !important; opacity: 1 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #1D1C1A !important; border-color: #1D1C1A !important; color: #FFFFFF !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #F2F0EC !important; border-color: #F2F0EC !important; color: #111110 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:disabled[style] { opacity: .55 !important; }
