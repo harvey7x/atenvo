@@ -6,13 +6,15 @@ import '../tokens.css';
 import '../base.css';
 import '../components/componentes.css';
 import './login.css';
+import { LogoAtenvo } from '../components/LogoAtenvo';
+import { MolduraAcesso } from './MolduraAcesso';
 import { CamposNovaSenha } from './CamposNovaSenha';
 import { useAtivacaoConvite } from '../hooks/useAtivacaoConvite';
 import { BotaoSec } from '../components';
 
 function BotaoIrParaLogin() {
   return (
-    <Link to="/login" className="entrar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+    <Link to="/login" className="entrar">
       Ir para o login
     </Link>
   );
@@ -36,13 +38,11 @@ export default function DefinirSenhaV2() {
   const bannerErro = <div className={erro ? 'lg-banner show erro' : 'lg-banner'} role="alert">{erro}</div>;
 
   return (
-    <div className="v2 tela-login">
-      <div className="luz2" />
-      <div className="grao" />
+    <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
-        <div className="marca2">A</div>
-        <div className="caps">Bem-vindo ao Atenvo</div>
-        <h1 className="p-display">Bem-vindo(a) à Atenvo.</h1>
+        <LogoAtenvo className="marca2" />
+        <div className="caps">Ativação de acesso</div>
+        <h1 className="p-display">Bem-vindo(a) ao Atenvo.</h1>
 
         {fase === 'carregando' ? (
           <div className="sub">Validando seu convite…</div>
@@ -81,9 +81,9 @@ export default function DefinirSenhaV2() {
             <button type="button" className="entrar" disabled={busy} onClick={concluirAtivacao}>
               {busy ? 'Concluindo…' : 'Concluir ativação'}
             </button>
-            <div style={{ marginTop: 12, display: 'flex', gap: 9, justifyContent: 'center' }}>
+            <div className="lg-sec">
               <BotaoSec mini disabled={busy} onClick={concluirAtivacao}>Tentar novamente</BotaoSec>
-              <Link to="/login" style={{ alignSelf: 'center', fontSize: 11.5, color: 'var(--txt-2)', borderBottom: '1px solid rgba(var(--tint), .2)', textDecoration: 'none' }}>
+              <Link to="/login" className="lg-link">
                 Ir para o login
               </Link>
             </div>
@@ -111,6 +111,6 @@ export default function DefinirSenhaV2() {
           </>
         )}
       </div>
-    </div>
+    </MolduraAcesso>
   );
 }

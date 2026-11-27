@@ -25,14 +25,23 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-maria', name: 'Maria Aparecida Souza', phone: '5551988124407', contatoId: 'wa-maria-ct',
       time: '14:38', unread: 2, lastAtMs: agora - 4 * min, aguardando: true, aguardandoDesde: iso(agora - 4 * min),
-      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: true, iaEtapa: 'coleta_docs',
+      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'coleta_docs',
       last: 'Áudio · 0:34', lastInter: 'há 4 min', tags: ['Urgente'], notes: 'Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.',
       msgs: [
+        /* dias antes: documentos e links FICTÍCIOS — vitrine de "Mídia, documentos e links" no painel do cliente (25/11) */
+        OUT('Para tirar o histórico de empréstimos, entre em https://meu.inss.gov.br e toque em "Extrato de Empréstimo". Se preferir, a gente te ajuda por ligação.', '10:12', { tsISO: iso(agora - 3 * 1440 * min), id: 'wm-a1', origemBot: true }),
+        IN('', '10:40', { tsISO: iso(agora - 3 * 1440 * min + 28 * min), id: 'wm-a2', tipo: 'documento', nome: 'Historico_Emprestimos_INSS.pdf', mime: 'application/pdf', tamanho: 312_448, localUrl: '/demo-midia/extrato-emprestimos-ficticio.pdf' }),
+        OUT('Perfeito, chegou certinho! Agora me manda o RG ou a CNH, frente e verso.', '10:41', { tsISO: iso(agora - 3 * 1440 * min + 29 * min), id: 'wm-a3', origemBot: true }),
+        IN('', '09:05', { tsISO: iso(agora - 2 * 1440 * min), id: 'wm-a4', tipo: 'documento', nome: 'RG_frente_e_verso.pdf', mime: 'application/pdf', tamanho: 1_148_204, localUrl: '/demo-midia/rg-ficticio.pdf' }),
+        IN('Minha filha disse que dá pra ver por aqui também: https://www.gov.br/inss', '09:07', { tsISO: iso(agora - 2 * 1440 * min + 2 * min), id: 'wm-a5' }),
+        /* áudio SEM transcrição — vitrine do "Transcrever" (IA com a chave da própria empresa, 25/11); o texto inventado
+           sai de TRANSCRICOES_DEMO em data/iaPropria.ts */
+        IN('', '09:12', { tsISO: iso(agora - 2 * 1440 * min + 7 * min), id: 'wm-a6', tipo: 'audio', localUrl: '/demo-midia/voz-cliente-maria.m4a', ...( { seconds: 19 } as Partial<WaMessage>) }),
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
-        OUT('Boa tarde, dona Maria! Aqui é o Matheo, da CAF Assessoria. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', '14:32', { tsISO: iso(agora - 10 * min), id: 'wm-2', origemBot: true }),
+        OUT('Boa tarde, dona Maria! Aqui é o Matheo, da Alfa Group. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', '14:32', { tsISO: iso(agora - 10 * min), id: 'wm-2', origemBot: true }),
         IN('Pode sim, meu filho', '14:35', { tsISO: iso(agora - 7 * min), id: 'wm-3' }),
         IN('', '14:38', {
-          tsISO: iso(agora - 4 * min), id: 'wm-4', tipo: 'audio',
+          tsISO: iso(agora - 4 * min), id: 'wm-4', tipo: 'audio', localUrl: '/demo-midia/voz-cliente-maria.m4a',
           transcricao: 'Meu nome é Maria Aparecida, eu recebo aposentadoria desde 2019 e vi uns descontos que eu não reconheço.',
           ...( { seconds: 34 } as Partial<WaMessage>),
         }),
@@ -50,7 +59,7 @@ export function seedWa(): WaContact[] {
       time: '14:02', unread: 1, lastAtMs: agora - 58 * min, aguardando: true, aguardandoDesde: iso(agora - 58 * min),
       /* sessão AINDA ATIVA com aguardando_humano = o estado âmbar VIVO (a IA está de pé,
          esperando um humano ajudar com a senha; se fosse 'pausada' o flag seria resto morto) */
-      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaAtiva: true, iaStatus: 'ativa', iaAtendendo: true, iaIris: true, iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
+      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
       precisaHumanoMotivo: 'auxilio_senha', precisaHumanoEm: iso(agora - 57 * min),
       last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min', tags: ['Revisão de contrato'],
       msgs: [
@@ -70,9 +79,9 @@ export function seedWa(): WaContact[] {
       last: 'Ah, que bom! Obrigada, meu filho', lastInter: 'há 18 min', tags: ['Revisão de contrato'],
       msgs: [
         IN('Boa tarde! Quero ver isso dos descontos no meu benefício', '13:50', { tsISO: iso(agora - 32 * min), id: 'wi-1' }),
-        OUT('Boa tarde, dona Ivone! Aqui é o Matheo, da CAF Assessoria. Para eu conferir os descontos, a senhora tem acesso ao Meu INSS (gov.br)?', '13:52', { tsISO: iso(agora - 30 * min), id: 'wi-2', origemBot: true }),
+        OUT('Boa tarde, dona Ivone! Aqui é o Matheo, da Alfa Group. Para eu conferir os descontos, a senhora tem acesso ao Meu INSS (gov.br)?', '13:52', { tsISO: iso(agora - 30 * min), id: 'wi-2', origemBot: true }),
         IN('Nunca usei isso de gov, meu filho. Não tenho senha não', '13:55', { tsISO: iso(agora - 27 * min), id: 'wi-3' }),
-        OUT('Dona Ivone, aqui é o Henrique, da equipe da CAF. Pode deixar que sigo com a senhora daqui — vamos criar o acesso juntos, passo a passo.', '14:02', { tsISO: iso(agora - 20 * min), id: 'wi-4' }),
+        OUT('Dona Ivone, aqui é o Henrique, da equipe da Alfa. Pode deixar que sigo com a senhora daqui — vamos criar o acesso juntos, passo a passo.', '14:02', { tsISO: iso(agora - 20 * min), id: 'wi-4' }),
         IN('Ah, que bom! Obrigada, meu filho', '14:04', { tsISO: iso(agora - 18 * min), id: 'wi-5' }),
       ],
     },

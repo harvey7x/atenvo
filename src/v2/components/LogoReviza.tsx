@@ -1,12 +1,12 @@
-/* ------------------------------------------------------------------
-   Marca do REVIZA CRM — a logo é a que o DONO criou e mandou em 21/11
-   ("acabei de criar a logo, pode usar essa"): o ícone de app em vidro
-   dourado-alaranjado com o R. Usamos o arquivo dele, recortado da imagem
-   original (src/assets/reviza-crm-icone.png, 320px); nada redesenhado.
-   Originais e tamanhos: ~/Desktop/reviza-crm-logo.
-   ------------------------------------------------------------------ */
-import icone from '../../assets/reviza-crm-icone.png';
+/* 28/11 (dono: "copiar tudo do Reviza… só deixa o nosso logo"): as telas vindas do Reviza pedem o ícone por
+   este nome; aqui ele é a marca do ATENVO (LogoAtenvo). O arquivo do Reviza (src/assets/reviza-crm-icone.png) fica
+   só no repositório dele. */
+import { LogoAtenvo } from './LogoAtenvo';
 
 export function IconeReviza({ className, tam }: { className?: string; tam?: number }) {
-  return <img className={className} src={icone} width={tam} height={tam} alt="Reviza CRM" draggable={false} />;
+  return (
+    <span className={className} style={tam ? { display: 'inline-block', width: tam, height: tam, lineHeight: 0 } : { display: 'contents' }} aria-label="Atenvo" role="img">
+      <LogoAtenvo />
+    </span>
+  );
 }

@@ -13,7 +13,7 @@ type ConvId = 'img2pdf' | 'pdf2img' | 'xlsx2csv' | 'csv2xlsx';
 type Conv = { id: ConvId; titulo: string; desc: string; accept: string; multiplos: boolean; dica: string };
 const CONVERSOES: Conv[] = [
   { id: 'img2pdf', titulo: 'Imagens → PDF', desc: 'Junte fotos, prints ou scans num PDF só.', accept: 'image/*', multiplos: true, dica: 'Imagens (JPG/PNG/WebP) · pode várias' },
-  { id: 'pdf2img', titulo: 'PDF → Imagens', desc: 'Cada página do PDF vira uma imagem (boa pra WhatsApp).', accept: 'application/pdf,.pdf', multiplos: false, dica: '1 arquivo PDF' },
+  { id: 'pdf2img', titulo: 'PDF → Imagens', desc: 'Cada página do PDF vira uma imagem.', accept: 'application/pdf,.pdf', multiplos: false, dica: '1 arquivo PDF' },
   { id: 'xlsx2csv', titulo: 'Excel → CSV', desc: 'Planilha .xlsx/.xls vira CSV (uma por aba).', accept: '.xlsx,.xls', multiplos: false, dica: '1 arquivo Excel' },
   { id: 'csv2xlsx', titulo: 'CSV → Excel', desc: 'Arquivo CSV vira uma planilha .xlsx.', accept: '.csv,text/csv', multiplos: false, dica: '1 arquivo CSV' },
 ];
@@ -93,14 +93,15 @@ export function ConversorArquivos() {
       <div className="ph sobe">
         <div>
           <div className="cob-migalha">Ferramentas</div>
-          <h2>Conversor de arquivos</h2>
-          <p>Converta entre PDF, imagens e planilhas — tudo no seu navegador, nada sai do computador.</p>
+          <h2 title="Converte entre PDF, imagens e planilhas no próprio navegador. Nada sai do computador.">Conversor de arquivos</h2>
         </div>
       </div>
 
       <div className="conv-tipos sobe">
         {CONVERSOES.map((c) => (
-          <button key={c.id} type="button" className={c.id === convId ? 'conv-tipo on' : 'conv-tipo'} onClick={() => trocarConv(c.id)}>
+          <button key={c.id} type="button" className={c.id === convId ? 'conv-tipo on' : 'conv-tipo'} aria-pressed={c.id === convId} onClick={() => trocarConv(c.id)}>
+            {/* tipo escolhido: borda dourada + ✓ de traço (régua do item ativo) */}
+            {c.id === convId && <svg className="conv-tipo-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
             <b>{c.titulo}</b>
             <span>{c.desc}</span>
           </button>
@@ -147,7 +148,7 @@ export function ConversorArquivos() {
                     <span className="ferr-ord num">{i + 1}</span>
                     <span className="ferr-nm">{f.name}<i className="ferr-nm-pg num">{fmtKB(f.size)}</i></span>
                     <div className="ferr-acoes">
-                      <button type="button" className="cm-num-lnk perigo" onClick={() => remover(i)} aria-label="Remover">✕</button>
+                      <button type="button" className="ferr-ib perigo" onClick={() => remover(i)} aria-label="Remover" title="Remover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg></button>
                     </div>
                   </div>
                 ))}
@@ -158,10 +159,7 @@ export function ConversorArquivos() {
             </CardVidro>
           )}
 
-          <div className="conv-nota">
-            <b>Precisa converter Word/Excel → PDF mantendo a formatação?</b> Esse tipo de conversão exige um servidor
-            de conversão (o arquivo sairia do computador) — me avise que a gente vê como ligar.
-          </div>
+          <p className="ferr-nota">A conversão de Word e Excel para PDF com a formatação original não está disponível nesta ferramenta.</p>
         </div>
 
         {/* ---- SAÍDA ---- */}
@@ -172,7 +170,7 @@ export function ConversorArquivos() {
             <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
               <EstadoVazio
                 titulo={proc ? 'Convertendo…' : 'O resultado aparece aqui'}
-                descricao={proc ? 'Processando no seu navegador.' : `Escolha a conversão, solte os arquivos e clique em Converter. (${conv.titulo})`}
+                descricao={proc ? 'Processando no seu navegador.' : 'Solte os arquivos à esquerda e clique em Converter.'}
               />
             </CardVidro>
           )}

@@ -11,7 +11,7 @@ import { temRecurso } from './recursos';
 import { useMemo, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
-import { isPrevia, supabase } from '@/lib/supabase';
+import { isPrevia, isRevizaMode, supabase } from '@/lib/supabase';
 import { WA_REAL, useWaCanais, waCreateInstance, waOcultar, waQr, waReconnect, waRemove, waStatus, type WaCanal } from '@/data/whatsapp';
 import { useCanaisWA, type CanalWA } from '../wa/wa';
 import { useUsuarios } from '../cobranca/usuarios';
@@ -82,8 +82,9 @@ const estadoAtd = (s: string): EstadoConexao => (s === 'conectado' ? 'conectado'
 const TEM_ATD = temRecurso('atendimento');
 const SEM_ATD = { data: [] as WaCanal[], isLoading: false, isError: false, refetch: () => Promise.resolve() } as const;
 export function useConexoesWA() {
-  const cobQ = useCanaisWA();
-  const usuariosQ = useUsuarios(true);
+  // 28/11: as Cobranças (wa_canais, profiles) só existem no Reviza — no Atenvo a lista é só dos números do Atendimento
+  const cobQ = useCanaisWA(isRevizaMode);
+  const usuariosQ = useUsuarios(isRevizaMode);
   // sem o Atendimento no servidor, a lista é só de Cobranças e a consulta dos números do Atendimento nem roda
   // (TEM_ATD é fixo da instalação: o ramo nunca muda entre renders)
   // eslint-disable-next-line react-hooks/rules-of-hooks

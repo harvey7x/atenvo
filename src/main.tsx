@@ -12,12 +12,18 @@ import { isMisconfigured, isDemoMode, isRevizaMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
 import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) — global: vale no login/mobile também
-import './v2/movimento.css'; // camada de movimento (dono 22/10) — Leve e Completo iguais; reverter = apagar esta linha
-import './v2/repaginada.css'; // repaginada "mais profissional" (dono 27/10) — só age com [data-repaginada] na raiz
+import './v2/movimento.css'; // camada de movimento do Atenvo (22/10)
+import './v2/repaginada.css'; // visual do Atenvo (repaginada 27/10) — age com [data-repaginada] na raiz
+import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua do Atenvo (depois da repaginada)
+import './v2/reviza-sistema.css'; // a régua única da ALFA (crítica de design 12/11) — por último
+import './v2/reviza-linear.css'; // estilo Linear na Reviza (dono 13/11) — só age com [data-linear] + [data-barra-alfa]
+import { aplicarLinearAlfa } from './v2/lib/linearAlfa';
+import './v2/reviza-moldura.css'; // moldura preta + conteúdo claro (dono 19/11) — só age com [data-moldura] + [data-barra-alfa]
+import { aplicarMoldura, lerMoldura } from './v2/lib/molduraAlfa';
+import './v2/reviza-fundacao.css'; // a fundação do visual novo (21/11): fonte neutra, medidas menores, pesos finos e movimento
+import './v2/reviza-grafite.css'; // grafite (dono 21/11): barra fixa interligada, preto + cinza / branco + branco escuro — só com [data-moldura]
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
-import './v2/linear.css'; // camada "Linear" (prévia 13/11) — só age com [data-linear] na raiz
-import { aplicarLinear, lerLinear } from './v2/lib/linear';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -145,11 +151,15 @@ if (typeof document !== 'undefined') aplicarRepaginada(true);
 // Atendimento renovado do Atenvo (inbox pro) FIXO: marca [data-inbox-pro] antes do primeiro paint (sem comparador)
 if (typeof document !== 'undefined') aplicarInboxPro(true);
 
+// Barra lateral e topo da ALFA (dono 12/11, referência "Dashboard Sidebar"): marca [data-barra-alfa] antes
 // do primeiro paint — Reviza de verdade e a demo (shell/BarraAlfa.tsx, shell/barra-alfa.css)
-
-// Camada "Linear" (prévia 13/11): marca [data-linear] antes do primeiro paint.
-// Padrão ligado; o comparador do demo grava a escolha por dispositivo.
-if (typeof document !== 'undefined') aplicarLinear(lerLinear());
+if (typeof document !== 'undefined') document.documentElement.setAttribute('data-barra-alfa', '');   // 28/11: o Atenvo usa o visual do Reviza
+// Estilo Linear (dono 13/11): [data-linear] antes do primeiro paint, só na ALFA; padrão ligado.
+// 19/11: o Linear é a BASE do visual da ALFA (a moldura preta mora em cima dele) — sempre ligado;
+// a escolha antiga "reviza.linear=0" (do Antes/Depois de 13/11) não vale mais
+if (typeof document !== 'undefined') aplicarLinearAlfa(true);
+// Moldura preta (dono 19/11): [data-moldura] antes do primeiro paint, só na ALFA; padrão ligado.
+if (typeof document !== 'undefined') aplicarMoldura(lerMoldura());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

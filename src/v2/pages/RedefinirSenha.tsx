@@ -6,6 +6,8 @@ import '../tokens.css';
 import '../base.css';
 import '../components/componentes.css';
 import './login.css';
+import { LogoAtenvo } from '../components/LogoAtenvo';
+import { MolduraAcesso } from './MolduraAcesso';
 import { CamposNovaSenha } from './CamposNovaSenha';
 import { erroDeLinkUsado } from '../hooks/useAtivacaoConvite';
 
@@ -64,12 +66,10 @@ export default function RedefinirSenhaV2() {
   const linkInvalido = !podeDefinir && !aguardando && !hasTokenInUrl && !loading;
 
   return (
-    <div className="v2 tela-login">
-      <div className="luz2" />
-      <div className="grao" />
+    <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
-        <div className="marca2">A</div>
-        <div className="caps">Bem-vindo ao Atenvo</div>
+        <LogoAtenvo className="marca2" />
+        <div className="caps">Recuperação de acesso</div>
         <h1 className="p-display">Defina uma nova senha.</h1>
 
         {aguardando ? (
@@ -79,7 +79,7 @@ export default function RedefinirSenhaV2() {
             <div className="lg-banner show erro" role="alert">
               Link de recuperação inválido ou expirado. Solicite um novo na tela de login.
             </div>
-            <Link to="/login" className="entrar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+            <Link to="/login" className="entrar">
               Voltar ao login
             </Link>
           </>
@@ -102,6 +102,6 @@ export default function RedefinirSenhaV2() {
           </>
         )}
       </div>
-    </div>
+    </MolduraAcesso>
   );
 }

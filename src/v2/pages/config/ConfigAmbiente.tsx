@@ -60,27 +60,9 @@ const Iris = lazy(() => import('./iris/ConfigIris'));
 import '../cobrancas.css';
 import './config.css';
 
-/** as seções que o Atenvo mostra (cada uma só abre se o recurso dela está no servidor) */
-const SECOES_ATENVO = new Set(['campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre', 'lembrete', 'webhooks', 'avisos-equipe', 'retomada', 'aviso-espera']);
-const MENU_ATENVO: Array<{ rotulo: string; para: string; grupo: string[] }> = [
-  { rotulo: 'Funil', para: '/config/campos', grupo: ['campos', 'motivos', 'venda', 'origens'] },
-  { rotulo: 'Cliente', para: '/config/produtos', grupo: ['produtos', 'cofre', 'lembrete'] },
-  { rotulo: 'Avisos à equipe', para: '/config/avisos-equipe', grupo: ['avisos-equipe'] },
-  { rotulo: 'Aviso de espera', para: '/config/aviso-espera', grupo: ['aviso-espera'] },
-  { rotulo: 'Retomada', para: '/config/retomada', grupo: ['retomada'] },
-  { rotulo: 'Webhooks', para: '/config/webhooks', grupo: ['webhooks'] },
-];
-function MenuSecoesAtenvo({ secao }: { secao: string }) {
-  return (
-    <nav aria-label="Seções do ambiente" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 14px' }}>
-      {MENU_ATENVO.map((m) => (
-        <Link key={m.para} to={m.para} aria-current={m.grupo.includes(secao) ? 'page' : undefined}
-          className={'p-btn btn-sec btn-mini' + (m.grupo.includes(secao) ? ' on' : '')} style={m.grupo.includes(secao) ? { fontWeight: 700 } : undefined}>{m.rotulo}</Link>
-      ))}
-      <Link to="/configuracoes" className="p-btn btn-sec btn-mini" style={{ marginLeft: 'auto' }}>Conta, equipe e canais</Link>
-    </nav>
-  );
-}
+/** 28/11: as seções do ambiente que existem no Atenvo (as outras — WhatsApp das cobranças, Asaas, licença, registros, IAs do Reviza — são do Reviza) */
+const SECOES_ATENVO = new Set(['integracoes', 'usuarios', 'equipes', 'atendimento', 'conta', 'notificacoes', 'preferencias', 'campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre', 'lembrete', 'webhooks', 'avisos-equipe', 'retomada', 'aviso-espera']);
+const SECOES_DE_TODOS = new Set(['conta', 'notificacoes', 'preferencias']);
 const SO_ADMIN = new Set(['whatsapp', 'integracoes', 'usuarios', 'equipes', 'registros', 'atendimento', 'iris', 'retomada', 'aviso-espera', 'campos', 'motivos', 'venda', 'origens', 'produtos', 'cofre', 'avisos-equipe', 'importacao', 'webhooks', 'lembrete']);
 const ABA_FIXA: Record<string, string> = { conta: 'conta', atendimento: 'atendimento', notificacoes: 'notif', preferencias: 'prefs' };
 
@@ -99,15 +81,17 @@ function Cabecalho({ titulo, sub, voltar }: { titulo: string; sub?: string; volt
   );
 }
 
-function ConfigAmbienteInterno() {
+export default function ConfigAmbiente() {
   const { secao, servico } = useParams();
   const { currentOrg } = useOrg();
   const admin = currentOrg.role === 'admin';
   // o ambiente é da Reviza; fora dela este endereço não existe
   // 28/11: no Atenvo o ambiente tem só as seções do atendimento (o resto — usuários, WhatsApp, Asaas, licença — é do Reviza)
   if (!isRevizaMode) {
-    if (!admin) return <Navigate to="/configuracoes" replace />;
-    if (!secao || !SECOES_ATENVO.has(secao)) return <Navigate to="/config/campos" replace />;
+    if (!secao || !SECOES_ATENVO.has(secao)) return <Navigate to={admin ? '/config/integracoes' : '/config/conta'} replace />;
+    if (!admin && !SECOES_DE_TODOS.has(secao)) return <Navigate to="/config/conta" replace />;
+    // Usuários no Atenvo = a aba Equipe de sempre (convites por e-mail, papéis, status)
+    if (secao === 'usuarios') return <ConfiguracoesV2 abaFixa="equipe" />;
   }
   // "Minha conta" (conta, notificações, preferências) são telas do Atendimento: sem ele no servidor, quem
   // não é administrador não tem o que fazer neste ambiente e volta para o trabalho
@@ -157,14 +141,4 @@ function ConfigAmbienteInterno() {
   if (secao === 'avisos-equipe') return (<><Cabecalho titulo="Avisos para a equipe" sub="Avisos automáticos no sino de quem você escolher, quando o cliente chega num momento que importa." /><ConfigAvisosEquipe /></>);
   if (ABA_FIXA[secao]) return <ConfiguracoesV2 abaFixa={ABA_FIXA[secao]} />;
   return <Navigate to={foraDaqui} replace />;
-}
-
-export default function ConfigAmbiente() {
-  const { secao } = useParams();
-  return (
-    <>
-      {!isRevizaMode && secao && SECOES_ATENVO.has(secao) && <MenuSecoesAtenvo secao={secao} />}
-      <ConfigAmbienteInterno />
-    </>
-  );
 }

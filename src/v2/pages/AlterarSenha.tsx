@@ -6,6 +6,8 @@ import '../tokens.css';
 import '../base.css';
 import '../components/componentes.css';
 import './login.css';
+import { LogoAtenvo } from '../components/LogoAtenvo';
+import { MolduraAcesso } from './MolduraAcesso';
 import { CamposNovaSenha } from './CamposNovaSenha';
 import { useTrocaSenhaObrigatoria } from '../hooks/useTrocaSenhaObrigatoria';
 import { DESTINO_PADRAO_V2 } from '../destino';
@@ -35,12 +37,10 @@ export default function AlterarSenhaV2() {
   }
 
   return (
-    <div className="v2 tela-login">
-      <div className="luz2" />
-      <div className="grao" />
+    <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
-        <div className="marca2">A</div>
-        <div className="caps">Bem-vindo ao Atenvo</div>
+        <LogoAtenvo className="marca2" />
+        <div className="caps">Primeiro acesso</div>
         <h1 className="p-display">Defina sua nova senha.</h1>
         <div className="sub">
           {senhaTrocada
@@ -71,6 +71,6 @@ export default function AlterarSenhaV2() {
           )}
         </form>
       </div>
-    </div>
+    </MolduraAcesso>
   );
 }

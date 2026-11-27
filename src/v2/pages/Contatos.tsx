@@ -223,7 +223,7 @@ export default function ContatosV2() {
         </div>
       ),
     },
-    { chave: 'tel', titulo: 'Telefone', classe: 'tel', render: (c) => <span className="num" style={{ whiteSpace: 'nowrap' }}>{fmtTel(c.tel)}</span> },
+    { chave: 'tel', titulo: 'Telefone', render: (c) => <span className="num" style={{ whiteSpace: 'nowrap' }}>{fmtTel(c.tel)}</span> },
     {
       chave: 'tags', titulo: 'Etiquetas', render: (c) => c.tags.length === 0
         ? <span style={{ color: 'var(--txt-3)' }}>—</span>
@@ -634,7 +634,7 @@ function ContatoModal({ modo, alvo, demo, aoFechar, aoSalvar }: {
     >
       <div className="form-grid">
         <div className="campo" style={{ marginBottom: 0 }}>
-          <label htmlFor="cnt-nome">Nome *</label>
+          <label htmlFor="cnt-nome">Nome</label>
           <Input id="cnt-nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" disabled={busy} />
         </div>
         <div className="form-2col">
