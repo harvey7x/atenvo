@@ -1252,7 +1252,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
         {ALFA ? (
           <BarraAlfa
             modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
-            org="Reviza CRM"
+            org={isRevizaMode ? 'Reviza CRM' : 'Atenvo'}
             ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: m.id === 'configuracoes' && !admin ? 'Sua conta e preferências' : DESCRICAO_AMBIENTE[m.id] }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
             aoTrocarAmbiente={(id) => { const m = MODULOS.find((x) => x.id === id); if (m) trocarModulo(m); }}
