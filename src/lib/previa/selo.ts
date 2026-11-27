@@ -51,10 +51,10 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 @media (prefers-reduced-motion:reduce){#selo-previa{transition:none}}
 #selo-previa .sp-nov{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;color:#08090a;
   background:rgba(244,131,73,.95);font:inherit;font-weight:650;letter-spacing:.01em}
-#selo-previa .sp-nov:hover{background:#f48349}
+#selo-previa .sp-nov:hover{background:#4C8DFF}
 #selo-previa .sp-nov:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #selo-previa .sp-nov i{font-style:normal;display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;border-radius:999px;
-  background:#08090a;color:#f48349;font-size:10px}
+  background:#08090a;color:#4C8DFF;font-size:10px}
 #novidades-previa{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:2147483001;width:min(440px,calc(100vw - 32px));
   max-height:min(78vh,640px);overflow:auto;padding:14px;border-radius:16px;background:rgba(16,17,20,.98);border:1px solid rgba(255,255,255,.1);
   box-shadow:0 24px 50px rgba(0,0,0,.5);color:#f3f4f6;font:400 12.5px/1.45 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
@@ -71,7 +71,7 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 #novidades-previa li p{grid-column:1 / -1;margin:3px 0 0;color:rgba(255,255,255,.72)}
 #novidades-previa li button{all:unset;cursor:pointer;grid-row:1 / 3;grid-column:2;align-self:center;padding:6px 12px;border-radius:999px;
   background:rgba(244,131,73,.95);color:#08090a;font-weight:650;font-size:12px}
-#novidades-previa li button:hover{background:#f48349}
+#novidades-previa li button:hover{background:#4C8DFF}
 #novidades-previa li button:focus-visible,#novidades-previa .nv-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
 `;
 

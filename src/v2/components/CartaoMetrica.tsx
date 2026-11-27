@@ -4,6 +4,7 @@ import { Icon, PeriodSelect, type PeriodOption } from '@/components/ui/metric-co
 // REGRA do dono (24/11): todo gráfico em BARRAS, como as dos cartões do Painel — sem o modo linha e sem o seletor
 const SO_BARRAS: ChartView = 'bar';
 import { PmcStyles } from '@/components/ui/progress-metric-card';
+import { isRevizaMode } from '@/lib/supabase';
 import { useTemaAtual } from '@/v2/lib/temaAtual';
 import { useMoldura } from '@/v2/lib/molduraAlfa';
 import './cartaoMetrica.css';
@@ -36,7 +37,9 @@ const CORES = {
   dark: { bom: '#3FAA79', ruim: '#E0504F', neutro: '#8A8F98' },
   light: { bom: '#2A7352', ruim: '#A23F33', neutro: '#666C76' },
 } as const;
-const DOURADO = { dark: '#F48349', light: '#ED642E' } as const; // a cor da logo (22/11: o laranja da letra, mais claro e suave que o dourado de antes)
+// a cor da casa: no Reviza, o laranja da logo (22/11); no ATENVO, o azul do atenvo-azul.css (dono 27/11: "deixa tudo
+// que é laranja azul, o azul é um padrão")
+const DOURADO = isRevizaMode ? { dark: '#F48349', light: '#ED642E' } : { dark: '#4C8DFF', light: '#2A62C9' };
 const FAIXA_NEUTRA = 0.5;
 const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 /** '2026-11-14' → '14 nov 2026' (+ ' · até agora' quando é hoje): a data do balão dos gráficos por dia */
@@ -283,10 +286,13 @@ const CORES_SERIE = {
   dark: ['#7C83F2', '#4CB0D9', '#3FB868', '#D1789B', '#8496AB'],
   light: ['#4F46E5', '#1F7E95', '#1E8A44', '#A14A77', '#5E7183'],
 } as const;
-const CORES_SERIE_CASA = {
+const CORES_SERIE_CASA: Record<'dark' | 'light', readonly string[]> = isRevizaMode ? {
   dark: ['#F48349', '#E4E4E7', '#8A8A93', '#FAB882', '#52525B'], // 23/11: cinzas neutros e o pêssego da logo no lugar do castanho (o escuro estava amarronzado)
   light: ['#ED642E', '#3A3532', '#ADA69F', '#F4A26F', '#D9D3CD'], // 24/11: grafite no lugar do quase-preto, o pêssego da logo no lugar do bronze
-} as const;
+} : {
+  dark: ['#4C8DFF', '#E4E4E7', '#8A8A93', '#9CC0FF', '#52525B'],  // Atenvo (27/11): azul e azul-claro no lugar do laranja e do pêssego
+  light: ['#2A62C9', '#3A3532', '#ADA69F', '#7FB0FF', '#D9D3CD'],
+};
 const corDaSerie = (cor: string, tema: 'dark' | 'light', i: number, casa: boolean): string => {
   const pal = (casa ? CORES_SERIE_CASA : CORES_SERIE)[tema];
   const n = Number(/--dado-(\d)/.exec(cor)?.[1] ?? 0);

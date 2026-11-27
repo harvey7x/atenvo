@@ -36,3 +36,21 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 /* a tela de entrada: o brilho e a arte em azul */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund):not(#rv-az) .v2 .lg-painel { background: radial-gradient(640px 440px at 0% 100%, rgba(76, 141, 255, .12), transparent 72%); }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund):not(#rv-az) .v2 .lg-painel-arte path + path { color: rgba(76, 141, 255, .3); }
+
+/* 27/11 (dono: "deixa tudo que é laranja azul, tá? O azul é um padrão"): o grafite e a fundação do Reviza pintam de
+   laranja também o AVISO (--ambar / --cor-alerta: o "Responder · 2" do Kanban, os selos ⚠, as janelas), o balão enviado
+   no tema claro, o celular de prévia e o funil dos disparos — tudo passa para o azul. O ERRO (rubro) deixa de ser
+   ferrugem alaranjada e vira vermelho de verdade. As cores de ETAPA do funil não entram aqui: são do cadastro. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 {
+  --ambar: #6FA3FF; --ambar-rgb: 111, 163, 255; --ambar-bg: rgba(76, 141, 255, .14);
+  --cor-alerta-txt: #8FB8FF; --cor-alerta-suave: rgba(76, 141, 255, .14);
+  --cor-erro-txt: #F28B82; --cor-erro-suave: rgba(224, 80, 79, .16);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 {
+  --ambar: #2A62C9; --ambar-rgb: 42, 98, 201; --ambar-bg: rgba(42, 98, 201, .12);
+  --cor-alerta-txt: #1F56B8; --cor-alerta-suave: rgba(42, 98, 201, .12);
+  --cor-erro-txt: #B3261E; --cor-erro-suave: rgba(192, 57, 43, .1);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .wa-msgs .bolha.env2 { background: #EAF1FF; border-color: #CFE0FF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .zp-tel { --zp-ambar: #2A62C9; --zp-rubro: #C0392B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .zp-tel { --zp-ambar: #6FA3FF; --zp-rubro: #E0504F; }

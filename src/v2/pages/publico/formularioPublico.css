@@ -1,7 +1,7 @@
 /* A página pública do formulário (26/11): fora do sistema, celular primeiro, claro e escuro pelo aparelho do cliente */
 .fp {
   --fp-fundo: #f4f3f0; --fp-cartao: #ffffff; --fp-txt: #1d1c1a; --fp-txt2: #57534e; --fp-txt3: #8a857e; --fp-linha: #e4e1db;
-  --fp-campo: #fbfaf8; --fp-acento: #f26b1d; --fp-acento-txt: #ffffff; --fp-erro: #c2410c; --fp-sel: #1d1c1a; --fp-sel-txt: #ffffff;
+  --fp-campo: #fbfaf8; --fp-acento: #2A62C9; --fp-acento-txt: #ffffff; --fp-erro: #C62828; --fp-sel: #1d1c1a; --fp-sel-txt: #ffffff;
   min-height: 100vh; min-height: 100dvh; box-sizing: border-box; padding: 28px 16px 40px; background: var(--fp-fundo); color: var(--fp-txt);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: flex-start;
 }
