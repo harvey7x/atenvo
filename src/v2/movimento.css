@@ -390,17 +390,8 @@ html .v2 .aviso-inline.cfg-aviso {
   /* drawer: véu (IRMÃO do painel: a opacity não corta o blur dele) esmaece, painel desliza 12px da borda */
   html:root[data-perf] .v2 .veu-drawer { animation: v2-mo-esmaece var(--mo-m) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .drawer-v2 { animation: v2-mo-desliza var(--mo-m) var(--mo-enf) backwards !important; }
-  /* toast de resposta: entra da direita; a barra de 9s volta a esvaziar no Leve
-     (forwards ok: .prog não tem classe de estado). Repouso P exige o .show em P. */
-  html:root[data-perf] .v2 .notif {
-    transform: translateX(12px);
-    transition: opacity var(--mo-m) var(--mo-pad), transform var(--mo-m) var(--mo-pad) !important;
-  }
-  html:root[data-perf] .v2 .notif.show {
-    transform: none;
-    transition: opacity var(--mo-l) var(--mo-enf), transform var(--mo-l) var(--mo-enf) !important;
-  }
-  html:root[data-perf] .v2 .notif.show .prog { animation: v2-esvazia 9s linear forwards !important; }
+  /* aviso de mensagem nova (27/11): virou pílula na barra do topo com entrada própria (shell.css) —
+     as regras do toast antigo (deslizar da direita) saíram daqui; a barra de 9 s é do shell.css */
   /* retornos inline (montam uma vez por ação) */
   html:root[data-perf] .v2 .aviso-inline,
   html:root[data-perf] .v2 .estado,

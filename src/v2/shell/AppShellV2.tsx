@@ -985,6 +985,14 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     setBadgePop((n) => n + 1);
     setSinoOn(true);
   }
+  // DEV (27/11): a barra ALFA não tem o botão "Simular resposta" da barra antiga — a prévia dispara o aviso
+  // pelo console: window.__simularResposta(). Some do build de produção (import.meta.env.DEV).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __simularResposta?: () => void };
+    w.__simularResposta = simularResposta;
+    return () => { delete w.__simularResposta; };
+  });
 
   // Reviza: mostra o NOME do usuário logado (do perfil), não o genérico "Equipe" (dono 15/09)
   const nome = (isRevizaMode ? papelSessao?.nome?.trim() : '') || user?.name?.trim() || 'Equipe';
@@ -1366,6 +1374,17 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
               <span className="busca-texto">{buscaClientes ? 'Buscar clientes e seções…' : 'Buscar seções do sistema…'}</span><kbd>⌘K</kbd>
             </button>
             )}
+            {/* aviso de mensagem nova: pílula DENTRO da barra do topo, ao lado do sino (dono 27/11) — o cartão
+                solto cobria o período do Dashboard e o topo do painel de dados */}
+            <NotificacaoResposta
+              dados={notif}
+              aoFechar={fecharNotif}
+              aoResponder={() => {
+                const alvo = notif?.conversaId;
+                fecharNotif();
+                navigate(alvo ? `/whatsapp?conversa=${encodeURIComponent(alvo)}` : '/whatsapp');
+              }}
+            />
             <div className="top-dir">
               {(isRevizaMode || isDemoMode) && <BotaoDesfazer />}
               {/* Mensagem para a equipe (Atenvo 13/11): só o administrador vê; aparece no meio da tela deles */}
@@ -1511,16 +1530,6 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
                 : <Outlet />}
             </div>
           </div>
-
-          <NotificacaoResposta
-            dados={notif}
-            aoFechar={fecharNotif}
-            aoVerConversa={() => {
-              const alvo = notif?.conversaId;
-              fecharNotif();
-              navigate(alvo ? `/whatsapp?conversa=${encodeURIComponent(alvo)}` : '/whatsapp');
-            }}
-          />
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}

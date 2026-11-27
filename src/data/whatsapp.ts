@@ -641,6 +641,19 @@ export function criarMotorDaLista(qc: QueryClient, orgId: string, sobrepor: Part
 /** Canal do progresso da 1ª carga da lista (tela "Iniciando o WhatsApp", ver progressoCarga.ts). */
 export const PROGRESSO_WA = 'wa-conversas';
 
+/** Ordem de EXIBIÇÃO da lista (a paginação é por id; a ordem é refeita aqui, no lugar): 1) abertas
+ *  aguardando resposta (mais antiga primeiro); 2) demais abertas por atividade mais recente;
+ *  3) encerradas por atividade. */
+export function ordenarListaConversas(arr: WaContact[]): WaContact[] {
+  const rank = (x: WaContact) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
+  return arr.sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
+    return (b.lastAtMs || 0) - (a.lastAtMs || 0);
+  });
+}
+
 /* ===================== Hooks ===================== */
 export function useWaConversations() {
   const { currentOrg } = useOrg();
@@ -717,11 +730,13 @@ export function useWaConversations() {
         // pesar no banco no pico (a query mais pesada do sistema — ver o comentário do refetch).
         const primeira = qc.getQueryData(['wa-conversas', orgId]) === undefined;
         if (primeira) publicarProgresso(PROGRESSO_WA, { feitas: 0, total: 16, itens: 0 });
-        const linhas = await buscarKeysetEmFaixas<DbConv>(
+        const faixas = (arquivadas: 'sem' | 'so' | 'todas', simultaneas: number, progresso: boolean) => buscarKeysetEmFaixas<DbConv>(
           (faixa, cursor, tam, sig) => {
             let q = consultaListaConversas(orgId)
               .order('id', { ascending: false })
               .limit(tam);
+            if (arquivadas === 'sem') q = q.is('arquivada_em', null);
+            else if (arquivadas === 'so') q = q.not('arquivada_em', 'is', null);
             if (faixa.de) q = q.gte('id', faixa.de);
             if (faixa.ate) q = q.lt('id', faixa.ate);
             if (cursor) q = q.lt('id', cursor);
@@ -730,25 +745,50 @@ export function useWaConversations() {
           },
           (c) => (c as unknown as { id: string }).id,
           {
-            rotulo: 'conversas', signal, simultaneas: primeira ? 6 : 2,
-            aoAvancar: primeira ? (feitas, total, itens) => publicarProgresso(PROGRESSO_WA, { feitas, total, itens }) : undefined,
+            rotulo: arquivadas === 'so' ? 'conversas arquivadas' : 'conversas', signal, simultaneas,
+            aoAvancar: progresso ? (feitas, total, itens) => publicarProgresso(PROGRESSO_WA, { feitas, total, itens }) : undefined,
           },
         );
-        // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
-        const etapas = await etapasPromise;
-        const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
-        lancarSeAbortado(signal);
-        const carga = linhas.map((l) => {
+        // Etapa do Kanban por contato + IA por conversa (best-effort, em PARALELO com o fetch principal):
+        // etapa por CONTATO; IA por CONVERSA.
+        const montar = (l: DbConv, etapas: Awaited<typeof etapasPromise>, ia: Awaited<typeof iaPromise>) => {
           const c = mapConversa(l);
-          return aplicarSatelites(c, c.contatoId ? etapas.get(c.contatoId) : null, iaEstados.get(c.id));
-        });
+          return aplicarSatelites(c, c.contatoId ? etapas.get(c.contatoId) : null, ia.get(c.id));
+        };
+        let linhas: DbConv[];
+        let etapas: Awaited<typeof etapasPromise>;
+        let iaEstados: Awaited<typeof iaPromise>;
+        if (primeira) {
+          // ABERTURA EM DUAS ETAPAS (dono 27/11: "faz a abertura mais rápida"): na CAF, 31% das conversas
+          // estão ARQUIVADAS (2.431 de 6.770) e ninguém precisa delas para começar a atender. Partida a
+          // frio: 1) só as ATIVAS, 6 faixas por vez, e a lista vai para a tela NA HORA (setQueryData: o
+          // esqueleto some e o realtime já aplica os eventos nela); 2) as arquivadas, 2 por vez, de fundo.
+          // No fim a carga inteira pousa como sempre (reconciliação abaixo) e a aba Arquivadas e a busca
+          // passam a enxergá-las. Recarga de fundo é sempre completa (o cache já existe → não é "primeira").
+          const ativas = await faixas('sem', 6, true);
+          etapas = await etapasPromise;
+          iaEstados = await iaPromise;
+          lancarSeAbortado(signal);
+          const soAtivas = ativas.map((l) => montar(l, etapas, iaEstados));
+          ordenarListaConversas(soAtivas);
+          qc.setQueryData<WaContact[]>(['wa-conversas', orgId], soAtivas);
+          const arquivadas = await faixas('so', 2, false);
+          linhas = [...ativas, ...arquivadas];
+        } else {
+          linhas = await faixas('todas', 2, false);
+          etapas = await etapasPromise;
+          iaEstados = await iaPromise;
+        }
+        lancarSeAbortado(signal);
+        const carga = linhas.map((l) => montar(l, etapas, iaEstados));
         // CORRIDA: evento/patch/busca-alvo aplicado DEPOIS que esta carga partiu está mais novo no
         // cache do que aqui — o item fica com a versão do cache e ganha uma busca-alvo nova; conversa
         // que chegou por busca-alvo e ainda não está nesta carga não some.
         const atual = qc.getQueryData<WaContact[]>(['wa-conversas', orgId]);
         const { lista: arr, tocados } = pousarCargaCompleta(atual, carga, rt.carimbos, marco);
-        if (atual) {
+        if (atual && !primeira) {
           // métrica do caminho incremental: o que os patches/buscas-alvo deixaram de refletir
+          // (na partida a frio o cache é só a 1ª etapa — as arquivadas "faltando" não são divergência)
           const d = contarDivergencias(atual, arr);
           if (d.total) console.info('[wa] reconciliação', d);
         }
@@ -756,15 +796,7 @@ export function useWaConversations() {
         // O canal se inscreveu DURANTE esta carga (partida a frio): eventos entre a leitura das
         // páginas e a inscrição nunca chegam → mais uma carga completa, já com o canal no ar.
         if (!inscritoNoInicio && rt.inscrito) setTimeout(() => { void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 0);
-        // Ordenação: 1) abertas aguardando resposta (mais antiga primeiro);
-        // 2) demais abertas por atividade mais recente; 3) encerradas por atividade.
-        const rank = (x: WaContact) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
-        arr.sort((a, b) => {
-          const ra = rank(a), rb = rank(b);
-          if (ra !== rb) return ra - rb;
-          if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
-          return (b.lastAtMs || 0) - (a.lastAtMs || 0);
-        });
+        ordenarListaConversas(arr);
         registrarCargaCompleta(orgId);   // pousou
         return arr;
       } finally {

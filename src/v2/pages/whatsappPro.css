@@ -664,3 +664,31 @@ html[data-barra-alfa]:not(#rv-wa) .v2 .wa-filtro :is(.fp-nada, .fp-it .oftag, .f
 /* 26/11: fixada só para mim: o mesmo alfinete, mais claro (o title diz "só para você") */
 .v2 .conv2 .wa-pin.on.minha { opacity: .6; }
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin.on.minha { opacity: .6; }
+
+/* ---------- cabeçalho da conversa ENQUADRADO (dono 27/11: "quando essas coisas estão abertas, a barra de cima fica
+   toda travada… tudo enquadrado, alinhado"): com o painel de dados e a barra lateral abertos o nome sumia e os botões
+   vazavam por cima do painel. A coluna da conversa é um container e a barra se adapta à largura DELA, não da janela:
+   larga = ícone + rótulo; ≤ 960 px = só o ícone (o rótulo vira a dica); ≤ 640 px = Transferir/Arquivar/Abrir na fila
+   ficam só no menu ⋮ e o modo de foco some (medido na janela do dono, 1470 px: barra lateral + painel de dados abertos
+   = 614 px de coluna → o nome e a linha do número ficam inteiros; só o painel aberto = 790 px → ícones). A foto nunca encolhe, o nome tem sempre lugar (mín. 140 px) e termina em
+   "…"; os botões nunca quebram linha nem vazam. No celular (≤ 760 px) vale o bloco acima (uma linha que rola). ---------- */
+html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-conv { container-type: inline-size; container-name: wa-conv; }
+@media (min-width: 761px) {
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo { flex-wrap: nowrap; align-items: center; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .idw { flex: 1 1 auto; min-width: 140px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; align-self: center; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-acao { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-acao svg { width: 15px; height: 15px; flex: none; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-hetapa { max-width: 200px; }
+  html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-hetapa .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @container wa-conv (max-width: 960px) {
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-acao:not(.wa-assumir) { width: 30px; min-width: 30px; padding: 0; justify-content: center; gap: 0; }
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-acao:not(.wa-assumir) .rot { display: none; }
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-assumir { padding: 0 9px; }
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-hetapa { max-width: 150px; }
+  }
+  @container wa-conv (max-width: 640px) {
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir :is(.wa-transferir, .wa-arquivar, .wa-fila, .ib2[title^="Modo de foco"]) { display: none; }
+    html[data-barra-alfa]:not(#rv-wa) .v2 .wa-pg .wa-ctopo .dir .wa-hetapa { max-width: 120px; }
+  }
+}

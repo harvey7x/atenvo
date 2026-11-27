@@ -176,6 +176,11 @@ const IcArquivo = () => <Ic><rect x="3.5" y="4.5" width="17" height="4.5" rx="1.
 const IcVoltar = () => <Ic><path d="m14.5 6-6 6 6 6" /></Ic>;
 const IcOk = () => <Ic><path d="m5 12.5 4.5 4.5L19 7.5" /></Ic>;
 const IcInfo = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><path d="M12 8h.01" /></Ic>;
+// dono 27/11 ("tudo enquadrado, alinhado"): as ações do cabeçalho da conversa têm ícone — com a coluna
+// apertada (painel de dados + barra lateral abertos) fica só ele, com o nome na dica (ver whatsappPro.css)
+const IcTransferir = () => <Ic><path d="M4 7.5h13l-3-3" /><path d="M20 16.5H7l3 3" /></Ic>;
+const IcFila = () => <Ic><path d="M4 6.5h16M4 12h9M4 17.5h6" /><path d="m16.5 14 3 3-3 3" /></Ic>;
+const IcPainelDados = () => <Ic><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><path d="M14.5 4.5v15" /><path d="M16.5 9h2M16.5 12h2" /></Ic>;
 
 /* telefone no formato único (crítica 12/11): "(51) •••••-4407"; fora do padrão brasileiro, a máscara de sempre */
 const numeroMascarado = (n: string | null | undefined) => {
@@ -1687,17 +1692,21 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               </div>
               <div className="dir">
                 <EtapaTopoSel lead={current} demo={demo} aoAvisar={aoAvisar} />
+                {/* dono 27/11 ("quando essas coisas estão abertas a barra fica toda travada… tudo enquadrado, alinhado"):
+                    cada ação tem ícone + rótulo. Com a coluna da conversa apertada (painel de dados e barra lateral
+                    abertos) o rótulo some e fica o ícone com a dica; mais apertada ainda, Transferir/Arquivar/Abrir na
+                    fila ficam só no menu ⋮ (que sempre os tem). Regras em whatsappPro.css ("cabeçalho ENQUADRADO"). */}
                 {inbox.donoEfetivo
-                  ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
-                  : <BotaoSec mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
-                <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
+                  ? <BotaoMini className="wa-acao wa-transferir" title="Transferir atendimento" aria-label="Transferir atendimento" onClick={() => setTransferirAberto(true)}><IcTransferir /><span className="rot">Transferir</span></BotaoMini>
+                  : <BotaoSec mini className="wa-acao wa-assumir" title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
+                <BotaoMini className="wa-acao wa-arquivar" title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} aria-label={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}><IcArquivo /><span className="rot">{current.arquivada ? 'Desarquivar' : 'Arquivar'}</span></BotaoMini>
                 {/* dono 12/11: "pode remover o IA ligada, eu preciso de um botão de abrir na fila, que vai abrir na ficha
                     do cliente" — o ligar/desligar a IA foi para o menu ⋮ */}
                 {acessoFila === true && current.contatoId && (
-                  <BotaoMini title="Abrir a ficha deste cliente na Fila da Iris"
-                    onClick={() => nav('/fila-iris?cliente=' + encodeURIComponent(current.contatoId!))}>Abrir na fila</BotaoMini>
+                  <BotaoMini className="wa-acao wa-fila" title="Abrir a ficha deste cliente na Fila da Iris" aria-label="Abrir na Fila da Iris"
+                    onClick={() => nav('/fila-iris?cliente=' + encodeURIComponent(current.contatoId!))}><IcFila /><span className="rot">Abrir na fila</span></BotaoMini>
                 )}
-                {!ctxAberto && <BotaoMini className="wa-dados-desk" title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
+                {!ctxAberto && <BotaoMini className="wa-dados-desk wa-acao wa-dados" title="Abrir painel de dados do contato" aria-label="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}><IcPainelDados /><span className="rot">Dados</span></BotaoMini>}
                 <button type="button" className="ib2 wa-cel-so" title="Dados do contato" aria-label="Abrir os dados do contato" onClick={abrirFichaCel}><IcInfo /></button>
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
@@ -2349,6 +2358,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           {pop.kind === 'acoes' && (
             <>
               <button type="button" className="it" onClick={() => { setPop(null); iniciarEdicao(); }}>Editar dados do cliente</button>
+              {/* dono 27/11: com a coluna apertada, Transferir e Abrir na fila saem do cabeçalho — aqui ficam sempre */}
+              {inbox.donoEfetivo && <button type="button" className="it" onClick={() => { setPop(null); setTransferirAberto(true); }}>Transferir atendimento</button>}
+              {acessoFila === true && current.contatoId && (
+                <button type="button" className="it" onClick={() => { setPop(null); nav('/fila-iris?cliente=' + encodeURIComponent(current.contatoId!)); }}>Abrir na Fila da Iris</button>
+              )}
               {(current.unread ?? 0) > 0
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}

@@ -40,6 +40,18 @@ describe('consultaListaConversas → URL do PostgREST', () => {
     expect(select).toContain('ult:mensagens(');
   });
 
+  it('abertura em duas etapas (27/11): 1ª só as ativas (arquivada_em is null), 2ª só as arquivadas (not.is.null)', async () => {
+    const { consultaListaConversas } = await import('./whatsapp');
+    const ativas = (consultaListaConversas('org-1').is('arquivada_em', null).order('id', { ascending: false }).limit(1000) as unknown as { url: URL }).url;
+    expect(ativas.searchParams.get('arquivada_em')).toBe('is.null');
+    const arquivadas = (consultaListaConversas('org-1').not('arquivada_em', 'is', null).order('id', { ascending: false }).limit(1000) as unknown as { url: URL }).url;
+    expect(arquivadas.searchParams.get('arquivada_em')).toBe('not.is.null');
+    // as duas etapas levam o mesmo select e os mesmos embeds da carga de sempre
+    expect(ativas.searchParams.get('select')).toBe(arquivadas.searchParams.get('select'));
+    expect(ativas.searchParams.get('real.limit')).toBe('1');
+    expect(arquivadas.searchParams.get('ult.limit')).toBe('1');
+  });
+
   it('busca pontual (ids) usa o MESMO select e os mesmos embeds', async () => {
     const { consultaListaConversas, SELECT_CONVERSAS } = await import('./whatsapp');
     const url = (consultaListaConversas('org-1').in('id', ['a', 'b']) as unknown as { url: URL }).url;

@@ -21,9 +21,12 @@ type NotificacaoRespostaProps = {
 };
 
 /**
- * Toast de resposta de cliente (.notif do mockup) — SOMENTE o componente
- * visual, com auto-fechamento em 9,2s e barra de progresso de 9s.
- * A fiação realtime entra na sessão do WhatsApp (decisão aprovada, item 8).
+ * Aviso de mensagem nova de cliente. Dono 27/11 ("quando essas coisas estão abertas, a barra de
+ * cima fica toda travada"): deixou de ser um cartão solto por cima da tela — cobria o período do
+ * Dashboard e o topo do painel de dados — e virou uma PÍLULA dentro da barra do topo, ao lado do
+ * sino: nunca por cima de botão nenhum. Uma linha: quem · trecho da mensagem · Responder · ×; a
+ * origem (número) e o "agora" ficam na dica. Auto-fecha em 9,2 s (barra de progresso de 9 s).
+ * A fiação realtime fica na casca (AppShellV2).
  */
 export function NotificacaoResposta({ dados, aoFechar, aoResponder, aoVerConversa }: NotificacaoRespostaProps) {
   const aberta = dados !== null;
@@ -34,30 +37,23 @@ export function NotificacaoResposta({ dados, aoFechar, aoResponder, aoVerConvers
     return () => window.clearTimeout(timer);
   }, [aberta, dados, aoFechar]);
 
+  if (!dados) return null;
+  const abrir = aoResponder ?? aoVerConversa;
   return (
-    <div className={aberta ? 'notif vidro show' : 'notif vidro'} role="status" aria-live="polite">
-      {dados && (
-        // key pela seq: re-disparo remonta corpo e barra, reiniciando a animação
-        <div key={dados.seq ?? 0}>
-          <button type="button" className="fechar" onClick={aoFechar} aria-label="Fechar notificação">×</button>
-          <div className="corpo">
-            <div className="p-av">{dados.iniciais}<i aria-hidden /></div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="l1">
-                <span className="quem">{dados.quem}</span>
-                <span className="qdo">{dados.quando ?? 'agora'}</span>
-              </div>
-              <div className="msg">{dados.mensagem}</div>
-              <div className="fonte"><i aria-hidden />{dados.fonte}</div>
-            </div>
-          </div>
-          <div className="acoes-n">
-            <button type="button" className="bm claro" onClick={aoResponder}>Responder</button>
-            <button type="button" className="bm fant" onClick={aoVerConversa}>Ver conversa</button>
-          </div>
-          <div className="prog" aria-hidden />
+    // key pela seq: re-disparo remonta a pílula, reiniciando a entrada e a barra de progresso
+    <div key={dados.seq ?? 0} className="notif show" role="status" aria-live="polite" title={`${dados.fonte} · ${dados.quando ?? 'agora'}`}>
+      <div className="p-av" aria-hidden>{dados.iniciais}<i /></div>
+      <div className="nf-tx">
+        <span className="nf-quem">{dados.quem}</span>
+        <span className="nf-msg">{dados.mensagem}</span>
+      </div>
+      {abrir && (
+        <div className="acoes-n">
+          <button type="button" className="bm claro" onClick={abrir}>Responder</button>
         </div>
       )}
+      <button type="button" className="fechar" onClick={aoFechar} aria-label="Fechar o aviso">×</button>
+      <div className="prog" aria-hidden />
     </div>
   );
 }
