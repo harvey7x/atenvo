@@ -76,6 +76,7 @@
 import { isPrevia, isRevizaMode } from '@/lib/supabase';
 
 export type Recurso = 'atendimento' | 'telas' | 'asaas' | 'wa-oficial' | 'iris' | 'iris-motor' | 'acessos' | 'anuncios' | 'tempo-resposta' | 'ao-vivo' | 'tarefas' | 'chat-equipe' | 'notas' | 'ia-propria' | 'retomada' | 'motivos-fechamento' | 'aviso-espera' | 'saude-numeros' | 'resumo-dia' | 'agenda' | 'campos' | 'venda-origem' | 'financeiro' | 'cofre' | 'avisos-equipe' | 'iris-senha' | 'automacoes' | 'importacao' | 'crm-extra' | 'formularios' | 'webhooks' | 'disparos' | 'lembrete-reuniao';
+const SO_REVIZA: ReadonlySet<string> = new Set(['telas', 'asaas', 'wa-oficial', 'iris', 'iris-motor', 'acessos', 'ia-propria', 'iris-senha', 'importacao']);
 const LIGADOS = new Set(String(import.meta.env.VITE_RECURSOS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
 const PREVIA_SO_REAL = import.meta.env.VITE_PREVIA_SO_REAL === 'true';
 const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null
@@ -84,7 +85,8 @@ const PREVIA_ESCOLHIDOS = import.meta.env.VITE_PREVIA_RECURSOS == null ? null
 // isPrevia/isRevizaMode são lidos DENTRO da função, nunca na carga do módulo: este arquivo entra no
 // ciclo de imports de lib/supabase (pela prévia) e ler as duas na carga quebrava a abertura do sistema
 function ligado(r: Recurso): boolean {
-  if (!isRevizaMode) return true;
+  // 28/11: no Atenvo tudo liga, menos o que é do produto Reviza (login por perfis, mensalidade, Asaas, IA com chave própria, Iris do Reviza, importação do Guimoo)
+  if (!isRevizaMode) return !SO_REVIZA.has(r);
   if (isPrevia) return PREVIA_ESCOLHIDOS ? PREVIA_ESCOLHIDOS.has(r) : !PREVIA_SO_REAL;
   return LIGADOS.has('tudo') || LIGADOS.has(r);
 }

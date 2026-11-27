@@ -121,7 +121,7 @@ export function useExcluirEntrada() {
 }
 
 /** um envio de exemplo no formato da Telein (o "Testar" manda este, sem criar nada) */
-export const EXEMPLO_ENVIO = { nome: 'Maria da Silva', telefone: '5551999990000', mailing: 'teste', campanha: 'teste do Reviza', opcao: '1', email: '', endereco: '', cidade: '' };
+export const EXEMPLO_ENVIO = { nome: 'Maria da Silva', telefone: '5551999990000', mailing: 'teste', campanha: 'teste do Atenvo', opcao: '1', email: '', endereco: '', cidade: '' };
 /** manda um envio de TESTE ao endereço: o servidor confere a chave e lê os campos, mas não cria nada */
 export function useTestarEntrada() {
   const qc = useQueryClient();
@@ -132,7 +132,7 @@ export function useTestarEntrada() {
         const ok = e.ativo && (!e.opcoes.length || e.opcoes.includes(EXEMPLO_ENVIO.opcao));
         await supabase!.from('atd_entrada_eventos').insert({
           id: Date.now(), entrada_id: e.id, recebido_em: new Date().toISOString(), resultado: ok ? 'teste' : 'desligada',
-          telefone: EXEMPLO_ENVIO.telefone, nome: EXEMPLO_ENVIO.nome, mensagem: null, detalhe: ok ? 'teste: lido, nada foi criado · campanha teste do Reviza · mailing teste · apertou 1' : 'o recebimento está desligado', conversa_id: null,
+          telefone: EXEMPLO_ENVIO.telefone, nome: EXEMPLO_ENVIO.nome, mensagem: null, detalhe: ok ? 'teste: lido, nada foi criado · campanha teste do Atenvo · mailing teste · apertou 1' : 'o recebimento está desligado', conversa_id: null,
         });
         return ok ? { ok: true, telefone: EXEMPLO_ENVIO.telefone } : { ok: false, erro: 'desligada' };
       }

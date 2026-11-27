@@ -30,7 +30,7 @@ export const NOVIDADES: Novidade[] = [
   },
   {
     id: 'webhooks-26-11', titulo: 'Webhooks: avisar outro sistema', onde: 'Configurações › Webhooks', quando: '26/11', recurso: 'webhooks', soAdmin: true,
-    texto: 'Cadastre o endereço de outro sistema (planilha, ERP, automação) e escolha os momentos: lead novo, mudança de etapa, venda, descarte, reunião marcada e formulário. Cada aviso vai assinado com o segredo do webhook; se o outro lado falhar, o Reviza tenta de novo até 3 vezes. "Testar" manda um exemplo e a lista mostra o resultado.',
+    texto: 'Cadastre o endereço de outro sistema (planilha, ERP, automação) e escolha os momentos: lead novo, mudança de etapa, venda, descarte, reunião marcada e formulário. Cada aviso vai assinado com o segredo do webhook; se o outro lado falhar, o Atenvo tenta de novo até 3 vezes. "Testar" manda um exemplo e a lista mostra o resultado.',
     rota: '/config/webhooks',
   },
   {
@@ -44,19 +44,9 @@ export const NOVIDADES: Novidade[] = [
     rota: '/kanban',
   },
   {
-    id: 'importacao-26-11', titulo: 'O Kanban do sistema anterior já está aqui', onde: 'Configurações › Importação do sistema anterior', quando: '26/11', recurso: 'importacao', soAdmin: true,
-    texto: 'Todos os clientes do Kanban do sistema que vocês usavam antes entraram no funil COMERCIAL REVIZA, cada um na mesma etapa, com as etiquetas e a data de entrada; as vendas ficaram em FECHADOS e os descartados em LEAD DESCARTADO. Quem tinha dois números lá virou um cliente só. Os cards guardam quem cuidava deles lá: quando a equipe tiver login, a tela "Importação do sistema anterior" passa os cards de cada responsável para a pessoa daqui, pelo mesmo nome ou escolhendo na lista.',
-    rota: '/config/importacao',
-  },
-  {
     id: 'automacoes-26-11', titulo: 'Automações: sequências e palavras', onde: 'Atendimento › Automações', quando: '26/11', recurso: 'automacoes',
     texto: 'Sequências: mensagens em série, com a espera antes de cada uma (texto ou o arquivo de um script). No WhatsApp, o ⋯ da conversa tem "Aplicar uma sequência": cada mensagem vira uma mensagem agendada e, se o cliente responder, o resto para. Automação por palavras (administrador): quando o cliente escreve uma palavra-chave (contém, exato, começa com, termina com ou regex), o card vai sozinho para a etapa escolhida, com palavras para ignorar e o "testar a regra". O menu Automações também leva às Mensagens agendadas.',
     rota: '/automacoes/sequencias',
-  },
-  {
-    id: 'iris-guimoo-26-11', titulo: 'As IAs como no sistema de antes', onde: 'Configurações › Atendentes de IA', quando: '26/11', recurso: 'iris', soAdmin: true,
-    texto: 'Em "Nova IA" tem "A Bia do sistema de antes": o roteiro, as regras, as 8 perguntas frequentes e os 63 gatilhos do agente que a Reviza usava, com espera de 15 segundos e áudio sempre. A tela ganhou: Roteiro e regras (texto livre), Quando ela começa (esperar antes de responder e as frases que fazem ela começar), Outras IAs (principal e secundárias que recebem por transferência), áudio nunca/sempre/igual ao cliente, assinatura, o catálogo de produtos, o Copiloto (a IA da empresa revisa a configuração e entrega trechos prontos) e a senha de edição de cada IA.',
-    rota: '/config/iris',
   },
   {
     id: 'avisos-equipe-26-11', titulo: 'Avisos para a equipe', onde: 'Configurações › Avisos para a equipe', quando: '26/11', recurso: 'avisos-equipe', soAdmin: true,
@@ -94,16 +84,6 @@ export const NOVIDADES: Novidade[] = [
     rota: '/agenda',
   },
   {
-    id: 'guimoo-conversas-26-11', titulo: 'Conversas do jeito que a equipe já usava', onde: 'WhatsApp', quando: '26/11',
-    texto: 'Abas "Fila", "Não respondidas" e "IA". No ⋯ da lista: selecionar várias conversas (marcar como lidas, fixar, arquivar), esconder telefones e mensagens para mostrar a tela a alguém e, para o administrador, o desempenho do chat de hoje. No ⋯ da conversa: buscar na conversa, copiar o link e exportar a conversa. Em cada mensagem, ao lado do Responder: Encaminhar para outra conversa (mensagem com senha não encaminha). E o botão "Contrato fechado" ao lado da etapa.',
-    rota: '/whatsapp',
-  },
-  {
-    id: 'guimoo-dados-26-11', titulo: 'O funil, as etiquetas e as mensagens rápidas da Reviza', onde: 'Kanban · WhatsApp · Scripts · Configurações', quando: '26/11',
-    texto: 'Veio do sistema que a Reviza usava antes: o funil COMERCIAL REVIZA com as 9 etapas, as 16 etiquetas, as mensagens rápidas de texto (por pessoa: Garcia, Emillyn, Felipe), as equipes Club da Luta, Ferrari, Junin e Veteranos e os follow-ups na retomada automática (que continua desligada até o administrador ligar).',
-    rota: '/kanban',
-  },
-  {
     id: 'resumo-dia-25-11', titulo: 'Resumo do dia', onde: 'Dashboard › Resumo do dia', quando: '25/11', recurso: 'resumo-dia', soAdmin: true,
     texto: 'O dia da equipe numa tela só: quantos clientes escreveram, quantos a equipe e a IA atenderam, o tempo de resposta, quem esperou além da meta, por que as conversas fecharam e cada atendente. Dá para ver hoje, ontem ou outro dia, e ligar o aviso no sino no fim da tarde.',
     rota: '/dashboard?aba=resumo',
@@ -124,34 +104,14 @@ export const NOVIDADES: Novidade[] = [
     rota: '/whatsapp',
   },
   {
-    id: 'documentos-ia-25-11', titulo: 'Documentos reconhecidos pela IA', onde: 'WhatsApp › painel do cliente › Mídia, documentos e links', quando: '25/11', recurso: 'ia-propria',
-    texto: 'O "Identificar os arquivos" faz a IA olhar as fotos e os PDFs que o cliente mandou e dizer o que é cada um (RG ou CNH, comprovante de endereço, extrato de empréstimos…). Logo abaixo aparece o que já chegou, o que falta e o que precisa ser pedido de novo porque não dá para ler. A IA não copia nome, número nem valor nenhum.',
-    rota: '/whatsapp',
-  },
-  {
-    id: 'sugerir-resposta-25-11', titulo: 'Sugerir resposta com IA', onde: 'WhatsApp › caixa de mensagem', quando: '25/11', recurso: 'ia-propria',
-    texto: 'Ao lado de Scripts, o botão com o brilho ("Sugerir resposta") faz a IA escrever um rascunho lendo a conversa e os scripts da empresa. Nada é enviado sozinho: confira, ajuste se quiser e envie. Se não gostar, "Desfazer" volta o que estava escrito.',
-    rota: '/whatsapp',
-  },
-  {
     id: 'lote2-25-11', titulo: 'Motivo ao fechar a conversa e planilha do Kanban', onde: 'WhatsApp › Fechar conversa · Kanban', quando: '25/11',
     texto: 'Ao fechar uma conversa, escolha o motivo: ele fica na atividade do atendimento, no painel do cliente. No Kanban, o administrador e o gestor têm o "Exportar planilha", que baixa os cartões da tela para o Excel.',
     rota: '/kanban',
   },
   {
-    id: 'coletor-guia-25-11', titulo: 'Coletor INSS: o arquivo de verdade e o guia de instalação', onde: 'Ferramentas › Coletor INSS', quando: '25/11',
-    texto: 'O botão "Baixar o Coletor para Windows" baixa o coletor pronto para usar. E tem um guia em PDF, um documento só, com a instalação passo a passo, o primeiro uso e o que fazer em cada aviso.',
-    rota: '/ferramentas/coletor-inss',
-  },
-  {
     id: 'retomada-25-11', titulo: 'Retomada automática', onde: 'Configurações › Retomada automática', quando: '25/11', recurso: 'retomada', soAdmin: true,
     texto: 'Mensagens que vão sozinhas quando o cliente para de responder, uma sequência por etapa do Kanban, com horário e ritmo por número. Se o cliente responder, para. Chega desligada: só envia depois que o administrador trocar os textos de exemplo e ligar.',
     rota: '/config/retomada',
-  },
-  {
-    id: 'ia-propria-25-11', titulo: 'IA com a chave da própria Reviza', onde: 'Configurações › Integrações › Inteligência artificial', quando: '25/11', recurso: 'ia-propria',
-    texto: 'Com a chave de IA da empresa colada em Integrações, o painel do cliente no WhatsApp ganha o "Resumo do atendimento" (o que ele quer, os documentos que chegaram e os que faltam, o próximo passo) e os áudios ganham o "Transcrever".',
-    rota: '/whatsapp',
   },
   {
     id: 'notas-25-11', titulo: 'Nota interna com @ na conversa', onde: 'WhatsApp › conversa do cliente', quando: '25/11', recurso: 'notas',

@@ -124,7 +124,7 @@ function ComoCriar({ atraso, lado }: { atraso: number; lado?: boolean }) {
         <ol className="cfgw-passos">
           <li>Entre em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"><b>platform.openai.com</b></a> com a conta da empresa.</li>
           <li>Em <b>Billing</b> (cobrança), coloque crédito: a OpenAI cobra antes do uso.</li>
-          <li>Em <b>API keys</b>, toque em <b>Create new secret key</b>, dê um nome (por exemplo, Reviza CRM) e copie a chave (ela começa com <b>sk-</b>). Ela só aparece uma vez.</li>
+          <li>Em <b>API keys</b>, toque em <b>Create new secret key</b>, dê um nome (por exemplo, Atenvo) e copie a chave (ela começa com <b>sk-</b>). Ela só aparece uma vez.</li>
           <li>Cole a chave aqui.</li>
         </ol>
       </div>

@@ -126,7 +126,7 @@ export function ConfigEntradas() {
           <li>Aqui, crie o endereço e clique em <b>Copiar endereço</b>. Ele já vem com os campos da Telein: nome, telefone, mailing, campanha, tecla, email, endereço e cidade.</li>
           <li>Na Telein, em <b>Ura Reversa e Discadora › Criar Campanhas</b>, abra as configurações da campanha.</li>
           <li>Cole no campo <b>URL</b>, em <b>Executar ao selecionar uma opção</b>, e clique em <b>Salvar</b>.</li>
-          <li>Em <b>Escolha qual chip utilizar</b>, use o mesmo número de WhatsApp que está conectado aqui: assim a resposta do cliente chega no Reviza, na mesma conversa.</li>
+          <li>Em <b>Escolha qual chip utilizar</b>, use o mesmo número de WhatsApp que está conectado aqui: assim a resposta do cliente chega no Atenvo, na mesma conversa.</li>
           <li>Volte aqui e confira em <b>Últimos recebimentos</b>.</li>
         </ol>
         <div className="pn-card-cab cfgr-sub"><div><h3>Outros sistemas</h3><p>Qualquer sistema pode chamar o mesmo tipo de endereço.</p></div></div>

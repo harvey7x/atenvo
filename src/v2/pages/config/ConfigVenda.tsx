@@ -64,7 +64,7 @@ function Ajustes() {
             <Toggle ligado={cfg.metaEventoAtivo} disabled rotulo="Enviar a venda para a Meta" aoMudar={() => undefined} />
             <div>
               <b>Desligado: falta conectar as Conversões da Meta</b>
-              <span>Para ligar, a Reviza conecta o conjunto de dados (o pixel) e o token das Conversões da Meta em Integrações. Só valem as vendas marcadas depois de ligar.</span>
+              <span>Para ligar, o administrador conecta o conjunto de dados (o pixel) e o token das Conversões da Meta em Integrações. Só valem as vendas marcadas depois de ligar.</span>
             </div>
           </div>
           <div className="pn-us-campo cfgv-evento">

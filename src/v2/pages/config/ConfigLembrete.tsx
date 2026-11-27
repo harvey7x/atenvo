@@ -1,6 +1,6 @@
 /* CONFIGURAÇÕES → LEMBRETE DE REUNIÃO (26/11, "igual" ao Follow-up de agendamentos do sistema que a Reviza usava antes). Liga e
    desliga o lembrete para o cliente antes de cada reunião marcada, quando ele sai (e o segundo aviso), o texto e a prévia.
-   Ligar pede confirmação: a partir daí o Reviza MANDA mensagem para os clientes. Dados: @/data/lembreteReuniao (migration 126). */
+   Ligar pede confirmação: a partir daí o Atenvo MANDA mensagem para os clientes. Dados: @/data/lembreteReuniao (migration 126). */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BotaoPrimario, BotaoSec, CardVidro, EstadoErro, ModalV2, Toggle } from '../../components';
@@ -71,7 +71,7 @@ export function ConfigLembrete() {
       </CardVidro>
       {confirmar && (
         <ModalV2 aberto aoFechar={() => setConfirmar(false)} largura={480}
-          titulo={<div>Ligar o lembrete?<div className="mod-sub">A partir de agora o Reviza manda mensagem para os clientes</div></div>}
+          titulo={<div>Ligar o lembrete?<div className="mod-sub">A partir de agora o Atenvo manda mensagem para os clientes</div></div>}
           rodape={<><BotaoSec onClick={() => setConfirmar(false)} disabled={salvar.isPending}>Cancelar</BotaoSec><BotaoPrimario disabled={salvar.isPending} onClick={() => void gravar({ ...v, ativo: true }).then(() => setV({ ...v, ativo: true }))}>{salvar.isPending ? 'Ligando…' : 'Ligar o lembrete'}</BotaoPrimario></>}>
           <div className="pn-us-form">
             <p className="cfgc-dica" style={{ fontSize: 13 }}>Cada cliente com reunião marcada (inclusive as que já estão na Agenda) vai receber esta mensagem {OPCOES_ANTES.find((o) => o.v === v.antesMin)?.r ?? ''}{v.segundoMin ? ` e ${OPCOES_SEGUNDO.find((o) => o.v === v.segundoMin)?.r ?? ''}` : ''}:</p>

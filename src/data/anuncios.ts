@@ -136,7 +136,7 @@ export function demoDashAnuncios(p: Periodo, conectado: boolean, hoje = spHoje()
   leads.sort((x, y) => y.entrouEm.localeCompare(x.entrouEm));
   return {
     conectado,
-    conta: conectado ? { id: 'act_000000000000', nome: 'Reviza Assessoria (exemplo)', moeda: 'BRL' } : null,
+    conta: conectado ? { id: 'act_000000000000', nome: 'Empresa (exemplo)', moeda: 'BRL' } : null,
     sincronizadoEm: conectado ? new Date(Date.now() - 23 * 60_000).toISOString() : null,
     totais: semConta(tot),
     anterior: semConta({ investido: tot.investido * 0.92, impressoes: tot.impressoes * 0.95, cliques: tot.cliques * 0.9, leads: Math.round(tot.leads * 0.86), fechados: Math.round(tot.fechados * 1.08) }),
@@ -156,8 +156,8 @@ const GUARDA_DEMO = 'previa-anuncios-conta';
 function contaDemo(): ContaAnuncios { try { return { ...CONTA_VAZIA, ...(JSON.parse(localStorage.getItem(GUARDA_DEMO) ?? 'null') ?? {}) }; } catch { return CONTA_VAZIA; } }
 function guardarDemo(c: ContaAnuncios | null) { try { if (c) localStorage.setItem(GUARDA_DEMO, JSON.stringify(c)); else localStorage.removeItem(GUARDA_DEMO); } catch { /* privado */ } }
 export const CONTAS_DEMO = [
-  { id: 'act_000000000000', nome: 'Reviza Assessoria (exemplo)', moeda: 'BRL' },
-  { id: 'act_111111111111', nome: 'Reviza — campanhas antigas (exemplo)', moeda: 'BRL' },
+  { id: 'act_000000000000', nome: 'Empresa (exemplo)', moeda: 'BRL' },
+  { id: 'act_111111111111', nome: 'Campanhas antigas (exemplo)', moeda: 'BRL' },
 ];
 
 const MSG: Record<string, string> = {

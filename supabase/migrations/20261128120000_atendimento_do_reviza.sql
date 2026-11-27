@@ -4240,7 +4240,7 @@ grant execute on function public.atd_formularios_resumo() to authenticated, serv
 -- administrador cadastra um endereço (https) e escolhe os momentos; a cada momento o Reviza manda um POST com os dados:
 --   lead_novo  card novo no funil         etapa     o card mudou de etapa      venda    o card virou venda
 --   perdido    o card foi descartado      reuniao   reunião marcada na Agenda  formulario  alguém preencheu um formulário
--- Cada envio vai assinado: X-Reviza-Assinatura: sha256=<HMAC do corpo com o segredo do webhook>. Em segundo plano (pg_net),
+-- Cada envio vai assinado: X-Atenvo-Assinatura: sha256=<HMAC do corpo com o segredo do webhook>. Em segundo plano (pg_net),
 -- nunca segura a tela. Falhou: tenta de novo até 3 vezes (2, 4 e 6 min depois). 30 falhas seguidas: o webhook desliga sozinho.
 -- Nada dispara durante a importação do sistema anterior. Isto NÃO manda mensagem a cliente nenhum. ADITIVA.
 
@@ -4313,8 +4313,8 @@ begin
   v_corpo := e.payload::text;
   v_req := net.http_post(
     url := w.url, body := e.payload, timeout_milliseconds := 8000,
-    headers := jsonb_build_object('Content-Type', 'application/json', 'User-Agent', 'Reviza-CRM-Webhook/1', 'X-Reviza-Evento', e.evento,
-                                  'X-Reviza-Envio', e.id::text, 'X-Reviza-Assinatura', 'sha256=' || encode(extensions.hmac(v_corpo, w.segredo, 'sha256'), 'hex')));
+    headers := jsonb_build_object('Content-Type', 'application/json', 'User-Agent', 'Atenvo-Webhook/1', 'X-Atenvo-Evento', e.evento,
+                                  'X-Atenvo-Envio', e.id::text, 'X-Atenvo-Assinatura', 'sha256=' || encode(extensions.hmac(v_corpo, w.segredo, 'sha256'), 'hex')));
   update public.atd_webhook_envios set request_id = v_req, tentativas = tentativas + 1, enviado_em = now(), status_http = null, erro = null where id = p_envio;
 end $$;
 revoke all on function private.atd_webhook_enviar(bigint) from public, anon, authenticated;
@@ -4451,7 +4451,7 @@ begin
   if not w.ativo then raise exception 'webhook_desligado'; end if;
   insert into public.atd_webhook_envios (webhook_id, organizacao_id, evento, payload)
   values (w.id, w.organizacao_id, 'teste', jsonb_build_object('evento', 'teste', 'quando', now(), 'dados', jsonb_build_object(
-    'mensagem', 'Teste do Reviza CRM: se chegou, o endereço está certo.', 'cliente', 'Cliente de exemplo', 'telefone', '5551999990000', 'etapa', 'LEAD NOVO')))
+    'mensagem', 'Teste do Atenvo: se chegou, o endereço está certo.', 'cliente', 'Cliente de exemplo', 'telefone', '5551999990000', 'etapa', 'LEAD NOVO')))
   returning id into v_id;
   perform private.atd_webhook_enviar(v_id);
   return v_id;

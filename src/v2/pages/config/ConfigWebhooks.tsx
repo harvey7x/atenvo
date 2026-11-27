@@ -78,7 +78,7 @@ export function ConfigWebhooks() {
         )}
 
       <CardVidro className="pn-card sobe" style={{ animationDelay: '.05s' }}>
-        <div className="pn-card-cab"><div><h3>Últimos envios</h3><p>Os 60 mais recentes. Quando o outro sistema falha, o Reviza tenta de novo até 3 vezes.</p></div></div>
+        <div className="pn-card-cab"><div><h3>Últimos envios</h3><p>Os 60 mais recentes. Quando o outro sistema falha, o Atenvo tenta de novo até 3 vezes.</p></div></div>
         {(envios.data ?? []).length === 0 ? <p className="pn-vazio">Nada enviado ainda.</p> : (
           <div className="pn-mapa-rolo">
             <table className="pn-eq pn-fin-tab pn-us-tab cfgw-tab cfgm-tab cfgwh-tab">
@@ -106,7 +106,7 @@ export function ConfigWebhooks() {
         <div className="pn-card-cab"><div><h3>Como o outro sistema recebe</h3><p>Para quem vai programar o lado de lá.</p></div></div>
         <ul className="cfgwh-doc">
           <li><b>Método:</b> POST, com o corpo em JSON: <code>{'{ "evento": "lead_novo", "quando": "…", "dados": { "cliente": "…", "telefone": "…", "etapa": "…", … } }'}</code></li>
-          <li><b>Cabeçalhos:</b> <code>X-Reviza-Evento</code> (o momento), <code>X-Reviza-Envio</code> (o número do envio) e <code>X-Reviza-Assinatura</code> = <code>sha256=</code> + HMAC-SHA256 do corpo com o segredo do webhook.</li>
+          <li><b>Cabeçalhos:</b> <code>X-Atenvo-Evento</code> (o momento), <code>X-Atenvo-Envio</code> (o número do envio) e <code>X-Atenvo-Assinatura</code> = <code>sha256=</code> + HMAC-SHA256 do corpo com o segredo do webhook.</li>
           <li><b>Resposta:</b> qualquer 2xx em até 8 segundos conta como recebido. Outra resposta ou demora: tenta de novo 2, 4 e 6 minutos depois.</li>
         </ul>
       </CardVidro>
