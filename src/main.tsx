@@ -21,7 +21,8 @@ import { aplicarLinearAlfa } from './v2/lib/linearAlfa';
 import './v2/reviza-moldura.css'; // moldura preta + conteúdo claro (dono 19/11) — só age com [data-moldura] + [data-barra-alfa]
 import { aplicarMoldura, lerMoldura } from './v2/lib/molduraAlfa';
 import './v2/reviza-fundacao.css'; // a fundação do visual novo (21/11): fonte neutra, medidas menores, pesos finos e movimento
-import './v2/reviza-grafite.css'; // grafite (dono 21/11): barra fixa interligada, preto + cinza / branco + branco escuro — só com [data-moldura]
+import './v2/reviza-grafite.css';
+import './v2/atenvo-azul.css'; // ATENVO em azul (dono 28/11) — por cima da moldura e do grafite, sempre por último // grafite (dono 21/11): barra fixa interligada, preto + cinza / branco + branco escuro — só com [data-moldura]
 import { aplicarRepaginada } from './v2/lib/repaginada';
 import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';

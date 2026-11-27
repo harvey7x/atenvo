@@ -1124,7 +1124,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
   // por cima do conteúdo: a gaveta do celular ou o trilho aberto pelo botão (tela média). Fecha ao navegar.
   const [sobreposta, setSobreposta] = useState(false);
   useEffect(() => { setSobreposta(false); }, [location.pathname, zonaBarra]);
-  const modoBarra: ModoBarra = zonaBarra === 'gaveta' ? 'gaveta' : zonaBarra === 'media' ? 'trilho' : barraFixa ? 'aberta' : prefBarra;
+  // 28/11 (dono): na tela larga a pessoa recolhe a barra quando quiser (o botão do topo e o do canto da barra) — a escolha fica guardada
+  const modoBarra: ModoBarra = zonaBarra === 'gaveta' ? 'gaveta' : zonaBarra === 'media' ? 'trilho' : prefBarra;
   const guardarPref = useCallback((prox: 'aberta' | 'trilho') => {
     setPrefBarra(prox);
     try { localStorage.setItem(CHAVE_BARRA, prox); } catch { /* sem storage: vale só nesta aba */ }
@@ -1140,7 +1141,8 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     ? { rotulo: 'Fechar o menu', tipo: 'fechar', aoClicar: fecharSobreposta }
     : modoBarra === 'trilho' && zonaBarra === 'media'
       ? (sobreposta ? { rotulo: 'Recolher a barra lateral', tipo: 'recolher', aoClicar: fecharSobreposta } : null)
-      : modoBarra === 'trilho' ? { rotulo: 'Manter a barra aberta', tipo: 'fixar', aoClicar: () => guardarPref('aberta') } : null;
+      : modoBarra === 'trilho' ? { rotulo: 'Manter a barra aberta', tipo: 'fixar', aoClicar: () => guardarPref('aberta') }
+      : modoBarra === 'aberta' && zonaBarra === 'larga' ? { rotulo: 'Recolher a barra lateral', tipo: 'recolher', aoClicar: () => guardarPref('trilho') } : null;
   // os itens da barra: os MESMOS do menu (mesmo filtro de papel), com o ícone e o contador de cada um
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),

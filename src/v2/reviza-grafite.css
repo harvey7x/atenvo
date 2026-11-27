@@ -94,9 +94,7 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):no
   box-sizing: border-box; width: 100%; padding: 12px 10px 10px;
   border: 1px solid var(--gf-barra-fio); border-radius: 18px; background: var(--gf-barra);
 }
-/* fixa: o botão de recolher sai do topo; a trilha começa na régua do conteúdo */
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-alternar { display: none; }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-topo { padding-left: 14px; }
+/* (28/11, Atenvo: o botão de recolher a barra FICA no topo — dono: "um botão pra minimizar a barra") */
 
 /* grupos: título em caixa alta com a seta; clicar abre e fecha */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupos { gap: 8px; }

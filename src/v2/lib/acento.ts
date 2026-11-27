@@ -14,8 +14,8 @@ export type Acento = 'azul' | 'verde' | 'dourado';
 export const CHAVE_ACENTO = 'atenvo-acento';
 
 export function lerAcento(): Acento {
-  // ALFA GROUP: acento DEFINITIVO = dourado (sem alternador). Trava aqui.
-  return 'dourado';
+  // ATENVO (dono 28/11: "o sistema tem que ser azul"): acento DEFINITIVO = azul (atributo ausente), sem alternador.
+  return 'azul';
 }
 
 /* azul = atributo AUSENTE de propósito: o CSS do azul é o caminho sem

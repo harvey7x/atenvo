@@ -1,0 +1,38 @@
+/* ATENVO EM AZUL (dono 28/11: "o sistema tem que ser azul, da mesma cor ali") — por cima da moldura e do grafite do
+   Reviza, que trocam o acento (--azul) pelo dourado/laranja. Aqui o acento volta ao azul do Atenvo (o mesmo do logo e do
+   skinAurora): #4C8DFF no escuro, #2A62C9 no claro. Só cores de ACENTO: alerta (âmbar) e erro (rubro) seguem como estão.
+   Especificidade: um :not(#id) a mais que os arquivos do Reviza, para ganhar sem !important. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 {
+  --azul: #4C8DFF; --azul-rgb: 76, 141, 255; --platina-a: #4C8DFF; --platina-b: #4C8DFF; --rv-tinta: #7FB0FF;
+  --cor-acento-txt: #7FB0FF;
+  --gf-creme: #E3EEFF; --gf-pessego: #9CC0FF; --gf-brasa: #2A62C9; --gf-tinta-bt: #06152E;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 {
+  --azul: #2A62C9; --azul-rgb: 42, 98, 201; --platina-a: #2A62C9; --platina-b: #2A62C9; --rv-tinta: #1F56B8;
+  --cor-acento-txt: #1F56B8;
+  --gf-creme: #E3EEFF; --gf-pessego: #9CC0FF; --gf-brasa: #1F56B8; --gf-tinta-bt: #FFFFFF;
+}
+/* a barra lateral: item ativo, contadores e foco */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .p-app {
+  --ba-ativo: rgba(76, 141, 255, .14); --ba-ativo-ico: #6FA3FF; --ba-ativo-tx: #8FB8FF;
+  --ba-badge-bg: rgba(76, 141, 255, .18); --ba-badge-tx: #8FB8FF; --ba-badge-on-tx: #8FB8FF;
+  --ba-foco: rgba(76, 141, 255, .75);
+}
+/* o ícone dos cards de métrica */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold):not(#rv-az) .v2 .pmc-root.rvm .rvm-ico { background: rgba(76, 141, 255, .14); color: #6FA3FF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold):not(#rv-az) .v2 .pmc-root.rvm .rvm-ico { background: rgba(42, 98, 201, .12); color: #2A62C9; }
+/* a barra do mês escolhido nos gráficos */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold):not(#rv-az) .v2 .pn-graf-col.on .pn-graf-bar {
+  background: linear-gradient(180deg, #7FB0FF 0%, #4C8DFF 60%, #2A62C9 100%);
+}
+/* o celular das Conversas e a bolha enviada */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .zp-tel {
+  --zp-verde: #4C8DFF; --zp-acao: #4C8DFF; --zp-badge: #4C8DFF; --zp-badge-txt: #06152E; --zp-tique-lida: #4C8DFF; --zp-onda-on: #4C8DFF; --zp-onda-ponto: #4C8DFF; --zp-out: #12213D;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2):not(#rv-az) .v2 .zp-tel {
+  --zp-badge: #2A62C9; --zp-onda-on: #2A62C9; --zp-onda-ponto: #2A62C9; --zp-tique-lida: #1F56B8; --zp-out: #E3EEFF;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund):not(#rv-az) .v2 .wa-msgs .bolha.env2 { background: rgba(76, 141, 255, .1); border: 1px solid rgba(76, 141, 255, .2); }
+/* a tela de entrada: o brilho e a arte em azul */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund):not(#rv-az) .v2 .lg-painel { background: radial-gradient(640px 440px at 0% 100%, rgba(76, 141, 255, .12), transparent 72%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund):not(#rv-az) .v2 .lg-painel-arte path + path { color: rgba(76, 141, 255, .3); }
