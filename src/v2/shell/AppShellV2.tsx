@@ -13,6 +13,7 @@ import { instalarSpotlight } from '../lib/spotlight';
 import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
+import { ICONES_ALFA } from './iconesAlfa';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { SinoPainel, naoLidasQueAcendem, useSino } from './SinoPainel';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
@@ -73,6 +74,10 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Pós-venda (dono 19/11): clientes FECHADOS num atendimento separado, logo abaixo do WhatsApp
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
+      // 28/11 (dono: trazer o Reviza): a rotina da equipe — conversa entre colegas, agenda e tarefas
+      { slug: 'chat-equipe', rotulo: 'Chat da equipe' },
+      { slug: 'agenda', rotulo: 'Agenda' },
+      { slug: 'tarefas', rotulo: 'Tarefas' },
       // Fila da Iris (dono 11/11): só para quem está liberado em fila_iris_config (os 5 atendentes + Murilo)
       { slug: 'fila-iris', rotulo: 'Fila da Iris', fila: true },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
@@ -105,6 +110,8 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
       // Painel da Equipe (29/10): um celular por atendente, igual ao WhatsApp, somente leitura
       { slug: 'equipe', rotulo: 'Painel da Equipe', admin: true },
+      // 28/11: sequências, palavras-chave, disparos e formulários (vêm do Reviza)
+      { slug: 'automacoes', rotulo: 'Automações', admin: true },
       // Central de Avisos (ex-Radar) SAIU do sistema (dono 19/11): /radar cai no WhatsApp
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
@@ -127,6 +134,9 @@ const GRUPOS: GrupoNav[] = [
     fixo: true,
     itens: [
       { slug: 'integracoes', rotulo: 'Integrações' },
+      // 28/11: os cadastros do atendimento (campos, origens, produtos, equipes, avisos…), só para o administrador
+      { slug: 'config', rotulo: 'Cadastros', admin: true },
+      { slug: 'novidades', rotulo: 'Novidades' },
       // Maturação descontinuada (Evolution restrito pela Meta) — item removido do menu; rota → placeholder.
       // paridade: /configuracoes NÃO tem RequireRole no app antigo (as abas variam por papel)
       { slug: 'configuracoes', rotulo: 'Configurações' },
@@ -157,7 +167,8 @@ const FERR_ICONES: Record<string, ReactNode> = {
 };
 function iconeDoItem(slug: string): ReactNode {
   if (slug.startsWith('ferramentas/')) return FERR_ICONES[slug.split('/')[1]] ?? FERR_ICONES.unificador;
-  return ICONES[slug];
+  // 'automacoes' e 'config' usam o ícone das sequências e das configurações do conjunto do Reviza
+  return ICONES[slug] ?? ICONES_ALFA[slug === 'automacoes' ? 'sequencias' : slug === 'config' ? 'configuracoes' : slug];
 }
 
 const PAPEL_ROTULO: Record<string, string> = {
