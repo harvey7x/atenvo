@@ -22,6 +22,7 @@
 import { IconeReviza } from '../components/LogoReviza';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import './barra-alfa.css';
 
 export type ModoBarra = 'aberta' | 'trilho' | 'gaveta';
@@ -144,7 +145,7 @@ function ItemLink({ item, aoEscolher }: { item: ItemBarra; aoEscolher?: () => vo
   const { pathname } = useLocation();
   const irma = IRMAS[item.slug]?.some((s) => pathname === '/' + s) ?? false;
   return (
-    <NavLink to={`/${item.slug}`} className={({ isActive }) => (isActive || irma ? 'ba-item on' : 'ba-item')} aria-current={irma ? 'page' : undefined} onClick={aoEscolher}
+    <NavLink to={`/${item.slug}`} className={({ isActive }) => (isActive || irma ? 'ba-item on' : 'ba-item')} aria-current={irma ? 'page' : undefined} onClick={aoEscolher} data-dica={item.rotulo}
       aria-keyshortcuts={item.atalho ? `Meta+${item.atalho} Control+${item.atalho}` : undefined}>
       <span className="ba-item-pri">
         <span className="ba-ico">{item.icone}{temBadge && <i className="ba-ponto" aria-hidden />}</span>
@@ -172,6 +173,10 @@ export type BarraAlfaProps = {
   aoFecharSobreposta: () => void;
   /** o botão do canto da barra quando ela está por cima do conteúdo (fixar aberta / recolher / fechar) */
   acaoTopo?: AcaoTopoBarra | null;
+  /** 28/11 (Atenvo): a ALÇA na borda da barra (tela larga) — recolhe para a trilha de ícones e abre de novo */
+  alca?: { recolhida: boolean; aoClicar: () => void } | null;
+  /** 28/11: na trilha de ícones, o nome de cada item num balão ao passar o mouse (a barra não abre sozinha) */
+  dicas?: boolean;
   org: string;
   ambientes: AmbienteBarra[];
   ambienteAtual: AmbienteBarra | null;
@@ -260,11 +265,22 @@ export function BarraAlfa(p: BarraAlfaProps) {
 
   const escolher = p.sobreposta ? p.aoFecharSobreposta : undefined;
   const a = p.acaoTopo;
+  // 28/11 (Atenvo): o balão com o nome do item na trilha de ícones — posição fixa (a barra corta o que sai dela)
+  const [dica, setDica] = useState<{ tx: string; top: number } | null>(null);
+  const mostrarDica = useCallback((e: React.MouseEvent) => {
+    if (!p.dicas) return;
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-dica]');
+    if (!el) { setDica(null); return; }
+    const r = el.getBoundingClientRect();
+    setDica({ tx: el.dataset.dica ?? '', top: Math.round(r.top + r.height / 2) });
+  }, [p.dicas]);
+  const esconderDica = useCallback(() => setDica(null), []);
+  useEffect(() => { if (!p.dicas) setDica(null); }, [p.dicas]);
   return (
     <>
       <aside ref={raiz} id="ba-barra" className="ba-barra" aria-label="Barra lateral"
         data-menu={menuAberto || undefined}>
-        <div className="ba-in">
+        <div className="ba-in" onMouseOver={mostrarDica} onMouseLeave={esconderDica} onClick={esconderDica}>
           <div className="ba-cab">
             <TrocaAmbiente org={p.org} atual={p.ambienteAtual} ambientes={p.ambientes} carregando={p.carregando}
               aoTrocar={(id) => { escolher?.(); p.aoTrocarAmbiente(id); }} aoMudarAberto={setMenuAberto} />
@@ -278,7 +294,7 @@ export function BarraAlfa(p: BarraAlfaProps) {
           <nav ref={nav} className="ba-grupos" aria-label="Navegação principal" data-rolagem={rolagem || undefined}>
             {!p.carregando && (
               <div className="ba-grupo">
-                <button type="button" className="ba-item ba-busca" onClick={() => { escolher?.(); p.aoBuscar(); }}
+                <button type="button" className="ba-item ba-busca" data-dica="Buscar" onClick={() => { escolher?.(); p.aoBuscar(); }}
                   aria-haspopup="dialog" aria-expanded={p.buscaAberta} aria-keyshortcuts="Meta+K Control+K">
                   <span className="ba-item-pri"><span className="ba-ico"><IcBusca /></span><span className="ba-item-tx">Buscar</span></span>
                   <span className="ba-item-lado"><kbd className="ba-kbd" aria-hidden>{rotuloAtalho('K')}</kbd></span>
@@ -305,7 +321,7 @@ export function BarraAlfa(p: BarraAlfaProps) {
           <div className="ba-pe">
             {!p.carregando && p.rodape.map((i) => <ItemLink key={i.slug} item={i} aoEscolher={escolher} />)}
             {/* com a conta à vista, o Sair mora no cartão dela; no trilho de ícones volta a ser o item */}
-            <button type="button" className={p.conta ? 'ba-item ba-sair' : 'ba-item'} onClick={p.aoSair}>
+            <button type="button" className={p.conta ? 'ba-item ba-sair' : 'ba-item'} data-dica="Sair" onClick={p.aoSair}>
               <span className="ba-item-pri"><span className="ba-ico"><IcSair /></span><span className="ba-item-tx">Sair</span></span>
             </button>
             {p.conta && (
@@ -323,6 +339,17 @@ export function BarraAlfa(p: BarraAlfaProps) {
           </div>
         </div>
       </aside>
+      {p.alca && (
+        <button type="button" className="ba-alca" data-recolhida={p.alca.recolhida ? '' : undefined} onClick={p.alca.aoClicar}
+          aria-controls="ba-barra" aria-expanded={!p.alca.recolhida}
+          aria-label={p.alca.recolhida ? 'Abrir a barra lateral' : 'Recolher a barra lateral'} title={p.alca.recolhida ? 'Abrir a barra lateral' : 'Recolher a barra lateral'}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m15 6-6 6 6 6" /></svg>
+        </button>
+      )}
+      {dica && p.dicas && typeof document !== 'undefined' && createPortal(
+        <div className="ba-dica" role="tooltip" style={{ top: dica.top }}>{dica.tx}</div>,
+        document.body,
+      )}
       {p.sobreposta && <div className={p.modo === 'gaveta' ? 'ba-veu' : 'ba-veu leve'} onClick={p.aoFecharSobreposta} aria-hidden />}
     </>
   );

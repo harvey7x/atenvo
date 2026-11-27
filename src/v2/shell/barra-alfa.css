@@ -616,3 +616,46 @@ html[data-barra-alfa] .v2 .ba-conta-sair:focus-visible { outline: 2px solid var(
 html[data-barra-alfa] .v2 .ba-conta-sair svg { width: 15px; height: 15px; }
 html[data-barra-alfa] .v2 .p-app:not([data-barra="trilho"]) .ba-pe .ba-sair { display: none; }
 html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-conta { display: none; }
+
+/* ================================================================
+   28/11 (Atenvo, dono: "quero que a barra minimize de uma forma melhor"):
+   1. a ALÇA na borda da barra (tela larga): recolhe para a trilha de ícones e abre de novo;
+   2. trilha FIXA (a pessoa recolheu): só os ícones, o nome num balão — a barra NÃO abre ao passar o mouse;
+   3. o botão do topo some na tela larga (a alça faz o papel).
+   ================================================================ */
+html[data-barra-alfa] .v2 .p-app { position: relative; }
+html[data-barra-alfa] .v2 .ba-alca {
+  position: absolute; z-index: 31; left: calc(var(--ba-w) - 13px); top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--ba-fio); background: var(--ba-menu); color: var(--ba-mudo); cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  transition: left .24s var(--ba-e), color .15s var(--ba-e), background-color .15s var(--ba-e), border-color .15s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-alca svg { width: 14px; height: 14px; display: block; transition: transform .24s var(--ba-e); }
+html[data-barra-alfa] .v2 .ba-alca[data-recolhida] svg { transform: rotate(180deg); }
+html[data-barra-alfa] .v2 .ba-alca:hover { color: var(--ba-txt); border-color: var(--azul); }
+html[data-barra-alfa] .v2 .ba-alca:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 2px; }
+html[data-barra-alfa] .v2 .p-app[data-zona="larga"] .ba-alternar { display: none; }
+html[data-barra-alfa] .v2 .p-app[data-zona="larga"] .ba-topo { padding-left: 14px; }
+/* trilha fixa: desfaz a abertura ao passar o mouse (as regras de cima) */
+@media (hover: hover) {
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover { width: 64px; box-shadow: none; background: var(--ba-fundo); border-right-color: var(--ba-fio); transition-delay: 0s; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao, .ba-cab-bt) { opacity: 0; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover .ba-cab-bt { visibility: hidden; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover .ba-ponto { opacity: 1; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover :is(.ba-item, .ba-ws-gat) { width: 40px; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra:hover .ba-grupo[role="group"]::before { opacity: 1; }
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"]:has(> .ba-barra:hover)::after { opacity: 0; }
+  /* o item sob o mouse acende, como um botão de ícone */
+  html[data-barra-alfa] .v2 .p-app[data-trilho="fixo"] .ba-barra .ba-item:hover { background: var(--ba-hover); }
+}
+/* o balão com o nome (fora da barra, que corta o que sai dela) */
+.ba-dica {
+  position: fixed; left: 74px; z-index: 1200; transform: translateY(-50%); pointer-events: none; white-space: nowrap;
+  padding: 6px 10px; border-radius: 8px; background: #18181B; color: #F4F4F5; border: 1px solid rgba(255, 255, 255, .1);
+  font: 500 12.5px/1 var(--fonte, system-ui, sans-serif); letter-spacing: 0; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .6);
+  animation: ba-dica-in .12s ease-out;
+}
+.ba-dica::before { content: ""; position: absolute; left: -5px; top: 50%; width: 8px; height: 8px; transform: translateY(-50%) rotate(45deg); background: #18181B; border-left: 1px solid rgba(255, 255, 255, .1); border-bottom: 1px solid rgba(255, 255, 255, .1); }
+@keyframes ba-dica-in { from { opacity: 0; transform: translate(-4px, -50%); } to { opacity: 1; transform: translateY(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ba-dica { animation: none; } }

@@ -1141,8 +1141,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     ? { rotulo: 'Fechar o menu', tipo: 'fechar', aoClicar: fecharSobreposta }
     : modoBarra === 'trilho' && zonaBarra === 'media'
       ? (sobreposta ? { rotulo: 'Recolher a barra lateral', tipo: 'recolher', aoClicar: fecharSobreposta } : null)
-      : modoBarra === 'trilho' ? { rotulo: 'Manter a barra aberta', tipo: 'fixar', aoClicar: () => guardarPref('aberta') }
-      : modoBarra === 'aberta' && zonaBarra === 'larga' ? { rotulo: 'Recolher a barra lateral', tipo: 'recolher', aoClicar: () => guardarPref('trilho') } : null;
+      : modoBarra === 'trilho' ? { rotulo: 'Manter a barra aberta', tipo: 'fixar', aoClicar: () => guardarPref('aberta') } : null;
   // os itens da barra: os MESMOS do menu (mesmo filtro de papel), com o ícone e o contador de cada um
   const itemDaBarra = (i: ItemNav): ItemBarra => ({
     slug: i.slug, rotulo: i.rotulo, icone: iconeDoItem(i.slug),
@@ -1250,10 +1249,13 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
-      <div className="p-app" data-barra={ALFA ? modoBarra : undefined} data-sobre={ALFA && sobreposta ? '' : undefined}>
+      <div className="p-app" data-barra={ALFA ? modoBarra : undefined} data-sobre={ALFA && sobreposta ? '' : undefined}
+        data-zona={ALFA ? zonaBarra : undefined} data-trilho={ALFA && zonaBarra === 'larga' && modoBarra === 'trilho' ? 'fixo' : undefined}>
         {ALFA ? (
           <BarraAlfa
             modo={modoBarra} sobreposta={sobreposta} aoFecharSobreposta={fecharSobreposta} acaoTopo={acaoTopo}
+            alca={zonaBarra === 'larga' ? { recolhida: modoBarra === 'trilho', aoClicar: alternarBarra } : null}
+            dicas={zonaBarra === 'larga' && modoBarra === 'trilho'}
             org={isRevizaMode ? 'Reviza CRM' : 'Atenvo'}
             ambientes={modulosDisponiveis.map((m) => ({ id: m.id, rotulo: m.rotulo, descricao: m.id === 'configuracoes' && !admin ? 'Sua conta e preferências' : DESCRICAO_AMBIENTE[m.id] }))}
             ambienteAtual={acessoCarregando ? null : { id: modulo.id, rotulo: modulo.rotulo }}
