@@ -1058,6 +1058,23 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       rank(a[0]) - rank(b[0]) || (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visiveis, usuarios, user?.id, tabEf, vis.veTodos, radarPorConv]);
+  // 28/11 (dono: "tá um pouco travado"): a lista desenha só o COMEÇO e cresce conforme rola — antes eram as 6.700 conversas
+  // de uma vez (116 mil nós na tela e centenas de bolinhas pulsando). Começa em 80, soma 80 a cada chegada ao fim; a
+  // conversa aberta sempre entra; trocar de aba ou buscar recomeça do topo.
+  const PASSO_LISTA = 80;
+  const [limiteLista, setLimiteLista] = useState(PASSO_LISTA);
+  useEffect(() => { setLimiteLista(PASSO_LISTA); }, [tabEf, search]);
+  const ordemIds = useMemo(() => grupos.flatMap(([, l]) => l.map((c) => c.id)), [grupos]);
+  const posAtual = currentId ? ordemIds.indexOf(currentId) : -1;
+  const limiteEf = posAtual >= limiteLista ? posAtual + 20 : limiteLista;
+  const sentinelaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelaRef.current; if (!el) return;
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setLimiteLista((n) => n + PASSO_LISTA); }, { root: el.closest('.wa-lista'), rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limiteEf, ordemIds.length]);
+  let orcamentoLista = limiteEf;
   /* "Próximo aguardando" (Radar): abre o próximo cliente sem tirar a pessoa da aba em que está quando
      ele já aparece nela; senão vai pelo mesmo atalho da Central (?conversa=, que escolhe a aba certa —
      cliente fechado cai em Fechados). */
@@ -1480,8 +1497,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               </div>
             ) : visiveis.length === 0 ? (
               <div className="wa-vazio">{buscaAtiva ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa nesta aba.'}</div>
-            ) : (
-              grupos.map(([respId, lista]) => {
+            ) : (<>
+              {grupos.map(([respId, lista]) => {
                 // "Todos" é lista única (sem cabeçalho) — nunca recolhe
                 // busca ativa ignora o recolhimento: resultado escondido confunde
                 const fechado = tabEf !== 'todos' && tabEf !== 'iris' && gruposFechados.has(respId) && !buscaAtiva;
@@ -1507,7 +1524,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     {naoLidasGrupo > 0 && <span className="gnl num" title={`${naoLidasGrupo} não lidas neste grupo`}>{naoLidasGrupo > 99 ? '99+' : naoLidasGrupo}</span>}
                   </button>
                   )}
-                  {!fechado && lista.map((c) => {
+                  {!fechado && (() => { const fatia = lista.slice(0, Math.max(0, orcamentoLista)); orcamentoLista -= fatia.length; return fatia; })().map((c) => {
                     const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
                     const alertas = alertasDe(c);
                     const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
@@ -1583,8 +1600,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   })}
                 </div>
                 );
-              })
-            )}
+              })}
+              {ordemIds.length > limiteEf && (
+                <div ref={sentinelaRef} className="wa-lista-mais" aria-hidden>Mostrando {limiteEf} de {ordemIds.length}…</div>
+              )}
+            </>)}
           </div>
           {selecao && (
             <BarraSelecao n={selecao.size} ocupado={selOcupado}

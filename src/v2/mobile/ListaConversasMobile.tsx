@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WaContact } from '@/data/whatsappDemo';
 import { tempoRelativo } from '@/data/slaView';
@@ -87,6 +87,18 @@ export default function ListaConversasMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, aba, term, buscaAtiva, user?.id, filtros, relogioMs, canalPorId, vis.veTodos]);
 
+  // 28/11 (dono: "tá um pouco travado"): a lista desenha só o começo e cresce conforme rola (eram milhares de cards de uma vez)
+  const PASSO_LISTA = 60;
+  const [limiteLista, setLimiteLista] = useState(PASSO_LISTA);
+  useEffect(() => { setLimiteLista(PASSO_LISTA); }, [visiveis.length]);
+  const sentinelaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelaRef.current; if (!el) return;
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setLimiteLista((n) => n + PASSO_LISTA); }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limiteLista, visiveis.length]);
+
   const carregando = !demo && inbox.live.isLoading && contacts.length === 0;
   const erro = !demo && inbox.live.isError && contacts.length === 0;
 
@@ -133,7 +145,7 @@ export default function ListaConversasMobile() {
           </div>
         )}
         {erro && <EstadoErro descricao="Erro ao carregar as conversas." aoTentarDeNovo={() => void inbox.live.refetch()} />}
-        {!carregando && !erro && visiveis.map((c) => {
+        {!carregando && !erro && visiveis.slice(0, limiteLista).map((c) => {
           const espera = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
           return (
             <button key={c.id} type="button" className={'m-card' + (espera ? ' t-' + espera.tier : '')} title={espera?.label} onClick={() => nav('/m/' + c.id)}>
@@ -152,6 +164,9 @@ export default function ListaConversasMobile() {
             </button>
           );
         })}
+        {!carregando && !erro && visiveis.length > limiteLista && (
+          <div ref={sentinelaRef} className="m-lista-mais" aria-hidden style={{ padding: '14px 12px 18px', textAlign: 'center', fontSize: 11.5, color: 'var(--txt-3)' }}>Mostrando {limiteLista} de {visiveis.length}…</div>
+        )}
         {!carregando && !erro && visiveis.length === 0 && (
           <div className="m-vazio">{buscaAtiva || nFiltros > 0 ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa por aqui ainda.'}</div>
         )}

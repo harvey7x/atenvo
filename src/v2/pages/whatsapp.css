@@ -1051,3 +1051,6 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
 .v2 .sug-aviso { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 6px 10px; border-radius: 8px;
   background: rgba(var(--tint), .05); border: 1px solid var(--linha); font-size: 12px; color: var(--txt-2); }
 .v2 .sug-aviso .lnk { margin-left: auto; border: 0; background: none; padding: 0; font: 12px var(--fonte); color: var(--txt); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+
+/* 28/11: a lista cresce conforme rola — o rodapé que puxa o próximo lote */
+.v2 .wa-lista-mais { padding: 14px 12px 18px; text-align: center; font-size: 11.5px; color: var(--txt-3); }

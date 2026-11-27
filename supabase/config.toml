@@ -514,3 +514,6 @@ verify_jwt = false
 # meta-anuncios: a tela (login de administrador, conferido na função) e o agendador (x-anuncios-secret).
 [functions.meta-anuncios]
 verify_jwt = false
+# contato-foto: a foto real do WhatsApp do cliente — a tela (login conferido dentro) e o agendador (x-fotos-secret).
+[functions.contato-foto]
+verify_jwt = false
