@@ -268,7 +268,7 @@ export default function Vitrine() {
               { cor: 'verde', texto: 'Bot Matheo · fila 0' },
               { cor: 'neutro', texto: 'Sincronizado 14:39' },
             ]}
-            fim="ALFA GROUP"
+            fim="ATENVO · CAF ASSESSORIA"
           />
         </Secao>
 

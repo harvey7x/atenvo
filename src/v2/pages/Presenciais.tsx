@@ -10,15 +10,7 @@ import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardCab, CardVidro, ConfirmDialogV2, EstadoErro, EstadoVazio,
   Input, ModalV2, Skeleton, type TomStatus,
 } from '../components';
-import { formatarTelefone } from '../lib/telefone';
 import './presenciais.css';
-
-/* setas de traço do mês (no lugar de ‹ › em texto) */
-const IcSeta = ({ esq }: { esq?: boolean }) => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    {esq ? <path d="m14.5 6-6 6 6 6" /> : <path d="m9.5 6 6 6-6 6" />}
-  </svg>
-);
 
 /* ------------------------------------------------------------------
    Presenciais (pedido do dono 29/10): calendário dos atendimentos
@@ -47,17 +39,11 @@ const hojeSP = () => diaSP(new Date().toISOString());
 const addDia = (dia: string, n: number) => {
   const d = new Date(`${dia}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 };
-/** Grade do mês: começa no domingo antes do dia 1 e vai só até a semana do último dia
-    (crítica 12/11: a 6ª linha inteira com dias de dezembro saiu; os dias de fora ficam vazios, como no
-    Calendário da Cobrança). */
+/** Grade do mês: começa no domingo antes do dia 1 e cobre 6 semanas. */
 function grade(mes: string): string[] {
   const um = `${mes}-01`;
   const ini = addDia(um, -new Date(`${um}T12:00:00Z`).getUTCDay());
-  const [ano, m] = mes.split('-').map(Number);
-  const ultimo = new Date(Date.UTC(ano, m, 0)).toISOString().slice(0, 10);
-  const fim = addDia(ultimo, 6 - new Date(`${ultimo}T12:00:00Z`).getUTCDay());
-  const n = Math.round((new Date(`${fim}T12:00:00Z`).getTime() - new Date(`${ini}T12:00:00Z`).getTime()) / 86_400_000) + 1;
-  return Array.from({ length: n }, (_, i) => addDia(ini, i));
+  return Array.from({ length: 42 }, (_, i) => addDia(ini, i));
 }
 const tituloDia = (dia: string) => {
   const t = diaTxt(`${dia}T15:00:00Z`);
@@ -98,7 +84,7 @@ export default function Presenciais() {
   const [diaSel, setDiaSel] = useState(hoje);
   const dias = useMemo(() => grade(mes), [mes]);
   const iniISO = instanteSP(dias[0], '00:00');
-  const fimISO = instanteSP(addDia(dias[dias.length - 1], 1), '00:00');
+  const fimISO = instanteSP(addDia(dias[41], 1), '00:00');
 
   const q = usePresenciais(iniISO, fimISO);
   const [seed, setSeed] = useState<Presencial[]>(seedDemo);
@@ -195,7 +181,8 @@ export default function Presenciais() {
     <>
       <div className="ph sobe">
         <div>
-          <h2 title="Ao marcar, o grupo DOCUMENTOS CLIENTES ALFA é avisado; no dia, às 8h, sai o lembrete.">Presenciais</h2>
+          <h2>Presenciais</h2>
+          <p>Atendimentos presenciais marcados. Ao marcar, o grupo DOCUMENTOS CLIENTES CAF é avisado; no dia, às 8h, sai o lembrete.{demo ? ' · modo demonstração (nada é enviado)' : ''}</p>
         </div>
         <div className="acoes">
           <BotaoPrimario onClick={() => abrirNovo()}>＋ Marcar presencial</BotaoPrimario>
@@ -215,28 +202,21 @@ export default function Presenciais() {
         <div className="pr-grade sobe" style={{ animationDelay: '.06s' }}>
           <CardVidro spot className="pr-cal">
             <div className="pr-cal-cab">
-              <BotaoMini className="pr-seta" onClick={() => mudarMes(-1)} aria-label="Mês anterior" title="Mês anterior"><IcSeta esq /></BotaoMini>
-              <h3>{MESES[m - 1].charAt(0).toUpperCase() + MESES[m - 1].slice(1)} <span className="pr-ano num">{a}</span></h3>
-              <BotaoMini className="pr-seta" onClick={() => mudarMes(1)} aria-label="Próximo mês" title="Próximo mês"><IcSeta /></BotaoMini>
+              <BotaoMini onClick={() => mudarMes(-1)} aria-label="Mês anterior">‹</BotaoMini>
+              <h3>{MESES[m - 1].charAt(0).toUpperCase() + MESES[m - 1].slice(1)} de {a}</h3>
+              <BotaoMini onClick={() => mudarMes(1)} aria-label="Próximo mês">›</BotaoMini>
               <BotaoMini className="pr-hoje" onClick={() => { setMes(hoje.slice(0, 7)); setDiaSel(hoje); }}>Hoje</BotaoMini>
             </div>
             <div className="pr-semana">{SEMANA.map((s) => <span key={s}>{s}</span>)}</div>
             <div className="pr-dias" role="grid" aria-label="Calendário">
               {dias.map((d) => {
-                // dia de outro mês: casa vazia (sem número), como no Calendário da Cobrança
-                if (d.slice(0, 7) !== mes) return <span key={d} className="pr-dia fora" aria-hidden />;
-                const doDiaCal = (porDia.get(d) ?? []).filter((p) => p.status === 'marcado').sort((x, y) => x.quando.localeCompare(y.quando));
-                const marcados = doDiaCal.length;
-                const cls = ['pr-dia', d === hoje ? 'hoje' : '', d === diaSel ? 'sel' : '', marcados ? 'tem' : ''].filter(Boolean).join(' ');
+                const marcados = (porDia.get(d) ?? []).filter((p) => p.status === 'marcado').length;
+                const cls = ['pr-dia', d.slice(0, 7) !== mes ? 'fora' : '', d === hoje ? 'hoje' : '', d === diaSel ? 'sel' : '', marcados ? 'tem' : ''].filter(Boolean).join(' ');
                 return (
                   <button key={d} type="button" className={cls} onClick={() => setDiaSel(d)} onDoubleClick={() => abrirNovo(d)}
                     aria-label={`${tituloDia(d)}${marcados ? `, ${marcados} presencial${marcados > 1 ? 'is' : ''}` : ''}`} aria-pressed={d === diaSel}>
-                    <span className="pr-dia-n num">{Number(d.slice(8))}</span>
-                    {/* o agendamento dentro do dia ("14h Hernani"); passando de dois, "+N" */}
-                    {doDiaCal.slice(0, marcados > 2 ? 1 : 2).map((p) => (
-                      <span key={p.id} className="pr-dia-it"><b className="num">{horaTxt(p.quando)}</b> {p.clienteNome.split(' ')[0]}</span>
-                    ))}
-                    {marcados > 2 && <span className="pr-dia-mais num">+{marcados - 1}</span>}
+                    <span className="num">{Number(d.slice(8))}</span>
+                    {marcados > 0 && <em className="num">{marcados}</em>}
                   </button>
                 );
               })}
@@ -260,7 +240,7 @@ export default function Presenciais() {
                       <div className="pr-hora num">{horaTxt(p.quando)}</div>
                       <div className="pr-info">
                         <div className="nm">{p.clienteNome}</div>
-                        <div className="sub">marcado por {p.marcadoPor ?? 'equipe'}{p.telefone ? ` · ${formatarTelefone(p.telefone)}` : ''}</div>
+                        <div className="sub">marcado por {p.marcadoPor ?? 'equipe'}{p.telefone ? ` · ${p.telefone}` : ''}</div>
                         {p.observacao && <div className="obs">{p.observacao}</div>}
                         <div className="pr-selos">
                           {p.status === 'desmarcado' ? <BadgeStatus tom="neutro">Desmarcado</BadgeStatus> : null}
@@ -290,7 +270,7 @@ export default function Presenciais() {
           <label className="pr-rot">Cliente</label>
           {cliente ? (
             <div className="pr-cliente">
-              <span className="nm">{cliente.nome}</span>{cliente.telefone && <span className="tel num">{formatarTelefone(cliente.telefone)}</span>}
+              <span className="nm">{cliente.nome}</span>{cliente.telefone && <span className="tel num">{cliente.telefone}</span>}
               <BotaoMini onClick={() => { setCliente(null); setBusca(''); }}>Trocar</BotaoMini>
             </div>
           ) : (
@@ -302,7 +282,7 @@ export default function Presenciais() {
                     ? <li className="vazio">{!demo && buscaQ.isFetching ? 'Buscando…' : 'Nenhum cliente encontrado.'}</li>
                     : achados.map((c) => (
                       <li key={c.id}><button type="button" onClick={() => setCliente(c)}>
-                        <span className="nm">{c.nome}</span>{c.telefone && <span className="tel num">{formatarTelefone(c.telefone)}</span>}
+                        <span className="nm">{c.nome}</span>{c.telefone && <span className="tel num">{c.telefone}</span>}
                       </button></li>
                     ))}
                 </ul>
@@ -317,7 +297,7 @@ export default function Presenciais() {
               </select>
             </div>
           </div>
-          <label className="pr-rot" htmlFor="pr-obs">Observação (visível só no sistema)</label>
+          <label className="pr-rot" htmlFor="pr-obs">Observação (só aqui no sistema)</label>
           <textarea id="pr-obs" className="inp" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: trazer os extratos do banco" />
           {cliente && (
             <>

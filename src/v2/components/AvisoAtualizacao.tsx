@@ -31,7 +31,7 @@ export function AvisoAtualizacao() {
   return createPortal(
     <div className="aviso-up" role="status" aria-live="polite">
       <span className="au-dot" aria-hidden />
-      <span className="au-txt">O Reviza CRM foi atualizado</span>
+      <span className="au-txt">O Atenvo foi atualizado</span>
       <button type="button" className="au-btn" onClick={() => window.location.reload()}>
         Recarregar agora
       </button>

@@ -3,8 +3,6 @@ import '../fontes';
 import '../tokens.css';
 import '../base.css';
 import './login.css';
-import { LogoAtenvo } from '../components/LogoAtenvo';
-import { MolduraAcesso } from './MolduraAcesso';
 
 /**
  * Configuração ausente v2 — família visual do login (paridade com
@@ -19,14 +17,16 @@ export default function ErroConfiguracao() {
   ].filter(Boolean) as string[];
 
   return (
-    <MolduraAcesso>
+    <div className="v2 tela-login">
+      <div className="luz2" />
+      <div className="grao" />
       <div className="lg-card vidro pg-entra">
-        <LogoAtenvo className="marca2" />
-        <div className="caps">Reviza CRM</div>
+        <div className="marca2">A</div>
+        <div className="caps">Atenvo</div>
         <h1 className="p-display">Configuração ausente.</h1>
         <div className="sub">
-          O acesso está indisponível porque a configuração do servidor está incompleta.
-          Avise o administrador do sistema.
+          O acesso está bloqueado porque o backend não está configurado. Defina as
+          variáveis de ambiente do Supabase e publique novamente.
         </div>
         {faltando.length > 0 ? (
           <ul className="lg-vars">
@@ -45,6 +45,6 @@ export default function ErroConfiguracao() {
           explicitamente <code className="ok">VITE_ENABLE_DEMO_MODE=true</code>.
         </div>
       </div>
-    </MolduraAcesso>
+    </div>
   );
 }

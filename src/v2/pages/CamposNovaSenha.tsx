@@ -22,7 +22,7 @@ export function CamposNovaSenha({ senha, conf, aoMudarSenha, aoMudarConf, rotulo
             name="nova"
             type={tipo}
             autoComplete="new-password"
-            placeholder="Digite a nova senha"
+            placeholder="••••••••"
             value={senha}
             onChange={(e) => aoMudarSenha(e.target.value)}
           />
@@ -49,7 +49,7 @@ export function CamposNovaSenha({ senha, conf, aoMudarSenha, aoMudarConf, rotulo
           name="conf"
           type={tipo}
           autoComplete="new-password"
-          placeholder="Repita a nova senha"
+          placeholder="••••••••"
           value={conf}
           onChange={(e) => aoMudarConf(e.target.value)}
         />

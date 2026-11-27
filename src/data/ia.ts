@@ -7,7 +7,7 @@
    volta pro front — aqui só chega o carimbo chave_definida_em.
    ============================================================================ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 
 export const IA_REAL = isSupabaseConfigured && !!supabase;
@@ -116,16 +116,6 @@ export function useCanaisIa() {
   return useQuery({
     queryKey: ['ia-canais', org], enabled: IA_REAL && !!org,
     queryFn: async (): Promise<CanalIa[]> => {
-      // Reviza: a Iris atende nos números do WhatsApp do Reviza (migration 90: função iris_canais)
-      if (isRevizaMode) {
-        const { data, error } = await supabase!.rpc('iris_canais');
-        if (error) throw new Error(error.message);
-        return ((data as Row[]) || []).map((r) => ({
-          id: r.id as string, nome: (r.nome as string) || 'Número', numero: (r.numero as string) || null,
-          iaEnabled: !!r.ia_enabled, iaModoTeste: r.ia_modo_teste !== false,
-          numerosTeste: Array.isArray(r.numeros_teste) ? (r.numeros_teste as string[]) : [], agenteId: (r.ia_agente_id as string) || null, fluxoId: null,
-        }));
-      }
       const { data, error } = await supabase!
         .from('canais')
         .select('id, nome_interno, numero_conectado, bot_canal_config(ia_enabled, ia_modo_teste, ia_agente_id, ia_fluxo_id, numeros_teste)')
@@ -349,9 +339,60 @@ export function useTestarConexao() {
 }
 
 /* ===================== exportar / importar atendente (.json) ===================== */
-// as regras do arquivo (o que entra, o que é cortado, o resumo) moram num módulo puro, sem React nem
-// banco, para a tela e a ferramenta de conferência (tools/iris/conferir.ts) usarem o MESMO código
-export { exportarAgente, parseAgenteImportado, resumoDoArquivo, type ArquivoAgente, type InfoArquivo } from './iaArquivo';
+export function exportarAgente(a: AgenteIa) {
+  // NUNCA exporta a chave (fica no cofre). O importador coloca a própria.
+  return { tipo: 'atendente-atenvo', versao: 1, nome: a.nome, provedor: a.provedor, modelo: a.modelo,
+    personaPrompt: a.personaPrompt, conhecimento: a.conhecimento, comportamentos: a.comportamentos };
+}
+const PROVEDORES_OK = new Set(['gemini', 'openai', 'anthropic']);
+const hhmm = (v: unknown): string | undefined => {
+  const s = String(v);
+  const m = /^(\d{2}):(\d{2})$/.exec(s);
+  if (!m) return undefined;
+  const h = Number(m[1]), min = Number(m[2]);
+  return h <= 23 && min <= 59 ? s : undefined;   // rejeita "99:99"/"40:70" do arquivo importado
+};
+const strOnly = (v: unknown, max: number): string => (typeof v === 'string' ? v : '').slice(0, max);
+/** reconstrói comportamentos só com chaves conhecidas e limites (arquivo importado = não confiável) */
+function sanearComportamentos(v: unknown): ComportamentosIa {
+  const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const out: ComportamentosIa = {};
+  if (c.horario && typeof c.horario === 'object') {
+    const h = c.horario as Record<string, unknown>;
+    out.horario = { ativo: h.ativo === true, inicio: hhmm(h.inicio), fim: hhmm(h.fim) };
+  }
+  if (c.janela && typeof c.janela === 'object') {
+    const j = c.janela as Record<string, unknown>;
+    out.janela = { inicio: hhmm(j.inicio), fim: hhmm(j.fim) };
+  }
+  if (typeof c.nudges_ativos === 'boolean') out.nudges_ativos = c.nudges_ativos;
+  if (typeof c.max_chamadas_dia === 'number' && isFinite(c.max_chamadas_dia)) out.max_chamadas_dia = Math.max(0, Math.min(100000, Math.floor(c.max_chamadas_dia)));
+  if (Array.isArray(c.proibidos)) out.proibidos = c.proibidos.slice(0, 50).map((s) => strOnly(s, 80).trim()).filter(Boolean);
+  if (typeof c.permitir_emojis === 'boolean') out.permitir_emojis = c.permitir_emojis;
+  if (typeof c.simular_digitacao === 'boolean') out.simular_digitacao = c.simular_digitacao;
+  if (typeof c.modelo_docs === 'string' && c.modelo_docs) out.modelo_docs = c.modelo_docs.slice(0, 80);
+  if (typeof c.modelo_pro === 'string' && c.modelo_pro) out.modelo_pro = c.modelo_pro.slice(0, 80);
+  return out;
+}
+export function parseAgenteImportado(texto: string): {
+  nome: string; provedor: ProvedorIa; modelo: string; personaPrompt: string; conhecimento: string; comportamentos: ComportamentosIa;
+} {
+  let obj: Record<string, unknown>;
+  try { obj = JSON.parse(texto) as Record<string, unknown>; }
+  catch { throw new Error('Arquivo inválido: não parece um JSON de atendente.'); }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Arquivo inválido.');
+  if (obj.tipo && obj.tipo !== 'atendente-atenvo') throw new Error('Este arquivo é de outro tipo (talvez um Fluxo). Use "Importar" na área certa.');
+  if (obj.personaPrompt === undefined && obj.comportamentos === undefined) throw new Error('Este arquivo não parece um atendente (sem prompt/comportamentos).');
+  const provedor = (PROVEDORES_OK.has(obj.provedor as string) ? obj.provedor : 'gemini') as ProvedorIa;
+  return {
+    nome: strOnly(obj.nome, 120) || 'Atendente importado',
+    provedor,
+    modelo: strOnly(obj.modelo, 80),
+    personaPrompt: strOnly(obj.personaPrompt, 20000),
+    conhecimento: strOnly(obj.conhecimento, 8000),
+    comportamentos: sanearComportamentos(obj.comportamentos),
+  };
+}
 export function useImportarAgente() {
   const qc = useQueryClient(); const { currentOrg } = useOrg();
   return useMutation({

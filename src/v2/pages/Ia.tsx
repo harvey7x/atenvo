@@ -17,9 +17,6 @@
    Em modo demo (ou sem Supabase) tudo roda em estado local, clicável.
    ============================================================================ */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { isRevizaMode } from '@/lib/supabase';
-import { JanelaImportarIris, PassosIris, type ModoImportar, type SecaoIris, type SituacaoIris } from './config/IrisImportar';
-import type { ArquivoAgente } from '@/data/iaArquivo';
 import './ia.css';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, Campo, CardVidro, CardCab,
@@ -37,15 +34,6 @@ import {
 import { baixarJson, lerArquivoTexto, slugArquivo } from '@/v2/lib/arquivo';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
-/* Reviza: a configuração da Iris em cinco assuntos (cada cartão diz a que assunto pertence em data-aba) */
-type AbaIris = 'geral' | 'atende' | 'sabe' | 'horarios' | 'conexao';
-const ABAS_IRIS: readonly { id: AbaIris; rotulo: string }[] = [
-  { id: 'geral', rotulo: 'Visão geral' },
-  { id: 'atende', rotulo: 'Como ela atende' },
-  { id: 'sabe', rotulo: 'O que ela sabe' },
-  { id: 'horarios', rotulo: 'Horários e limite' },
-  { id: 'conexao', rotulo: 'Chave e números' },
-];
 type MsgChat = { de: 'cliente' | 'ia'; texto: string; bloqueada?: boolean };
 
 const OPCOES_PROVEDOR: OpcaoSegmentado<ProvedorIa>[] = [
@@ -175,8 +163,6 @@ export default function Ia() {
   const [chave, setChave] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
-  const [importando, setImportando] = useState(false);
-  const [aba, setAba] = useState<AbaIris>('geral');   // Reviza: a tela em cinco assuntos   // Reviza: a janela de importar a configuração
   const [confirmaTroca, setConfirmaTroca] = useState<{ id: string | null } | null>(null); // null = criar novo
   const [editNums, setEditNums] = useState<{ canal: string; valor: string } | null>(null);
   /* playground */
@@ -186,15 +172,14 @@ export default function Ia() {
   const chatFimRef = useRef<HTMLDivElement | null>(null);
   const chatSessaoRef = useRef(0);
 
-  /** carrega o formulário com os dados de um atendente (ao trocar de atendente e depois de uma importação que atualiza) */
-  const espelhar = (agente: AgenteIa) => {
+  useEffect(() => {
+    if (!agente) return;
     setNome(agente.nome);
     setProvedor(agente.provedor);
     setModelo(agente.modelo);
     setPrompt(agente.personaPrompt);
     setConhecimento(agente.conhecimento);
     setAtivo(agente.ativo);
-    setProibidoInput('');
     const c = agente.comportamentos || {};
     setProibidos(Array.isArray(c.proibidos) ? c.proibidos : []);
     setPermitirEmojis(c.permitir_emojis === true);
@@ -208,9 +193,6 @@ export default function Ia() {
     setJanelaInicio(c.janela?.inicio || '07:30');
     setJanelaFim(c.janela?.fim || '21:30');
     setMaxDia(String(c.max_chamadas_dia ?? 500));
-  };
-  useEffect(() => {
-    if (agente) espelhar(agente);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agente?.id]);
 
@@ -440,42 +422,9 @@ export default function Ia() {
     const dados = {
       tipo: 'atendente-atenvo', versao: 1, nome, provedor, modelo,
       personaPrompt: prompt, conhecimento, comportamentos: { ...comportamentosForm, proibidos: proibidosExport },
-      ...(isRevizaMode ? { feitoEm: new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) } : {}),
     };
-    const slug = slugArquivo(nome || agente.nome);
-    baixarJson(isRevizaMode ? (slug.startsWith('iris') ? slug : `iris-${slug}`) : `atendente-${slug}`, dados);
-    setAviso({ tom: 'ok', texto: isRevizaMode
-      ? 'Arquivo da configuração baixado, sem a chave do Google. Quem receber importa e coloca a própria chave.'
-      : 'Arquivo do atendente baixado — SEM a chave (o cliente coloca a dele). Mande pra ele importar.' });
-  };
-
-  const situacaoDe = (a: AgenteIa | null): SituacaoIris => ({
-    chave: !!a?.chaveDefinidaEm, canais: a ? canais.filter((c) => c.agenteId === a.id).length : 0, ligada: !!a?.ativo,
-  });
-  /** leva à seção: abre a aba dela e rola até o cartão */
-  const irPara = (s: SecaoIris) => {
-    setAba(s === 'identidade' ? 'atende' : 'conexao');
-    window.setTimeout(() => document.querySelector(`[data-secao="${s}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-  };
-  const aplicarImportacao = async (arq: ArquivoAgente, modo: ModoImportar): Promise<SituacaoIris> => {
-    const { info: _info, cortes: _cortes, ...dados } = arq; void _info; void _cortes;
-    if (modo === 'atualizar' && agente) {
-      // a chave (cofre), os números e o ligado/desligado não vêm do arquivo: ficam como estão
-      const novo: AgenteIa = { ...agente, ...dados, comportamentos: { ...(agente.comportamentos ?? {}), ...dados.comportamentos } };
-      if (usarMock) setMockAgentes((xs) => xs.map((x) => (x.id === agente.id ? novo : x)));
-      else await salvar.mutateAsync({ id: agente.id, nome: novo.nome, provedor: novo.provedor, modelo: novo.modelo, personaPrompt: novo.personaPrompt, conhecimento: novo.conhecimento, comportamentos: novo.comportamentos, ativo: agente.ativo });
-      espelhar(novo);
-      setAviso({ tom: 'ok', texto: `${novo.nome} atualizada com o arquivo. A chave do Google e os números continuam os mesmos.` });
-      return situacaoDe(novo);
-    }
-    let novoId: string;
-    if (usarMock) {
-      const novo: AgenteIa = { id: `demo-${Date.now()}`, ...dados, ativo: false, chaveDefinidaEm: null, criadoEm: new Date().toISOString() };
-      setMockAgentes((xs) => [...xs, novo]); novoId = novo.id;
-    } else novoId = await importarAgente.mutateAsync(dados);
-    setSelId(novoId);
-    setAviso({ tom: 'ok', texto: `${dados.nome} importada. Falta guardar a chave do Google e escolher os números.` });
-    return { chave: false, canais: 0, ligada: false };
+    baixarJson(`atendente-${slugArquivo(nome || agente.nome)}`, dados);
+    setAviso({ tom: 'ok', texto: 'Arquivo do atendente baixado — SEM a chave (o cliente coloca a dele). Mande pra ele importar.' });
   };
 
   const aoEscolherArquivo = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -539,21 +488,20 @@ export default function Ia() {
     <div className="ia-pagina">
       <div className="ph sobe">
         <div>
-          {/* Reviza: a tela mora no ambiente Configurações com o nome da casa (dono 22/11); sem enfeite nos botões */}
-          <h1>{isRevizaMode ? 'Iris, atendente virtual' : 'Atendente de IA'}</h1>
-          <p>{isRevizaMode ? 'A atendente de IA do Atendimento: a chave do Google da empresa, a personalidade, o que ela sabe e em quais números ela atende.' : 'Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.'}</p>
+          <h1>Atendente de IA</h1>
+          <p>Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.</p>
         </div>
         <div className="fx-topo-acoes">
           <input ref={fileRef} type="file" accept=".json,application/json" className="fx-import-inp"
             onChange={aoEscolherArquivo} aria-hidden="true" tabIndex={-1} />
-          <BotaoSec onClick={() => (isRevizaMode ? setImportando(true) : fileRef.current?.click())} disabled={importarAgente.isPending}>
-            {importarAgente.isPending ? 'Importando…' : isRevizaMode ? 'Importar configuração' : '↧ Importar atendente'}
+          <BotaoSec onClick={() => fileRef.current?.click()} disabled={importarAgente.isPending}>
+            {importarAgente.isPending ? 'Importando…' : '↧ Importar atendente'}
           </BotaoSec>
-          {agente && <BotaoSec onClick={aoExportar}>{isRevizaMode ? 'Exportar configuração' : '↥ Exportar'}</BotaoSec>}
+          {agente && <BotaoSec onClick={aoExportar}>↥ Exportar</BotaoSec>}
           {agente && (
             <BotaoSec onClick={() => { chatSessaoRef.current++; setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
               title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
-              {isRevizaMode ? 'Conversar para testar' : '💬 Experimentar'}
+              💬 Experimentar
             </BotaoSec>
           )}
         </div>
@@ -578,33 +526,15 @@ export default function Ia() {
         </CardVidro>
       ) : !agente ? (
         <CardVidro sobe className="ia-card">
-          {isRevizaMode ? (
-            <>
-              <EstadoVazio
-                icone=""
-                titulo="A Iris ainda não foi configurada"
-                descricao="Importe o arquivo de configuração que você recebeu. Depois é só guardar a chave do Google e escolher os números."
-                acao={{ rotulo: 'Importar configuração', onClick: () => setImportando(true) }}
-              />
-              <p className="cfgr-do-zero"><button type="button" className="cfgi-link" disabled={criar.isPending} onClick={aoCriar}>{criar.isPending ? 'Criando…' : 'Não tenho arquivo: configurar do zero'}</button></p>
-            </>
-          ) : (
           <EstadoVazio
             icone="✦"
             titulo="Nenhum atendente de IA ainda"
             descricao="Crie o primeiro: você escolhe o provedor, coloca a sua chave e ensina como ele deve falar com seus clientes."
             acao={{ rotulo: criar.isPending ? 'Criando…' : 'Criar atendente', onClick: aoCriar }}
           />
-          )}
         </CardVidro>
       ) : (
-        <div className="ia-wrap" data-aba-ativa={isRevizaMode ? aba : undefined}>
-          {isRevizaMode && (
-            <div className="cfgr-abas" role="tablist" aria-label="Assuntos da configuração da Iris">
-              {ABAS_IRIS.map((t) => <button key={t.id} type="button" role="tab" aria-selected={aba === t.id} className={aba === t.id ? 'on' : undefined} onClick={() => setAba(t.id)}>{t.rotulo}</button>)}
-            </div>
-          )}
-          {isRevizaMode && aba === 'geral' && <PassosIris sit={situacaoDe(agente)} temConfig={!!agente.personaPrompt.trim()} aoIr={irPara} />}
+        <div className="ia-wrap">
           {/* ------------------- Lista de atendentes ------------------- */}
           <div className="ia-agentes-lista" role="tablist" aria-label="Atendentes de IA">
             {agentes.map((a) => (
@@ -614,7 +544,7 @@ export default function Ia() {
                 <span className="ia-agente-nome">{a.nome}</span>
                 <span className="ia-agente-meta">
                   {a.ativo ? <BadgeStatus tom="ok">ativo</BadgeStatus> : <BadgeStatus tom="neutro">pausado</BadgeStatus>}
-                  <span className="ia-hint">{((n) => `${n} ${n === 1 ? 'canal' : 'canais'}`)(canais.filter((c) => c.agenteId === a.id).length)}</span>
+                  <span className="ia-hint">{canais.filter((c) => c.agenteId === a.id).length} canal(is)</span>
                 </span>
               </button>
             ))}
@@ -624,7 +554,7 @@ export default function Ia() {
           </div>
 
           {/* ------------------- Atividade ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.03} data-aba="geral">
+          <CardVidro sobe className="ia-card" atraso={0.03}>
             <CardCab titulo="Atividade do atendente" direita={<span className="ia-hint">números do motor, ao vivo</span>} />
             <div className="ia-stats num">
               <div className="ia-stat"><b>{metricas?.sessoesAtivas ?? '—'}</b><span>conversas com a IA agora</span></div>
@@ -635,7 +565,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Identidade ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.05} data-secao="identidade" data-aba="atende">
+          <CardVidro sobe className="ia-card" atraso={0.05}>
             <CardCab titulo="Identidade" direita={
               <Toggle ligado={ativo} aoMudar={setAtivo} rotulo="Atendente ativo" />
             } />
@@ -653,7 +583,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Chave ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.08} data-secao="chave" data-aba="conexao">
+          <CardVidro sobe className="ia-card" atraso={0.08}>
             <CardCab titulo="Chave de API" direita={
               agente.chaveDefinidaEm
                 ? <BadgeStatus tom="ok">Configurada em {new Date(agente.chaveDefinidaEm).toLocaleDateString('pt-BR')}</BadgeStatus>
@@ -682,7 +612,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Cérebro ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.11} data-aba="atende">
+          <CardVidro sobe className="ia-card" atraso={0.11}>
             <CardCab titulo="Personalidade e instruções" />
             <div className="ia-tom-row" aria-label="Presets de tom de voz">
               <span className="ia-hint">Tom de voz (insere no prompt):</span>
@@ -708,7 +638,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Conhecimento ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.14} data-aba="sabe">
+          <CardVidro sobe className="ia-card" atraso={0.14}>
             <CardCab titulo="Conhecimento da empresa" direita={<span className="ia-hint num">{conhecimento.length}/8000</span>} />
             <Campo rotulo="O que o atendente sabe (endereço, serviços, diferenciais, perguntas frequentes…)">
               {(id) => (
@@ -725,7 +655,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Temas proibidos ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.17} data-aba="sabe">
+          <CardVidro sobe className="ia-card" atraso={0.17}>
             <CardCab titulo="Temas proibidos" contador={proibidos.length} />
             <p className="ia-hint">
               Além do filtro de fábrica (valores, taxas, juros, promessas), a IA <b>nunca</b> cita o que você listar
@@ -751,7 +681,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Humanização ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.2} data-aba="atende">
+          <CardVidro sobe className="ia-card" atraso={0.2}>
             <CardCab titulo="Humanização" />
             <LinhaToggle
               titulo={'Simular "digitando…"'}
@@ -766,7 +696,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Comportamentos ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.23} data-aba="horarios">
+          <CardVidro sobe className="ia-card" atraso={0.23}>
             <CardCab titulo="Comportamentos" />
             <LinhaToggle
               titulo="Horário de atendimento"
@@ -779,7 +709,6 @@ export default function Ia() {
                 <Campo rotulo="Fim" type="time" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} />
               </div>
             )}
-            {!isRevizaMode && (<>
             <LinhaToggle
               titulo="Follow-up automático"
               descricao="Se o cliente some, a IA retoma com até 3 toques em horários saudáveis."
@@ -789,7 +718,6 @@ export default function Ia() {
               <Campo rotulo="Contato proativo — a partir de" type="time" value={janelaInicio} onChange={(e) => setJanelaInicio(e.target.value)} />
               <Campo rotulo="Contato proativo — até" type="time" value={janelaFim} onChange={(e) => setJanelaFim(e.target.value)} />
             </div>
-            </>)}
             <div className="ia-2col ia-sub">
               <Campo rotulo="Limite de chamadas de IA por dia (por canal)" type="number" min={1}
                 value={maxDia} onChange={(e) => setMaxDia(e.target.value)} />
@@ -797,8 +725,8 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Avançado ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.26} data-aba="conexao" data-fora-do-reviza>
-            <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">(opcional)</span>} />
+          <CardVidro sobe className="ia-card" atraso={0.26}>
+            <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">opcional</span>} />
             <p className="ia-hint">
               Vazio = o motor decide (usa o modelo principal e sobe automático em casos complexos). Preencha só
               se quiser forçar um modelo específico pra cada função.
@@ -820,7 +748,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Canais ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.29} data-secao="canais" data-aba="conexao">
+          <CardVidro sobe className="ia-card" atraso={0.29}>
             <CardCab titulo="Canais de WhatsApp" contador={canais.length} />
             {canais.length === 0 ? (
               <p className="ia-hint">Nenhum canal de WhatsApp conectado ainda — conecte em Integrações.</p>
@@ -924,11 +852,6 @@ export default function Ia() {
           </div>
         </div>
       </DrawerV2>
-
-      {importando && (
-        <JanelaImportarIris atual={agente ? { nome: agente.nome } : null} edicaoNaoSalva={formSujo}
-          aoAplicar={aplicarImportacao} aoFechar={() => setImportando(false)} aoIr={irPara} />
-      )}
 
       <ConfirmDialogV2
         aberto={!!confirmaTroca}

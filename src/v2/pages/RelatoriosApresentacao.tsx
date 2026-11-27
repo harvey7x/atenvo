@@ -259,7 +259,7 @@ export default function RelatoriosApresentacao({ f, demo, dadosDemo, orgNome, pe
         {slide.id === 'fim' && (
           <div className="apres-slide" style={{ textAlign: 'center' }} key="fim">
             <B n={1}>
-              <div className="apres-display" style={{ fontSize: 40 }}>ALFA GROUP</div>
+              <div className="apres-display" style={{ fontSize: 40 }}>Atenvo</div>
               <div className="apres-sub">{orgNome} · {periodoLabel}</div>
             </B>
           </div>

@@ -239,7 +239,7 @@ export default function PlanoUsoV2() {
               <rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
             </svg>
             <div>
-              <b>Plano e uso</b> trata da assinatura da sua organização na ALFA GROUP (plano-base e
+              <b>Plano e uso</b> trata da assinatura da sua organização na Atenvo (plano-base e
               adicionais) — diferente de <b>Cobranças</b>, que gerencia as cobranças que a sua
               organização faz aos próprios clientes. O meio de pagamento da assinatura ainda está
               sendo definido; por enquanto a contratação de adicionais é apenas informativa.

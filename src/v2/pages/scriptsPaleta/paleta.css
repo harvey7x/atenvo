@@ -677,18 +677,3 @@ html:root[data-visual="corp"] .v2 .spl-pv-mais { border-radius: 4px; }
 .v2 .spl .spl-rod { height: 34px; padding: 0 14px 0 6px; }
 .v2 .spl .spl-ger { font-size: 10.5px; letter-spacing: .04em; font-weight: 600; }
 .v2 .spl .spl-dicas { font-size: 10px; gap: 12px; }
-
-/* ===== crítica 12/11 — atendimento (paleta de Scripts) =====
-   vidro mais opaco: no claro, o fundo acinzentado e turvo da conversa atrás deixava a paleta suja */
-html[data-barra-alfa][data-tema="light"]:not(#rv-wa) .v2 .spl.vidro-pro.vidro-pro {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(250, 251, 252, .94));
-  -webkit-backdrop-filter: blur(22px) saturate(1.15); backdrop-filter: blur(22px) saturate(1.15);
-}
-html[data-barra-alfa]:not([data-tema="light"]):not(#rv-wa) .v2 .spl.vidro-pro.vidro-pro {
-  background: linear-gradient(160deg, rgba(34, 36, 42, .92), rgba(22, 24, 28, .9));
-  -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
-}
-/* mínimo de 11px na paleta (pílulas, cabeçalhos de grupo, linhas de apoio, contadores, dicas de teclado) */
-html[data-barra-alfa]:not(#rv-wa) .v2 .spl :is(.spl-kbd, .spl-gcab, .spl-gcab-n, .spl-sub-onde, .spl-et-n, .spl-mid-tile b, .spl-pill, .spl-it-sub, .spl-it-n, .spl-pv-linha, .spl-tag, .spl-pv-desc, .spl-dicas) { font-size: 11px; }
-html[data-barra-alfa]:not(#rv-wa) .v2 .spl :is(.spl-usar, .spl-ger) { font-size: 12px; }
-html[data-barra-alfa]:not(#rv-wa) .v2 .spl .spl-var { font-size: inherit; }

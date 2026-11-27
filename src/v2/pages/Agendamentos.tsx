@@ -11,12 +11,11 @@ import {
 import { rangePeriodo, agendaEditavel, agendaReagendavel, statusSequencia, type PeriodoAg } from '@/lib/agendamentoMensagem';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardCab, CardVidro, ConfirmDialogV2, DrawerV2,
-  EstadoErro, EstadoVazio, Input, ModalV2, Segmentado, Skeleton, TabelaPadrao, TrilhoItem,
+  EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Segmentado, Skeleton, TabelaPadrao, TrilhoItem,
   type Coluna, type TomStatus,
 } from '../components';
 import { AgendarMensagemModalV2, type AgendarSubmit, type CanalOpcao } from './AgendarMensagemModalV2';
 import { dataHoraSP as fmtSP, tempoCelula as quandoCelula } from '../lib/tempo';
-import { CartaoMetricaFixo, GradeMetricas } from '../components/CartaoMetrica';
 import './agendamentos.css';
 
 /* ------------------------------------------------------------------
@@ -453,12 +452,12 @@ export default function AgendamentosV2() {
           <div className="ag-main">
             {ehPainel ? (
               <div className="pc-coluna">
-                <GradeMetricas rotulo="Os agendamentos em números">
-                  <CartaoMetricaFixo icone="relogio" titulo="Na fila" valor={painel.naFila} detalhe={<span>{painel.naFila === 1 ? 'agendamento programado' : 'agendamentos programados'}</span>} rodape={<span>Saem sozinhos na hora marcada</span>} />
-                  <CartaoMetricaFixo icone="envia" titulo="Enviadas hoje" valor={painel.enviadasHoje} detalhe={<span>mensagens que já saíram</span>} rodape={<span>Desde a meia-noite</span>} />
-                  <CartaoMetricaFixo icone="alerta" titulo="Precisa de ação" valor={painel.precisaAcao.length} detalhe={<span>falhas e bloqueios</span>} rodape={<span>{painel.precisaAcao.length ? 'Reagende ou abra a conversa' : 'Nada pendente'}</span>} />
-                  <CartaoMetricaFixo icone="porcento" titulo="Taxa de sucesso" valor={`${painel.taxa}%`} detalhe={<span>{painel.temDesfecho ? 'do período filtrado' : 'sem envios no período'}</span>} rodape={<span>Enviadas ÷ (enviadas + falhas)</span>} />
-                </GradeMetricas>
+                <div className="kpis sobe" style={{ marginBottom: 0, animationDelay: '.12s' }}>
+                  <Kpi rotulo="Na fila" valor={painel.naFila} delta={{ tom: 'neutro', texto: 'agendamentos programados' }} />
+                  <Kpi rotulo="Enviadas hoje" valor={painel.enviadasHoje} tomValor={painel.enviadasHoje > 0 ? 'ok' : undefined} delta={{ tom: painel.enviadasHoje > 0 ? 'ok' : 'neutro', texto: 'mensagens que já saíram' }} />
+                  <Kpi rotulo="Precisa de ação" valor={painel.precisaAcao.length} tomValor={painel.precisaAcao.length > 0 ? 'erro' : undefined} delta={{ tom: painel.precisaAcao.length > 0 ? 'erro' : 'neutro', texto: 'falhas e bloqueios' }} />
+                  <Kpi rotulo="Taxa de sucesso" valor={painel.taxa} sufixo="%" delta={{ tom: painel.temDesfecho ? (painel.taxa >= 90 ? 'ok' : 'atencao') : 'neutro', texto: painel.temDesfecho ? 'do período filtrado' : 'sem envios no período' }} />
+                </div>
 
                 <div className="pc-grade sobe" style={{ animationDelay: '.2s' }}>
                   <CardVidro spot className="mo-fixo">

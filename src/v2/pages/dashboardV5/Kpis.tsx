@@ -13,7 +13,7 @@ export const AJUDA_KPIS = {
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
   /* com a API nova do CAF (29/10): a mesma conta do pódio do "Meu painel" */
-  ganhosPlacar: 'Casos completos no sistema da ALFA no período, pela mesma regra do pódio do "Meu painel": data em que o caso ficou completo, vendedor do caso, só os vendedores do campeonato e sem os casos que o gerente tirou da conta. Lido de lá a cada 5 minutos.',
+  ganhosPlacar: 'Casos completos no sistema do administrativo no período, pela mesma regra do pódio do "Meu painel": data em que o caso ficou completo, vendedor do caso, só os vendedores do campeonato e sem os casos que o gerente tirou da conta. Lido de lá a cada 5 minutos.',
   tempo: 'Mediana do tempo entre a chegada do lead e o fechamento, considerando todos os fechados do período. Metade fecha mais rápido do que isso. Embaixo, a média e quantos fechados entraram na conta.',
 };
 

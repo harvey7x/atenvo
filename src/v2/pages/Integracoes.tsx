@@ -15,16 +15,7 @@ import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, ConfirmDialogV2, EstadoErro,
   Kpi, ModalV2, Segmentado, Skeleton, type TomStatus,
 } from '../components';
-import { formatarTelefone } from '../lib/telefone';
 import './integracoes.css';
-// Integrações é a extensão de Configurações › Canais e integrações: a régua da ALFA desta tela mora lá
-import './configuracoes.css';
-
-/* telefone no formato único, mascarado: "(51) •••••-0001" (fora do padrão brasileiro, a máscara de sempre) */
-const numeroMascarado = (n: string | null | undefined) => {
-  const f = formatarTelefone(n, { mascarar: true });
-  return f && f.includes('•') ? f : mascararNumero(n);
-};
 
 /* ------------------------------------------------------------------
    Integrações v2 — hub de conexões (anatomia int-card do mockup;
@@ -244,7 +235,6 @@ export default function IntegracoesV2() {
   const [seed, setSeed] = useState<SeedInt>(seedInt);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
-  const [tecAberto, setTecAberto] = useState(false);   // "Detalhes técnicos" da API oficial (só admin)
 
   const canaisQ = useWaCanais();
   const limiteQ = useWaLimite();
@@ -469,6 +459,10 @@ export default function IntegracoesV2() {
       <div className="ph sobe">
         <div>
           <h2>Integrações</h2>
+          <p>
+            Conexões do canal e serviços do sistema.
+            {demo ? ' · modo demonstração (nada é gravado)' : ''}
+          </p>
         </div>
         <div className="acoes">
           <BotaoSec onClick={() => refresh(true)}>Atualizar</BotaoSec>
@@ -560,8 +554,8 @@ export default function IntegracoesV2() {
                   ...s, canais: s.canais.map((k) => (k.id === c.id ? { ...k, alias: nome } : k)),
                 })))}
                 aoReconectar={() => setReconectar({ id: c.id, alias: c.alias })}
-                aoDesconectar={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + numeroMascarado(c.numero) : ''), modo: 'desconectar' })}
-                aoRemover={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + numeroMascarado(c.numero) : ''), modo: 'ocultar' })}
+                aoDesconectar={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'desconectar' })}
+                aoRemover={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'ocultar' })}
               />
             ))}
           </div>
@@ -578,7 +572,7 @@ export default function IntegracoesV2() {
         <div className="intg-sec-head sobe" style={{ animationDelay: '.2s' }}>
           <div>
             <h3><IcWa /> WhatsApp Cloud API</h3>
-            <p>Canal oficial da Meta, com número verificado e modelos de mensagem aprovados.</p>
+            <p>Canal oficial da Meta — número verificado, modelos de mensagem e webhook próprios.</p>
           </div>
         </div>
         {!demo && cloudQ.isLoading && podeConfig ? (
@@ -590,13 +584,13 @@ export default function IntegracoesV2() {
               <div className="tx">
                 <div className="int-n">
                   <span>WhatsApp Cloud API</span>
-                  <span className="intg-transp">API oficial</span>
+                  <span className="intg-transp">Cloud API · Meta</span>
                 </div>
                 <div className="int-s num">
                   {(() => {
                     if (!cloud) return 'Meta · WhatsApp Business Platform';
                     const at = cloud.canais.find((k) => k.papel !== 'disparo' && k.numero_conectado) ?? cloud.canais[0];
-                    return at?.numero_conectado ? `Meta oficial · ${numeroMascarado(at.numero_conectado)}` : 'Meta oficial · número ainda não confirmado';
+                    return at?.numero_conectado ? `Meta oficial · ${mascararNumero(at.numero_conectado)}` : 'Meta oficial · número ainda não confirmado';
                   })()}
                 </div>
               </div>
@@ -611,54 +605,37 @@ export default function IntegracoesV2() {
               <div className="intg-nota">A configuração da conta oficial fica com administradores e supervisores.</div>
             )}
             {podeConfig && !cloud && !demo && (
-              <div className="intg-nota">A conta oficial ainda não está configurada.</div>
+              <div className="intg-nota">Disponível com o backend configurado.</div>
             )}
 
             {cloud && podeConfig && (
               <>
-                {/* crítica 12/11: endereço, variáveis e IDs são da implantação — ficam recolhidos e só o
-                    administrador os vê (antes apareciam soltos no cartão, como recado de protótipo) */}
-                {currentOrg.role === 'admin' && (
-                  <div className="intg-tec" style={{ marginTop: 10 }}>
-                    <button type="button" aria-expanded={tecAberto} onClick={() => setTecAberto((v) => !v)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: 'var(--txt-2)', padding: '4px 0', background: 'none', border: 0, fontFamily: 'var(--fonte)' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: tecAberto ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><path d="m9.5 6 6 6-6 6" /></svg>
-                      Detalhes técnicos
-                    </button>
-                    {tecAberto && (<>
-                    <div className="mono">
-                      <span title={cloud.webhook_url}>{cloud.webhook_url}</span>
-                      <b role="button" tabIndex={0} onClick={() => copiar(cloud.webhook_url, 'Endereço')}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copiar(cloud.webhook_url, 'Endereço'); } }}>
-                        Copiar
-                      </b>
+                <div className="mono">
+                  <span title={cloud.webhook_url}>{cloud.webhook_url}</span>
+                  <b role="button" tabIndex={0} onClick={() => copiar(cloud.webhook_url, 'Endereço')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copiar(cloud.webhook_url, 'Endereço'); } }}>
+                    Copiar
+                  </b>
+                </div>
+
+                <div className="intg-check">
+                  {([
+                    ['META_WHATSAPP_TOKEN', cloud.secrets.META_WHATSAPP_TOKEN, false],
+                    ['META_WA_APP_SECRET', cloud.secrets.META_WA_APP_SECRET, false],
+                    ['META_WA_VERIFY_TOKEN', cloud.secrets.META_WA_VERIFY_TOKEN, false],
+                    ['CLOUD_API_ATIVO', cloud.cloud_api_ativo, false],
+                    ['CLOUD_BOT_DISPATCH', cloud.bot_dispatch, true],
+                  ] as [string, boolean, boolean][]).map(([nome, ok, neutro]) => (
+                    <div className="it" key={nome}>
+                      <span className={ok ? (neutro ? 'neutro' : 'ok') : neutro ? 'neutro' : 'falta'}>{ok ? '✓' : '✗'}</span>
+                      <b>{nome}</b>
                     </div>
-                    <div className="intg-check">
-                      {([
-                        ['META_WHATSAPP_TOKEN', cloud.secrets.META_WHATSAPP_TOKEN, false],
-                        ['META_WA_APP_SECRET', cloud.secrets.META_WA_APP_SECRET, false],
-                        ['META_WA_VERIFY_TOKEN', cloud.secrets.META_WA_VERIFY_TOKEN, false],
-                        ['CLOUD_API_ATIVO', cloud.cloud_api_ativo, false],
-                        ['CLOUD_BOT_DISPATCH', cloud.bot_dispatch, true],
-                      ] as [string, boolean, boolean][]).map(([nome, ok, neutro]) => (
-                        <div className="it" key={nome}>
-                          <span className={ok ? (neutro ? 'neutro' : 'ok') : neutro ? 'neutro' : 'falta'} aria-label={ok ? 'configurado' : 'faltando'}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{ok ? <path d="m5 12.5 4.5 4.5L19 7.5" /> : <path d="M6 6l12 12M18 6 6 18" />}</svg>
-                          </span>
-                          <b>{nome}</b>
-                        </div>
-                      ))}
-                      {cloud.canais.map((k) => (
-                        <div className="it" key={'id-' + k.id}><b>{(k.nome_interno ?? 'Número oficial') + ' · ID ' + (k.cloud_phone_number_id ?? '—')}</b></div>
-                      ))}
-                    </div>
-                    </>)}
-                  </div>
-                )}
+                  ))}
+                </div>
 
                 {!cloud.canal_disparo_id && cloud.canais.length > 0 && (
                   <div className="intg-alerta t-at">
-                    Sem número de disparo definido: o remarketing por modelo não é enviado (nunca sai pelo número de tráfego).
+                    Sem canal de disparo definido: o remarketing por modelo NÃO envia — ele nunca cai no número de tráfego.
                   </div>
                 )}
 
@@ -682,8 +659,9 @@ export default function IntegracoesV2() {
                             {cloud.canal_disparo_id === k.id && <BadgeStatus tom="neutro">é quem dispara</BadgeStatus>}
                           </div>
                           <div className="sb num">
-                            {k.numero_conectado ? numeroMascarado(k.numero_conectado) : 'número ainda não confirmado'}
-                            {k.cloud_waba_id ? '' : ' · sem conta comercial vinculada: os modelos não sincronizam'}
+                            {k.numero_conectado ? mascararNumero(k.numero_conectado) : 'número ainda não confirmado'}
+                            {` · ID ${k.cloud_phone_number_id ?? '—'}`}
+                            {k.cloud_waba_id ? '' : ' · sem WABA — não sincroniza modelos'}
                           </div>
                         </div>
                         {/* "conectado" sozinho não prova nada — o que prova é a Meta ter devolvido o número */}
@@ -1011,9 +989,9 @@ function CanalCard({ canal: c, h, ea, canais, podeConfig, testando, atraso, ehAt
         <div className="tx">
           <div className="int-n">
             <NomeEditavel nome={c.alias} podeEditar={podeConfig} aoSalvar={aoRenomear} />
-            <span className="intg-transp" title="Número conectado pelo QR Code do aplicativo">QR Code</span>
+            <span className="intg-transp">Evolution · QR</span>
           </div>
-          <div className="int-s num">{c.numero ? numeroMascarado(c.numero) : 'Número não identificado'}</div>
+          <div className="int-s num">{c.numero ? mascararNumero(c.numero) : 'Número não identificado'}</div>
         </div>
         <BadgeStatus tom={st.tom}>{st.t}</BadgeStatus>
       </div>
@@ -1319,7 +1297,7 @@ function DiagnosticoModalV2({ h, canal, podeAgir, atualizando, entregaAuto, prox
         <Par dt="Último recebido" dd={haQuanto(h.lastInbound)} />
         <Par dt="Último entregue" dd={haQuanto(h.lastDelivered)} />
         <Par dt="Webhook" dd={`${h.webhookOk === null ? '—' : h.webhookOk ? 'ativo' : 'inativo'} · ${h.lastWebhookEvent ?? '—'} (${haQuanto(h.lastWebhook)})`} />
-        <Par dt="Versão do conector" dd={h.versao ?? '—'} />
+        <Par dt="Evolution" dd={h.versao ?? '—'} />
         <Par dt="Origem comercial" dd={tipoOrigemLabel(canal?.origemTipo) ?? 'não configurada'} />
         <Par dt="Gestor" dd={canal?.gestorNome ?? '—'} />
       </dl>
@@ -1410,7 +1388,7 @@ function ConfigOrigemModalV2({ canal, demo, aoFechar, aoSalvo }: {
       aoFechar={() => { if (!busy) aoFechar(); }}
       fecharNoVeu={!busy}
       largura={560}
-      titulo={<span>Configurar origem comercial <span style={{ fontWeight: 400, color: 'var(--txt-2)', fontSize: 12 }}>· {canal.numero ? numeroMascarado(canal.numero) : 'Conexão de WhatsApp'}</span></span>}
+      titulo={<span>Configurar origem comercial <span style={{ fontWeight: 400, color: 'var(--txt-2)', fontSize: 12 }}>· {canal.numero ? mascararNumero(canal.numero) : 'Conexão de WhatsApp'}</span></span>}
       rodape={
         <>
           <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
