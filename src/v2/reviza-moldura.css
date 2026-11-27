@@ -1,0 +1,175 @@
+/* =====================================================================
+   MOLDURA PRETA da Reviza (dono 19/11, referência "Sales Dashboard"):
+   "preto com branco, a barra lateral fixa, os dourados, o alaranjado".
+   - A barra lateral e o topo viram UMA moldura preta, sem fios;
+   - o conteúdo é um painel claro de cantos arredondados por dentro dela;
+   - os cards em branco, cantos 16, o PRIMEIRO de cada grade em preto (o
+     destaque da referência), com o ícone num quadradinho laranja;
+   - gráficos dos cards em laranja; botão principal preto com o ícone dourado;
+   - títulos mais fortes (a referência usa peso alto nos títulos e números).
+   Liga com [data-moldura] na raiz, só com [data-barra-alfa]; ausente = o
+   visual de antes, idêntico. Importado DEPOIS de reviza-linear.css.
+
+   ESPECIFICIDADE: prefixo html[data-barra-alfa][data-moldura]×3:not(#rv-mold)
+   (1 id + 4 atributos) — vence a camada Linear (1 id + 3) e a régua (1 id + 1).
+   ===================================================================== */
+
+/* ---- 0. a moldura: preto de ponta a ponta; barra e topo usam os tokens "escuro" sempre ---- */
+/* (!important: o fundo da página vem com !important do modo corporativo) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2.app-v2 { background: #09090B !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .p-app {
+  --ba-fundo: #09090B;
+  --ba-fio: rgba(255, 255, 255, .06);
+  --ba-txt: #F4F4F5;
+  --ba-mudo: #A1A1AA;
+  --ba-rotulo: #6F6F78;
+  --ba-hover: rgba(255, 255, 255, .06);
+  --ba-ativo: rgba(245, 165, 36, .13);
+  --ba-ativo-ico: #F5A524;
+  --ba-ativo-tx: #F7B955;
+  --ba-badge-bg: rgba(245, 165, 36, .16);
+  --ba-badge-tx: #F5A524;
+  --ba-badge-on-tx: #F5A524;
+  --ba-kbd-fio: rgba(255, 255, 255, .1);
+  --ba-kbd-bg: rgba(255, 255, 255, .04);
+  --ba-kbd-tx: #8A8A93;
+  --ba-menu: #151517;
+  --ba-sombra-menu: 0 20px 40px -12px rgba(0, 0, 0, .65);
+  --ba-sombra-trilho: none;
+  --ba-foco: rgba(245, 165, 36, .75);
+}
+/* texto da barra e do topo (e dos menus que abrem deles): claro sobre o preto, nos dois temas */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.ba-barra, .p-topbar) {
+  --txt: #F4F4F5; --txt-2: #B4B4BC; --txt-3: #8A8A93; --tint: 255, 255, 255;
+  --linha: rgba(255, 255, 255, .07); --vidro-a: #151517; --vidro-b: #151517; --surface: #151517;
+  --rp-menu: #151517; --rp-elev: #1F1F22; --rp-campo: #111113; --rp-campo-fio: rgba(255, 255, 255, .1);
+  --lin-fio: rgba(255, 255, 255, .08); --lin-branco: #FFFFFF;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra {
+  background: #09090B; border-right: 0; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2.app-v2 .p-topbar {
+  background: #09090B; border-bottom: 0; box-shadow: none;
+}
+/* item ativo do menu: pílula escura com o texto e o ícone em laranja (a referência) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-item.on {
+  background: var(--ba-ativo); color: var(--ba-ativo-tx); font-weight: 600;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
+
+/* ---- 1. o painel do conteúdo: por dentro da moldura, cantos arredondados ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco {
+  margin: 0 12px 12px 0; border-radius: 20px; overflow: hidden; background: var(--base);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco { box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco > .pagina { background: var(--base); }
+/* escuro: a moldura vai a preto puro para o painel se destacar */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2.app-v2 { background: #000000 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 .p-app { --ba-fundo: #000000; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 :is(.ba-barra, .p-topbar) { background: #000000; }
+@media (max-width: 760px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco { margin: 0 8px 8px; border-radius: 16px; }
+}
+
+/* ---- 2. o claro do conteúdo: fios mais leves, cards com sombra de contato ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco {
+  --lin-fio: #E9E9EC; --linha: #EEEEF0; --d5-fio: #EEEEF0;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  border-radius: 16px;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi) {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+
+/* ---- 3. (títulos e números: a medida e o peso moram em reviza-fundacao.css — 21/11, "nada grande, nada grosso") ---- */
+
+/* ---- 4. o ícone de cada card: quadradinho laranja ao lado do título ---- */
+.v2 .pmc-root.rvm .rvm-ico { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-ico {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; margin-right: 10px; border-radius: 9px;
+  background: rgba(245, 165, 36, .14); color: #F5A524;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-ico {
+  background: #FFF2DD; color: #E5840A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pmc-root.rvm .rvm-cab { min-height: 30px; }
+
+/* ---- 5. (o primeiro card em preto saiu em 21/11: na referência nova os cartões são todos iguais) ---- */
+
+/* ---- 6. botão principal: preto com o ícone dourado (no claro); no escuro segue o dourado ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  color: #FFFFFF; background: #111113; border: 1px solid #111113; border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: #27272A; border-color: #27272A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .btn-pri:not(.btn-mini) svg { color: #F5A524; }
+
+/* ---- 7. seleção: a opção ligada do segmentado é a pílula preta (claro) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .gp-sc-item.on, .kb-ord > .kb-fchip.on) {
+  color: #FFFFFF; background: #111113; box-shadow: none;
+}
+/* (as abas do Dashboard continuam sublinhadas, com o marcador dourado — camada Linear) */
+
+/* ---- 8. BARRA LATERAL MINIMALISTA (dono 19/11: "da pra deixar menor? mais minimalista") ----
+   212px (era 260), itens de 30px, ícones de 15, rótulos de grupo menores e mais juntos, a marca e a
+   busca menores. A gaveta do celular (toque) segue com os alvos grandes. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 { --ba-cheia: 222px; }   /* 222: "Unificador de documentos" cabe inteiro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra {
+  & .ba-in { padding: 10px 8px; }
+  & .ba-cab { margin-bottom: 6px; }
+  & .ba-ws-gat { gap: 9px; padding: 4px; }
+  & .ba-ws-nome { font-size: 12.5px; line-height: 15px; }
+  & .ba-ws-amb { font-size: 11px; line-height: 14px; }
+  & .ba-cab-bt { width: 24px; height: 24px; }
+  & .ba-grupos { gap: 10px; margin-top: 2px; }
+  & .ba-grupo { gap: 1px; }
+  & .ba-grupo-rot { margin-bottom: 2px; padding: 0 9px; font-size: 10px; letter-spacing: .07em; }
+  & .ba-item { padding: 5px 8px 5px 9px; font-size: 12.5px; line-height: 20px; border-radius: 7px; }
+  & .ba-item-pri { gap: 9px; }
+  & .ba-ico, & .ba-ico svg { width: 15px; height: 15px; }
+  & .ba-badge { min-width: 18px; height: 18px; font-size: 10px; padding: 0 5px; }
+  & .ba-item.ba-busca { height: 30px; padding: 0 5px 0 9px; border-radius: 7px; }
+  & .ba-kbd { height: 18px; padding: 0 5px; font-size: 9.5px; }
+  & .ba-grupos > .ba-grupo:first-child { margin-bottom: 2px; }
+  & .ba-pe { margin-top: 8px; padding-top: 8px; gap: 1px; }
+  & .ba-versao { padding: 6px 9px 0; font-size: 10px; }
+}
+
+/* ---- 9. O DOURADO DA CASA, mais quente (dono 19/11: "troca essa cor por algo mais dourado,
+   alaranjado, que combina com o sistema"): o acento sai do mostarda (#B8860B no claro) para o
+   dourado-laranja da moldura. O texto em dourado (--rv-tinta) segue um tom mais fundo, legível no branco. ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 {
+  --azul: #EE9A1C; --azul-rgb: 238, 154, 28; --platina-a: #EE9A1C; --platina-b: #EE9A1C; --rv-tinta: #A8650A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-mold) .v2 {
+  --azul: #F5A82E; --azul-rgb: 245, 168, 46; --platina-a: #F5A82E; --platina-b: #F5A82E;
+}
+/* a barra do mês escolhido (Recebido por mês) e as barras parciais: o dourado em degradê suave, de cima para baixo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pn-graf-col.on .pn-graf-bar {
+  background: linear-gradient(180deg, #F8BE5C 0%, #EE9A1C 60%, #E08712 100%);
+  border-radius: 7px 7px 2px 2px;
+}
+
+/* ---- 10. A MARCA: o quadrado em dourado-laranja com brilho no alto, o desenho escuro e um halo ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra .ba-ws-marca {
+  width: 32px; height: 32px; border-radius: 9px; color: #1B1206;
+  background:
+    radial-gradient(120% 75% at 28% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 58%),
+    linear-gradient(150deg, #FFDC85 0%, #F7B23D 45%, #E3830F 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .28),
+    inset 0 -2px 5px rgba(120, 58, 0, .28),
+    0 6px 16px -6px rgba(245, 160, 40, .6);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .ba-barra .ba-ws-marca svg { width: 20px; height: 20px; filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .35)); }
+
+/* ---- 11. MENOS RISCOS: sem o fio sob o título da página e sob a barra do mês — o espaço separa ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pagina > .ph { border-bottom: 0; padding-bottom: 6px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 .pn-barra { border-bottom: 0; padding-bottom: 4px; }
+/* subtítulos de cartão um tom mais apagados; o número fala mais alto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-mold) .v2 :is(.pn-card-cab p, .card-cab p, .d5-sec-sub) { color: var(--txt-3); }
+/* linhas de tabela mais leves */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-mold) .v2 .palco :is(tbody tr, .d5-tab tbody tr) { border-color: #F0F0F2; }

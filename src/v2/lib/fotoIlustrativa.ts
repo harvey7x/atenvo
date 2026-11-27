@@ -1,13 +1,15 @@
 /* Foto ILUSTRATIVA do cliente no card do Kanban (dono 29/10: "fotos de idosos, homens,
    mulheres, nas pessoinhas… umas 10 fotos e pode repetir"). Não é o cliente: 10 retratos
-   livres (Unsplash, ver public/avatares/idosos/CREDITOS.md), escolhidos pelo primeiro nome
+   livres (Unsplash, ver src/v2/assets/idosos/CREDITOS.md — só lá: o build embute/aponta pelo
+   import.meta.glob, a cópia em public/ saiu porque ia duplicada no deploy), escolhidos pelo primeiro nome
    (palpite de mulher/homem) e fixos por cliente (mesmo id → mesma foto). */
 
 import { FEMININOS_SEM_A, MASCULINOS_COM_A } from './nomesGenero';
 
-const BASE = '/avatares/idosos/';
-const MULHERES = ['f1', 'f2', 'f3', 'f4', 'f5'].map((f) => `${BASE}${f}.webp`);
-const HOMENS = ['h1', 'h2', 'h3', 'h4', 'h5'].map((f) => `${BASE}${f}.webp`);
+const ARQ = import.meta.glob('../assets/idosos/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const foto = (f: string) => ARQ[`../assets/idosos/${f}.webp`];
+const MULHERES = ['f1', 'f2', 'f3', 'f4', 'f5'].map(foto);
+const HOMENS = ['h1', 'h2', 'h3', 'h4', 'h5'].map(foto);
 const TODAS = [...MULHERES, ...HOMENS];
 
 /** Exceções à regra "termina em 'a' = mulher", tiradas do IBGE (Censo 2010) — ver nomesGenero.ts.

@@ -6,7 +6,11 @@
   "description": "Atenvo — Plataforma de Atendimento e Gestão (frontend definitivo · fase funcional)",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "vite --mode demo",
+    "dev:reviza": "vite --mode reviza",
     "build": "tsc --noEmit && vite build",
+    "build:demo": "tsc --noEmit && vite build --mode demo",
+    "build:reviza": "tsc --noEmit && vite build --mode reviza",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -17,6 +21,7 @@
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.45.4",
     "@tanstack/react-query": "^5.101.0",

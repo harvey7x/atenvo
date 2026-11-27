@@ -1,0 +1,70 @@
+/* =====================================================================
+   Figuras de demonstração da configuração inicial (prefixo cfig-).
+
+   Ilustrações SVG estilo mockup de interface: mostram a tela que a
+   pessoa vai ver fora do sistema (Excel, Drive, Planilhas, Google
+   Cloud, Apps Script) e ONDE clicar. Não são capturas reais — é desenho
+   vetorial, nítido nos dois temas:
+   · cor SÓ por var(--token) ou currentColor (nada de hex aqui);
+   · realce DOURADO (var(--azul): anel + seta) marca o ponto de clique;
+   · superfícies/fantasmas no canal de tinta rgba(var(--tint), α),
+     que inverte a luminância sozinho entre dark e light;
+   · moldura de "janela de navegador" (3 pontos + endereço) em toda
+     figura — o passo acontece fora do sistema;
+   · texto segue a escala da configuração (11 / 12.5 / 13.5).
+   ===================================================================== */
+
+.v2 .cfig { display: block; width: 100%; height: auto; font-family: var(--fonte); }
+
+/* ---------- moldura do navegador ---------- */
+.v2 .cfig-jan { fill: var(--vidro-b); stroke: rgba(var(--tint), .14); }
+.v2 .cfig-jan-div { stroke: rgba(var(--tint), .10); }
+.v2 .cfig-jan-pt { fill: rgba(var(--tint), .20); }
+.v2 .cfig-jan-end { fill: rgba(var(--tint), .05); stroke: rgba(var(--tint), .09); }
+
+/* ---------- texto ---------- */
+.v2 .cfig-tit { font-size: 13.5px; font-weight: 600; fill: var(--txt); }
+.v2 .cfig-tx { font-size: 12.5px; fill: var(--txt); }
+.v2 .cfig-tx-f { font-size: 12.5px; font-weight: 600; fill: var(--txt); }
+.v2 .cfig-rot { font-size: 11px; fill: var(--txt-2); }
+.v2 .cfig-mono,
+.v2 .cfig-mono-f {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px; fill: var(--txt-2);
+}
+.v2 .cfig-mono-f { fill: var(--txt); font-weight: 600; }
+
+/* ---------- superfícies da "tela" ---------- */
+.v2 .cfig-sup { fill: rgba(var(--tint), .035); stroke: rgba(var(--tint), .09); }
+/* painel elevado (menu aberto, modal): base opaca + véu de tinta — nada vaza por trás */
+.v2 .cfig-painel-base { fill: var(--base); }
+.v2 .cfig-painel { fill: rgba(var(--tint), .065); stroke: rgba(var(--tint), .18); }
+.v2 .cfig-sep { stroke: rgba(var(--tint), .12); }
+.v2 .cfig-linha { stroke: rgba(var(--tint), .07); }
+.v2 .cfig-ghost { fill: rgba(var(--tint), .10); }
+.v2 .cfig-ghost-2 { fill: rgba(var(--tint), .055); }
+/* conteúdo de fundo (atrás de um modal): apagado em grupo, sem véu */
+.v2 .cfig-fundo { opacity: .5; }
+
+/* ---------- controles ilustrados ---------- */
+.v2 .cfig-bt { fill: rgba(var(--tint), .07); stroke: rgba(var(--tint), .16); }
+.v2 .cfig-bt-pri { fill: rgba(var(--tint), .15); stroke: rgba(var(--tint), .22); }
+.v2 .cfig-campo { fill: rgba(var(--tint), .035); stroke: rgba(var(--tint), .17); }
+.v2 .cfig-chip { fill: rgba(var(--tint), .07); stroke: rgba(var(--tint), .14); }
+.v2 .cfig-radio { fill: none; stroke: rgba(var(--tint), .3); stroke-width: 1.5; }
+.v2 .cfig-chk { fill: none; stroke: rgba(var(--tint), .3); stroke-width: 1.5; }
+
+/* ícones de traço (família do menu: 1.7 na grade 24 ≈ 2 com a escala) */
+.v2 .cfig-ic { color: var(--txt-2); stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.v2 .cfig-ic-forte { color: var(--txt); }
+
+/* ---------- realce dourado (ponto de clique / seleção) ---------- */
+.v2 .cfig-realce { fill: rgba(var(--azul-rgb), .09); stroke: var(--azul); stroke-width: 1.75; }
+.v2 .cfig-realce-halo { fill: none; stroke: rgba(var(--azul-rgb), .22); stroke-width: 5; }
+.v2 .cfig-seta { fill: none; stroke: var(--azul); stroke-width: 2; stroke-linecap: round; }
+.v2 .cfig-seta-pta { fill: var(--azul); }
+/* seleção que não é clique (aba ativa, radio marcado): tinta cheia, sem anel */
+.v2 .cfig-sel { fill: var(--azul); }
+
+/* cursor do mouse (contorno na base p/ destacar sobre qualquer superfície) */
+.v2 .cfig-cursor { fill: var(--txt); stroke: var(--base); stroke-width: 1.4; stroke-linejoin: round; }

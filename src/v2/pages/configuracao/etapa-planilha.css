@@ -1,0 +1,442 @@
+/* ============================================================
+   Configuração inicial — ETAPA 1 "Planilha de clientes".
+   Prefixo EXCLUSIVO cpl- (colisoesCss.test.ts). Só tokens v2:
+   claro/escuro saem sozinhos. Também carregado pelo painel de
+   sincronização da Gestão (SyncPainel reusa as peças exportadas).
+
+   Escala (regras comuns; guarda em escalaVisualSync.test.ts):
+   · fonte: 11 · 12.5 · 13.5 · 15 · 20 · 28 (nada fora disso);
+   · raio: var(--r-card) · var(--r-ctl) · 50% · 999px;
+   · espaço: 4/8/12/16/24/32/48;
+   · cor: --txt texto; --txt-2 todo texto secundário; --txt-3 SÓ
+     placeholder/separador/chevron/desabilitado; --azul = atual,
+     seleção, progresso, foco; --verde só concluído; --ambar só
+     risco real; --rubro só erro. --X-bg só em tile/marcador.
+   ============================================================ */
+.v2 .cpl-raiz { display: flex; flex-direction: column; gap: 16px; min-width: 0; color: var(--txt); }
+.v2 .cpl-raiz p, .v2 .cpl-link p, .v2 .cpl-chave p, .v2 .cpl-testar p, .v2 .cpl-conf p, .v2 .cpl-conta p { margin: 0; }
+/* largura INTRÍNSECA zero (width 0 + min-width 100%): texto sem quebra (e-mail no resumo, nome
+   de arquivo, código) não alarga o painel do assistente quando ele se ajusta ao conteúdo (360px) */
+.v2 .cpl-passo-res, .v2 .cpl-arq-nome, .v2 .cpl-codigo-pre, .v2 .cpl-id-1l { width: 0; min-width: 100%; }
+.v2 .cpl-vh {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------- foco: o mesmo anel do Painel aprovado ---------- */
+:root .v2 .cpl-raiz :is(a, button, input, summary, [tabindex]):focus-visible,
+:root .v2 :is(.cpl-link, .cpl-chave, .cpl-testar, .cpl-conf, .cpl-conta, .cpl-reg, .cpl-ajuda) :is(a, button, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgba(var(--azul-rgb, 240, 188, 78), .7); outline-offset: 2px;
+}
+:root .v2 .cpl-res-linha:focus-visible, :root .v2 .cpl-codigo-pre:focus-visible { outline-offset: -2px; }
+
+/* ---------- botões dentro da etapa (40 no card; 44 no toque) ---------- */
+.v2 .cpl-raiz .p-btn:not(.btn-mini) { min-height: 40px; padding: 0 16px; font-size: 13.5px; justify-content: center; }
+.v2 .cpl-raiz .p-btn.btn-pri:not(.btn-mini) { min-width: 152px; }
+.v2 .cpl-raiz .p-btn.btn-mini { min-height: 30px; padding: 0 10px; gap: 6px; font-size: 12.5px; border-radius: var(--r-ctl); }
+.v2 .cpl-a { text-decoration: none; }
+/* primário desabilitado NEUTRO: (0,7,0) vence os pares dourados do skinAurora (0,5,0) e o corp (0,4,1) */
+:root .v2 .cpl-raiz .p-btn.btn-pri:disabled:not([aria-busy="true"]) {
+  opacity: 1; background: rgba(var(--tint), .06); color: var(--txt-3); border-color: rgba(var(--tint), .08);
+  box-shadow: none; transform: none; cursor: not-allowed;
+}
+:root .v2 .cpl-raiz .p-btn.btn-pri:disabled:not([aria-busy="true"])::after { display: none; }
+:root .v2 .cpl-raiz .p-btn.btn-pri[aria-busy="true"] { opacity: .85; cursor: progress; }
+
+/* ---------- cabeçalho próprio (só com comCabecalho; no assistente o card já traz) ---------- */
+.v2 .cpl-topo { display: flex; flex-direction: column; gap: 4px; }
+.v2 .cpl-titulo { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; }
+
+/* ---------- stepper vertical A–F ---------- */
+.v2 .cpl-passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.v2 .cpl-passo { position: relative; }
+/* fio que liga um marcador ao próximo (passa pelo corpo aberto) */
+.v2 .cpl-passo::before {
+  content: ""; position: absolute; left: 13.5px; top: 40px; bottom: -12px; width: 1px;
+  background: var(--linha);
+}
+.v2 .cpl-passo:last-child::before { display: none; }
+.v2 .cpl-passo-concluido::before { background: rgba(var(--verde-rgb), .45); }
+
+.v2 .cpl-passo-h { margin: 0; font: inherit; }
+/* a área clicável "sangra" 8px à esquerda: hover e anel de foco envolvem o marcador com
+   respiro; o marcador (e o fio do ::before) não saem do lugar */
+.v2 .cpl-passo-cab {
+  width: calc(100% + 8px); min-height: 52px; display: grid; grid-template-columns: 28px minmax(0, 1fr) 14px; align-items: center; gap: 16px;
+  margin-left: -8px; padding: 0 8px; border: 0; border-radius: var(--r-ctl);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background .15s var(--ease);
+}
+/* hover só com ponteiro de verdade: no toque o :hover "gruda" depois do tap */
+@media (hover: hover) { .v2 .cpl-passo-cab:hover { background: rgba(var(--tint), .03); } }
+
+.v2 .cpl-marca {
+  position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--txt-2); background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .14);
+  transition: border-color .2s var(--ease), color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.v2 .cpl-passo-atual .cpl-marca {
+  color: var(--azul, #F0BC4E); background: transparent; border: 1.5px solid var(--azul, #F0BC4E);
+  box-shadow: 0 0 0 4px rgba(var(--azul-rgb, 240, 188, 78), .12);
+}
+/* no claro o dourado não é cor de texto pequeno (≈3:1): a letra fica em --txt, o ouro só no anel */
+:root[data-tema="light"] .v2 .cpl-passo-atual .cpl-marca { color: var(--txt); }
+.v2 .cpl-passo-concluido .cpl-marca { color: var(--verde); background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .35); }
+
+.v2 .cpl-passo-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.v2 .cpl-passo-tit { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt); }
+.v2 .cpl-passo-pendente .cpl-passo-tit { font-weight: 550; color: var(--txt-2); }
+/* aberto (mesmo fora da ordem): o título do passo que está na tela é texto principal */
+.v2 .cpl-passo-pendente.cpl-passo-aberto .cpl-passo-tit { font-weight: 600; color: var(--txt); }
+.v2 .cpl-passo-res {
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cpl-passo-seta { color: var(--txt-3); transform: rotate(-90deg); transition: transform .2s var(--ease); }
+.v2 .cpl-passo-aberto .cpl-passo-seta { transform: none; }
+
+.v2 .cpl-passo-corpo { padding: 4px 0 24px 44px; animation: cpl-entra .22s var(--ease); }
+
+/* ---------- conteúdo dos passos ---------- */
+.v2 .cpl-corpo { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.v2 .cpl-intro { font-size: 13.5px; line-height: 1.55; color: var(--txt-2); max-width: 64ch; }
+.v2 .cpl-intro b { font-weight: 600; color: var(--txt); }
+.v2 .cpl-acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.v2 .cpl-carregando { display: flex; align-items: center; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+
+/* guia numerada: a ação numa linha; menus, detalhe e link à parte */
+.v2 .cpl-guia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; max-width: 64ch; }
+.v2 .cpl-guia > li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; }
+.v2 .cpl-guia-n { font-size: 12.5px; font-weight: 600; line-height: 21px; color: var(--txt-2); }
+.v2 .cpl-guia-corpo { min-width: 0; }
+.v2 .cpl-guia-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-nome { font-weight: 600; color: var(--txt); }
+.v2 .cpl-guia-det { margin-top: 6px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+/* depois dos chips do menu: respiro para a nota não colar na borda deles */
+.v2 .cpl-trilha-menu + .cpl-guia-det { margin-top: 8px; }
+.v2 .cpl-link-ext {
+  font-weight: 600; color: var(--txt); white-space: nowrap;
+  text-decoration: underline; text-decoration-color: rgba(var(--tint), .3); text-underline-offset: 3px;
+}
+.v2 .cpl-link-ext:hover { text-decoration-color: currentColor; }
+.v2 .cpl-link-ext svg { display: inline; margin-left: 4px; vertical-align: -2px; color: var(--txt-2); }
+
+/* caminho de menus: chips encadeados por chevron. Cada par (chevron + chip) ocupa 6+11+6 = 23px de
+   seta; a trilha recua 23px e recorta esse recuo: o chevron do começo de cada linha some */
+.v2 .cpl-trilha-menu {
+  display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; margin: 6px 0 0 -23px; clip-path: inset(0 0 0 23px);
+}
+.v2 .cpl-menu-par { display: inline-flex; align-items: center; gap: 6px; padding-left: 6px; }
+.v2 .cpl-menu-it {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-ctl);
+  font-size: 12.5px; font-weight: 550; line-height: 1; white-space: nowrap; color: var(--txt);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .10);
+}
+.v2 .cpl-menu-sep { flex: none; color: var(--txt-3); }
+
+/* ---------- instrução + demonstração (figuras de cena) ---------- */
+/* figura de sincronia no topo da etapa: centrada, na largura de leitura */
+.v2 .cpl-sinc { margin: 0 auto; width: min(460px, 100%); }
+
+/* texto numerado à esquerda, figura à direita; no estreito empilha (a figura vem DEPOIS do texto) */
+.v2 .cpl-demo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 32px; align-items: start; }
+.v2 .cpl-demo-fig { margin: 0 auto; width: min(460px, 100%); min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2 .cpl-demo-tela { animation: cpl-fade .18s var(--ease); }
+.v2 .cpl-demo-leg { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); text-align: center; text-wrap: balance; }
+.v2 .cpl-demo-item { font-weight: 600; color: var(--txt); }
+
+/* número-botão (guia com mais de uma cena): clicar realça o item e troca a figura */
+.v2 .cpl-guia-demo > li { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
+.v2 .cpl-guia-num {
+  width: 24px; height: 24px; margin-top: -2px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid rgba(var(--tint), .14); background: rgba(var(--tint), .04);
+  color: var(--txt-2); font: inherit; font-size: 12.5px; font-weight: 600; line-height: 1; cursor: pointer;
+  transition: border-color .15s var(--ease), color .15s var(--ease), box-shadow .15s var(--ease);
+}
+@media (hover: hover) { .v2 .cpl-guia-num:hover { color: var(--txt); border-color: rgba(var(--tint), .32); } }
+.v2 .cpl-guia-on .cpl-guia-num {
+  color: var(--txt); background: transparent;
+  border: 1.5px solid var(--azul, #F0BC4E); box-shadow: 0 0 0 4px rgba(var(--azul-rgb, 240, 188, 78), .12);
+}
+
+/* no largo, a figura acompanha a leitura (o passo A é alto: a cena fica à vista ao trocar) */
+@media (min-width: 880px) {
+  .v2 .cpl-demo { grid-template-columns: minmax(0, 1fr) minmax(280px, 344px); }
+  .v2 .cpl-demo-fig { position: sticky; top: 16px; width: auto; margin: 0; }
+}
+
+/* ---------- receitas de estado ---------- */
+/* BLOCO SEMÂNTICO: fundo neutro, borda na cor, tile com o ícone (no máximo um por card) */
+.v2 .cpl-sem {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 16px; border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .10);
+}
+.v2 .cpl-sem-at { border-color: rgba(var(--ambar-rgb), .35); }
+.v2 .cpl-sem-er { border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .cpl-sem-tile { width: 32px; height: 32px; border-radius: var(--r-ctl); display: grid; place-items: center; }
+.v2 .cpl-sem-at .cpl-sem-tile { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .cpl-sem-er .cpl-sem-tile { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .cpl-sem-corpo { min-width: 0; min-height: 32px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.v2 .cpl-sem-tit { font-size: 13.5px; font-weight: 650; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-sem-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cpl-sem-so .cpl-sem-tx { color: var(--txt); }
+
+/* SUPERFÍCIE NEUTRA (confirmações, nota de segurança, indisponível, registros) */
+.v2 .cpl-neutro, .v2 .cpl-confirma, .v2 .cpl-reg { border-radius: var(--r-ctl); background: rgba(var(--tint), .035); }
+.v2 .cpl-neutro { padding: 16px; }
+.v2 .cpl-neutro-nota { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; }
+.v2 .cpl-neutro-ic { display: flex; align-items: center; height: 21px; color: var(--txt-2); }
+.v2 .cpl-neutro-corpo { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2 .cpl-neutro-tit { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-neutro-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+
+/* LINHA DE STATUS: sem fundo; ícone na cor semântica */
+.v2 .cpl-status { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 12px; align-items: start; }
+.v2 .cpl-status-ic { display: flex; align-items: center; height: 21px; }
+.v2 .cpl-status-ok .cpl-status-ic { color: var(--verde); }
+.v2 .cpl-status-er .cpl-status-ic { color: var(--rubro); }
+.v2 .cpl-status-info .cpl-status-ic { color: var(--txt-2); }
+.v2 .cpl-status-corpo { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cpl-status-tit { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-status-det { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-status-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-status-info .cpl-status-tx { color: var(--txt-2); }
+
+.v2 .cpl-erro { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; color: var(--rubro); }
+.v2 .cpl-erro svg { flex: none; margin-top: 3px; }
+
+/* atalho só da prévia: botão de texto discreto */
+.v2 .cpl-previa {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 0;
+  border: 0; background: none; color: var(--txt-2); font: inherit; font-size: 12.5px; line-height: 1.5; cursor: pointer;
+}
+.v2 .cpl-previa:hover { color: var(--txt); }
+.v2 .cpl-previa:hover .cpl-previa-tx { text-decoration: underline; text-underline-offset: 3px; }
+.v2 .cpl-previa-tag, .v2 .cpl-tag-op {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; line-height: 1;
+  color: var(--txt-2); background: rgba(var(--tint), .06);
+}
+
+/* ---------- (A) link ---------- */
+.v2 .cpl-link { display: flex; flex-direction: column; gap: 8px; }
+.v2 .cpl-rot { font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-link-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.v2 .cpl-link .cpl-link-inp { flex: 1 1 260px; min-width: 0; width: auto; height: 40px; border-radius: var(--r-ctl); font-size: 13.5px; }
+.v2 .cpl-link .inp.cpl-inv { border-color: rgba(var(--rubro-rgb), .55); }
+.v2 .cpl-link .inp.cpl-inv:focus { box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); }
+.v2 .cpl-link-dica { min-height: 20px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-ok-tx { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--txt-2); }
+.v2 .cpl-ok-ic { flex: none; color: var(--verde); }
+.v2 .cpl-er-tx { color: var(--rubro); }
+/* mono: sem caixa nem borda */
+.v2 .cpl-id, .v2 .cpl-email {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5;
+  color: var(--txt); overflow-wrap: anywhere;
+}
+.v2 .cpl-id-1l { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+
+/* linhas "registrado" (planilha, conta, arquivo escolhido): superfície neutra */
+.v2 .cpl-reg { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 16px; }
+.v2 .cpl-tile {
+  width: 32px; height: 32px; border-radius: var(--r-ctl); display: grid; place-items: center;
+  color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08);
+}
+.v2 .cpl-reg-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cpl-reg-rot { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-reg-acoes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.v2 .cpl-conta { display: flex; flex-direction: column; gap: 8px; }
+.v2 .cpl-conta-nota { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-copiar { flex: none; }
+
+/* ---------- (C) chave: área de soltar ---------- */
+.v2 .cpl-chave { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cpl-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 136px; padding: 24px 16px; text-align: center;
+  border: 1.5px dashed rgba(var(--tint), .22); border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .02); cursor: pointer;
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.v2 .cpl-drop:hover { border-color: rgba(var(--tint), .40); }
+.v2 .cpl-drop-on, .v2 .cpl-drop-on:hover { border-style: solid; border-color: var(--azul, #F0BC4E); background: rgba(var(--azul-rgb, 240, 188, 78), .06); }
+.v2 .cpl-drop-erro { border-color: rgba(var(--rubro-rgb), .5); }
+.v2 .cpl-drop-ic {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 4px; border-radius: var(--r-ctl);
+  color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08);
+}
+.v2 .cpl-drop-tit { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-drop-sub { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-arq-nome { font-size: 13.5px; font-weight: 600; line-height: 1.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .cpl-arq-meta { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+
+/* ---------- (D) teste ---------- */
+.v2 .cpl-testar { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cpl-teste-cab { display: flex; align-items: baseline; gap: 12px; }
+.v2 .cpl-teste-hora { margin-left: auto; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+/* cada fato traz o seu separador; o do começo de cada linha cai fora do recorte (nada de ponto órfão ao quebrar) */
+.v2 .cpl-fatos {
+  display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; margin-left: -19px; clip-path: inset(0 0 0 19px);
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2);
+}
+.v2 .cpl-fato { display: inline-flex; align-items: center; gap: 4px; }
+.v2 .cpl-fato::before {
+  content: ""; flex: none; width: 3px; height: 3px; margin: 0 4px 0 8px; border-radius: 50%; background: var(--txt-3);
+}
+.v2 .cpl-fato-ok { color: var(--verde); }
+.v2 .cpl-fato-er { color: var(--rubro); }
+.v2 .cpl-teste-corr {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(var(--tint), .08);
+}
+.v2 .cpl-teste-corr-rot { font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--txt-2); }
+
+/* ---------- (E) conferência ---------- */
+.v2 .cpl-conf { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cpl-conf-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2); font-variant-numeric: tabular-nums;
+}
+.v2 .cpl-conf-cab b { font-weight: 600; color: var(--txt); }
+/* resumo: UM contêiner, linhas separadas por fio */
+.v2 .cpl-resumo { list-style: none; margin: 0; padding: 0; border: 1px solid rgba(var(--tint), .10); border-radius: var(--r-ctl); overflow: hidden; }
+.v2 .cpl-res-item + .cpl-res-item { border-top: 1px solid rgba(var(--tint), .06); }
+.v2 .cpl-res-linha {
+  width: 100%; display: grid; grid-template-columns: 56px minmax(0, 1fr) 14px; align-items: center; gap: 16px;
+  padding: 12px 16px 12px 8px; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background .15s var(--ease);
+}
+@media (hover: hover) { .v2 .cpl-res-linha:hover:not(:disabled) { background: rgba(var(--tint), .03); } }
+.v2 .cpl-res-linha:disabled { cursor: default; }
+.v2 .cpl-res-linha:disabled .cpl-res-n, .v2 .cpl-res-linha:disabled .cpl-res-rot { color: var(--txt-2); }
+.v2 .cpl-res-on .cpl-res-linha { background: rgba(var(--tint), .03); }
+.v2 .cpl-res-n { text-align: right; font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.2; color: var(--txt); }
+.v2 .cpl-res-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cpl-res-rot { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt); }
+.v2 .cpl-res-ef { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-res-seta { color: var(--txt-3); transition: transform .2s var(--ease); }
+.v2 .cpl-res-on .cpl-res-seta { transform: rotate(180deg); }
+.v2 .cpl-res-lista { border-top: 1px solid rgba(var(--tint), .06); background: rgba(var(--tint), .02); }
+.v2 .cpl-lista-itens { list-style: none; margin: 0; padding: 0; max-height: 264px; overflow-y: auto; }
+.v2 .cpl-lista-itens > li {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 8px 16px; font-size: 12.5px; line-height: 1.5; border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .cpl-lista-itens > li:last-child { border-bottom: 0; }
+.v2 .cpl-lista-nome { min-width: 0; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .cpl-lista-det { flex: none; max-width: 60%; text-align: right; color: var(--txt-2); }
+.v2 .cpl-lista-mais {
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2); border-top: 1px solid rgba(var(--tint), .06);
+}
+
+/* confirmação inline (o assistente é takeover: modal ficaria por baixo) — superfície neutra */
+.v2 .cpl-confirma { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+.v2 .cpl-confirma-tit { font-size: 15px; font-weight: 650; line-height: 1.6; color: var(--txt); }
+.v2 .cpl-confirma-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cpl-confirma-tx b { font-weight: 600; color: var(--txt); }
+.v2 .cpl-confirma .cpl-acoes { margin-top: 8px; }
+
+/* ---------- (F) automático ---------- */
+.v2 .cpl-auto { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0; }
+.v2 .cpl-auto .tgl { margin-top: 1px; }
+.v2 .cpl-auto-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cpl-auto-tit { font-size: 13.5px; font-weight: 600; line-height: 1.55; }
+.v2 .cpl-auto-sub { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+
+/* recolhíveis (ajuda / atualização na hora): sem caixa, só fios */
+.v2 .cpl-ajuda { border-top: 1px solid rgba(var(--tint), .06); border-bottom: 1px solid rgba(var(--tint), .06); }
+.v2 .cpl-ajuda > summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px;
+  font-size: 13.5px; font-weight: 600; color: var(--txt-2); cursor: pointer; border-radius: var(--r-ctl);
+  transition: color .15s var(--ease);
+}
+.v2 .cpl-ajuda > summary::-webkit-details-marker { display: none; }
+.v2 .cpl-ajuda > summary:hover { color: var(--txt); }
+.v2 .cpl-ajuda-seta { flex: none; color: var(--txt-3); transform: rotate(-90deg); transition: transform .2s var(--ease); }
+.v2 .cpl-ajuda[open] > summary .cpl-ajuda-seta { transform: none; }
+.v2 .cpl-ajuda-lista { margin: 0; display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px 21px; }
+.v2 .cpl-ajuda-item dt { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-ajuda-item dd { margin: 2px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cpl-nahora-ic { flex: none; }
+.v2 .cpl-nahora .cpl-tag-op { margin-left: 4px; }
+.v2 .cpl-nahora-corpo { display: flex; flex-direction: column; gap: 16px; padding: 0 0 16px 21px; }
+
+/* código do Apps Script (overflow hidden aqui pode: não há sticky dentro) */
+.v2 .cpl-codigo { border: 1px solid rgba(var(--tint), .10); border-radius: var(--r-ctl); overflow: hidden; }
+.v2 .cpl-codigo-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 8px 8px 16px; font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--txt-2);
+  background: rgba(var(--tint), .03); border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .cpl-codigo-pre {
+  margin: 0; max-height: 280px; overflow: auto; padding: 12px 16px;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.6;
+  white-space: pre; tab-size: 2; color: var(--txt); background: rgba(var(--tint), .02);
+}
+
+/* ---------- rodapé fixo de ações (receita comum, idêntica ao .cini-pe) ---------- */
+.v2 .cpl-pe {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px;
+  margin: 24px calc(1px - var(--cini-pad, 32px)) calc(1px - var(--cini-pad, 32px));
+  padding: 12px calc(var(--cini-pad, 32px) - 1px);
+  border-top: 1px solid var(--linha); border-radius: 0 0 calc(var(--r-card) - 1px) calc(var(--r-card) - 1px);
+  background: linear-gradient(rgba(var(--tint), .055), rgba(var(--tint), .055)), var(--base);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, .22);
+}
+:root[data-tema="light"] .v2 .cpl-pe { background: var(--vidro-a); box-shadow: 0 -6px 16px rgba(22, 25, 31, .06); }
+:root[data-perf="lite"] .v2 .cpl-pe { background: var(--vidro-a); }
+.v2 .cpl-pe-dica { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cpl-pe-acoes { display: flex; gap: 8px; flex-shrink: 0; }
+.v2 .cpl-pe-prog { align-items: center; gap: 12px; }
+.v2 .cpl-pe-barra { flex: none; width: 64px; height: 4px; border-radius: 999px; background: rgba(var(--tint), .12); overflow: hidden; }
+.v2 .cpl-pe-barra > span {
+  display: block; height: 100%; border-radius: inherit;
+  background: var(--azul, #F0BC4E); transition: width .45s var(--ease);
+}
+.v2 .cpl-pe-ok { font-size: 13.5px; line-height: 1.55; color: var(--txt); }
+.v2 .cpl-pe-ok b { font-weight: 600; }
+.v2 .cpl-pe-ic { display: flex; align-items: center; height: 21px; flex: none; color: var(--verde); }
+
+/* ---------- carregando ---------- */
+.v2 .cpl-giro {
+  display: inline-block; flex: none; width: 13px; height: 13px; border-radius: 50%;
+  border: 1.7px solid currentColor; border-right-color: transparent;
+  animation: cpl-gira 1.6s linear infinite;
+}
+/* keyframes só com `from`: o estado final é a base (rotate -360° → none) */
+@keyframes cpl-gira { from { transform: rotate(-360deg); } }
+@keyframes cpl-entra { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes cpl-fade { from { opacity: 0; } }
+
+/* ---------- telas estreitas (até 360px) ---------- */
+@media (max-width: 640px) {
+  .v2 .cpl-passo::before { display: none; }
+  .v2 .cpl-passo-corpo { padding: 0 0 20px 0; }
+  .v2 .cpl-raiz .p-btn:not(.btn-mini) { min-height: 44px; }
+  .v2 .cpl-pe { flex-direction: column; align-items: stretch; gap: 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .v2 .cpl-pe-acoes .p-btn { flex: 1; min-height: 44px; justify-content: center; }
+}
+@media (max-width: 560px) {
+  .v2 .cpl-link-linha .p-btn { width: 100%; }
+  .v2 .cpl-reg { grid-template-columns: 32px minmax(0, 1fr); }
+  .v2 .cpl-reg-acoes { grid-column: 1 / -1; justify-content: flex-start; }
+  .v2 .cpl-teste-hora { display: none; }
+  .v2 .cpl-lista-itens > li { flex-direction: column; gap: 2px; }
+  .v2 .cpl-lista-det { max-width: none; text-align: left; }
+  .v2 .cpl-res-linha { grid-template-columns: 40px minmax(0, 1fr) 14px; gap: 12px; padding: 12px 12px 12px 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .cpl-passo-corpo, .v2 .cpl-demo-tela { animation: none; }
+  .v2 .cpl-giro { animation-duration: 2.4s; }
+  .v2 .cpl-pe-barra > span, .v2 .cpl-passo-seta, .v2 .cpl-res-seta, .v2 .cpl-ajuda-seta, .v2 .cpl-marca, .v2 .cpl-guia-num { transition: none; }
+}
+:root[data-perf="lite"] .v2 .cpl-passo-corpo { animation: none; }
+:root[data-perf="lite"] .v2 .cpl-demo-tela { animation: none; }
+:root[data-perf="lite"] .v2 .cpl-giro { animation-duration: 2.4s; }

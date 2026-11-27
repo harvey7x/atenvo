@@ -791,8 +791,39 @@
   background: var(--rubro); margin-right: 6px; vertical-align: 1px;
 }
 
+/* =====================================================   ABAS do Dashboard (12/11) — Visão geral · Campanhas · Atendentes · Iris.
+=======
+/* ===== crítica 12/11 — atendimento (Dashboard) =====
+   Só na ALFA. A mesma paleta de gráfico da Cobrança: barras e mapa NEUTROS (cinza), verde e vermelho só
+   na variação; o KPI e a pílula de variação já seguem o do Painel (régua do sistema). */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg { --dado-1: #A1A7B0; --dado-1-rgb: 161, 167, 176; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg { --dado-1: #5F6570; --dado-1-rgb: 95, 101, 112; }
+/* o vermelho/verde do mapa e das barras não existe: só a variação usa semântica */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-var-chip { font-family: var(--fonte); }
+/* 1ª coluna das tabelas por número: o telefone começa onde começa o nome (à esquerda), não centralizado */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome .d5-cel2 { align-items: flex-start; text-align: left; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome .d5-cel2 > small { text-align: left; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome-in { align-items: flex-start; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab .d5-nome-in .d5-ponto { margin-top: 5px; }
+/* células de dado alinhadas ao centro: a régua de CABEÇALHO (11/600 espaçado) não vale para os números */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab :is(td, tfoot th).d5-dir { font-size: 13px; font-weight: 400; letter-spacing: 0; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab td .d5-cel2 > small { letter-spacing: 0; font-size: 12px; }
+/* textos abaixo de 11px */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg :is(.d5-kpi-fonte, .d5-demo) { font-size: 11px; }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-kpi-rot { font-size: 12px; }
+/* a linha da tabela no hover: o fio à esquerda era dourado (o ouro fica na seleção) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab tbody tr:hover > :first-child { box-shadow: inset 2px 0 0 rgba(var(--tint), .25); }
+/* "já estava no sistema" é dado, não seleção: neutro (era dourado) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-ja { color: var(--txt); }
+/* o único destaque dourado da tela: o período escolhido no mapa (a linha "Hoje"/semana em foco) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje { outline-color: var(--cor-acento-fio); }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-calor-hoje .d5-calor-rot::before { background: var(--azul); }
+/* mínimo de 11px também nas legendas miúdas (% de "Quem marcou", "em 7 dias" do pé do mapa) */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg :is(.d5-quem-leg small, .d5-calor-pe small, .d5-barra-v small) { font-size: 11px; }
+
+
 /* ============================================================
-   ABAS do Dashboard (12/11) — Visão geral · Campanhas · Atendentes · Iris.
+   ABAS do Dashboard (12/11) — Visão geral · Campanhas · Atendentes (trazidas do Atenvo em 13/11; a aba Iris não vem: a Reviza não tem a Iris).
    Período global acima; a linha de abas é navegação (esquerda), as tabelas
    seguem a regra da casa: título e conteúdo centralizados, 1ª coluna à
    esquerda. Cor de série SÓ por token (--dado-1…5) + tracejado distinto.
@@ -946,3 +977,45 @@
   .v2 .d5-par-funil li { grid-template-columns: 1fr 44px; }
   .v2 .d5-par-funil li .d5-trilho { display: none; }
 }
+
+/* ===== abas do Atenvo na Reviza (13/11) — gráfico de ondas com VÁRIAS linhas =====
+   A paleta neutra da Cobrança (--dado-1 cinza) serve a barra e o mapa, mas linhas de campanhas
+   ou de atendentes precisam se distinguir: no cartão que tem legenda com mais de uma série, as
+   cores de série voltam (íris, céu, verde, rosa, cinza — tons médios, legíveis nos dois temas).
+   A Reviza não tinha --dado-2…5 (vieram com a repaginada do Atenvo depois do fork). */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg { --dado-2: #4CB0D9; --dado-3: #3FB868; --dado-4: #D1789B; --dado-5: #8496AB; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg { --dado-2: #1F7E95; --dado-3: #1E8A44; --dado-4: #A14A77; --dado-5: #5E7183; }
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .d5-sec:has(.d5-graf-leg li + li) { --dado-1: #7C83F2; --dado-1-rgb: 124, 131, 242; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .d5-sec:has(.d5-graf-leg li + li) { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }
+/* aba Atendentes: a 1ª coluna (nome + "fecha mais por …") não espreme em três linhas quando a tabela rola */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab th.d5-nome { min-width: 176px; }
+/* (14/11) a bolinha da campanha nos cards (Melhor campanha, "fecha mais por") usa a MESMA cor da
+   linha dela nas ondas — dentro dos cards o --dado-1 é o da série, não o cinza das barras */
+html[data-barra-alfa]:not([data-tema="light"]):not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #7C83F2; --dado-1-rgb: 124, 131, 242; }
+html[data-barra-alfa][data-tema="light"]:not(#rv-d5) .v2 .d5-pg .pmc-root.rvm { --dado-1: #4F46E5; --dado-1-rgb: 79, 70, 229; }
+
+/* ============================================================
+   21/11 — TUDO NA RÉGUA (dono: "tudo bem alinhado, tudo retinho, nada torto")
+   ============================================================ */
+/* o título da 1ª coluna começava 4px antes do texto das linhas e do título do cartão (a regra geral
+   de cabeçalho de tabela ganhava do recuo do painel); o da última terminava 4px depois */
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab thead tr > :first-child { padding-left: var(--d5-px); }
+html[data-barra-alfa]:not(#rv-d5) .v2 .d5-pg .d5-tab thead tr > :last-child { padding-right: var(--d5-px); }
+/* variação em duas linhas (etiqueta + "vs anterior"): as duas no meio da coluna, como o resto da célula */
+.v2 .d5-tab .d5-cel2-dir .d5-var { justify-content: center; }
+/* linha Total das entradas: mesmo desenho da linha (barra + número), com a barra invisível */
+.v2 .d5-tab .d5-trilho-vago { visibility: hidden; }
+/* com a barra lateral fixa o painel tem ~1146px num monitor de 1440: os títulos compridos da tabela de
+   atendentes quebram em duas linhas, para a última coluna não ficar cortada */
+@container d5pg (max-width: 1280px) {
+  html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
+  html[data-barra-alfa] .v2 .d5-tab-at thead .d5-ord { line-height: 1.35; }
+}
+
+/* 24/11 — o gráfico do Dashboard virou de COLUNAS (regra do dono: todo gráfico em barras) */
+.v2 .d5-graf-barra { transition: opacity .12s ease; }
+.v2 .d5-graf-serie[data-apagada] .d5-graf-barra { opacity: .18; }
+.v2 .d5-graf-faixa { fill: rgba(var(--tint), .05); }
+.v2 .d5-graf-svg .d5-graf-stop-topo { stop-opacity: 1; }
+.v2 .d5-graf-svg .d5-graf-stop-meio { stop-opacity: .92; }
+.v2 .d5-graf-svg .d5-graf-stop-base { stop-opacity: .72; }

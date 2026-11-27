@@ -10,7 +10,7 @@ import { Ajuda, Legenda, PontoStatus, Secao, Vazio } from './comum';
    período; embaixo, cada número de WhatsApp em que o robô atendeu. */
 
 const AJUDA = {
-  comecaram: 'Clientes novos para quem o robô mandou a primeira mensagem no período. Quem já tinha falado com a CAF antes não entra.',
+  comecaram: 'Clientes novos para quem o robô mandou a primeira mensagem no período. Quem já tinha falado com a ALFA antes não entra.',
   concluiram: 'Chegaram ao fim do fluxo do robô, respondendo as perguntas até o fim.',
   entregues: 'O robô passou o cliente para um atendente — hoje, na mesma hora em que o cliente conclui. O tempo é a mediana entre a primeira mensagem do robô e a entrega: metade foi entregue mais rápido do que isso.',
   elegiveis: 'Dos clientes que o robô entregou, os que não foram marcados como não elegíveis até o fim do período.',
@@ -119,7 +119,7 @@ export function Robo({ robo }: { robo: RoboV5 }) {
   const t = robo.total;
   return (
     <Secao className="d5-robo" titulo="Robô"
-      sub="Clientes novos que o robô atendeu no período: quantos concluíram o fluxo, quantos ele entregou à equipe e quantos desses seguem elegíveis.">
+      ajuda="Clientes novos que o robô atendeu no período: quantos concluíram o fluxo, quantos ele entregou à equipe e quantos desses seguem elegíveis.">
       {t.entraram === 0 ? (
         <Vazio texto="O robô não atendeu nenhum cliente novo no período." />
       ) : (

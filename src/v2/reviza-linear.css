@@ -1,0 +1,372 @@
+/* =====================================================================
+   ESTILO LINEAR NA REVIZA (dono 13/11: "copie o dashboard e esse estilo",
+   guia DESIGN-estilo-linear.md). Camada ADITIVA por cima da régua da ALFA
+   (reviza-sistema.css), ligada por [data-linear] na raiz — só onde há
+   [data-barra-alfa] (Reviza e a demo). Atributo ausente = visual de antes.
+
+   O que muda, item a item do guia:
+   - FUNDOS: quase preto de ponta a ponta (Vazio #08090A); cartões um degrau
+     acima (Carbono #0F1011), painéis internos mais um (Obsidiana #161718),
+     áreas de hover/botão discreto em Grafite #23252A. Sem degradê.
+   - FIOS no lugar da sombra: 1px #23252A entre cartões e seções.
+   - TEXTO branco e cinza-azulado; nada de negrito pesado (o mais forte é o
+     peso médio); títulos com as letras um pouco mais juntas.
+   - MONO (JetBrains Mono) pequena SÓ nos identificadores: telefone, hora,
+     data de registro, código — lista escolhida à mão (nunca .num genérico).
+   - UMA cor de botão por tela. O verde-limão do guia vira o DOURADO da
+     Reviza (decisão do dono 12/11: "priorizar os tons dourados"): ele é o
+     único botão colorido e o marcador da aba ativa; o resto é neutro.
+   - Cantos: 6px nos botões e campos, 12px nos cartões.
+   - Movimento: hover não sobe nem cresce — a borda clareia um tom.
+
+   ESPECIFICIDADE: prefixo html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin)
+   (1 id + 3 atributos) — vence a régua (1 id + 1 atributo) e o CSS de cada
+   tela em qualquer ordem, sem !important.
+   ===================================================================== */
+
+/* ---- 0. TOKENS — escuro ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin):not([data-tema="light"]) .v2 {
+  --base: #08090A;
+  --vidro-a: #0F1011;
+  --vidro-b: #0F1011;
+  --surface: #161718;
+  --linha: #1C1E21;
+  --fio-a: #23252A;
+  --fio-b: #23252A;
+  --txt: #EEF0F3;
+  --txt-2: #A3A9B3;
+  --txt-3: #8A8F98;
+  --sombra-1: none;
+  --sombra-2: 0 16px 40px -12px rgba(0, 0, 0, .7);
+  --rp-elev: #1E2024;
+  --rp-menu: #131416;
+  --rp-campo: #08090A;
+  --rp-campo-fio: #23252A;
+  --rp-campo-fio-hover: #363840;
+  --rp-trilho: #0B0C0D;
+  --rp-bisel: none;
+  --rp-cartao-solido: #121315;
+  --surface-2: rgba(255, 255, 255, .02);
+  --line-2: #23252A;
+  --hover: rgba(255, 255, 255, .035);
+  /* nomes do guia */
+  --lin-branco: #F7F8F8;
+  --lin-nevoa: #D0D6E0;
+  --lin-fio: #23252A;
+  --lin-fio-hover: #363840;
+  --lin-grafite: #23252A;
+  --lin-obsidiana: #161718;
+  --lin-tinta-botao: #08090A;
+  --d5-fio: #1C1E21;
+  --d5-fio-forte: #2C2E34;
+}
+
+/* ---- 0b. TOKENS — claro (a mesma ideia: branco sobre cinza-gelo, fio em vez de sombra) ---- */
+html[data-barra-alfa][data-linear][data-linear][data-tema="light"]:not(#rv-lin) .v2 {
+  --base: #F7F7F8;
+  --vidro-a: #FFFFFF;
+  --vidro-b: #FFFFFF;
+  --surface: #FFFFFF;
+  --linha: #ECEDF0;
+  --fio-a: #E3E4E8;
+  --fio-b: #E3E4E8;
+  --txt: #0F1011;
+  --txt-2: #4A4F58;
+  --txt-3: #666C76;
+  --sombra-1: none;
+  --sombra-2: 0 16px 40px -12px rgba(16, 24, 40, .16);
+  --rp-elev: #FFFFFF;
+  --rp-menu: #FFFFFF;
+  --rp-campo: #FFFFFF;
+  --rp-campo-fio: #E0E2E6;
+  --rp-campo-fio-hover: #C9CCD2;
+  --rp-trilho: #F0F1F3;
+  --rp-bisel: none;
+  --rp-cartao-solido: #FFFFFF;
+  --surface-2: rgba(15, 16, 17, .02);
+  --line-2: #E3E4E8;
+  --hover: rgba(15, 16, 17, .035);
+  --lin-branco: #08090A;
+  --lin-nevoa: #2A2E35;
+  --lin-fio: #E3E4E8;
+  --lin-fio-hover: #C9CCD2;
+  --lin-grafite: #F0F1F3;
+  --lin-obsidiana: #F7F8F9;
+  --lin-tinta-botao: #08090A;
+  --d5-fio: #ECEDF0;
+  --d5-fio-forte: #DADCE0;
+}
+
+/* ---- 1. RÉGUA: cantos e pesos do guia ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 {
+  --btn-r: 6px; --r-controle: 6px; --r-ctl: 6px;
+  --selo-r: 4px; --r-selo: 4px;
+  --r-cartao: 12px; --r-card: 12px;
+  --fw-forte: 560; --fw-titulo: 540;
+}
+/* fundo da página: o Vazio de ponta a ponta */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) :is(body, .v2.app-v2, .v2 .p-main, .v2 .pagina) {
+  background-color: var(--base);
+}
+
+/* ---- 2. CARTÕES: Carbono chapado + fio de 1px; nada de sombra, bisel ou degradê ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.vidro:not(.p-modal), .kpi, .d5-kpi, .cv2-kpi, .rg-tile, .rl2-kpi) {
+  background: var(--vidro-a);
+  box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.kpi, .d5-kpi, .cv2-kpi, .rg-tile, .rl2-kpi) {
+  border: 1px solid var(--lin-fio);
+}
+/* o fio do .vidro é o ::before (máscara): vira o fio chapado do guia */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .vidro:not(.p-modal)::before {
+  background: var(--lin-fio);
+}
+/* modal e menus flutuantes: Obsidiana, fio, sombra só para descolar do fundo */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .p-modal.vidro {
+  background: var(--lin-obsidiana);
+  box-shadow: var(--sombra-2);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .p-modal.vidro::before { background: var(--lin-fio); }
+/* KPI de atenção (Conversas): o mesmo cartão */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .cv2-kpi.atencao { background: var(--vidro-a); border-color: var(--lin-fio); }
+
+/* ---- 3. HOVER: nada sobe nem cresce; a borda clareia um tom ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(
+  .spot, .kpi, .d5-kpi, .cv2-kpi, .rg-tile, .rl2-kpi, .d5-cel, .kc, .kb-carga-c, .pv-hero, .ars-card,
+  .pd-mod, .conv-tipo, .pd-tipo, .ferr-kpi, .atd-cor, .sv-seta, .p-btn, .fjb-btn, .entrar
+):hover {
+  transform: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.spot, .kpi, .d5-kpi, .cv2-kpi, .rg-tile, .rl2-kpi, .kc):hover {
+  border-color: var(--lin-fio-hover);
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .spot:hover::before { background: var(--lin-fio-hover); }
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.p-btn, .chip, .vidro, .kpi, .d5-kpi, .kc, input.inp, select.inp, .segm > button) {
+  transition-duration: .16s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ---- 4. BOTÕES ----
+   PRINCIPAL: o dourado chapado, texto quase preto, sem brilho correndo, sem halo. */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  color: var(--lin-tinta-botao);
+  background: var(--platina-a);
+  border: 1px solid transparent;
+  box-shadow: none;
+  text-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--platina-a), #fff 12%);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) {
+  background: color-mix(in srgb, var(--platina-a), #000 8%);
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .btn-pri::after { display: none; }
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .btn-pri:not(.btn-mini) svg { color: currentColor; }
+
+/* SECUNDÁRIO: sem fundo, texto Névoa, contorno de 1px no fio — o mesmo canto */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: var(--lin-nevoa);
+  background: transparent;
+  border: 1px solid var(--lin-fio);
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok,
+  .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  color: var(--lin-branco);
+  background: var(--hover);
+  border-color: var(--lin-fio-hover);
+}
+/* destrutiva de linha: neutra em repouso, o vermelho só acende no hover */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.fin-btn:not(.fin-ok), .pn-fin-nao, .p-btn.btn-perigo.btn-mini):not(:hover) {
+  color: var(--txt-2);
+  border-color: var(--lin-fio);
+  background: transparent;
+}
+/* botões de ícone (topo, linhas): canto 6, hover em Grafite */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.ib, .ib2, .tool, .d5-ib) { border-radius: 6px; }
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.ib, .ib2, .tool, .d5-ib):hover:not(:disabled) { background: var(--hover); }
+
+/* ---- 5. CAMPOS: o próprio fundo + fio; canto 6 ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(input.inp, select.inp, textarea.inp, .wa-busca, .kb-busca, .d5-sel select) {
+  background-color: var(--rp-campo);
+  border-color: var(--rp-campo-fio);
+  border-radius: 6px;
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(input.inp, select.inp, textarea.inp, .wa-busca, .kb-busca, .d5-sel select):hover {
+  border-color: var(--rp-campo-fio-hover);
+}
+
+/* ---- 6. SELEÇÃO ----
+   Segmentado: trilho no fundo, polegar Grafite chapado (sem sombra). */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.segm, .pn-fin-seg, .ev-seg, .cm-seg, .kb-ord, .gp-sc-caixa) {
+  background: var(--rp-trilho);
+  border: 1px solid var(--lin-fio);
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .kb-ord > .kb-fchip.on, .gp-sc-item.on) {
+  color: var(--lin-branco);
+  background: var(--lin-grafite);
+  box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear][data-tema="light"]:not(#rv-lin) .v2 :is(.segm > button.on, .pn-fin-seg > button.on, .ev-seg > button.on, .cm-seg-btn.on, .kb-ord > .kb-fchip.on, .gp-sc-item.on) {
+  background: #FFFFFF;
+  box-shadow: 0 0 0 1px #E0E2E6;
+}
+/* chip ligado: NEUTRO (o dourado fica para o botão principal e a aba ativa) */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(button.chip.on, .calx-chip.on, .kb-barra > .kb-fchip.on, .rg-de > button.on) {
+  color: var(--lin-branco);
+  background: var(--lin-grafite);
+  border-color: var(--lin-fio-hover);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(button.chip, .calx-chip, .kb-barra > .kb-fchip, .rg-de > button):not(.on) {
+  border-color: var(--lin-fio);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .wa-aba.on {
+  color: var(--lin-branco);
+  background: var(--lin-grafite);
+  box-shadow: inset 0 0 0 1px var(--lin-fio-hover);
+}
+/* abas com sublinhado (Envios, Régua): o marcador dourado de 2px fica — é o papel do limão */
+
+/* ---- 7. TIPOGRAFIA ----
+   Nada de negrito pesado: tudo que era 600/700 vira o peso médio. (:where = peso zero:
+   regras de componente mais específicas, como o KPI, ainda escolhem o próprio.) */
+/* (o card de métrica, .pmc-root, traz a própria tipografia — fica de fora; :not(:where()) não pesa) */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :where(h1, h2, h3, h4, h5, h6, b, strong, th):not(:where(.pmc-root *)) {
+  font-weight: 560;
+}
+/* título de página: peso médio, letras mais juntas, branco */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.ph h1, .ph h2, .d5-cab h2, .d5-cab-tits h2) {
+  font-weight: 540;
+  letter-spacing: -.03em;
+  color: var(--lin-branco);
+}
+/* título de cartão/seção */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .an-cartao-tit, .ev-card-tit, .vidro > h3, .p-modal-cab) {
+  font-weight: 560;
+  letter-spacing: -.012em;
+}
+/* número de KPI: peso médio, branco, letras juntas */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.kpi .val, .d5-kpi-val, .cv2-kpi > b, .rg-tile-v b, .ev-regua-pct b, .ev-passo-num b, .d5-robo-val, .d5-qd-n, .d5-qd-camp) {
+  font-weight: 540;
+  letter-spacing: -.03em;
+  color: var(--lin-branco);
+}
+/* cabeçalho de tabela e rótulo em caixa alta: médio, com o espaçamento de sempre */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(thead th, .rt-tab-h > *, .pn-ord, .d5-ord, .d5-ord-tx, .pn-vh, .ev-rot, .gp-sc-tit, .d5-dir) {
+  font-weight: 540;
+}
+/* selos: 11/560 (o 600 da régua vira o médio do guia) */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 :is(.st, .ev-chip, .kc-chip, .kc-flag, .d5-var-chip, .kpi .delta, .pn-delta.chip, .etqchip, .ctx-tag) {
+  font-weight: 560;
+}
+
+/* ---- 8. MONO NOS IDENTIFICADORES ----
+   Lista escolhida à mão (varredura das telas da prévia, 13/11): horários, datas de
+   registro, telefones e códigos. Dinheiro, KPI e texto corrido ficam na fonte da casa.
+   font-size-adjust casa a altura com a Instrument Sans; o tamanho de cada lugar fica. */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 {
+  --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+/* (21/11: com a fundação nova — [data-moldura] — os identificadores voltam para a fonte da casa,
+   com algarismos alinhados; a mono lia como "tela de programador") */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin):not([data-moldura]) .v2 :is(
+  .conv2 .h2,                 /* WhatsApp: horário na lista */
+  .conv2 .cr,                 /* WhatsApp: tempo aguardando */
+  .hh.num,                    /* WhatsApp: hora das mensagens */
+  .audio2 .dur,               /* WhatsApp: duração do áudio */
+  .wa-ctx .t2.num,            /* WhatsApp: telefone na ficha lateral */
+  .ct-tel,                    /* WhatsApp: telefone no "nova conversa" */
+  .zp-hora,                   /* Conversas (Cobrança): horário/data na lista */
+  .zp-status-h,               /* Conversas: hora do status */
+  .cv2-item-fim > .num,       /* Conversas: horário do item */
+  .ev-hora > .num,            /* Envios: hora e dia do envio */
+  .ev-resp.num,               /* Envios: hora da resposta */
+  .pn-num-quem > .num,        /* Números: telefone do número */
+  .pn-fin-mes,                /* Financeiro: data e hora do lançamento */
+  .pn-eq-nm > small.num,      /* Financeiro: data e hora na equipe */
+  td.d.num,                   /* Novos: datas da linha */
+  .calx-al-selo.num,          /* Calendário: dia do alerta */
+  .reg-quando,                /* Registros: data e hora */
+  .pn-mural-quando,           /* Painel: hora do recado */
+  .pn-us-senha-cod,           /* Usuários: senha provisória */
+  .cm-ciclo-cod,              /* Régua: código do ciclo */
+  .kc-chip.num:not(.est),     /* Kanban: data de entrada */
+  .kd-hist-when,              /* Kanban: data/hora do histórico */
+  .tl-hora.num, .pr-hora.num, .wa-hora.num, /* horários das linhas do tempo e Presenciais */
+  .d5-tel,                    /* Dashboard: número de cada canal */
+  td.tel .num, .tel.num       /* Contatos: telefone */
+) {
+  font-family: var(--mono);
+  font-size-adjust: .5;
+  letter-spacing: 0;
+  word-spacing: -.3em;
+  font-feature-settings: 'zero' 0;
+}
+
+/* ---- 9. BARRA LATERAL E TOPO: o mesmo chão, o item ativo em Grafite com o ícone dourado ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin):not([data-tema="light"]) .v2 {
+  --ba-fundo: #0B0C0D;
+  --ba-fio: #1C1E21;
+  --ba-txt: #EEF0F3;
+  --ba-mudo: #9399A3;
+  --ba-rotulo: #7F848D;
+  --ba-hover: rgba(255, 255, 255, .04);
+  --ba-ativo: #1A1B1E;
+  --ba-menu: #131416;
+  --ba-kbd-fio: #23252A;
+  --ba-kbd-bg: transparent;
+  --ba-sombra-menu: 0 16px 40px -12px rgba(0, 0, 0, .7);
+  --ba-sombra-trilho: 1px 0 0 #1C1E21;
+}
+html[data-barra-alfa][data-linear][data-linear][data-tema="light"]:not(#rv-lin) .v2 {
+  --ba-fundo: #FBFBFC;
+  --ba-fio: #ECEDF0;
+  --ba-hover: rgba(15, 16, 17, .04);
+  --ba-ativo: #F0F1F3;
+  --ba-sombra-trilho: 1px 0 0 #ECEDF0;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .p-topbar {
+  background: var(--base);
+  border-bottom: 1px solid var(--linha);
+  box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+
+/* ---- 10. DASHBOARD: abas com o marcador dourado (o lugar do limão no guia) ---- */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas {
+  border-bottom: 1px solid var(--linha);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas .segm {
+  background: transparent; border: 0; padding: 0; gap: 4px; border-radius: 0; min-height: 0;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas .segm > button {
+  position: relative; height: 38px; min-height: 38px; padding: 0 12px; border-radius: 0;
+  background: transparent; box-shadow: none; color: var(--txt-2);
+  font-size: 13px; font-weight: 540;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas .segm > button:hover { color: var(--lin-branco); }
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas.d5-abas .segm.segm > button.on.on {
+  /* (classes repetidas: vence o polegar branco do segmentado no tema claro) */
+  color: var(--lin-branco); background: transparent; box-shadow: none;
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas .segm > button.on::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; border-radius: 2px;
+  background: var(--azul);
+}
+/* o polegar deslizante do Segmentado (se houver) some nas abas */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-abas .segm > :is(.segm-polegar, .thumb, i) { display: none; }
+/* quadros e tabelas do dashboard: fio do guia; dica do gráfico em Obsidiana chapada */
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-qd { border-color: var(--lin-fio); background: transparent; }
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-graf-tip {
+  background: var(--lin-obsidiana); border-color: var(--lin-fio); box-shadow: var(--sombra-2);
+}
+html[data-barra-alfa][data-linear][data-linear]:not(#rv-lin) .v2 .d5-graf-ponto { stroke: var(--vidro-a); }
+
+/* (entrada da tela: o fade com leve subida de 4px já vem da camada de movimento — v2-mo-sobe) */

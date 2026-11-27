@@ -1,0 +1,294 @@
+/* AMBIENTE CONFIGURAÇÕES (22/11) — o que é próprio das telas do ambiente; o resto vem das famílias
+   do sistema (pn-*, kpis, reg-*, cfg-*). */
+.v2 .cfga-sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--txt-3); max-width: 720px; }
+/* uma seção por vez (abaFixa): a tela de Configurações sem a coluna das abas */
+.v2 .cfg.cfg-so { display: block; }
+.v2 .cfg.cfg-so > div { max-width: none; }
+
+/* ---- WhatsApp ---- */
+.v2 .cfgw { display: flex; flex-direction: column; gap: 14px; }
+.v2 .cfgw > .kpis { margin: 0; }
+/* selo do ambiente: neutro para Atendimento, na cor da casa para Cobranças (um detalhe, não um arco-íris) */
+.v2 .cfgw-amb { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgw-amb.cobrancas { color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .1); border-color: rgba(var(--azul-rgb), .22); }
+.v2 .cfgw-tab td .pn-us-1a { display: block; margin-top: 4px; }
+.v2 .cfgw-explica { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* QR Code */
+.v2 .cfgw-qr { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.v2 .cfgw-qr img, .v2 .cfgw-qr-vazio { width: 224px; height: 224px; border-radius: 14px; background: #fff; padding: 10px; box-sizing: border-box; display: block; }
+.v2 .cfgw-qr-vazio { display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 12.5px; color: #6B6661; background: #F3F1EE; }
+.v2 .cfgw-passos { margin: 0; padding: 0 0 0 18px; align-self: stretch; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+.v2 .cfgw-passos b { color: var(--txt); font-weight: 600; }
+.v2 .cfgw-espera { margin: 0; align-self: stretch; display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.4; color: var(--txt-3); }
+.v2 .cfgw-espera i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--azul); }
+@media (prefers-reduced-motion: no-preference) { .v2 .cfgw-espera i { animation: cfgw-pulsa 1.6s ease-out infinite; } }
+@keyframes cfgw-pulsa { 0% { box-shadow: 0 0 0 0 rgba(var(--azul-rgb), .5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(var(--azul-rgb), 0); } }
+
+/* conectado */
+.v2 .cfgw-ok { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0 2px; text-align: center; }
+.v2 .cfgw-ok-ic { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 50%; color: var(--azul); background: rgba(var(--azul-rgb), .14); }
+.v2 .cfgw-ok-ic svg { width: 22px; height: 22px; }
+.v2 .cfgw-ok b { font-size: 15px; font-weight: 600; color: var(--txt); }
+.v2 .cfgw-ok .num { font-size: 13px; color: var(--txt-2); }
+.v2 .cfgw-ok p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); max-width: 340px; }
+.v2 .cfgw-ok p b { font-size: inherit; }
+
+/* gerenciar */
+.v2 .cfgw-ficha { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.v2 .cfgw-ficha > div { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--lin-fio, var(--linha)); border-radius: 10px; }
+.v2 .cfgw-ficha dt { font-size: 11px; color: var(--txt-3); }
+.v2 .cfgw-ficha dd { margin: 0; font-size: 12.5px; color: var(--txt); }
+.v2 .cfgw-confirma { margin: 0; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
+.v2 .p-modal .num-remover { all: unset; cursor: pointer; font-size: 12.5px; color: var(--cor-erro-txt, var(--rubro)); }
+.v2 .p-modal .num-remover:hover:not(:disabled) { text-decoration: underline; }
+.v2 .p-modal .num-remover:disabled { opacity: .5; cursor: default; }
+.v2 .p-modal .num-rodape-esp { flex: 1; }
+@media (max-width: 560px) { .v2 .cfgw-ficha, .v2 .cfgw-explica { grid-template-columns: 1fr; } }
+
+/* ---- Integrações (22/11): um quadradinho por serviço de fora ---- */
+.v2 .cfgi { display: flex; flex-direction: column; gap: 14px; }
+/* voltar à tela de cima (a trilha do topo não é clicável): um link discreto sobre o título */
+.v2 .cfga-volta { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 12px; color: var(--txt-3); text-decoration: none; }
+.v2 .cfga-volta svg { width: 13px; height: 13px; margin-left: -3px; }
+.v2 .cfga-volta:hover { color: var(--txt); }
+.v2 .cfga-volta:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 4px; }
+.v2 .cfgi-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; }
+.v2 .cfgi-quadro { display: flex; flex-direction: column; gap: 14px; min-height: 218px; }
+.v2 .cfgi-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* o ícone do serviço: neutro; na cor da casa quando está conectado */
+.v2 .cfgi-ic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-ic svg { width: 19px; height: 19px; }
+.v2 .cfgi-ic.on { color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .12); border-color: rgba(var(--azul-rgb), .24); }
+.v2 .cfgi-breve { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; white-space: nowrap;
+  color: var(--txt-3); border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-tx { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.v2 .cfgi-tx small { font-size: 11px; color: var(--txt-3); }
+.v2 .cfgi-tx h3 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+.v2 .cfgi-tx p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgi-pe { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding-top: 12px; box-sizing: border-box;
+  border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgi-det { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--txt-2); }
+.v2 .cfgi-pe > .p-btn { margin-left: auto; flex: none; }
+/* em breve: lugar guardado, sem botão — mais apagado para não parecer que funciona */
+.v2 .cfgi-quadro.breve .cfgi-tx h3 { color: var(--txt-2); }
+.v2 .cfgi-quadro.breve .cfgi-tx p { color: var(--txt-3); }
+.v2 .cfgi-quadro.breve .cfgi-ic { color: var(--txt-3); }
+.v2 .cfgi-quadro.breve .cfgi-pe::before { content: 'Ainda não disponível'; font-size: 12px; color: var(--txt-3); }
+
+/* ---- Asaas ---- */
+.v2 .cfgi-duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.v2 .cfgi-duas > .pn-card { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cfgi-duas > .pn-card > .pn-card-cab { margin-bottom: 2px; }
+.v2 .cfgi > .pn-card { display: flex; flex-direction: column; gap: 14px; }
+.v2 .cfgi-conta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .cfgi-conta-nm { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .cfgi-conta-nm b { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .cfgi-conta-nm span { font-size: 12px; color: var(--txt-3); }
+.v2 .cfgi-nota { margin: 0; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2);
+  background: rgba(var(--azul-rgb), .07); border: 1px solid rgba(var(--azul-rgb), .2); }
+.v2 .cfgi-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .cfgi-esp { flex: 1; }
+.v2 .cfgi-link { all: unset; cursor: pointer; font-size: 12.5px; color: var(--txt-2); text-decoration: underline; text-underline-offset: 3px; }
+.v2 .cfgi-link:hover { color: var(--txt); }
+.v2 .cfgi-link:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 4px; }
+.v2 .cfgi-link.perigo { color: var(--cor-erro-txt, var(--rubro)); text-decoration: none; }
+.v2 .cfgi-link.perigo:hover { text-decoration: underline; }
+.v2 .cfgi-sep { height: 1px; background: var(--lin-fio, var(--linha)); }
+.v2 .cfgi-lista { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+/* a forma de pagamento: no Asaas é uma por cobrança — quatro opções, duas por linha (família pn-us-opcoes) */
+.v2 .cfgi .pn-us-opcoes button { align-items: flex-start; height: 100%; }
+/* aviso que pede uma ação (retorno pausado): o texto e o botão na mesma linha */
+.v2 .cfgi-nota-acao { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .cfgi-nota-acao > span { flex: 1 1 320px; min-width: 0; }
+/* as linhas de liga/desliga: o botão no alto, o texto ocupando a largura */
+.v2 .cfgi .tgl-l { align-items: flex-start; padding: 0; gap: 12px; font-size: 13px; color: var(--txt); }
+.v2 .cfgi .tgl-l > .tgl { flex: none; margin-top: 1px; }
+.v2 .cfgi .tgl-l .d { margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--txt-3); }
+.v2 .cfgi-recuo { padding-left: 46px; }
+/* percentual: campo curto com o % dentro */
+.v2 .cfgi-pct { position: relative; display: block; max-width: 132px; }
+.v2 .cfgi-pct .inp { width: 100%; padding-right: 30px; box-sizing: border-box; font-variant-numeric: tabular-nums; }
+.v2 .cfgi-pct i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 12.5px; color: var(--txt-3); pointer-events: none; }
+@media (max-width: 1180px) { .v2 .cfgi-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .v2 .cfgi-duas { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .v2 .cfgi-grade { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-recuo { padding-left: 0; } }
+/* o aviso e a faixa de salvar acompanham a rolagem: a resposta do sistema fica sempre à vista */
+.v2 .cfgi > .gs-aviso { position: sticky; top: 8px; z-index: 3; margin-bottom: 0; background: var(--rp-menu, var(--surface)); }
+.v2 .cfgi-salvar { position: sticky; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px 10px 16px; border-radius: 12px;
+  background: var(--rp-menu, var(--surface)); border: 1px solid var(--cor-acento-fio); box-shadow: var(--ba-sombra-menu, 0 16px 40px -14px rgba(0, 0, 0, .5)); }
+.v2 .cfgi-salvar > span { flex: 1 1 260px; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--txt); }
+@media (prefers-reduced-motion: no-preference) { .v2 .cfgi-salvar { animation: cfgi-sobe .18s ease-out; } }
+@keyframes cfgi-sobe { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- WhatsApp oficial (22/11) ---- */
+/* a lista de números achados na conta da Meta: um por linha, marcável */
+.v2 .cfgo-numeros { display: flex; flex-direction: column; gap: 8px; }
+.v2 .cfgo-numeros button { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: left; cursor: pointer; font: inherit; font-size: 11.5px; line-height: 1.4;
+  color: var(--txt-3); border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .025); }
+.v2 .cfgo-numeros button b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgo-numeros button:hover:not(:disabled) { border-color: rgba(var(--tint), .25); }
+.v2 .cfgo-numeros button.on { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgo-numeros button:disabled { opacity: .55; cursor: default; }
+.v2 .cfgo-numeros button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+.v2 .cfgo-linha-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+/* a conferência do passo 3: o que ficou certo e o que falta */
+.v2 .cfgo-conf { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.v2 .cfgo-conf li { display: flex; align-items: flex-start; gap: 11px; padding: 10px 0; border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgo-conf li:first-child { border-top: 0; padding-top: 2px; }
+.v2 .cfgo-conf i { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
+  color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .14); }
+.v2 .cfgo-conf li.falta i { color: var(--txt-2); background: rgba(var(--tint), .1); }
+.v2 .cfgo-conf i svg { width: 12px; height: 12px; }
+.v2 .cfgo-conf span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .cfgo-conf b { font-size: 13px; font-weight: 500; color: var(--txt); }
+.v2 .cfgo-conf small { font-size: 12px; line-height: 1.45; color: var(--txt-3); }
+/* modelos de mensagem: o nome técnico, o texto inteiro (nada cortado) e o motivo da recusa */
+.v2 .cfgo-mod { display: flex; flex-direction: column; gap: 4px; padding: 3px 0; text-align: left; white-space: normal; }
+.v2 .cfgo-mod b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgo-mod span { font-size: 12px; line-height: 1.5; color: var(--txt-2); max-width: 760px; }
+.v2 .cfgo-mod small { font-size: 12px; line-height: 1.45; color: var(--cor-erro-txt, var(--rubro)); max-width: 760px; }
+.v2 .cfgo-tab td { vertical-align: top; }
+.v2 .cfgo-tab td:not(:first-child) { padding-top: 12px; white-space: nowrap; }
+.v2 .pn-card-cab > .cfgi-acoes { flex: none; }
+.v2 .cfgo-texto { height: auto !important; min-height: 116px; padding: 10px 12px; line-height: 1.5; resize: vertical; font: inherit; font-size: 13px; }
+.v2 .cfgo-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.v2 .cfgo-vars small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfgo-vars button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 11.5px; color: var(--txt-2); border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .04); }
+.v2 .cfgo-vars button:hover { color: var(--txt); border-color: rgba(var(--tint), .28); }
+.v2 .cfgo-vars button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+/* o tipo e a situação na mesma régua (a etiqueta tem 22px de altura; o texto ganha a mesma linha) */
+.v2 .cfgo-tab td:not(:first-child) .pn-us-amb-tx { display: inline-block; line-height: 22px; }
+/* botão sozinho num campo da janela: do tamanho do texto, não esticado de ponta a ponta */
+.v2 .p-modal .pn-us-campo > .p-btn { align-self: flex-start; }
+
+/* ---- Iris (a tela de atendente de IA dentro do ambiente Configurações, 22/11) ---- */
+/* o título de cada cartão na mesma régua do conteúdo (o cabeçalho tinha um recuo próprio a mais) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ia-pagina .ia-card > .card-cab { padding: 0 0 12px; }
+.v2 .ia-pagina .ph h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+/* os botões do topo numa linha só, à direita; o texto da esquerda é que cede a largura */
+.v2 .ia-pagina .ph { align-items: flex-start; gap: 16px; }
+.v2 .ia-pagina .ph > div:first-child { flex: 1 1 0; min-width: 0; }
+.v2 .ia-pagina .ph .fx-topo-acoes { flex: none; flex-wrap: nowrap; }
+
+/* ---- Iris: importar a configuração e os passos para ela atender (22/11) ---- */
+.v2 .cfgr-passos { gap: 14px; }
+.v2 .cfgr-passos-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.v2 .cfgr-passos-cab h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .cfgr-passos-cab span { font-size: 12px; color: var(--txt-3); }
+.v2 .cfgr-passos-lista { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.v2 .cfgr-passos-lista li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-content: start; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgr-passos-lista i { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; color: var(--cor-acento-txt, var(--azul)); background: rgba(var(--azul-rgb), .14); }
+.v2 .cfgr-passos-lista li.falta i { color: var(--txt-2); background: rgba(var(--tint), .1); }
+.v2 .cfgr-passos-lista i svg { width: 12px; height: 12px; }
+.v2 .cfgr-passos-lista span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .cfgr-passos-lista b { font-size: 13px; font-weight: 500; line-height: 20px; color: var(--txt); }
+.v2 .cfgr-passos-lista small { font-size: 12px; line-height: 1.4; color: var(--txt-3); }
+.v2 .cfgr-passos-lista .cfgi-link { grid-column: 2; justify-self: start; }
+.v2 .cfgr-do-zero { margin: 0; text-align: center; }
+/* a área de soltar o arquivo */
+.v2 .cfgr-solta { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 22px 16px; border-radius: 12px; text-align: center;
+  border: 1px dashed rgba(var(--tint), .28); background: rgba(var(--tint), .025); }
+.v2 .cfgr-solta:hover, .v2 .cfgr-solta.sobre { border-color: var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgr-solta:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+.v2 .cfgr-solta i { display: inline-flex; color: var(--txt-2); }
+.v2 .cfgr-solta i svg { width: 22px; height: 22px; }
+.v2 .cfgr-solta b { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.v2 .cfgr-solta span { font-size: 12px; color: var(--txt-3); }
+/* o resumo do que veio no arquivo: rótulo à esquerda, valor à direita, uma linha por item */
+.v2 .cfgr-resumo { margin: 0; display: flex; flex-direction: column; }
+.v2 .cfgr-resumo > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid var(--lin-fio, var(--linha)); }
+.v2 .cfgr-resumo > div:first-child { border-top: 0; padding-top: 0; }
+.v2 .cfgr-resumo dt { font-size: 12.5px; color: var(--txt-2); }
+.v2 .cfgr-resumo dd { margin: 0; font-size: 12.5px; color: var(--txt); text-align: right; }
+.v2 .cfgr-resumo > div.vazio dd { color: var(--cor-erro-txt, var(--rubro)); }
+@media (max-width: 900px) { .v2 .cfgr-passos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .v2 .cfgr-passos-lista { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- Iris em abas (22/11): cinco assuntos no lugar de uma tela comprida ---- */
+.v2 .cfgr-abas { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--lin-fio, var(--linha)); background: rgba(var(--tint), .03); align-self: flex-start; }
+.v2 .cfgr-abas button { all: unset; cursor: pointer; padding: 7px 14px; border-radius: 8px; font-size: 13px; color: var(--txt-2); white-space: nowrap; }
+.v2 .cfgr-abas button:hover { color: var(--txt); }
+.v2 .cfgr-abas button.on { color: var(--txt); background: var(--cor-acento-suave); box-shadow: inset 0 0 0 1px var(--cor-acento-fio); }
+.v2 .cfgr-abas button:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; }
+/* cada cartão só aparece na aba do seu assunto (o que não tem assunto, como salvar, aparece sempre) */
+.v2 .ia-wrap[data-aba-ativa] > [data-aba] { display: none; }
+.v2 .ia-wrap[data-aba-ativa="geral"] > [data-aba="geral"],
+.v2 .ia-wrap[data-aba-ativa="atende"] > [data-aba="atende"],
+.v2 .ia-wrap[data-aba-ativa="sabe"] > [data-aba="sabe"],
+.v2 .ia-wrap[data-aba-ativa="horarios"] > [data-aba="horarios"],
+.v2 .ia-wrap[data-aba-ativa="conexao"] > [data-aba="conexao"] { display: flex; }
+
+/* ---- Asaas: gerar a cobrança de uma parcela (22/11) ---- */
+.v2 .cfgi-gerar { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.v2 .cfgi-gerar .pn-us-campo .inp + .inp { margin-top: 2px; }
+.v2 .cfgi-gerar-acao { padding-top: 24px; }
+.v2 .cfgi-feita { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--cor-acento-fio); background: var(--cor-acento-suave); }
+.v2 .cfgi-feita > div { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2 .cfgi-feita b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgi-feita span { font-size: 12.5px; color: var(--txt-2); }
+.v2 .cfgi-link-pg { flex: 1 1 280px; min-width: 0; padding: 7px 10px; border-radius: 8px; font: inherit; font-size: 12px; color: var(--txt); background: rgba(var(--tint), .06); border: 1px solid var(--lin-fio, var(--linha)); overflow-wrap: anywhere; user-select: all; }
+@media (max-width: 900px) { .v2 .cfgi-gerar { grid-template-columns: minmax(0, 1fr); } .v2 .cfgi-gerar-acao { padding-top: 0; } }
+/* o que a Iris do Reviza ainda não usa (modelos por função) não aparece nas abas dela */
+.v2 .ia-wrap[data-aba-ativa] > [data-fora-do-reviza] { display: none !important; }
+
+/* ---------- Equipes (23/11): gerente, pessoas e o WhatsApp de cada equipe ---------- */
+.v2 .cfge-tab td { vertical-align: middle; }
+.v2 .cfge-nomes { display: block; white-space: normal; line-height: 1.4; }
+.v2 .cfge-nums { display: inline-flex; flex-direction: column; gap: 6px; }
+.v2 .cfge-num { display: flex; flex-direction: column; line-height: 1.3; font-size: 12.5px; color: var(--txt); }
+.v2 .cfge-num small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfge-explica { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v2 .cfge-opcoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.v2 .cfge-op { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--linha); background: rgba(var(--tint), .025); font-size: 12.5px; color: var(--txt); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.v2 .cfge-op:hover { border-color: rgba(var(--tint), .25); }
+.v2 .cfge-op:has(input:checked) { border-color: var(--azul); background: rgba(var(--tint), .05); }
+.v2 .cfge-op:has(input:focus-visible) { outline: 2px solid var(--azul); outline-offset: 2px; }
+.v2 .cfge-op input { margin: 2px 0 0; width: 15px; height: 15px; flex: none; accent-color: var(--azul); }
+.v2 .cfge-op span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.v2 .cfge-op small { font-size: 11.5px; color: var(--txt-3); }
+.v2 .cfge-muda { font-size: 12px; line-height: 1.45; color: var(--txt-2); padding: 9px 11px; border-radius: 9px; background: rgba(var(--tint), .045); border: 1px solid var(--linha); }
+.v2 .cfge-muda b { color: var(--txt); font-weight: 600; }
+.v2 .cfge-texto { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+@media (max-width: 720px) { .v2 .cfge-explica, .v2 .cfge-opcoes { grid-template-columns: 1fr; } }
+
+.v2 .cfge-aviso { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); padding: 11px 14px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(var(--tint), .035); }
+.v2 .cfge-aviso b { color: var(--txt); font-weight: 600; }
+
+/* ---------- Receber de outros sistemas (23/11) ---------- */
+.v2 .cfgr-tab td { vertical-align: middle; }
+.v2 .cfgr-url { display: block; max-width: 320px; overflow-wrap: anywhere; font-size: 11px; color: var(--txt-3); line-height: 1.35; }
+.v2 .cfgr-instr { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .cfgr-dl { margin: 0; display: grid; gap: 8px; }
+.v2 .cfgr-dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 12.5px; }
+.v2 .cfgr-dl dt { color: var(--txt-3); }
+.v2 .cfgr-dl dd { margin: 0; color: var(--txt); line-height: 1.45; }
+.v2 .cfgr-exemplo { border: 1px solid var(--linha); border-radius: 10px; overflow: hidden; }
+.v2 .cfgr-exemplo-cab { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; font-size: 11.5px; color: var(--txt-3); border-bottom: 1px solid var(--linha); background: rgba(var(--tint), .03); }
+.v2 .cfgr-exemplo pre { margin: 0; padding: 10px 12px; font: 11.5px/1.5 ui-monospace, Menlo, monospace; color: var(--txt); white-space: pre-wrap; overflow-wrap: anywhere; }
+.v2 .cfgr-nota { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgr-endereco { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; background: rgba(var(--tint), .03); }
+.v2 .cfgr-endereco code { flex: 1; min-width: 0; font: 12px/1.45 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; color: var(--txt); }
+@media (max-width: 860px) { .v2 .cfgr-instr { grid-template-columns: 1fr; } }
+
+.v2 .cfgr-passos { margin: 0 0 4px; padding-left: 18px; display: grid; gap: 7px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cfgr-passos b { color: var(--txt); font-weight: 600; }
+.v2 .cfgr-sub { margin-top: 14px; }
+.v2 .cfgr-det { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4; color: var(--txt-3); }
+
+/* ---- Integrações › Inteligência artificial (chave própria) — ConfigChaveIa ---- */
+.v2 [data-como-criar] { display: flex; flex-direction: column; gap: 12px; }
+.v2 [data-como-criar] > .pn-card-cab { margin-bottom: 2px; }
+.v2 .cfgia-provs { display: flex; flex-direction: column; gap: 12px; }
+.v2 .cfgia-provs.lado { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); gap: 0 22px; }
+.v2 .cfgia-provs.lado > .cfgi-sep { height: auto; width: 1px; }
+.v2 .cfgia-prov { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v2 .cfgia-prov h4 { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .cfgia-prov h4 span { font-size: 11px; font-weight: 500; color: var(--txt-3); }
+.v2 .cfgia-prov a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.v2 .cfgia-prov a:focus-visible { outline: 2px solid var(--cor-acento-fio); outline-offset: 2px; border-radius: 3px; }
+.v2 .cfgo-numeros.cfgia-duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .v2 .cfgia-provs.lado { grid-template-columns: minmax(0, 1fr); gap: 12px; } .v2 .cfgia-provs.lado > .cfgi-sep { height: 1px; width: auto; } }
+@media (max-width: 560px) { .v2 .cfgo-numeros.cfgia-duas { grid-template-columns: minmax(0, 1fr); } }

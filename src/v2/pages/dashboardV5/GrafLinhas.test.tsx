@@ -30,15 +30,19 @@ describe('GrafLinhas (estilo da referência)', () => {
     for (const t of ['>0<', '>50<', '>100<', '>150<']) expect(h).toContain(t);
   });
 
-  it('legenda clicável com a leitura ao lado do nome; cada linha com a sua área em degradê', () => {
+  it('legenda clicável com a leitura ao lado do nome; colunas em degradê por série (gráficos SEMPRE em barras, dono 24/11)', () => {
     const h = render(<GrafLinhas baldes={baldes} series={dados} titulo="Entradas" vazio="nada" />);
     expect((h.match(/aria-pressed="true"/g) ?? []).length).toBe(2);
     expect(h).toContain('Diego');
     expect(h).toContain('>caiu<');
     expect(h).toContain('>parou e voltou<');
-    expect((h.match(/class="d5-graf-area"/g) ?? []).length).toBe(2);
+    // uma coluna por série em cada dia, com o degradê da série; nenhuma linha nem área
+    expect((h.match(/class="d5-graf-serie"/g) ?? []).length).toBe(2);
+    // dia zerado não desenha coluna: Diego tem 3 dias com valor, Juros abusivo 2
+    expect((h.match(/class="d5-graf-barra"/g) ?? []).length).toBe(5);
     expect((h.match(/<linearGradient/g) ?? []).length).toBe(2);
-    expect((h.match(/class="d5-graf-linha"/g) ?? []).length).toBe(2);
+    expect(h).not.toContain('d5-graf-linha');
+    expect(h).not.toContain('d5-graf-area');
     // nada de contorno por coluna nem tracejado
     expect(h).not.toContain('d5-graf-hit');
     expect(h).not.toContain('stroke-dasharray');

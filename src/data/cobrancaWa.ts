@@ -3,7 +3,7 @@
    (sem linha em `canais`, sem webhook) — nada aparece no inbox.
    Um número por atendente (unique org+atendente em cobranca_numeros). */
 import { useQuery } from '@tanstack/react-query';
-import { supabase, isDemoMode } from '@/lib/supabase';
+import { supabase, isDemoMode, isRevizaMode } from '@/lib/supabase';
 
 export type CobNumeroEstado = 'desconectado' | 'aguardando_qr' | 'conectado';
 export interface CobNumero {
@@ -16,7 +16,7 @@ export interface CobNumero {
 }
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
-  if (isDemoMode) throw new Error('Ação indisponível no modo demonstração.');
+  if (isDemoMode || isRevizaMode) throw new Error('Conecte um número de WhatsApp para usar esta ação.');
   const { data, error } = await supabase!.functions.invoke('cobranca-wa', { body });
   if (error) {
     let msg = error.message;
@@ -37,7 +37,7 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
 export function useCobNumeros(orgId?: string) {
   return useQuery({
     queryKey: ['cob-numeros', orgId],
-    enabled: !!orgId && !isDemoMode,
+    enabled: !!orgId && !isDemoMode && !isRevizaMode,
     refetchInterval: 30_000, // estado muda por fora (leitura do QR no celular)
     queryFn: async () => {
       const { data, error } = await supabase!

@@ -1,0 +1,592 @@
+/* ============================================================
+   Grade "Excel 2.0" — Gestão de cobranças (contrato §4).
+   Escopo `.v2 .plx`; tokens do tema (claro em :root[data-tema="light"]).
+   Camadas dentro da lona (z-index): células 0 · peça rolável da
+   seleção 1 · células congeladas 2 · números e peça congelada 3 ·
+   faixa dos números 4 · editor 6 · letras 7 · indicador de mover 9.
+   ============================================================ */
+.v2 .plx {
+  --plx-fundo: #0E1013;
+  --plx-linha: rgba(var(--tint), .075);
+  --plx-linha-forte: rgba(var(--tint), .15);
+  --plx-cab: #15171B;
+  --plx-cab-txt: var(--txt-3);
+  --plx-rn: #121418;
+  --plx-sel-rgb: 96, 152, 255;
+  --plx-sel: rgb(var(--plx-sel-rgb));
+  --plx-bloco: #31353D;
+  --plx-bloco-txt: #FFFFFF;
+  --plx-bloco-linha: rgba(255, 255, 255, .10);
+  --plx-ed: #16181D;
+  --plx-hit: rgba(var(--ambar-rgb), .32);
+  --plx-fixa-sombra: rgba(0, 0, 0, .55);
+  position: relative;
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 320px;
+  background: var(--plx-fundo);
+  border: 1px solid var(--linha); border-radius: var(--r-card);
+  overflow: hidden;
+  color: var(--txt); font-family: var(--fonte);
+}
+/* estado do pagamento (célula de mês de cliente) = estilos Bom / Neutro / Ruim do Excel.
+   Escuro: tons translúcidos legíveis sobre o fundo; claro: as cores exatas do Excel.
+   Também valem na legenda (fora da .plx, na barra da tela) */
+.v2 .plx, .v2 .plx-legenda {
+  --plx-ok-bg: rgba(74, 190, 140, .22);
+  --plx-ok-fg: #7EE2B3;
+  --plx-pend-bg: rgba(217, 164, 74, .26);
+  --plx-pend-fg: #F3D28A;
+  --plx-ruim-bg: rgba(229, 102, 92, .26);
+  --plx-ruim-fg: #FFA39C;
+}
+:root[data-tema="light"] .v2 .plx, :root[data-tema="light"] .v2 .plx-legenda {
+  --plx-ok-bg: #C6EFCE;
+  --plx-ok-fg: #006100;
+  --plx-pend-bg: #FFEB9C;
+  --plx-pend-fg: #9C5700;
+  --plx-ruim-bg: #FFC7CE;
+  --plx-ruim-fg: #9C0006;
+}
+:root[data-tema="light"] .v2 .plx {
+  --plx-fundo: #FFFFFF;
+  --plx-linha: #E3E5E9;
+  --plx-linha-forte: #CDD1D7;
+  --plx-cab: #F4F5F7;
+  --plx-rn: #F4F5F7;
+  --plx-sel-rgb: 26, 115, 232;
+  --plx-bloco: #1F2329;
+  --plx-bloco-linha: rgba(255, 255, 255, .12);
+  --plx-ed: #FFFFFF;
+  --plx-hit: rgba(255, 196, 0, .40);
+  --plx-fixa-sombra: rgba(22, 25, 31, .12);
+}
+
+/* ---------- barra de formatação ---------- */
+.v2 .plx-barra {
+  position: relative; z-index: 20;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--linha);
+  background: rgba(var(--tint), .025);
+}
+.v2 .plx-bt {
+  height: 28px; min-width: 28px; padding: 0 7px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid transparent; border-radius: 7px;
+  background: transparent; color: var(--txt-2);
+  font: 500 12px/1 var(--fonte); cursor: pointer;
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+.v2 .plx-bt:hover:not(:disabled) { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .plx-bt.on { background: rgba(var(--plx-sel-rgb), .15); border-color: rgba(var(--plx-sel-rgb), .35); color: var(--txt); }
+.v2 .plx-bt:disabled { opacity: .35; cursor: default; }
+.v2 .plx-bt:focus-visible { outline: 2px solid var(--plx-sel); outline-offset: 1px; }
+.v2 .plx-bt-b { font-weight: 800; font-size: 13px; }
+.v2 .plx-bt-i { font-style: italic; font-family: Georgia, 'Times New Roman', serif; font-size: 14px; }
+.v2 .plx-bt-txt { white-space: nowrap; }
+.v2 .plx-sep { width: 1px; height: 18px; margin: 0 6px; background: var(--linha); }
+.v2 .plx-esp { flex: 1; }
+.v2 .plx-split { position: relative; display: inline-flex; align-items: center; }
+.v2 .plx-split > .plx-bt:first-child:not(:only-child) { border-radius: 7px 0 0 7px; padding-right: 4px; }
+.v2 .plx-split > .plx-bt + .plx-bt { border-radius: 0 7px 7px 0; min-width: 16px; padding: 0 4px; }
+.v2 .plx-cor-ic { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.v2 .plx-cor-barra { width: 15px; height: 3px; border-radius: 1px; box-shadow: inset 0 0 0 1px rgba(var(--tint), .28); }
+
+.v2 .plx-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+}
+.v2 .plx-pal { display: grid; grid-template-columns: repeat(6, 22px); gap: 6px; }
+.v2 .plx-sw {
+  width: 22px; height: 22px; padding: 0;
+  border: 1px solid rgba(var(--tint), .2); border-radius: 5px;
+  cursor: pointer; transition: transform .1s var(--ease);
+}
+.v2 .plx-sw:hover { transform: scale(1.12); box-shadow: 0 0 0 2px rgba(var(--plx-sel-rgb), .55); }
+.v2 .plx-sw.atual { box-shadow: 0 0 0 2px var(--plx-sel); }
+.v2 .plx-sw-nada {
+  background:
+    linear-gradient(135deg, transparent 45%, var(--rubro) 45%, var(--rubro) 55%, transparent 55%),
+    var(--plx-fundo);
+}
+.v2 .plx-outra {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--linha);
+  font-size: 12px; color: var(--txt-2); cursor: pointer;
+}
+.v2 .plx-outra input { width: 26px; height: 20px; padding: 0; border: 0; background: none; cursor: pointer; }
+/* ---------- painel de atalhos ---------- */
+.v2 .plx-atalhos {
+  left: auto; right: 0; width: min(680px, calc(100vw - 48px)); padding: 0;
+  max-height: min(600px, calc(100vh - 160px)); display: flex; flex-direction: column; overflow: hidden;
+  color: var(--txt-2); font-size: 12.5px;
+}
+.v2 .plx-at-cab { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px 12px; border-bottom: 1px solid var(--linha); }
+.v2 .plx-at-cab > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .plx-at-cab b { font-size: 14px; font-weight: 600; color: var(--txt); letter-spacing: -.005em; }
+.v2 .plx-at-cab span { font-size: 11.5px; color: var(--txt-3); }
+.v2 .plx-at-x { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; border: 1px solid transparent; background: none; color: var(--txt-3); cursor: pointer; }
+.v2 .plx-at-x:hover { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .plx-at-x:focus-visible { outline: 2px solid var(--plx-sel); outline-offset: 1px; }
+.v2 .plx-at-corpo { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 26px; padding: 4px 16px 10px; }
+@media (max-width: 720px) { .v2 .plx-at-corpo { grid-template-columns: 1fr; } }
+.v2 .plx-at-col { display: flex; flex-direction: column; min-width: 0; }
+.v2 .plx-at-grupo { padding-top: 8px; }
+.v2 .plx-at-grupo h4 { margin: 0 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .plx-at-grupo ul { list-style: none; margin: 0; padding: 0; }
+.v2 .plx-at-grupo li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; padding: 2px 6px; margin: 0 -6px; border-radius: 7px; }
+.v2 .plx-at-grupo li:hover { background: rgba(var(--tint), .045); }
+.v2 .plx-at-o { color: var(--txt); line-height: 1.35; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .plx-at-k { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.v2 .plx-at-teclas { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .plx-at-combo { display: inline-flex; align-items: center; gap: 3px; }
+.v2 .plx-at-ou, .v2 .plx-at-txt { font-style: normal; font-size: 11px; color: var(--txt-3); white-space: nowrap; }
+.v2 .plx-at-ou { margin-right: 3px; }
+.v2 .plx-kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box;
+  font: 600 11px/1 var(--fonte); font-variant-numeric: tabular-nums; color: var(--txt);
+  background: linear-gradient(180deg, rgba(var(--tint), .07), rgba(var(--tint), .03));
+  border: 1px solid rgba(var(--tint), .16); border-bottom-width: 2px; border-radius: 6px;
+  white-space: nowrap;
+}
+.v2 .plx-kbd.larga { letter-spacing: .12em; padding: 0 7px; }
+:root[data-tema="light"] .v2 .plx-kbd { background: linear-gradient(180deg, #fff, #f3f4f6); border-color: rgba(22, 25, 31, .16); box-shadow: 0 1px 0 rgba(22, 25, 31, .04); }
+.v2 .plx-at-pe { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-3); background: rgba(var(--tint), .02); }
+.v2 .plx-at-pe svg { color: var(--verde); }
+
+/* ---------- barra de fórmula ---------- */
+.v2 .plx-fbar { display: flex; align-items: stretch; height: 30px; border-bottom: 1px solid var(--linha); background: var(--plx-fundo); }
+.v2 .plx-nome {
+  flex: none; width: 96px; padding: 0 6px;
+  border: 0; border-right: 1px solid var(--linha); outline: none;
+  background: transparent; color: var(--txt);
+  font: 600 12px var(--fonte); text-align: center; font-variant-numeric: tabular-nums;
+}
+.v2 .plx-nome:focus { background: rgba(var(--plx-sel-rgb), .08); }
+.v2 .plx-fx-rot {
+  display: flex; align-items: center; padding: 0 11px;
+  border-right: 1px solid var(--linha);
+  color: var(--txt-3); font: italic 600 12.5px Georgia, 'Times New Roman', serif;
+  user-select: none;
+}
+/* textarea de 1 linha (guarda a quebra de linha; Alt+Enter insere) */
+.v2 .plx-fx {
+  flex: 1; min-width: 0; height: 100%; margin: 0; padding: 6px 10px 0;
+  border: 0; border-radius: 0; outline: none; background: transparent;
+  color: var(--txt); font: 400 12.5px var(--fonte); line-height: 17px;
+  resize: none; overflow: hidden; white-space: pre; overflow-wrap: normal;
+}
+.v2 .plx-fx:focus { background: rgba(var(--plx-sel-rgb), .06); }
+.v2 .plx-fx[readonly] { color: var(--txt-2); }
+
+/* ---------- grade ---------- */
+.v2 .plx-grade {
+  position: relative; flex: 1; min-height: 0;
+  overflow: auto; overscroll-behavior: contain;
+  background: var(--plx-fundo);
+  user-select: none; -webkit-user-select: none;
+  outline: none;
+}
+.v2 .plx-grade::-webkit-scrollbar { width: 11px; height: 11px; }
+.v2 .plx-grade::-webkit-scrollbar-thumb { background: rgba(var(--tint), .16); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+.v2 .plx-grade::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--tint), .28); }
+.v2 .plx-grade::-webkit-scrollbar-corner { background: var(--plx-fundo); }
+.v2 .plx-lona { position: relative; z-index: 0; width: var(--plx-w); }
+.v2 .plx-lona.plx-movendo, .v2 .plx-lona.plx-movendo * { cursor: grabbing !important; }
+
+/* letras (A, B, C…) */
+.v2 .plx-cab { position: sticky; top: 0; z-index: 7; width: var(--plx-w); height: 24px; }
+.v2 .plx-cab-grade { display: grid; grid-template-columns: var(--plx-tpl); height: 100%; }
+.v2 .plx-canto, .v2 .plx-letra {
+  background: var(--plx-cab);
+  border-right: 1px solid var(--plx-linha);
+  border-bottom: 1px solid var(--plx-linha-forte);
+}
+.v2 .plx-canto { position: sticky; left: 0; z-index: 3; cursor: cell; }
+.v2 .plx-canto::after {
+  content: ''; position: absolute; right: 3px; bottom: 3px;
+  border: 5px solid transparent;
+  border-right-color: rgba(var(--tint), .28); border-bottom-color: rgba(var(--tint), .28);
+}
+.v2 .plx-letra {
+  position: relative; min-width: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--plx-cab-txt); font: 500 11px/1 var(--fonte); letter-spacing: .02em;
+  cursor: default;
+}
+.v2 .plx-letra.plx-c-fixa { position: sticky; z-index: 2; }
+.v2 .plx-letra.plx-c-ult { box-shadow: 3px 0 4px -2px var(--plx-fixa-sombra); }
+.v2 .plx-letra-mes .plx-letra-txt::after {
+  content: ''; display: inline-block; width: 3px; height: 3px; margin-left: 4px; vertical-align: 2px;
+  border-radius: 50%; background: var(--verde); opacity: .7;
+}
+.v2 .plx-letra-menu {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--txt-3); opacity: 0; cursor: pointer;
+}
+.v2 .plx-letra:hover .plx-letra-menu { opacity: 1; }
+.v2 .plx-letra-menu:hover { background: rgba(var(--tint), .12); color: var(--txt); }
+.v2 .plx-rz { position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; }
+.v2 .plx-rz:hover { background: rgba(var(--plx-sel-rgb), .55); }
+.v2 .plx-oc {
+  position: absolute; left: 0; top: 4px; bottom: 4px; width: 5px;
+  border-left: 3px double rgba(var(--tint), .45);
+  cursor: pointer;
+}
+.v2 .plx-oc-fim { left: auto; right: 7px; }
+.v2 .plx-oc:hover { border-left-color: var(--plx-sel); }
+
+/* linhas e células */
+.v2 .plx-corpo { position: relative; }
+.v2 .plx-lin { position: absolute; left: 0; width: var(--plx-w); display: grid; grid-template-columns: var(--plx-tpl); }
+.v2 .plx-rn {
+  position: sticky; left: 0; z-index: 3;
+  background: var(--plx-rn);
+  border-right: 1px solid var(--plx-linha-forte); border-bottom: 1px solid var(--plx-linha);
+  color: var(--txt-3); font: 500 11px/calc(var(--h, 26px) - 1px) var(--fonte);
+  text-align: center; font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.v2 .plx-rn-menu {
+  position: absolute; right: 1px; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 16px; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 3px; background: transparent;
+  color: var(--txt-3); opacity: 0; cursor: pointer;
+}
+.v2 .plx-rn:hover .plx-rn-menu { opacity: 1; }
+.v2 .plx-rn-menu:hover { background: rgba(var(--tint), .12); color: var(--txt); }
+.v2 .plx-c {
+  min-width: 0; overflow: hidden;
+  padding: 0 6px;
+  border-right: 1px solid var(--plx-linha); border-bottom: 1px solid var(--plx-linha);
+  font-size: 12.5px; line-height: calc(var(--h, 26px) - 1px);
+  white-space: pre; text-overflow: ellipsis;
+  cursor: cell;
+}
+.v2 .plx-c-fixa { position: sticky; z-index: 2; background-color: var(--plx-fundo); }
+.v2 .plx-c.plx-c-ult { box-shadow: 3px 0 4px -2px var(--plx-fixa-sombra); border-right-color: var(--plx-linha-forte); }
+.v2 .plx-al-r { text-align: right; }
+.v2 .plx-al-c { text-align: center; }
+.v2 .plx-b { font-weight: 700; }
+.v2 .plx-i { font-style: italic; }
+/* cor automática das células de mês (só texto; estilo explícito vence por ser inline) */
+.v2 .plx-pg { color: var(--verde); }
+.v2 .plx-np { color: var(--rubro); }
+.v2 .plx-c-trava { color: var(--txt-3); cursor: not-allowed; }
+.v2 .plx-hit { background-image: linear-gradient(var(--plx-hit), var(--plx-hit)); }
+/* texto preto sem fundo no tema escuro = "automático" (legível); idem branco no claro */
+.v2 .plx .plx-c.plx-fg-esc { color: var(--txt) !important; }
+:root[data-tema="light"] .v2 .plx .plx-c.plx-fg-esc { color: var(--plx-fg) !important; }
+:root[data-tema="light"] .v2 .plx .plx-c.plx-fg-cla { color: var(--txt) !important; }
+
+/* estado do pagamento: vence a cor manual (a grade nem aplica o fundo/texto inline) e a
+   congelada; negrito/itálico/alinhamento manuais continuam valendo */
+.v2 .plx-c.plx-st-ok, .v2 .plx-leg-am.plx-st-ok { background-color: var(--plx-ok-bg); color: var(--plx-ok-fg); }
+.v2 .plx-c.plx-st-pend, .v2 .plx-leg-am.plx-st-pend { background-color: var(--plx-pend-bg); color: var(--plx-pend-fg); }
+.v2 .plx-c.plx-st-ruim, .v2 .plx-leg-am.plx-st-ruim { background-color: var(--plx-ruim-bg); color: var(--plx-ruim-fg); }
+.v2 .plx-c.plx-st { border-right-color: rgba(var(--tint), .10); border-bottom-color: rgba(var(--tint), .10); }
+:root[data-tema="light"] .v2 .plx-c.plx-st { border-right-color: rgba(22, 25, 31, .09); border-bottom-color: rgba(22, 25, 31, .09); }
+/* recusado: o valor que o financeiro NÃO aceitou, riscado */
+.v2 .plx-st-risca { text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: currentColor; }
+/* relógio do "aguardando o financeiro" (antes do valor informado) */
+.v2 .plx-rel { display: inline-flex; vertical-align: -1px; margin-right: 4px; opacity: .9; }
+.v2 .plx-rel svg { stroke-width: 2.2; }
+
+/* "+" do informar pagamento: um botão só, posicionado pelo JS na célula sob o ponteiro */
+.v2 .plx-mais {
+  position: absolute; z-index: 1;
+  display: none; place-items: center;
+  width: 18px; height: 18px; padding: 0; margin: 0;
+  border: 1px solid rgba(var(--plx-sel-rgb), .5); border-radius: 5px;
+  background: var(--plx-fundo); color: var(--plx-sel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
+  cursor: pointer;
+  transition: background .12s var(--ease), color .12s var(--ease), transform .12s var(--ease);
+}
+.v2 .plx-mais:hover { background: var(--plx-sel); color: #FFFFFF; transform: scale(1.08); }
+:root[data-tema="light"] .v2 .plx-mais { box-shadow: 0 1px 3px rgba(22, 25, 31, .18); }
+
+/* legenda (acima da grade, na barra da tela): três "células" de amostra */
+.v2 .plx-legenda { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.v2 .plx-leg-am {
+  display: inline-flex; align-items: center;
+  height: 22px; padding: 0 9px; border-radius: 5px;
+  font: 600 11.5px/1 var(--fonte); white-space: nowrap; cursor: default;
+  box-shadow: inset 0 0 0 1px rgba(var(--tint), .08);
+}
+:root[data-tema="light"] .v2 .plx-leg-am { box-shadow: inset 0 0 0 1px rgba(22, 25, 31, .08); }
+.v2 .plx-leg-am .plx-rel { margin-right: 5px; vertical-align: 0; }
+
+/* linha de cabeçalho do bloco: como o Excel do cliente (fundo escuro, texto claro, negrito) */
+.v2 .plx-lin-cab .plx-c {
+  background-color: var(--plx-bloco); color: var(--plx-bloco-txt); font-weight: 700;
+  border-right-color: var(--plx-bloco-linha); border-bottom-color: var(--plx-bloco-linha);
+}
+.v2 .plx-lin-cab .plx-rn { color: var(--txt); font-weight: 700; box-shadow: inset 3px 0 0 var(--plx-bloco); }
+.v2 .plx-lin-rot .plx-rn { color: var(--ambar); }
+
+/* ---------- camadas de seleção (overlay) ---------- */
+.v2 .plx-banda { position: absolute; left: 0; top: 0; width: var(--plx-w); height: 0; display: none; pointer-events: none; }
+.v2 .plx-cab .plx-banda { height: 100%; }
+.v2 .plx-pc { display: none; height: 100%; box-sizing: border-box; }
+.v2 .plx-pc-fx { position: sticky; z-index: 3; }
+.v2 .plx-pc-rl { position: absolute; top: 0; z-index: 1; }
+.v2 .plx-sel .plx-pc { background: rgba(var(--plx-sel-rgb), .11); border: 1px solid var(--plx-sel); }
+.v2 .plx-copia .plx-pc { border: 2px dashed var(--plx-sel); }
+.v2 .plx-pc.sem-dir { border-right-width: 0 !important; }
+.v2 .plx-pc.sem-esq { border-left-width: 0 !important; }
+.v2 .plx-cabsel .plx-pc { background: rgba(var(--plx-sel-rgb), .16); box-shadow: inset 0 -2px 0 var(--plx-sel); }
+.v2 .plx-rnsel-pc {
+  position: sticky; left: 0; z-index: 4;
+  width: 46px; height: 100%;
+  background: rgba(var(--plx-sel-rgb), .16); box-shadow: inset -2px 0 0 var(--plx-sel);
+}
+.v2 .plx-at {
+  position: absolute; top: 0; z-index: 1;
+  height: 100%; box-sizing: border-box;
+  border: 2px solid var(--plx-sel); border-radius: 1px;
+}
+.v2 .plx-at.fixa { z-index: 3; }
+.v2 .plx-grade:not(:focus-within) .plx-at { border-color: rgba(var(--tint), .38); }
+.v2 .plx-at.editando { z-index: 6; pointer-events: auto; box-shadow: 0 6px 18px rgba(0, 0, 0, .28); }
+/* editor = textarea de 1 linha (guarda a quebra de linha; Alt+Enter insere). line-height da
+   célula vem do JS (autoTamanho); com quebra, o editor cresce para baixo */
+.v2 .plx-ed {
+  position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box;
+  display: block; margin: 0; padding: 0 4px; border: 0; outline: 0; border-radius: 0;
+  background: transparent; color: transparent; caret-color: transparent;
+  font: 400 12.5px var(--fonte); line-height: 23px;
+  resize: none; overflow: hidden; white-space: pre; overflow-wrap: normal;
+  opacity: 0;
+}
+.v2 .plx-at.editando .plx-ed { opacity: 1; background: var(--plx-ed); color: var(--txt); caret-color: var(--plx-sel); }
+.v2 .plx-at.editando.cab .plx-ed { background: var(--plx-bloco); color: var(--plx-bloco-txt); }
+.v2 .plx-drop {
+  position: absolute; top: 0; bottom: 0; z-index: 9;
+  width: 3px; margin-left: -1px; border-radius: 2px;
+  background: var(--plx-sel);
+  display: none; pointer-events: none;
+}
+.v2 .plx-vazio { position: sticky; left: 0; padding: 36px 16px; text-align: center; color: var(--txt-3); font-size: 13px; }
+
+/* ---------- rodapé (status) ---------- */
+.v2 .plx-rodape {
+  display: flex; align-items: center; gap: 12px;
+  height: 28px; padding: 0 12px;
+  border-top: 1px solid var(--linha);
+  background: rgba(var(--tint), .02);
+  color: var(--txt-2); font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+.v2 .plx-rod-esq { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v2 .plx-rod-num { white-space: nowrap; }
+.v2 .plx-rod-num b { color: var(--txt); font-weight: 600; }
+.v2 .plx-trava-tag { color: var(--ambar); }
+.v2 .plx-aviso {
+  position: absolute; left: 50%; bottom: 38px; z-index: 25;
+  max-width: min(80%, 560px); padding: 8px 14px;
+  transform: translateX(-50%);
+  background: var(--surface); color: var(--txt);
+  border: 1px solid rgba(var(--tint), .14); border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  font-size: 12px; line-height: 1.4;
+  animation: plx-entra .18s var(--ease);
+}
+.v2 .plx-aviso.erro { border-color: rgba(var(--rubro-rgb), .5); color: var(--rubro); }
+@keyframes plx-entra { from { opacity: 0; transform: translate(-50%, 6px); } }
+
+/* ---------- menu de contexto (portal .v2) ---------- */
+.v2 .plx-menu {
+  position: fixed; z-index: 1000;
+  min-width: 236px; max-width: 340px; padding: 5px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  color: var(--txt); font: 12.5px var(--fonte);
+}
+.v2 .plx-menu-tit {
+  margin-bottom: 4px; padding: 5px 10px 7px;
+  border-bottom: 1px solid var(--linha);
+  color: var(--txt-3); font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .plx-mi {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  width: 100%; padding: 7px 10px;
+  border: 0; border-radius: 6px; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.v2 .plx-mi:hover:not(:disabled), .v2 .plx-mi:focus-visible { background: var(--hover); outline: none; }
+.v2 .plx-mi:disabled { color: var(--txt-3); cursor: default; }
+.v2 .plx-mi.perigo { color: var(--rubro); }
+.v2 .plx-mi kbd { color: var(--txt-3); font: 11px var(--fonte); }
+.v2 .plx-msep { height: 1px; margin: 4px 6px; background: var(--linha); }
+
+.v2 .plx-dica { margin: 10px 0 0; color: var(--txt-3); font-size: 12px; line-height: 1.5; }
+
+/* cursor global durante o redimensionar (o mouse sai da alça) */
+body.plx-cursor-col, body.plx-cursor-col * { cursor: col-resize !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .plx-aviso { animation: none; }
+  .v2 .plx-sw, .v2 .plx-bt { transition: none; }
+}
+
+/* =====================================================================
+   Acabamento (dono 25/09: "mesmo formato da planilha, mais sofisticado,
+   profissional, alinhado, atraente") — só visual; a folha continua igual
+   ===================================================================== */
+.v2 .plx {
+  --plx-zebra: rgba(var(--tint), .022);
+  --plx-zebra-solida: #111317;
+  --plx-hover: rgba(var(--plx-sel-rgb), .06);
+  --plx-hover-solida: #141922;
+  --plx-sep: rgba(var(--tint), .22);
+  --plx-vazia: #0B0C0F;
+}
+:root[data-tema="light"] .v2 .plx {
+  --plx-linha: #E8EAEE;
+  --plx-linha-forte: #D5D9DF;
+  --plx-zebra: #F8F9FB;
+  --plx-zebra-solida: #F8F9FB;
+  --plx-hover: rgba(26, 115, 232, .055);
+  --plx-hover-solida: #EEF4FD;
+  --plx-sep: #B9BFC8;
+  --plx-vazia: #F3F4F6;
+}
+
+/* células: dígitos alinhados em toda a grade, respiro lateral maior */
+.v2 .plx-c { padding: 0 9px; font-variant-numeric: tabular-nums; }
+.v2 .plx-c-doc { letter-spacing: .01em; }
+.v2 .plx-c-mes { padding: 0 4px; }
+
+/* zebra suave + realce da linha sob o mouse (as congeladas precisam de fundo opaco) */
+.v2 .plx-lin-z { background: var(--plx-zebra); }
+.v2 .plx-lin-z .plx-c-fixa { background-color: var(--plx-zebra-solida); }
+.v2 .plx-lin-cli:hover { background: var(--plx-hover); }
+.v2 .plx-lin-cli:hover .plx-c-fixa { background-color: var(--plx-hover-solida); }
+.v2 .plx-lin-cli:hover .plx-rn { color: var(--txt); }
+
+/* divisória entre o cadastro e os meses (na grade e nas letras) */
+.v2 .plx-c-sep { box-shadow: inset 2px 0 0 var(--plx-sep); }
+.v2 .plx-letra.plx-c-sep { box-shadow: inset 2px 0 0 var(--plx-sep); }
+
+/* linha em branco entre blocos: faixa de respiro, sem grade */
+.v2 .plx-lin-vazia .plx-c { background-color: var(--plx-vazia); border-right-color: transparent; }
+.v2 .plx-lin-vazia .plx-c-fixa { background-color: var(--plx-vazia); }
+.v2 .plx-lin-vazia .plx-rn { color: transparent; }
+.v2 .plx-lin-vazia .plx-c-sep { box-shadow: none; }
+
+/* cabeçalho de cada bloco: faixa escura com fio âmbar embaixo (o preto do Excel, refinado) */
+.v2 .plx-lin-cab .plx-c {
+  font: 600 11.5px/calc(var(--h, 30px) - 1px) var(--fonte); letter-spacing: .035em;
+  box-shadow: inset 0 -2px 0 rgba(var(--ambar-rgb), .7);
+}
+.v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -2px 0 rgba(var(--ambar-rgb), .7), inset 2px 0 0 rgba(255, 255, 255, .28); }
+.v2 .plx-lin-cab .plx-rn { background: var(--plx-bloco); color: #fff; box-shadow: inset 0 -2px 0 rgba(var(--ambar-rgb), .7); }
+:root[data-tema="light"] .v2 .plx-lin-cab .plx-rn { color: #fff; }
+
+/* letras: mais discretas e firmes */
+.v2 .plx-letra { font: 600 10.5px/1 var(--fonte); letter-spacing: .06em; }
+
+/* pagamento = etiqueta arredondada DENTRO da célula (a grade do Excel continua em volta) */
+.v2 .plx-c.plx-st { position: relative; isolation: isolate; background-color: transparent !important; font-weight: 600; font-size: 12px; border-right-color: var(--plx-linha); border-bottom-color: var(--plx-linha); }
+:root[data-tema="light"] .v2 .plx-c.plx-st { border-right-color: var(--plx-linha); border-bottom-color: var(--plx-linha); }
+.v2 .plx-c.plx-st::before {
+  content: ''; position: absolute; inset: 4px 5px; z-index: -1;
+  border-radius: 6px; background: var(--plx-st-bg); box-shadow: inset 0 0 0 1px var(--plx-st-bd);
+}
+.v2 .plx-c.plx-st-ok { --plx-st-bg: var(--plx-ok-bg); --plx-st-bd: rgba(74, 190, 140, .28); }
+.v2 .plx-c.plx-st-pend { --plx-st-bg: var(--plx-pend-bg); --plx-st-bd: rgba(217, 164, 74, .38); }
+.v2 .plx-c.plx-st-ruim { --plx-st-bg: var(--plx-ruim-bg); --plx-st-bd: rgba(229, 102, 92, .32); }
+:root[data-tema="light"] .v2 .plx-c.plx-st-ok { --plx-st-bd: rgba(0, 97, 0, .14); }
+:root[data-tema="light"] .v2 .plx-c.plx-st-pend { --plx-st-bd: rgba(156, 87, 0, .2); }
+:root[data-tema="light"] .v2 .plx-c.plx-st-ruim { --plx-st-bd: rgba(156, 0, 6, .16); }
+/* NÃO PAGOU cabe inteiro na etiqueta */
+.v2 .plx-c.plx-st-ruim { font-size: 11px; letter-spacing: .03em; }
+.v2 .plx-c.plx-st .plx-rel { margin-right: 5px; }
+/* número pago sem estado (NOVOS, sem vínculo): só a cor do texto, como antes */
+.v2 .plx-c-mes.plx-pg, .v2 .plx-c-mes.plx-np { font-weight: 600; }
+
+/* legenda com a mesma etiqueta */
+.v2 .plx-leg-am { border-radius: 6px; font-weight: 600; }
+
+/* "Sem pagamento informado" (dono 25/09): quadrado BRANCO, texto em 2 linhas, no lugar da data */
+.v2 .plx, .v2 .plx-legenda { --plx-sem-bg: rgba(var(--tint), .045); --plx-sem-bd: rgba(var(--tint), .18); --plx-sem-fg: var(--txt-3); }
+:root[data-tema="light"] .v2 .plx, :root[data-tema="light"] .v2 .plx-legenda { --plx-sem-bg: #FFFFFF; --plx-sem-bd: #CDD2D9; --plx-sem-fg: #6B7280; }
+.v2 .plx-c.plx-st-sem { --plx-st-bg: var(--plx-sem-bg); --plx-st-bd: var(--plx-sem-bd); color: var(--plx-sem-fg); font-weight: 500; }
+:root[data-tema="light"] .v2 .plx-c.plx-st-sem::before { box-shadow: inset 0 0 0 1px var(--plx-sem-bd), 0 1px 1px rgba(22, 25, 31, .04); }
+.v2 .plx-sem-txt { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; white-space: normal; font-size: 9.5px; line-height: 1.12; letter-spacing: .01em; text-align: center; }
+.v2 .plx-leg-am.plx-st-sem { background-color: var(--plx-sem-bg); color: var(--plx-sem-fg); box-shadow: inset 0 0 0 1px var(--plx-sem-bd); }
+/* legenda das cores dentro da barra de formatação (sobra espaço no meio) */
+.v2 .plx-barra-extra { display: inline-flex; align-items: center; margin-right: 10px; min-width: 0; }
+.v2 .plx-barra-extra .plx-legenda { flex-wrap: nowrap; }
+@media (max-width: 1180px) { .v2 .plx-barra-extra { display: none; } }
+
+/* =====================================================================
+   crítica 12/11 — formatação + fórmula numa linha só (a grade ganha uma
+   faixa); legenda das cores no rodapé; "A informar" legível (11px).
+   ===================================================================== */
+.v2 .plx-barra { flex-wrap: nowrap; padding: 4px 6px; gap: 2px; }
+.v2 .plx-barra > .plx-fbar {
+  flex: 1 1 auto; min-width: 180px; height: 28px; margin: 0 4px 0 2px;
+  border: 1px solid var(--linha); border-radius: 7px; overflow: hidden;
+  background: var(--plx-fundo);
+}
+.v2 .plx-barra > .plx-fbar .plx-nome { width: 64px; }
+.v2 .plx-barra > .plx-fbar .plx-fx { padding-top: 5px; }
+@media (max-width: 900px) {
+  .v2 .plx-barra { flex-wrap: wrap; row-gap: 4px; }
+  .v2 .plx-barra > .plx-fbar { order: 9; flex-basis: 100%; margin: 0; }
+}
+/* rodapé: legenda das cores ao lado da contagem (bolinha + texto, não parece botão) */
+.v2 .plx-rod-extra { display: inline-flex; align-items: center; flex: none; min-width: 0; }
+.v2 .plx-rod-extra .plx-legenda { flex-wrap: nowrap; gap: 12px; }
+.v2 .plx-rod-extra .plx-leg-am,
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-rod-extra .plx-leg-am {
+  height: auto; min-height: 0; padding: 0; gap: 0; border-radius: 0;
+  background: none !important; box-shadow: none !important;
+  font: 500 11px/1 var(--fonte); color: var(--txt-2) !important;
+}
+.v2 .plx-rod-extra .plx-leg-am::before {
+  content: ''; flex: none; width: 8px; height: 8px; margin-right: 6px; border-radius: 3px;
+  background: var(--plx-dot, rgba(var(--tint), .3));
+}
+.v2 .plx-rod-extra .plx-leg-am .plx-rel { display: none; }
+.v2 .plx-rod-extra .plx-st-ok { --plx-dot: var(--plx-ok-fg); }
+.v2 .plx-rod-extra .plx-st-pend { --plx-dot: var(--plx-pend-fg); }
+.v2 .plx-rod-extra .plx-st-ruim { --plx-dot: var(--plx-ruim-fg); }
+.v2 .plx-rod-extra .plx-st-sem { --plx-dot: transparent; }
+.v2 .plx-rod-extra .plx-st-sem::before { box-shadow: inset 0 0 0 1px var(--plx-sem-bd); }
+@media (max-width: 1180px) { .v2 .plx-rod-extra { display: none; } }
+/* "A informar" numa linha só, 11px, contorno cinza (o texto completo vai na dica) */
+.v2 .plx-sem-txt,
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-sem-txt {
+  display: block; height: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 11px; line-height: inherit; letter-spacing: 0; text-align: center;
+}
+/* filete da linha de cabeçalho do bloco: dourado da marca (o âmbar virou cor de alerta) */
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6), inset 2px 0 0 var(--plx-sep); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); box-shadow: inset 0 -2px 0 rgba(var(--azul-rgb), .6); }
+html[data-barra-alfa] .v2 .plx-lin-cab .plx-c { font-weight: 600; }
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-rn { color: var(--plx-bloco-txt); }
+/* título de coluna (linha de cabeçalho do bloco): até 2 linhas de 11px em vez do corte com reticências */
+.v2 .plx-lin-cab .plx-c { display: flex; align-items: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-c { justify-content: center; }
+.v2 .plx-lin-cab .plx-c.plx-al-r { justify-content: flex-end; }
+.v2 .plx-cab-txt {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: normal; overflow-wrap: anywhere; line-height: 12px; font-size: 11px; max-width: 100%;
+}
+html[data-barra-alfa]:not(#rv-sis) .v2 .plx-lin-cab .plx-c { letter-spacing: .01em; }
+/* mês em aberto com só a data do vencimento escrita: texto discreto (a data repetida virava ruído) */
+.v2 .plx-c.plx-c-data { color: var(--txt-3); font-size: 11.5px; }
+.v2 .plx-lin-cab .plx-c { padding-left: 5px; padding-right: 5px; }

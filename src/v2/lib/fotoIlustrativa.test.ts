@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fotoIlustrativa, generoProvavel } from './fotoIlustrativa';
 
+// Reviza: as fotos vêm de src/v2/assets/idosos (import.meta.glob), não de public/avatares — o teste aceita os dois caminhos
 describe('foto ilustrativa do card', () => {
   it('palpite pelo primeiro nome', () => {
     expect(generoProvavel('Maria Lucia Collares')).toBe('f');
@@ -26,8 +27,8 @@ describe('foto ilustrativa do card', () => {
   it('mesma pessoa → mesma foto; mulher → foto de mulher', () => {
     const a = fotoIlustrativa('Maria', 'id-1');
     expect(fotoIlustrativa('Maria', 'id-1')).toBe(a);
-    expect(a).toMatch(/\/avatares\/idosos\/f\d\.webp$/);
-    expect(fotoIlustrativa('João', 'id-2')).toMatch(/\/avatares\/idosos\/h\d\.webp$/);
-    expect(fotoIlustrativa('5551999990000', 'id-3')).toMatch(/\/avatares\/idosos\/[fh]\d\.webp$/);
+    expect(a).toMatch(/\/idosos\/f\d\.webp$/);
+    expect(fotoIlustrativa('João', 'id-2')).toMatch(/\/idosos\/h\d\.webp$/);
+    expect(fotoIlustrativa('5551999990000', 'id-3')).toMatch(/\/idosos\/[fh]\d\.webp$/);
   });
 });

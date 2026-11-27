@@ -46,8 +46,16 @@ export interface WaMessage {
   origemBot?: boolean;
   /** v2 (aditivo): transcrição do áudio quando o backend gravar metadados.transcricao. */
   transcricao?: string;
+  /** reações (26/11): a nossa (metadados.minha_reacao) e a do cliente (metadados.reacao_cliente) */
+  minhaReacao?: string | null;
+  reacaoCliente?: string | null;
+  /** o que é este arquivo, segundo a IA da empresa (metadados.doc_*, 25/11): RG, comprovante, extrato… */
+  doc?: import('./documentosIa').DocIa | null;
   /** prévia da mensagem citada, para renderizar a mini-caixa dentro da bolha. */
   quoted?: { remetente?: string; tipo?: string; texto?: string };
+  /** NOTA INTERNA (tipo 'nota_interna', migration 99): só a equipe vê, nunca vai ao cliente. `automatica` = gravada
+   *  pelo próprio sistema (ligação registrada, pedido do gestor), sem autor. */
+  nota?: { autorNome?: string; mencoesNomes: string[]; automatica: boolean };
 }
 
 /** #6 último canal/número usado para falar com a conversa. */
@@ -103,6 +111,8 @@ export interface WaContact {
   /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
   arquivada?: boolean;
   fixada?: boolean;
+  /** 26/11: fixada só na lista de quem fixou (Reviza, recurso crm-extra) */
+  fixadaMinha?: boolean;
   silenciada?: boolean;
   /** id do contato (para abrir em Contatos e editar). */
   contatoId?: string | null;
@@ -126,6 +136,9 @@ export interface WaContact {
   oppRespId?: string | null;
   /** CANAL ATUAL do atendimento (conversas.canal_id -> nome_interno). Ex.: ANDRIUS, URA, LUIZA, RMKT. */
   canalAtual?: string | null;
+  /** Conversa PRESA neste canal (conversas.canal_preso_id): entrada por outro número não rouba
+   *  mais o atendimento. Hoje só o chip do Murillo prende. NULL = regra normal. */
+  canalPresoId?: string | null;
   last: string;
   email: string;
   stage: string;

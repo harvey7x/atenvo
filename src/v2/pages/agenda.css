@@ -1,0 +1,94 @@
+/* ATENDIMENTO › AGENDA (26/11). Neutros do tema; cada tipo com um fio de cor à esquerda (laranja só sólido, na reunião). */
+.v2 .agd { display: flex; flex-direction: column; gap: 12px; }
+.v2 .agd-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; }
+.v2 .agd-tit h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--txt); }
+.v2 .agd-tit p { margin: 2px 0 0; font-size: 13px; color: var(--txt-2); }
+.v2 .agd-tit p::first-letter { text-transform: uppercase; }
+.v2 .agd-ctrl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .agd-nav { display: flex; gap: 4px; }
+.v2 .agd-minhas { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); cursor: pointer; }
+.v2 .agd-card { padding: 0; overflow: hidden; }
+.v2 .agd-nota { margin: 0; font-size: 11.5px; color: var(--txt-3); }
+.v2 .agd-vazio { margin: 0; padding: 28px 18px; text-align: center; font-size: 13px; color: var(--txt-3); }
+.v2 .agd-erro { margin: 10px 0 0; font-size: 12px; color: var(--cor-erro-txt, var(--rubro)); }
+
+/* o evento (na grade, no mês e na lista o fio de cor é o mesmo) */
+.v2 .agd-ev { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden;
+  padding: 3px 6px 3px 7px; border-radius: 6px; border-left: 3px solid var(--txt-3); background: var(--surface); box-shadow: 0 0 0 1px var(--linha) inset; font-size: 11.5px; line-height: 1.3; color: var(--txt); }
+.v2 .agd-ev:hover { box-shadow: 0 0 0 1px rgba(var(--tint), .35) inset; }
+.v2 .agd-ev:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+.v2 .agd-ev .h { font-size: 10.5px; color: var(--txt-3); }
+.v2 .agd-ev .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .agd-ev.compacto { flex-direction: row; align-items: baseline; gap: 5px; }
+.v2 .agd-ev .c { font-size: 10.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .t-reuniao { border-left-color: var(--accent) !important; }
+.v2 .t-ligacao { border-left-color: var(--cor-ok-txt, var(--verde)) !important; }
+.v2 .t-retorno { border-left-color: var(--cor-alerta-txt, var(--ambar)) !important; }
+.v2 .t-videochamada { border-left-color: var(--txt-2) !important; }
+.v2 .t-presencial { border-left-style: dashed !important; border-left-color: var(--txt-3) !important; }
+.v2 .s-feita, .v2 .s-cancelada { opacity: .55; }
+.v2 .s-cancelada .t { text-decoration: line-through; }
+.v2 .s-faltou .h::after { content: ' · faltou'; color: var(--cor-erro-txt, var(--rubro)); }
+
+/* dia e semana: grade de horas */
+.v2 .agd-grade { --hora: 46px; display: flex; flex-direction: column; }
+.v2 .agd-cab { display: grid; grid-template-columns: 52px repeat(var(--n), minmax(0, 1fr)); border-bottom: 1px solid var(--linha); background: rgba(var(--tint), .02); }
+.v2 .agd-cab span { padding: 9px 8px; font-size: 11.5px; font-weight: 500; color: var(--txt-2); text-transform: capitalize; text-align: center; }
+.v2 .agd-cab span.hoje { color: var(--txt); font-weight: 700; }
+.v2 .agd-corpo { display: grid; grid-template-columns: 52px repeat(var(--n), minmax(0, 1fr)); max-height: 66vh; overflow-y: auto; }
+.v2 .agd-horas { display: flex; flex-direction: column; }
+.v2 .agd-horas span { height: var(--hora); padding: 2px 8px 0 0; text-align: right; font-size: 10.5px; color: var(--txt-3); border-top: 1px solid transparent; }
+.v2 .agd-col { position: relative; border-left: 1px solid var(--linha); }
+.v2 .agd-col.hoje { background: rgba(var(--tint), .025); }
+.v2 .agd-slot { all: unset; box-sizing: border-box; display: block; width: 100%; height: var(--hora); border-top: 1px solid rgba(var(--tint), .05); cursor: copy; }
+.v2 .agd-slot:hover { background: rgba(var(--tint), .04); }
+.v2 .agd-slot:focus-visible { outline: 2px solid var(--txt); outline-offset: -2px; }
+.v2 .agd-col .agd-ev { position: absolute; left: 3px; right: 3px; min-height: 22px; z-index: 1; }
+
+/* mês */
+.v2 .agd-mes { display: flex; flex-direction: column; }
+.v2 .agd-mes-cab, .v2 .agd-mes-sem { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.v2 .agd-mes-cab span { padding: 8px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--txt-3); text-align: center; border-bottom: 1px solid var(--linha); }
+.v2 .agd-mes-dia { min-height: 104px; padding: 5px; display: flex; flex-direction: column; gap: 3px; border-right: 1px solid var(--linha); border-bottom: 1px solid var(--linha); min-width: 0; }
+.v2 .agd-mes-sem .agd-mes-dia:last-child { border-right: 0; }
+.v2 .agd-mes-dia.fora { background: rgba(var(--tint), .02); }
+.v2 .agd-mes-dia.fora .n { color: var(--txt-3); }
+.v2 .agd-mes-dia .n { all: unset; cursor: pointer; align-self: flex-start; min-width: 22px; height: 22px; border-radius: 6px; text-align: center; line-height: 22px; font-size: 12px; color: var(--txt-2); }
+.v2 .agd-mes-dia.hoje .n { background: var(--accent); color: #fff; font-weight: 700; }
+.v2 .agd-mes-dia .n:hover { background: rgba(var(--tint), .08); }
+.v2 .agd-mes-dia .agd-ev { padding: 2px 5px; flex-direction: row; gap: 5px; align-items: baseline; }
+.v2 .agd-mes-dia .mais { all: unset; cursor: pointer; font-size: 11px; color: var(--txt-2); padding: 0 4px; }
+.v2 .agd-mes-dia .mais:hover { text-decoration: underline; }
+
+/* lista */
+.v2 .agd-lista { display: flex; flex-direction: column; padding: 6px 0; max-height: 70vh; overflow-y: auto; }
+.v2 .agd-lista h4 { margin: 10px 16px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .agd-lista ul { margin: 0; padding: 0; list-style: none; }
+.v2 .agd-lin { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: grid; grid-template-columns: 52px 108px minmax(0, 1fr) 140px 110px; gap: 12px; align-items: baseline;
+  padding: 9px 16px 9px 13px; border-left: 3px solid var(--txt-3); border-top: 1px solid var(--linha); font-size: 13px; color: var(--txt); }
+.v2 .agd-lin:hover { background: rgba(var(--tint), .03); }
+.v2 .agd-lin .h { color: var(--txt-2); font-size: 12.5px; }
+.v2 .agd-lin .tp, .v2 .agd-lin .r { font-size: 12px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .agd-lin .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .agd-lin .t small { color: var(--txt-3); font-size: 12px; }
+.v2 .agd-lin .st { font-size: 11.5px; color: var(--txt-3); text-align: right; }
+
+/* detalhes e formulário */
+.v2 .agd-det, .agd-det { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.agd-det > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+.agd-det dt { color: var(--txt-3); }
+.agd-det dd { margin: 0; color: var(--txt); }
+.agd-det .lnk { border: 0; background: none; padding: 0; font: inherit; color: var(--txt); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.agd-det-acoes { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.agd-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.agd-form .campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--txt-2); margin: 0; }
+.agd-form .campo.larga { grid-column: 1 / -1; }
+.agd-form .agd-cli { font-size: 12.5px; color: var(--txt-2); }
+.agd-form .agd-cli b { color: var(--txt); }
+.agd-erro { margin: 10px 0 0; font-size: 12px; color: var(--cor-erro-txt, var(--rubro)); }
+
+@media (max-width: 900px) {
+  .v2 .agd-lin { grid-template-columns: 48px minmax(0, 1fr); }
+  .v2 .agd-lin .tp, .v2 .agd-lin .r, .v2 .agd-lin .st { display: none; }
+  .agd-form { grid-template-columns: minmax(0, 1fr); }
+}

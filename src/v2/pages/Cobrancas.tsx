@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { Suspense, useMemo, useRef, useState, type ReactNode, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { parseMoedaBRL, formataMoedaBRL } from '@/lib/fichaJudicialNormalizers';
+import { isDemoMode, isRevizaMode } from '@/lib/supabase';
 import {
   COB_REAL, useCobrancas, useCobranca, useCobrancasMetricas,
   useCriarCobranca, useRegistrarBaixa, useAlterarStatusParcela, useCancelarCobranca,
@@ -15,7 +16,22 @@ import {
   ConfirmDialogV2, EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Skeleton, TabelaPadrao,
   type Coluna, type TomStatus,
 } from '../components';
-import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, PainelResumo } from './cobrancaMotor';
+import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, AbaNovos, AbaFinanceiro, AbaCalendario, AbaConversas } from './cobrancaMotor';
+import { AbaCancelados } from './cancelados/AbaCancelados';
+import { GestaoPlanilha } from './planilha/GestaoPlanilha';
+import { AbaAvisos, AvisosAlerta } from './CobrancaAvisos';
+import { usePapel } from '../data/cobranca/sessao';
+import { secaoDoPapel } from '../data/cobranca/secoes';
+import { useRealtimeCobranca } from '../data/cobranca/useRealtimeCobranca';
+import { AbaUsuarios } from './RevizaUsuarios';
+import { RevizaRegistros } from './RevizaRegistros';
+import { PainelReviza, PainelGeralReviza, AtendentesReviza } from './RevizaPainel';
+import { NumerosReviza, ConversasReviza, ReguaReviza } from './RevizaWhatsApp';
+import { EnviosReviza } from './RevizaEnvios';
+import { lazyComRecarga } from '@/lib/recargaChunk';
+// Análise INSS (porte do "ALFA Análise — Extratos do INSS"): lazy — o motor e o pdf.js só
+// carregam ao abrir a aba; 100% no navegador, nenhum PDF sai da máquina
+const AnaliseInss = lazyComRecarga(() => import('./analise/AnaliseInss'));
 import { CICLOS_LISTA } from './cobrancaAnalytics';
 import { useCiclosReais, diaDoCiclo, vincularCiclo, criarContatoCobranca } from '@/data/cobrancaCiclos';
 import { ImportarPlanilha } from './cobrancaImport';
@@ -30,15 +46,25 @@ function proximaDataDoDia(dia: number): string {
   return new Date(y, m, Math.min(dia, last)).toISOString().slice(0, 10);
 }
 
-export type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'ciclos' | 'regua' | 'numeros' | 'envios';
+export type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'planilha' | 'novos' | 'cancelados' | 'financeiro' | 'calendario' | 'avisos' | 'usuarios' | 'ciclos' | 'regua' | 'conversas' | 'numeros' | 'envios' | 'registros' | 'analise';
 export const ABAS: { id: AbaCobranca; rotulo: string }[] = [
   { id: 'painel', rotulo: 'Painel' },
   { id: 'atendentes', rotulo: 'Atendentes' },
   { id: 'clientes', rotulo: 'Clientes' },
+  { id: 'planilha', rotulo: 'Gestão de cobranças' },
+  { id: 'novos', rotulo: 'Novos' },
+  { id: 'cancelados', rotulo: 'Cancelados' },
+  { id: 'financeiro', rotulo: 'Financeiro' },
+  { id: 'calendario', rotulo: 'Calendário' },
+  { id: 'avisos', rotulo: 'Avisos' },
   { id: 'ciclos', rotulo: 'Ciclos' },
   { id: 'regua', rotulo: 'Régua de mensagens' },
+  { id: 'conversas', rotulo: 'Conversas' },
   { id: 'numeros', rotulo: 'Números' },
   { id: 'envios', rotulo: 'Envios' },
+  { id: 'registros', rotulo: 'Registros' },
+  { id: 'analise', rotulo: 'Análise INSS' },
+  { id: 'usuarios', rotulo: 'Usuários' },
 ];
 
 /* ------------------------------------------------------------------
@@ -157,8 +183,13 @@ function metricasDe(lista: CobrancaDetalhe[]) {
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
 export default function CobrancasV2() {
+  const navigate = useNavigate();
   const { currentOrg } = useOrg();
   const gestor = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  // papel REAL do usuário na instância Reviza (comercial/financeiro têm botões próprios);
+  // fora dela o hook devolve 'gestor' e nada muda
+  const papelReal = usePapel().data?.papel ?? undefined;
+  useRealtimeCobranca(); // tempo real (Reviza): mudança de qualquer sessão reflete na hora
   const demo = !COB_REAL;
   const [importar, setImportar] = useState(false);
   const { data: ciclosImport = [] } = useCiclosReais(demo ? undefined : currentOrg?.id);
@@ -174,9 +205,39 @@ export default function CobrancasV2() {
 
   // seção = módulo Cobranças no menu da esquerda (rota /cobrancas/:secao).
   // As antigas abas viraram itens de menu; sem :secao cai em 'painel'.
+  // Instância REVIZA: só as telas do banco dedicado; qualquer outra cai na Gestão.
   const { secao } = useParams();
-  const aba: AbaCobranca = (ABAS.some((a) => a.id === secao) ? secao : 'painel') as AbaCobranca;
+  const ehAdmin = currentOrg.role === 'admin';
+  const ABAS_REVIZA: AbaCobranca[] = ['painel', 'atendentes', 'planilha', 'novos', 'cancelados', 'financeiro', 'calendario', 'avisos', 'regua', 'conversas', 'numeros', 'envios', 'usuarios', 'registros', 'analise'];
+  // Financeiro restrito (comercial); Usuários só admin; papel CADASTRO só vê a tela Novos
+  const podeFin = !isRevizaMode || gestor || papelReal === 'financeiro';
+  const soCadastro = isRevizaMode && papelReal === 'cadastro';
+  const ehComercialR = isRevizaMode && papelReal === 'comercial';
+  const ehFinanceiroR = isRevizaMode && papelReal === 'financeiro';
+  // MATRIZ do dono (14/09; 27/09: financeiro ganhou o PAINEL GERAL): admin/gestor tudo;
+  // FINANCEIRO = Painel (geral) + Novos + Financeiro + Gestão + Atendentes + Avisos;
+  // COMERCIAL = Painel (individual: só os clientes dele) + Gestão +
+  // Calendário (só visualização) + Avisos + Régua + Conversas + Números + Envios;
+  // cadastro (legado) segue Novos + Gestão + Avisos. Espelhar SEMPRE com o menu
+  // do AppShellV2.
+  // listas por papel = FONTE ÚNICA em data/cobranca/secoes.ts (o menu do AppShellV2 lê a mesma)
+  const secaoLiberada = (sc: string | undefined) =>
+    ABAS_REVIZA.includes(sc as AbaCobranca) && (sc !== 'financeiro' || podeFin) && (sc !== 'usuarios' || ehAdmin) && (sc !== 'registros' || ehAdmin)
+    && (!(ehFinanceiroR || ehComercialR || soCadastro) || secaoDoPapel(papelReal, sc ?? ''));
+  // Paridade demo=Reviza: 'clientes'/'ciclos' não existem na demo — URL digitada
+  // cai no Painel, igual à instância real (o menu já as esconde). 'registros', ao
+  // contrário, é só Reviza/demo: no Atenvo real a rota cai no Painel como antes.
+  const abaOculta = isDemoMode ? (secao === 'clientes' || secao === 'ciclos') : (secao === 'registros' || secao === 'analise' || secao === 'cancelados');
+  const aba: AbaCobranca = isRevizaMode
+    ? (secaoLiberada(secao) ? (secao as AbaCobranca) : (soCadastro || ehFinanceiroR ? 'novos' : 'painel'))
+    : ((ABAS.some((a) => a.id === secao) && !abaOculta ? secao : 'painel') as AbaCobranca);
   const abaAtual = ABAS.find((a) => a.id === aba);
+  // seção bloqueada pro papel (Reviza, com o papel já resolvido) ou inexistente na
+  // demo: corrige a URL pro fallback (menu acende e F5 mantém a tela certa)
+  useEffect(() => {
+    if (secao && secao !== aba && ((isRevizaMode && !!papelReal) || isDemoMode)) navigate(`/cobrancas/${aba}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secao, aba, papelReal]);
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'todas' | 'ativa' | 'concluida' | 'cancelada'>('todas');
   const [pagina, setPagina] = useState(1);
@@ -301,17 +362,22 @@ export default function CobrancasV2() {
 
   return (
     <>
-      <div className="ph sobe">
+      {/* Gestão de cobranças: o cabeçalho (título + ações numa linha só) é da própria tela */}
+      {aba !== 'planilha' && <div className="ph sobe">
         <div>
           <div className="cob-migalha">Cobranças</div>
           <h2>{abaAtual?.rotulo ?? 'Cobranças'}</h2>
-          <p>Cobranças que sua organização faz aos próprios clientes.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
-          {gestor && !demo && <BotaoSec onClick={() => setImportar(true)}>Importar planilha</BotaoSec>}
-          {gestor && aba === 'painel' && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
+          {demo && !isRevizaMode && <span className="st s-ne"><i aria-hidden />Demonstração</span>}
+          {gestor && !demo && !isRevizaMode && <BotaoSec onClick={() => setImportar(true)}>Importar planilha</BotaoSec>}
+          {gestor && aba === 'painel' && !isRevizaMode && !demo && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
+          {/* criar cliente = tela Novos ("＋ Novo cliente": ficha completa + ponte + células);
+              a Gestão agora é a planilha, onde criar é só pelo menu da linha. Crítica 12/11: o
+              mesmo nome do botão de Novos, e já abre o formulário (?novo=1) */}
+          {gestor && aba === 'painel' && (isRevizaMode || demo) && <BotaoPrimario onClick={() => navigate('/cobrancas/novos?novo=1')}>＋ Novo cliente</BotaoPrimario>}
         </div>
-      </div>
+      </div>}
 
       {importar && !demo && (
         <ImportarPlanilha orgId={currentOrg.id} ciclos={ciclosImport}
@@ -330,30 +396,48 @@ export default function CobrancasV2() {
           abas do motor, fora do demo, mostram o estado REAL da base — que foi
           ZERADA a pedido do dono (29/08, backup bkp_reset_*). O seed dos 600 só
           existe no modo demonstração. */}
-      {aba === 'atendentes' && <AbaAtendentes demo={demo} />}
+      {aba === 'atendentes' && (isRevizaMode ? <AtendentesReviza /> : <AbaAtendentes demo={demo} />)}
       {aba === 'clientes' && <AbaClientes demo={demo} gestor={gestor} aoNovo={() => setNovo(true)} />}
+      {/* Gestão = planilha "Excel 2.0" (contrato §6); a AbaPlanilha antiga só volta
+          como transição, de dentro da GestaoPlanilha, se a planilha não existir no banco */}
+      {aba === 'planilha' && <GestaoPlanilha demo={demo} gestor={gestor} papel={papelReal} />}
+      {aba === 'novos' && <AbaNovos demo={demo} gestor={gestor} papel={papelReal} />}
+      {aba === 'cancelados' && <AbaCancelados gestor={gestor} papel={papelReal} />}
+      {aba === 'financeiro' && <AbaFinanceiro demo={demo} gestor={gestor} papel={papelReal} admin={ehAdmin} />}
+      {aba === 'calendario' && <AbaCalendario demo={demo} gestor={gestor} />}
+      {aba === 'avisos' && <AbaAvisos gestor={gestor} papel={papelReal} />}
+      {aba === 'usuarios' && (isRevizaMode || demo) && <AbaUsuarios demo={demo} gestor={ehAdmin} />}
+      {aba === 'registros' && <RevizaRegistros />}
+      {aba === 'analise' && (
+        <Suspense fallback={<div className="aviso-inline" role="status">Abrindo a Análise INSS…</div>}>
+          <AnaliseInss />
+        </Suspense>
+      )}
       {aba === 'ciclos' && <AbaCiclos demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'regua' && <AbaRegua demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'numeros' && <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'envios' && <AbaEnvios demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {aba === 'regua' && (isRevizaMode ? <ReguaReviza gestor={gestor} aoAvisar={(t, tom) => setAviso({ tom: tom ?? 'ok', texto: t })} /> : <AbaRegua demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />)}
+      {aba === 'conversas' && (isRevizaMode ? <ConversasReviza /> : <AbaConversas />)}
+      {aba === 'numeros' && (isRevizaMode ? <NumerosReviza gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />)}
+      {aba === 'envios' && (isRevizaMode ? <EnviosReviza gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : <AbaEnvios demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />)}
 
-      {aba === 'painel' && (erro ? (
+      {aba === 'painel' && isRevizaMode && <PainelReviza />}
+      {aba === 'painel' && !isRevizaMode && (erro ? (
         <CardVidro sobe>
           <EstadoErro descricao="Não conseguimos carregar as cobranças. Verifique a conexão." aoTentarDeNovo={() => cobQ.refetch()} />
         </CardVidro>
       ) : carregando ? (
         <CarregandoCobrancas />
+      ) : demo ? (
+        /* demo = o MESMO painel da instância Reviza, lendo o blob vivo (a tabela
+           e a previsão antigas vinham de um seed paralelo que não reagia a nada) */
+        <PainelGeralReviza />
       ) : (
         <>
-          {demo ? <PainelResumo /> : (
-            <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
-              <Kpi rotulo="Previsto no mês" valor={kPrev?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kPrev?.cent ?? ',00'} />
-              <Kpi rotulo="Recebido no mês" valor={kRec?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRec?.cent ?? ',00'} tomValor="ok" />
-              <Kpi rotulo="Em atraso" valor={kAtr?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kAtr?.cent ?? ',00'} tomValor={kpi && kpi.emAtraso > 0 ? 'erro' : undefined} />
-              <Kpi rotulo="A receber" valor={kRcb?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRcb?.cent ?? ',00'} />
-            </div>
-          )}
-          {demo && <div className="cm-sec-lista sobe" style={{ animationDelay: '.26s' }}><span className="caps">Cobranças ativas</span></div>}
+          <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
+            <Kpi rotulo="Previsto no mês" valor={kPrev?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kPrev?.cent ?? ',00'} />
+            <Kpi rotulo="Recebido no mês" valor={kRec?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRec?.cent ?? ',00'} tomValor="ok" />
+            <Kpi rotulo="Em atraso" valor={kAtr?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kAtr?.cent ?? ',00'} tomValor={kpi && kpi.emAtraso > 0 ? 'erro' : undefined} />
+            <Kpi rotulo="A receber" valor={kRcb?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRcb?.cent ?? ',00'} />
+          </div>
 
           <div className="cob-filtros sobe" style={{ animationDelay: '.12s' }}>
             <Chips>
@@ -440,6 +524,8 @@ export default function CobrancasV2() {
           aoFechar={() => setDetId(null)}
         />
       )}
+      {/* alerta flutuante de aviso não lido (comercial) — some na própria aba Avisos */}
+      {(demo || isRevizaMode) && <AvisosAlerta abaAtual={aba} />}
     </>
   );
 }

@@ -22,7 +22,8 @@ export function useContador(alvo: number, formato: FormatoContador = 'int'): str
     // Corporativo cai na mesma via do reduced-motion: valor final direto
     // (número é dado de livro-caixa; contador subindo lê como marketing).
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      || document.documentElement.getAttribute('data-visual') === 'corp') {
+      // (21/11: na Reviza com a fundação nova o dono pediu as métricas animadas — o contador volta)
+      || (document.documentElement.getAttribute('data-visual') === 'corp' && !document.documentElement.hasAttribute('data-moldura'))) {
       exibido.current = alvo;
       setTexto(formata(alvo, formato));
       return;
@@ -79,18 +80,17 @@ export function DefsSpark() {
   );
 }
 
-/** Sparkline que se desenha (viewBox 120×34; y em 0–34, menor = mais alto). */
+/** Mini gráfico do indicador — em BARRAS (regra do dono 24/11: nada de linha). y em 0–34, menor = mais alto;
+    a última barra (o agora) fica acesa. */
 export function Spark({ pontos }: { pontos: number[] }) {
   if (pontos.length < 2) return null;
-  const passo = 120 / (pontos.length - 1);
-  const cords = pontos.map((y, i) => `${Math.round(i * passo)},${y}`);
-  const linha = `M${cords.join(' L')}`;
-  const area = `${cords.join(' ')} 120,34 0,34`;
+  const n = pontos.length;
   return (
-    <svg className="spark" viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden>
-      <polygon points={area} />
-      <path pathLength={1} d={linha} />
-    </svg>
+    <span className="spark spark-barras" aria-hidden>
+      {pontos.map((y, i) => (
+        <i key={i} className={i === n - 1 ? 'on' : undefined} style={{ height: `${Math.max(8, ((34 - y) / 34) * 100)}%`, animationDelay: `${Math.min(i, 12) * 30}ms` }} />
+      ))}
+    </span>
   );
 }
 
@@ -104,6 +104,8 @@ const TOM_DELTA: Record<TomDelta, string> = {
 
 type KpiProps = {
   rotulo: string;
+  /** Ícone de traço fino (svg) — vai num quadradinho ao lado do rótulo (referência SaaS executivo). */
+  icone?: ReactNode;
   /** Valor numérico do contador animado. */
   valor: number;
   formato?: FormatoContador;
@@ -112,6 +114,8 @@ type KpiProps = {
   /** Sufixo apagado (.cent — ex.: ",00", "%", "min"). */
   sufixo?: ReactNode;
   delta?: { tom: TomDelta; texto: ReactNode };
+  /** Contexto mudo ao lado do delta (ex.: "vs mês anterior", "48 clientes"). */
+  nota?: ReactNode;
   /** Pontos da sparkline (omitida se ausente). */
   spark?: number[];
   /** Tinge o valor na semântica (ex.: vencidas em rubro, recebido em verde). */
@@ -120,19 +124,27 @@ type KpiProps = {
   atraso?: number;
 };
 
-/** Card de KPI do dashboard: rótulo, contador animado, delta e sparkline. */
-export function Kpi({ rotulo, valor, formato = 'int', prefixo, sufixo, delta, spark, tomValor, sobe, atraso }: KpiProps) {
+/** Card de KPI: [ícone] rótulo caps → número grande → delta + nota → sparkline. */
+export function Kpi({ rotulo, icone, valor, formato = 'int', prefixo, sufixo, delta, nota, spark, tomValor, sobe, atraso }: KpiProps) {
   const texto = useContador(valor, formato);
   const corValor = tomValor === 'ok' ? 'var(--verde)' : tomValor === 'erro' ? 'var(--rubro)' : undefined;
   return (
     <CardVidro spot sobe={sobe} atraso={atraso} className="kpi">
-      <div className="rot">{rotulo}</div>
+      <div className="kpi-cab">
+        {icone && <span className="kpi-ic" aria-hidden>{icone}</span>}
+        <span className="rot">{rotulo}</span>
+      </div>
       <div className="val num" style={corValor ? { color: corValor } : undefined}>
         {prefixo}
         <span>{texto}</span>
         {sufixo !== undefined && <span className="cent">{sufixo}</span>}
       </div>
-      {delta && <span className={`delta ${TOM_DELTA[delta.tom]}`}>{delta.texto}</span>}
+      {(delta || nota) && (
+        <div className="kpi-pe">
+          {delta && <span className={`delta ${TOM_DELTA[delta.tom]}`}>{delta.texto}</span>}
+          {nota && <span className="kpi-nota">{nota}</span>}
+        </div>
+      )}
       {spark && <Spark pontos={spark} />}
     </CardVidro>
   );

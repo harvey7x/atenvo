@@ -1,0 +1,44 @@
+/* A página pública do formulário (26/11): fora do sistema, celular primeiro, claro e escuro pelo aparelho do cliente */
+.fp {
+  --fp-fundo: #f4f3f0; --fp-cartao: #ffffff; --fp-txt: #1d1c1a; --fp-txt2: #57534e; --fp-txt3: #8a857e; --fp-linha: #e4e1db;
+  --fp-campo: #fbfaf8; --fp-acento: #f26b1d; --fp-acento-txt: #ffffff; --fp-erro: #c2410c; --fp-sel: #1d1c1a; --fp-sel-txt: #ffffff;
+  min-height: 100vh; min-height: 100dvh; box-sizing: border-box; padding: 28px 16px 40px; background: var(--fp-fundo); color: var(--fp-txt);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: flex-start;
+}
+@media (prefers-color-scheme: dark) {
+  .fp { --fp-fundo: #111110; --fp-cartao: #1b1b19; --fp-txt: #f2f0ec; --fp-txt2: #bdb8b0; --fp-txt3: #8a857e; --fp-linha: #2e2d2a; --fp-campo: #222220; --fp-sel: #f2f0ec; --fp-sel-txt: #111110; --fp-erro: #fb923c; }
+}
+.fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
+.fp-cartao { width: 100%; max-width: 560px; background: var(--fp-cartao); border: 1px solid var(--fp-linha); border-radius: 18px; padding: 26px 22px 24px; }
+.fp-marca { display: flex; margin-bottom: 14px; }
+.fp h1 { margin: 0 0 8px; font-size: 22px; line-height: 1.25; font-weight: 650; text-wrap: balance; }
+.fp-desc { margin: 0 0 18px; font-size: 14.5px; line-height: 1.55; color: var(--fp-txt2); }
+.fp-campos { display: flex; flex-direction: column; gap: 16px; }
+.fp-campo { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.fp-campo > label, .fp-campo > legend { font-size: 14px; font-weight: 550; color: var(--fp-txt); padding: 0; }
+.fp-ob { color: var(--fp-acento); } .fp-op { font-weight: 400; color: var(--fp-txt3); font-size: 12.5px; }
+.fp input:not([type=radio]), .fp textarea {
+  width: 100%; font: inherit; font-size: 16px; color: var(--fp-txt); background: var(--fp-campo); border: 1px solid var(--fp-linha); border-radius: 10px; padding: 11px 12px;
+}
+.fp input:focus-visible, .fp textarea:focus-visible, .fp button:focus-visible, .fp-opcao:focus-within { outline: 2px solid var(--fp-acento); outline-offset: 1px; }
+.fp-opcoes { display: flex; flex-direction: column; gap: 8px; }
+.fp-opcao { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--fp-linha); border-radius: 10px; background: var(--fp-campo); font-size: 15px; cursor: pointer; }
+.fp-opcao input { accent-color: var(--fp-acento); width: 18px; height: 18px; margin: 0; }
+.fp-opcao.on { border-color: var(--fp-txt2); }
+.fp-isca { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.fp-agenda { margin-top: 18px; }
+.fp-dias, .fp-horas { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.fp-horas { flex-wrap: wrap; overflow: visible; }
+.fp-dia, .fp-hora { flex-shrink: 0; font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--fp-linha); background: var(--fp-campo); color: var(--fp-txt); cursor: pointer; font-variant-numeric: tabular-nums; }
+.fp-dia.on, .fp-hora.on { background: var(--fp-sel); color: var(--fp-sel-txt); border-color: var(--fp-sel); }
+.fp-escolha { margin: 2px 0 0; font-size: 13.5px; color: var(--fp-txt2); }
+.fp-erro { margin: 16px 0 0; font-size: 14px; color: var(--fp-erro); }
+.fp-enviar { margin-top: 20px; width: 100%; font: inherit; font-size: 16px; font-weight: 600; padding: 13px; border: 0; border-radius: 12px; background: var(--fp-acento); color: var(--fp-acento-txt); cursor: pointer; }
+.fp-enviar:disabled { opacity: .6; cursor: default; }
+.fp-legal { margin: 12px 0 0; font-size: 12px; color: var(--fp-txt3); text-align: center; }
+.fp-info { margin: 4px 0; font-size: 14px; color: var(--fp-txt2); }
+.fp-fim { text-align: center; padding: 18px 4px 8px; }
+.fp-fim p { margin: 0 0 8px; font-size: 15px; line-height: 1.55; color: var(--fp-txt2); }
+.fp-ok { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--fp-acento); color: var(--fp-acento-txt); font-size: 24px; margin-bottom: 12px; }
+.fp-marcado b { color: var(--fp-txt); }
+@media (prefers-reduced-motion: reduce) { .fp * { transition: none !important; } }

@@ -183,6 +183,11 @@ html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2 
 html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2 { background: var(--base) !important; }
 
 html:root[data-repaginada][data-repaginada] .v2 .pagina:not(.cheia) { padding: 26px 30px 36px; }
+/* celular: a página respira 16px dos lados (30px tiravam 60px de largura da tela — o celular da
+   Conversas ficava com 216px num aparelho de 360px) */
+@media (max-width: 640px) {
+  html:root[data-repaginada][data-repaginada] .v2 .pagina:not(.cheia) { padding: 20px 16px 28px; }
+}
 html:root[data-repaginada][data-repaginada] .v2 .kb-pg { padding: 26px 30px 14px; }
 
 /* cabeçalho de página: título com presença, subtítulo calmo, respiro antes do conteúdo */
@@ -313,6 +318,13 @@ html:root[data-repaginada][data-repaginada] .v2 .inp:hover:not(:focus) { border-
 html:root[data-repaginada][data-repaginada] .v2 .inp:focus {
   border-color: color-mix(in srgb, var(--platina-a) 75%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 22%, transparent);
+}
+/* campo com erro segue rubro (as duas regras de cima, mais fortes, apagavam a borda do componentes.css) */
+html:root[data-repaginada][data-repaginada] .v2 .campo.invalida .inp,
+html:root[data-repaginada][data-repaginada] .v2 .campo.invalida .inp:hover:not(:focus) { border-color: rgba(var(--rubro-rgb), .55); }
+html:root[data-repaginada][data-repaginada] .v2 .campo.invalida .inp:focus {
+  border-color: rgba(var(--rubro-rgb), .7);
+  box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .14);
 }
 html:root[data-repaginada][data-repaginada] .v2 select.inp {
   -webkit-appearance: none; appearance: none; padding-right: 32px; cursor: pointer;
@@ -934,7 +946,8 @@ html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .
 }
 
 /* rótulo de campo no cinza secundário: o branco fica para o VALOR */
-html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .campo > label { color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .campo > label,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .campo > .lg-l > label { color: var(--txt-2); }
 
 /* etiqueta neutra só no fio: sai mais um cinza de fundo */
 html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ag-pill {

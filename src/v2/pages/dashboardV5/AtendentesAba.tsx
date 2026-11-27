@@ -6,15 +6,16 @@ import { fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
 import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
+import { CartaoSeries } from '../../components/CartaoMetrica';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Variacao, Vazio } from './comum';
-import { GrafLinhas, LegendaGraf, useLinhasGraf, type SerieGraf } from './GrafLinhas';
+import type { SerieGraf } from './GrafLinhas';
 
 /* Aba ATENDENTES (12/11): quem fecha mais (placar do CAF), os DOIS relógios com os
    excluídos à vista — "preciso de um resultado exato, não posso aceitar algo falso"
    (dono) —, por qual campanha cada um fecha, tempo de resposta, as ondas de fechados
    da equipe e as fotos de agora (vácuo, carteira, parados). */
 
-const AJUDA_FECHADOS = 'Fechados do placar do CAF creditados ao vendedor do caso — o mesmo número do pódio. '
+const AJUDA_FECHADOS = 'Fechados do placar da ALFA creditados ao vendedor do caso — o mesmo número do pódio. '
   + 'O administrativo lança em dia útil e re-sincroniza a cada 5 minutos: números passados podem mudar.';
 const AJUDA_CLI = 'Relógio do CLIENTE: da entrada do lead até o fechamento, mediana. É o tempo que o cliente esperou, '
   + 'independente de quantas mãos o lead passou.';
@@ -24,7 +25,7 @@ const AJUDA_AT = 'Relógio do ATENDENTE: de quando a pessoa RECEBEU o lead (prim
 const AJUDA_RESP = 'Tempo de resposta: mediana, em minutos ÚTEIS (seg–sex, 9h–19h), da mensagem do cliente à '
   + 'primeira resposta humana. Madrugada e fim de semana não contam no relógio. Inclui respostas pelo celular, '
   + 'creditadas ao dono do lead.';
-const AJUDA_AGORA = 'Fotos de AGORA, independentes do período escolhido: '
+const AJUDA_AGORA = 'Fotos de AGORA, independentes do período escolhido: clientes no 3º aviso do radar de vácuo, '
   + 'conversas abertas na carteira e paradas há mais de 7 dias. Carteira e parados carregam o legado antigo — '
   + 'servem para comparar entre a equipe, não como meta.';
 
@@ -84,6 +85,16 @@ function Cabeca({ col, ordem, aoOrdenar }: { col: Coluna; ordem: { chave: Chave;
 
 const CORES_EQUIPE = ['var(--dado-1)', 'var(--dado-2)', 'var(--dado-3)', 'var(--dado-4)', 'var(--dado-5)'];
 
+/** número da tabela "Carteira agora" com a barra proporcional embaixo */
+function CelBarra({ v, max, alerta }: { v: number; max: number; alerta?: boolean }) {
+  return (
+    <span className="rvm-celbar">
+      <b className={'num' + (v ? (alerta ? ' d5-agora-vac' : '') : ' d5-mudo')}>{fmtInt(v)}</b>
+      <span className={'rvm-barra' + (alerta ? ' rvm-barra-alerta' : '')} aria-hidden><i style={{ width: `${v ? Math.max(3, (v / max) * 100) : 0}%` }} /></span>
+    </span>
+  );
+}
+
 export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; periodo: Periodo; hoje: string }) {
   const [ordem, setOrdem] = useState<{ chave: Chave; dir: Dir }>({ chave: 'ganhos', dir: 'desc' });
   const linhas = useMemo(() => ordenar(d.atendentes, ordem.chave, ordem.dir), [d.atendentes, ordem]);
@@ -93,7 +104,6 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   const maxGanhos = Math.max(1, ...d.atendentes.map((a) => a.ganhos));
 
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
-  const linhasGraf = useLinhasGraf();
   // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
   const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const serieEquipe = useMemo<SerieGraf[]>(() => {
@@ -110,10 +120,18 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   }, [d.atendentes, d.serieGanhos, balde]);
   const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
 
+  const vacuoTotal = d.atendentes.reduce((s, a) => s + a.vacuo3o, 0);
+  // "Carteira agora": a barra de cada número contra o maior da equipe (comparar num relance)
+  const maxAgora = {
+    vacuo: Math.max(1, ...d.atendentes.map((a) => a.vacuo3o)),
+    carteira: Math.max(1, ...d.atendentes.map((a) => a.carteira)),
+    parados: Math.max(1, ...d.atendentes.map((a) => a.parados7d)),
+  };
+
   return (
     <>
       <Secao className="d5-at d5-at-aba" titulo="Desempenho por atendente"
-        sub="Fechados pelo placar do CAF; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar.">
+        sub="Fechados pelo placar da ALFA; os dois relógios dizem quem esperou — o cliente e o atendente. Clique no título de uma coluna para ordenar.">
         {d.atendentes.length === 0 ? (
           <Vazio texto="Ninguém da equipe teve movimento no período." />
         ) : (
@@ -186,20 +204,24 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
       </Secao>
 
       {serieEquipe.length > 0 && (
-        <Secao className="d5-ondas d5-ondas-eq" titulo="Fechados da equipe, no tempo"
-          ajuda={'Fechados do placar do CAF por atendente. O administrativo lança em dia útil: fim de semana e feriado '
+        /* no formato do card de métrica (dono 14/11), como as ondas por campanha */
+        <CartaoSeries
+          titulo="Fechados da equipe, no tempo"
+          ajuda={<Ajuda rotulo="Fechados da equipe, no tempo" texto={'Fechados do placar da ALFA por atendente. O administrativo lança em dia útil: fim de semana e feriado '
             + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
-            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'}
+            + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar as barras da pessoa.'} />}
           sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
-          acao={<div className="d5-ondas-ctl"><LegendaGraf series={serieEquipe} controle={linhasGraf} /></div>}>
-          <GrafLinhas baldes={baldes} series={serieEquipe} controle={linhasGraf}
-            titulo={`Fechados por atendente e ${balde === 'dia' ? 'dia' : 'semana'}`}
-            vazio="Sem fechados lançados neste período." />
-        </Secao>
+          pontos={baldes.map((b) => ({ chave: b.chave, rotulo: b.rotuloLongo }))}
+          eixo={baldes.map((b) => b.rotulo)}
+          series={serieEquipe}
+          unidade={(n) => (n === 1 ? 'fechado' : 'fechados')}
+          rodape="Clique num nome para esconder ou mostrar as barras da pessoa."
+          vazio="Sem fechados lançados neste período."
+        />
       )}
 
       <Secao className="d5-agora" titulo="Carteira agora" ajuda={AJUDA_AGORA}
-        sub="Foto deste instante, não do período escolhido.">
+        sub={`Foto deste instante, não do período escolhido.${vacuoTotal > 0 ? ` ${fmtInt(vacuoTotal)} clientes no 3º aviso do vácuo.` : ''}`}>
         {d.atendentes.length === 0 ? (
           <Vazio texto="Sem carteira para mostrar." />
         ) : (
@@ -208,18 +230,20 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
               <thead>
                 <tr>
                   <th scope="col">Atendente</th>
+                  <th scope="col" className="d5-dir">No vácuo (3º aviso)</th>
                   <th scope="col" className="d5-dir">Conversas abertas</th>
                   <th scope="col" className="d5-dir">Paradas há 7+ dias</th>
                 </tr>
               </thead>
               <tbody>
-                {[...d.atendentes].sort((a, b) => b.carteira - a.carteira || a.nome.localeCompare(b.nome, 'pt-BR')).map((a) => (
+                {[...d.atendentes].sort((a, b) => b.vacuo3o - a.vacuo3o || a.nome.localeCompare(b.nome, 'pt-BR')).map((a) => (
                   <tr key={a.usuarioId}>
                     <th scope="row" className="d5-nome">
                       <span className="d5-nome-in"><Avatar nome={a.nome} /><b className="d5-pessoa">{a.nome}</b></span>
                     </th>
-                    <td className="d5-dir"><b className={'num' + (a.carteira ? '' : ' d5-mudo')}>{fmtInt(a.carteira)}</b></td>
-                    <td className="d5-dir"><b className={'num' + (a.parados7d ? '' : ' d5-mudo')}>{fmtInt(a.parados7d)}</b></td>
+                    <td className="d5-dir"><CelBarra v={a.vacuo3o} max={maxAgora.vacuo} alerta /></td>
+                    <td className="d5-dir"><CelBarra v={a.carteira} max={maxAgora.carteira} /></td>
+                    <td className="d5-dir"><CelBarra v={a.parados7d} max={maxAgora.parados} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -227,7 +251,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
           </div>
         )}
         <p className="d5-graf-nota">Perda marcada pela equipe quase não existe no sistema (em novembro, 100% das perdas são não
-          elegíveis) — por isso o "deixou esperando" sai das conversas paradas, não de um botão de perda.</p>
+          elegíveis) — por isso o "deixou esperando" sai do radar de vácuo e das conversas paradas, não de um botão de perda.</p>
       </Secao>
     </>
   );

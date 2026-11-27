@@ -8,14 +8,14 @@ import { AuthProvider } from '@/context/AuthContext';
 import { OrgProvider } from '@/context/OrgContext';
 import { ToastProvider } from '@/hooks/useToast';
 import { ConfigError } from '@/pages/ConfigError';
-import { isMisconfigured, isDemoMode } from '@/lib/supabase';
+import { isMisconfigured, isDemoMode, isRevizaMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
 import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) — global: vale no login/mobile também
 import './v2/movimento.css'; // camada de movimento (dono 22/10) — Leve e Completo iguais; reverter = apagar esta linha
 import './v2/repaginada.css'; // repaginada "mais profissional" (dono 27/10) — só age com [data-repaginada] na raiz
-import { aplicarRepaginada, lerRepaginada } from './v2/lib/repaginada';
-import { aplicarInboxPro, lerInboxPro } from './v2/lib/inboxPro';
+import { aplicarRepaginada } from './v2/lib/repaginada';
+import { aplicarInboxPro } from './v2/lib/inboxPro';
 import './v2/linear.css'; // camada "Linear" (prévia 13/11) — só age com [data-linear] na raiz
 import { aplicarLinear, lerLinear } from './v2/lib/linear';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
@@ -32,17 +32,82 @@ if (typeof window !== 'undefined') {
   });
 }
 
+/* Reviza — takeover de atualização no meio da tela (pedido do dono 11/09):
+   overlay em DOM puro (roda fora da árvore React, em qualquer rota), botão
+   "Atualizar agora" + contagem de 8s que recarrega sozinha. Visual sóbrio
+   dourado-no-escuro, igual ao resto do sistema. */
+function mostrarTakeoverAtualizacao(auto: boolean): void {
+  if (document.getElementById('rv-atualiza')) return;
+  const raiz = document.createElement('div');
+  raiz.id = 'rv-atualiza';
+  raiz.setAttribute('role', 'alertdialog');
+  raiz.setAttribute('aria-label', 'Atualização do sistema');
+  raiz.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(8,8,10,.74);backdrop-filter:blur(4px)';
+  raiz.innerHTML = `
+    <div style="background:#141416;border:1px solid rgba(240,188,78,.35);border-radius:14px;max-width:420px;width:calc(100% - 48px);padding:28px 26px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.55);font-family:inherit">
+      <div style="font-size:17px;font-weight:700;color:#f5f2ea;margin-bottom:8px">Atualização do sistema</div>
+      <p style="margin:0 0 18px;font-size:13.5px;line-height:1.55;color:#b9b5ab">Uma nova versão foi publicada. Atualize para continuar — leva um segundo e nada do que foi salvo se perde.</p>
+      <button id="rv-atualiza-btn" type="button" style="font:inherit;font-weight:700;font-size:14px;padding:11px 24px;border-radius:9px;border:0;cursor:pointer;background:#F0BC4E;color:#241A05">Atualizar agora</button>
+      <div id="rv-atualiza-cd" style="margin-top:12px;font-size:11.5px;color:#8b877e"></div>
+    </div>`;
+  document.body.appendChild(raiz);
+  const cd = document.getElementById('rv-atualiza-cd');
+  const recarregar = () => { try { sessionStorage.setItem('rv_reload_sw', String(Date.now())); } catch { /* segue */ } window.location.reload(); };
+  // a planilha ainda gravando (fila de escrita): recarregar agora cortaria a edição
+  // que a tela já mostra — espera a fila esvaziar. Gancho em window (planilha.ts),
+  // sem importar a planilha no chunk de entrada. Teto de 60 s: rede travada não
+  // prende o takeover (aí o navegador pergunta "Sair do site?" antes de perder).
+  const escritaPendente = () => {
+    try { return !!(window as unknown as { __rvEscritaPendente?: () => boolean }).__rvEscritaPendente?.(); } catch { return false; }
+  };
+  let esperando = false;
+  const irAgora = () => {
+    if (!escritaPendente()) { recarregar(); return; }
+    if (cd) cd.textContent = 'Terminando de salvar…';
+    if (esperando) return;
+    esperando = true;
+    const desde = Date.now();
+    const t2 = window.setInterval(() => {
+      if (escritaPendente() && Date.now() - desde < 60_000) return;
+      clearInterval(t2);
+      recarregar();
+    }, 300);
+  };
+  document.getElementById('rv-atualiza-btn')?.addEventListener('click', irAgora);
+  if (auto) {
+    let s = 8;
+    if (cd) cd.textContent = `Atualizando sozinho em ${s}…`;
+    const t = window.setInterval(() => {
+      s -= 1;
+      if (esperando) { clearInterval(t); return; } // clicou "Atualizar agora" e está terminando de salvar
+      if (s <= 0) { clearInterval(t); irAgora(); return; }
+      if (cd) cd.textContent = `Atualizando sozinho em ${s}…`;
+    }, 1000);
+  }
+}
+if (import.meta.env.DEV) (window as unknown as { __rvTesteAtualiza?: (a: boolean) => void }).__rvTesteAtualiza = mostrarTakeoverAtualizacao;
+
 // PWA: service worker com atualização automática (skipWaiting+clientsClaim no build).
 // Abas de atendimento ficam abertas o dia todo — checa update de hora em hora.
 if ('serviceWorker' in navigator) {
   registerSW({
     immediate: true,
-    // SEM reload forçado no update (rascunho digitado, conversa aberta e filtros
-    // iriam embora a cada deploy). Em vez disso, sinaliza o aviso in-app
-    // (AvisoAtualizacao): o atendente recarrega POR CLIQUE. O SW novo já assumiu
-    // o controle quando este callback roda (skipWaiting+clientsClaim), então o
-    // reload pega o index novo; o guard vite:preloadError segue cobrindo 404.
-    onNeedReload() { sinalizarAtualizacao(); },
+    // Atenvo: SEM reload forçado no update (rascunho digitado, conversa aberta e
+    // filtros iriam embora a cada deploy) — sinaliza o aviso in-app e o atendente
+    // recarrega POR CLIQUE. REVIZA: takeover no MEIO DA TELA exigindo atualizar
+    // (pedido do dono 11/09), com botão + contagem de 8s que atualiza sozinha.
+    // O SW novo já assumiu o controle quando este callback roda (skipWaiting+
+    // clientsClaim), então o reload pega o index novo. Se recarregou há <60s,
+    // mostra só o botão (sem contagem) — nunca entra em laço de reload.
+    onNeedReload() {
+      if (isRevizaMode) {
+        let auto = true;
+        try { auto = Date.now() - Number(sessionStorage.getItem('rv_reload_sw') || 0) >= 60 * 1000; } catch { /* segue */ }
+        mostrarTakeoverAtualizacao(auto);
+        return;
+      }
+      sinalizarAtualizacao();
+    },
     onRegisteredSW(_url, reg) {
       if (!reg) return;
       // 5 min (era 15): o aviso de deploy deve chegar rápido — atendente rodou versão
@@ -74,13 +139,13 @@ if (typeof document !== 'undefined') aplicarAcento(lerAcento());
 // escuro/claro continua livre; reverter = apagar esta linha.
 if (typeof document !== 'undefined') document.documentElement.setAttribute('data-visual', 'corp');
 
-// Repaginada (prévia 27/10): marca [data-repaginada] antes do primeiro paint.
-// Padrão ligado; o comparador do demo grava a escolha por dispositivo.
-if (typeof document !== 'undefined') aplicarRepaginada(lerRepaginada());
+// Visual do Atenvo FIXO na ALFA (sem comparador): marca [data-repaginada] antes do primeiro paint.
+if (typeof document !== 'undefined') aplicarRepaginada(true);
 
-// Atendimento renovado (prévia 29/10): marca [data-inbox-pro] antes do primeiro paint.
-// Padrão ligado; o comparador do demo grava a escolha por dispositivo.
-if (typeof document !== 'undefined') aplicarInboxPro(lerInboxPro());
+// Atendimento renovado do Atenvo (inbox pro) FIXO: marca [data-inbox-pro] antes do primeiro paint (sem comparador)
+if (typeof document !== 'undefined') aplicarInboxPro(true);
+
+// do primeiro paint — Reviza de verdade e a demo (shell/BarraAlfa.tsx, shell/barra-alfa.css)
 
 // Camada "Linear" (prévia 13/11): marca [data-linear] antes do primeiro paint.
 // Padrão ligado; o comparador do demo grava a escolha por dispositivo.

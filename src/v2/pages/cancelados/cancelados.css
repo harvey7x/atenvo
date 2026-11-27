@@ -1,0 +1,35 @@
+/* Cancelados (mig 79) — aba + modal "Mover para Cancelados". Tokens do tema (claro/escuro) */
+.v2 .mc-filtros { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 2px 0 10px; }
+.v2 .mc-todos { white-space: nowrap; margin-right: 2px; }
+
+.v2 .mc-cli { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.v2 .mc-cli b { color: var(--txt); font-weight: 600; }
+.v2 .mc-cli span { color: var(--txt-3); font-size: 11.5px; }
+.v2 .mc-quando { display: flex; flex-direction: column; gap: 1px; }
+.v2 .mc-quando small, .v2 .mc-st small { color: var(--txt-3); font-size: 11px; }
+.v2 .mc-mot { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: var(--txt-2); }
+.v2 .mc-mut { color: var(--txt-3); }
+
+/* status: o select carrega a cor do estado (cancelado = rubro, reativação = âmbar, reativado = verde) */
+.v2 .mc-st { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.v2 .mc-st-sel { height: 30px; padding: 0 28px 0 10px; font-size: 12.5px; font-weight: 600; min-width: 190px; }
+.v2 .mc-st-sel.erro { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .38); background-color: rgba(var(--rubro-rgb), .06); }
+.v2 .mc-st-sel.atencao { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .42); background-color: rgba(var(--ambar-rgb), .08); }
+.v2 .mc-st-sel.ok { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); background-color: rgba(var(--verde-rgb), .07); }
+.v2 .mc-st-sel option { color: var(--txt); background: var(--surface); }
+
+/* modal */
+.v2 .mc-mov { display: flex; flex-direction: column; gap: 12px; }
+.v2 .mc-achados { display: flex; flex-direction: column; gap: 6px; margin-top: -4px; }
+.v2 .mc-sel-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--txt-2); }
+.v2 .mc-sel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.v2 .mc-sel li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 8px 7px 11px; border: 1px solid var(--linha); border-radius: 8px; background: rgba(var(--tint), .03); }
+.v2 .mc-sel-nm { display: flex; flex-direction: column; gap: 1px; min-width: 0; color: var(--txt); font-size: 13px; font-weight: 600; }
+.v2 .mc-sel-nm small { color: var(--txt-3); font-size: 11.5px; font-weight: 400; }
+.v2 .mc-sel-x { flex: none; width: 26px; height: 26px; border-radius: 6px; border: 0; background: transparent; color: var(--txt-3); font-size: 16px; line-height: 1; cursor: pointer; }
+.v2 .mc-sel-x:hover { background: rgba(var(--rubro-rgb), .1); color: var(--rubro); }
+.v2 .mc-sel-x:focus-visible { outline: 2px solid rgba(var(--ambar-rgb), .7); outline-offset: 1px; }
+.v2 .mc-opc { font-weight: 400; color: var(--txt-3); font-size: 11px; margin-left: 4px; }
+.v2 .mc-lnk { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 500; color: var(--txt-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.v2 .mc-lnk:hover { color: var(--txt); }
+.v2 .mc-lnk:disabled { opacity: .5; cursor: default; }

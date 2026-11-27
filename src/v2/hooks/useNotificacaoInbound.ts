@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { isRevizaMode, supabase } from '@/lib/supabase';
 import { WA_REAL, mascararNumero } from '@/data/whatsapp';
 import { useOrg } from '@/context/OrgContext';
 import { useVisibilidade } from '@/lib/visibilidade';
@@ -49,9 +49,10 @@ export function useNotificacaoInbound(opts: {
   // visibilidade (22/10): quem não vê todos só é avisado de cliente DELE (null = avisa de todos)
   const vis = useVisibilidade();
   const soDeRef = useRef<string | null>(null);
-  soDeRef.current = vis.veTodos ? null : vis.uid ?? '';
+  soDeRef.current = vis.veTodos || vis.veEquipe ? null : vis.uid ?? '';
 
   useEffect(() => {
+    if (isRevizaMode) return; // instância Reviza: sem realtime de mensagens do Atenvo
     if (!WA_REAL || !supabase || !currentOrg.id) return;
     const orgId = currentOrg.id;
     const ch = supabase

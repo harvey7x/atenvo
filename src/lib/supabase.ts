@@ -1,4 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+/* A PRÉVIA de design (HTML único, dados fictícios, sem rede) NÃO é importada aqui: no build da prévia o
+   pacote '@supabase/supabase-js' é trocado por lib/previa/supabaseJsPrevia.ts (alias em
+   vite.config.previa.ts), que devolve o cliente de mentira. Assim o pacote de produção não leva nada da
+   prévia, e `isPrevia` é uma comparação direta que o empacotador resolve para `false` (22/11). */
+
+/** prévia de design (build de HTML único, dados fictícios, sem rede) */
+export const isPrevia = import.meta.env.VITE_PREVIA === 'true';
 
 /** Normaliza a URL do projeto Supabase: remove barras finais e um sufixo de endpoint
  *  colado por engano (ex.: ".../rest/v1", ".../auth/v1"). O supabase-js espera apenas a
@@ -24,6 +31,12 @@ export const isDemoMode = !isSupabaseConfigured && isDemoModeEnabled;
 /** Sem backend real e sem demo habilitado => configuração ausente: a app exibe a
  *  tela de erro de configuração e bloqueia o login (ver main.tsx / ConfigError). */
 export const isMisconfigured = !isSupabaseConfigured && !isDemoModeEnabled;
+
+/** Instância deste BUILD: 'atenvo' (padrão) ou 'reviza' (cliente Reviza — backend
+ *  Supabase dedicado, só o módulo Cobranças). NÃO é demo: grava de verdade.
+ *  Definida em build-time via VITE_APP_INSTANCIA (.env.reviza.local / --mode reviza). */
+export const appInstancia = String(import.meta.env.VITE_APP_INSTANCIA || 'atenvo');
+export const isRevizaMode = appInstancia === 'reviza' && isSupabaseConfigured;
 
 /** Quais variáveis estão presentes (para a tela de configuração). */
 export const supabaseEnv = { hasUrl: Boolean(url), hasKey: Boolean(anonKey) };

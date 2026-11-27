@@ -1,0 +1,35 @@
+/* =====================================================================
+   Celular da tela Conversas (Cobranças · Reviza) — o LUGAR do aparelho
+   na página (prefixo fz-). O aparelho em si (o celular do Painel da
+   Equipe do Atenvo, classes zp-) mora em pages/fone-zap.css.
+   · coluna da direita, acompanha a rolagem (sticky); a altura vem do
+     zoom calculado no JS (AparelhoZap): o que sobra da janela abaixo do
+     topo do aparelho (medido) − 20px, até 860px — cabe inteiro ao abrir
+   · a foto ampliada (portal fora do celular) e o texto só pra leitor de
+     tela (usado também pelo gravador, AudioRecorderV2 pele="zap")
+   ===================================================================== */
+
+/* ---------- layout da página: painel à esquerda, aparelho fixo à direita ---------- */
+.v2 .fx-raiz { align-items: start; }
+.v2 .fz-fone {
+  position: sticky; top: 12px; align-self: start;
+  display: flex; justify-content: center;
+}
+
+.v2 .fz-sr { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- foto ampliada (portal na raiz v2, fora do celular) ---------- */
+.v2 .fz-zoom { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; background: rgba(8, 12, 16, .9); cursor: zoom-out; }
+.v2 .fz-zoom img { max-width: 92vw; max-height: 92vh; border-radius: 6px; box-shadow: 0 24px 80px rgba(0, 0, 0, .6); cursor: default; }
+.v2 .fz-zoom-x { position: fixed; top: 18px; right: 20px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .14); color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+.v2 .fz-zoom-x:hover { background: rgba(255, 255, 255, .24); }
+.v2 .fz-zoom-x:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* ---------- telas estreitas ---------- */
+@media (max-width: 1060px) {
+  .v2 .fz-fone { position: static; }
+}
+/* no celular de verdade não faz sentido desenhar outro celular: vira só a tela (fone-zap.css) */
+@media (max-width: 640px) {
+  .v2 .fz-fone { width: 100%; }
+}

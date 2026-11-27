@@ -379,7 +379,7 @@ export function useKanban() {
   // visibilidade (22/10): quem não vê todos só vê os cards DELE (oportunidades.responsavel_id —
   // o mesmo responsável que o card mostra; o gatilho de sincronia o mantém igual ao do contato)
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
 
   const funilQ = useQuery({
     queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, gcTime: KANBAN_GC_MS,

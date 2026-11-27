@@ -1,0 +1,28 @@
+/* Automações › Disparos (26/11) — barras sólidas, como as dos cartões do Painel */
+.v2 .dsp-sub { font-size: 12.5px; color: var(--txt-3); }
+.v2 .dsp-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.v2 .dsp-lista > li { display: flex; flex-direction: column; gap: 10px; padding: 14px 0; border-top: 1px solid var(--linha); }
+.v2 .dsp-lista > li:first-child { border-top: 0; }
+.v2 .dsp-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.v2 .dsp-tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .dsp-tx b { font-size: 13.5px; font-weight: 550; color: var(--txt); }
+.v2 .dsp-tx small { font-size: 11.5px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .dsp-msg { font-size: 12.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80ch; }
+.v2 .dsp-ac { display: inline-flex; gap: 6px; flex-shrink: 0; }
+.v2 .dsp-barra { display: flex; height: 10px; border-radius: 3px; overflow: hidden; background: rgba(var(--tint), .06); }
+.v2 .dsp-barra span { display: block; height: 100%; }
+.v2 .dsp-barra .env { background: var(--accent); }
+.v2 .dsp-barra .fila { background: rgba(var(--tint), .22); }
+.v2 .dsp-barra .falha { background: var(--erro, #d64545); }
+.v2 .dsp-nums { margin: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.v2 .dsp-nums > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.v2 .dsp-nums > div:first-child { align-items: flex-start; }
+.v2 .dsp-nums dt { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .dsp-nums dd { margin: 0; font-size: 15px; font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .dsp-conta { margin: 0; font-size: 13px; color: var(--txt-2); }
+.v2 .dsp-conta b { color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .dsp-conta.erro, .v2 .dsp-conta.erro b { color: var(--erro, #d64545); }
+.v2 .dsp-amostra { margin: -4px 0 0; font-size: 12px; color: var(--txt-3); }
+.v2 .dsp-previa { align-self: flex-start; max-width: 420px; padding: 9px 12px; border-radius: 12px 12px 12px 4px; background: rgba(var(--tint), .06); border: 1px solid var(--linha); font-size: 13px; line-height: 1.45; color: var(--txt); white-space: pre-wrap; }
+.v2 .dsp-confirmo { padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; }
+@media (max-width: 700px) { .v2 .dsp-nums { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

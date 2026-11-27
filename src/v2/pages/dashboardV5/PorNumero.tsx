@@ -51,7 +51,7 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
   const repetidos = totEnt - kpis.entradas;
   return (
     <Secao className="d5-num" titulo="Entradas por número"
-      sub="Todos os números conectados, mesmo sem entrada. Entradas: tudo que entrou, cada dia, como no Gerenciador de Anúncios. Não elegíveis e fechados contam pelo dia da marcação.">
+      ajuda="Todos os números conectados, mesmo sem entrada. Entradas: tudo que entrou, cada dia, como no Gerenciador de Anúncios. Não elegíveis e fechados contam pelo dia da marcação.">
       <div className="d5-tab-rolo">
         <table className="d5-tab">
           <colgroup>
@@ -115,7 +115,8 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
                   )}
                 </span>
               </th>
-              <td className="d5-dir"><b className="num">{fmtInt(totEnt)}</b></td>
+              {/* o total na MESMA coluna dos números das linhas (o trilho vazio guarda o lugar da barra) */}
+              <td className="d5-dir"><span className="d5-ent"><span className="d5-trilho d5-trilho-vago" aria-hidden /><b className="num">{fmtInt(totEnt)}</b></span></td>
               <td className="d5-dir"><b className="num">{fmtInt(totNe)}</b></td>
               <td className="d5-dir"><b className="num">{fmtInt(totGan)}</b></td>
               <td className="d5-dir"><TempoFechar med={kpis.fechMedianaH} media={kpis.fechMediaH} n={kpis.fechN} /></td>

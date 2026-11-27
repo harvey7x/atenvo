@@ -6,6 +6,10 @@ import { ConversorArquivos } from './Conversor';
 import { ColetorInss } from './ColetorInss';
 import './ferramentas.css';
 
+/* ícone de traço das ações da fila (subir/descer/remover) — no lugar de ↑ ↓ ✕ em texto */
+const IcFer = ({ d }: { d: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>
+);
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /* Ordem do download = ordem dos períodos (mais recente → mais antigo):
@@ -116,15 +120,14 @@ function UnificadorDocumentos() {
       <div className="ph sobe">
         <div>
           <div className="cob-migalha">Ferramentas</div>
-          <h2>Unificador de documentos</h2>
-          <p>Junte vários PDFs de qualquer tipo num arquivo só. Nada sai do seu computador.</p>
+          <h2 title="Junta vários PDFs num arquivo só. Nada sai do seu computador.">Unificador de documentos</h2>
         </div>
       </div>
 
       <div className="ferr-modo sobe">
         <label className="ferr-modo-toggle">
           <Toggle ligado={identificarBancos} aoMudar={trocarIdent} rotulo="Identificar bancos" />
-          <span><b>Identificar bancos</b> <span className="ferr-modo-dica">— ligue quando forem Históricos de Créditos do INSS: além de unir, aponta os bancos e resume por beneficiário.</span></span>
+          <span title="Além de unir, aponta os bancos e resume por beneficiário."><b>Identificar bancos</b> <span className="ferr-modo-dica">· para Históricos de Créditos do INSS</span></span>
         </label>
       </div>
 
@@ -160,9 +163,9 @@ function UnificadorDocumentos() {
                     <span className="ferr-ord num">{i + 1}</span>
                     <span className="ferr-nm">{f.name}<i className="ferr-nm-pg num">{fmtKB(f.size)}</i></span>
                     <div className="ferr-acoes">
-                      <button type="button" className="cm-num-lnk" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Subir">↑</button>
-                      <button type="button" className="cm-num-lnk" disabled={i === files.length - 1} onClick={() => mover(i, 1)} aria-label="Descer">↓</button>
-                      <button type="button" className="cm-num-lnk perigo" onClick={() => remover(i)} aria-label="Remover">✕</button>
+                      <button type="button" className="ferr-ib" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Subir" title="Subir"><IcFer d="m6 15 6-6 6 6" /></button>
+                      <button type="button" className="ferr-ib" disabled={i === files.length - 1} onClick={() => mover(i, 1)} aria-label="Descer" title="Descer"><IcFer d="m6 9 6 6 6-6" /></button>
+                      <button type="button" className="ferr-ib perigo" onClick={() => remover(i)} aria-label="Remover" title="Remover"><IcFer d="M6 6l12 12M18 6 6 18" /></button>
                     </div>
                   </div>
                 ))}
@@ -191,8 +194,8 @@ function UnificadorDocumentos() {
                 titulo={proc ? (identificarBancos ? 'Lendo os documentos…' : 'Unindo os PDFs…') : 'O resultado aparece aqui'}
                 descricao={proc ? (identificarBancos ? 'Juntando os PDFs e identificando os bancos.' : 'Juntando os PDFs num arquivo só.')
                   : identificarBancos
-                    ? 'Selecione os Históricos de Créditos à esquerda e clique em Unificar documentos. Vamos gerar o PDF único, apontar os bancos e resumir por beneficiário.'
-                    : 'Selecione os PDFs à esquerda e clique em Unificar documentos. Vamos gerar um PDF único com todos eles.'}
+                    ? 'Selecione os Históricos de Créditos à esquerda e clique em Unificar documentos.'
+                    : 'Selecione os PDFs à esquerda e clique em Unificar documentos.'}
               />
             </CardVidro>
           )}

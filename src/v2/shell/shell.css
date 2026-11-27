@@ -26,6 +26,8 @@ html:root[data-visual="corp"]:not([data-tema="light"]) .v2.portal-v2 {
 html:root[data-tema="light"] div.v2.app-v2, html:root[data-tema="light"] div.v2.portal-v2 { --base: #F0F1F3; --txt-3: #80868F; }
 /* 84 = 10 de respiro + 64 do rail flutuante + 10 de vão até o conteúdo */
 .v2 .p-app { position: relative; z-index: 1; height: 100%; padding-left: 84px; }
+/* celular (≤640px): o rail flutuante continua, sem o vão de 10px até o conteúdo */
+@media (max-width: 640px) { .v2 .p-app { padding-left: 74px; } }
 
 /* --- sidebar (rail 64 → 242 no hover, em overlay) -----------
    Recriada SEM animação de layout (o `width` 64→242 reflowava a
@@ -264,6 +266,9 @@ html:root[data-visual="corp"] .v2.app-v2 .p-sidebar .item.on:focus-visible {
 }
 .v2 .rodape-sb .nome { font-size: 12.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .rodape-sb .cargo { font-size: 11px; color: var(--txt-3); line-height: 1.3; }
+/* versão do painel (Reviza): discreta, no fim da sidebar (identifica o build de cada um) */
+.v2 .sb-versao { padding: 6px 2px 2px; font-size: 10.5px; letter-spacing: .02em; color: var(--txt-3); opacity: .7; white-space: nowrap; }
+.v2 .p-sidebar:not(:hover):not(:focus-within) .sb-versao { visibility: hidden; }
 
 /* --- topbar ------------------------------------------------- */
 .v2 .principal { height: 100%; display: flex; flex-direction: column; min-width: 0; }
@@ -276,6 +281,8 @@ html:root[data-visual="corp"] .v2.app-v2 .p-sidebar .item.on:focus-visible {
 /* encaixe da pílula do Radar de Atendimento: ocupa o vão à esquerda dos ícones (a busca saiu 12/11) */
 .v2 .radar-slot { flex: 1; min-width: 0; display: flex; justify-content: center; gap: 8px; }
 .v2 .top-dir { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+/* celular: botões do topo mais juntos — num aparelho de 360px o avatar (menu com Sair) passava da borda */
+@media (max-width: 640px) { .v2 .top-dir { gap: 6px; } }
 .v2 .ib {
   position: relative; width: 33px; height: 33px; border-radius: var(--r-ctl); color: var(--txt-2);
   background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .10);
@@ -305,7 +312,7 @@ html:root[data-visual="corp"]:not([data-tema="light"]) .v2 .wa-etqpop { backgrou
 /* portado ao body (fora do stacking context da topbar) e SÓLIDO opaco (#17191D, padrão .wa-pop):
    nada do palco/cabeçalho transparece nem pinta por cima. top/right vêm do rect do avatar (JS). */
 /* painel de notificações (herda a pele do .usuario-menu) */
-.v2 .notif-panel { width: 340px; max-height: 420px; overflow-y: auto; }
+.v2 .notif-panel { width: 340px; max-width: calc(100vw - 24px); max-height: 420px; overflow-y: auto; }
 .v2 .np-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }
 .v2 .np-todas { background: none; border: none; color: var(--txt-3); font-size: 10.5px; cursor: pointer; font-family: var(--fonte); text-decoration: underline; }
 .v2 .np-todas:hover { color: var(--txt); }

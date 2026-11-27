@@ -1,0 +1,412 @@
+/* =====================================================================
+   FUNDAÇÃO do visual novo da Reviza — etapa 1 (dono 21/11):
+   "minimalista = profissional; nada grande, nada grosso; fonte neutra;
+   animações breves; as métricas animadas ao passar o mouse".
+   Vale com [data-moldura] (o mesmo liga/desliga da moldura preta) e mexe
+   SÓ na base — fonte, medidas, pesos e movimento — para as telas dos dois
+   ambientes mudarem juntas. Tela por tela vem depois, se precisar.
+   Importado por último (depois de reviza-moldura.css): mesmo peso de
+   seletor, ganha pela ordem.
+   ===================================================================== */
+
+/* ---- 1. FONTE NEUTRA (Inter) e a régua de medidas, um degrau abaixo ----
+   Os nomes dos tokens são os da régua da ALFA (reviza-sistema.css); o valor encolhe:
+   título de página 23 → 19 · número de KPI 26 → 21 · título de cartão 16 → 14.
+   Pesos: 400 texto · 500 rótulo/botão · 550 destaque · 600 o MAIS forte (título e número). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 {
+  --fonte: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-14: 13.5px; --fs-16: 14px; --fs-23: 19px; --fs-26: 21px;
+  --fw-normal: 400; --fw-medio: 500; --fw-forte: 550; --fw-titulo: 600;
+  --rvf-ease: cubic-bezier(.2, .8, .2, 1);
+  font-family: var(--fonte);
+  font-optical-sizing: auto;
+}
+/* nada de negrito pesado em lugar nenhum: h1–h6, b, strong e th no peso de destaque */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :where(h1, h2, h3, h4, h5, h6, b, strong, th):not(:where(.pmc-root:not(.rvm) *)) {
+  font-weight: 550;
+}
+
+/* ---- 2. TÍTULOS E NÚMEROS: pequenos e firmes, sem gritar ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ph :is(h1, h2) {
+  font-size: 19px; font-weight: 600; letter-spacing: -.018em; line-height: 1.25;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ph p { font-size: 12.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pmc-root.rvm .rvm-val, .kpi .val, .pn-kpi-val, .cv2-kpi > b, .d5-kpi-val, .rg-tile-v b, .d5-robo-val) {
+  font-size: 21px; font-weight: 600; letter-spacing: -.02em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.card-cab h3, .pn-card-cab h3, .fin-head h3, .d5-sec-tit, .an-cartao-tit, .ev-card-tit, .vidro > h3, .rvm-bloco-tit, .pmc-root.rvm .rvm-series-tit, .p-modal-cab) {
+  font-size: 14px; font-weight: 600; letter-spacing: -.008em;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-tit { font-size: 12.5px; font-weight: 500; color: var(--txt-2); }
+/* cabeçalho de tabela e rótulos em caixa alta: menores, médios, mais arejados */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(thead th, .rt-tab-h > *, .pn-ord, .d5-ord, .d5-ord-tx, .pn-vh, .pn-barra-rot, .ev-rot, .gp-sc-tit, .gp-sc-gt) {
+  font-size: 10.5px; font-weight: 500; letter-spacing: .055em; color: var(--txt-3);
+}
+/* botões: 12,5 / médio; o principal no destaque */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv) { font-size: 12.5px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-btn.btn-pri:not(.btn-mini) { font-weight: 550; }
+/* o ícone do card de métrica: menor e mais discreto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { display: inline-flex; width: 26px; height: 26px; margin-right: 9px; border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico svg { width: 14px; height: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-cab { min-height: 26px; }
+/* cantos um pouco mais contidos */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
+
+/* ---- 3. MOVIMENTO — curto e discreto; nada disso com "reduzir movimento" ligado ---- */
+@media (prefers-reduced-motion: no-preference) {
+  /* os cards de métrica entram em sequência: sobem 8px e acendem */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm {
+    animation: rvf-sobe .45s var(--rvf-ease) backwards;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(2) { animation-delay: .06s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(3) { animation-delay: .12s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-grade > .pmc-root.rvm:nth-child(4) { animation-delay: .18s; }
+
+  /* passar o mouse numa métrica: o ícone responde */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .rvm-ico { transition: transform .25s var(--rvf-ease); }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm:hover .rvm-ico { transform: scale(1.1) rotate(-5deg); }
+  /* o balão surge (não pisca) e o ponto marcado "pousa" */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip { animation: rvf-balao .16s var(--rvf-ease) backwards; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-tip-wrap { transition: transform .12s ease-out; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pmc-root.rvm .pmc-chart__svg circle {
+    transform-box: fill-box; transform-origin: center; animation: rvf-ponto .28s var(--rvf-ease) backwards;
+    transition: cx .12s ease-out, cy .12s ease-out;
+  }
+
+  /* barras que crescem ao abrir: "Recebido por mês" e as faixas de proporção */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-bar {
+    transform-origin: bottom; animation: rvf-cresce .6s var(--rvf-ease) backwards;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(2) .pn-graf-bar { animation-delay: .04s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(3) .pn-graf-bar { animation-delay: .08s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(4) .pn-graf-bar { animation-delay: .12s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(5) .pn-graf-bar { animation-delay: .16s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .pn-graf-col:nth-child(n+6) .pn-graf-bar { animation-delay: .2s; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pn-prop > i, .pn-trilho > i, .d5-trilho > i, .rvm-barra > i) {
+    transform-origin: left; animation: rvf-estica .7s var(--rvf-ease) backwards;
+  }
+
+  /* linhas de tabela e itens clicáveis: a cor entra suave; o botão afunda um nada ao clicar */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr { transition: background-color .15s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .chip, .segm > button) {
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+  }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn):active:not(:disabled) { transform: scale(.975); }
+  /* menu lateral: o ícone do item desliza 1px ao passar o mouse */
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item .ba-ico { transition: transform .2s var(--rvf-ease), color .2s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item:not(.on):hover .ba-ico { transform: translateX(1.5px); }
+}
+/* hover das linhas de tabela (vale também sem movimento: é cor, não deslocamento) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr:hover { background-color: rgba(var(--tint), .025); }
+
+@keyframes rvf-sobe { from { opacity: 0; transform: translateY(8px); } }
+@keyframes rvf-balao { from { opacity: 0; scale: .96; } }
+@keyframes rvf-ponto { from { opacity: 0; transform: scale(.3); } }
+@keyframes rvf-cresce { from { transform: scaleY(0); } }
+@keyframes rvf-estica { from { transform: scaleX(0); } }
+
+/* =====================================================================
+   21/11 (2) — PALETA DA CASA, ÍCONES E BOTÕES
+   Dono: "é um sistema dourado e preto; quando entra azul, vermelho, verde,
+   parece que polui". A cor passa a ser EXCEÇÃO:
+     · tudo bem / normal  → grafite e cinzas (sem cor)
+     · atenção / destaque → o dourado da casa
+     · queda / atraso     → ferrugem (laranja queimado, da mesma família quente)
+   Nada de azul, verde ou vermelho no sistema.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 {
+  --verde: #3F3F46; --verde-rgb: 63, 63, 70; --verde-bg: rgba(24, 24, 27, .06);
+  --rubro: #B4532A; --rubro-rgb: 180, 83, 42; --rubro-bg: rgba(180, 83, 42, .1);
+  --ambar: #C77A0A; --ambar-rgb: 199, 122, 10; --ambar-bg: rgba(238, 154, 28, .12);
+  --cor-ok-txt: #3F3F46; --cor-alerta-txt: #A8650A; --cor-erro-txt: #A84A24;
+  --cor-ok-suave: rgba(24, 24, 27, .06); --cor-alerta-suave: rgba(238, 154, 28, .13); --cor-erro-suave: rgba(180, 83, 42, .1);
+  --dado-1: #52525B; --dado-1-rgb: 82, 82, 91;
+  --cor-info: #52525B; --cor-info-suave: rgba(24, 24, 27, .06);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 {
+  --verde: #D4D4D8; --verde-rgb: 212, 212, 216; --verde-bg: rgba(255, 255, 255, .08);
+  --rubro: #E27B52; --rubro-rgb: 226, 123, 82; --rubro-bg: rgba(226, 123, 82, .14);
+  --ambar: #F5A82E; --ambar-rgb: 245, 168, 46; --ambar-bg: rgba(245, 168, 46, .13);
+  --cor-ok-txt: #D4D4D8; --cor-alerta-txt: #F5A82E; --cor-erro-txt: #EE9B78;
+  --cor-ok-suave: rgba(255, 255, 255, .08); --cor-alerta-suave: rgba(245, 168, 46, .14); --cor-erro-suave: rgba(226, 123, 82, .16);
+  --dado-1: #A1A1AA; --dado-1-rgb: 161, 161, 170;
+  --cor-info: #A1A1AA; --cor-info-suave: rgba(255, 255, 255, .08);
+}
+/* séries de gráfico e bolinhas de campanha: dourado · grafite · cinza · bronze · cinza claro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .d5-pg { --dado-2: #27272A; --dado-3: #A1A1AA; --dado-4: #9A6A2B; --dado-5: #D4D4D8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .d5-pg { --dado-2: #E4E4E7; --dado-3: #8A8A93; --dado-4: #C69A5E; --dado-5: #52525B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-pg :is(.pmc-root.rvm, .d5-sec:has(.d5-graf-leg li + li)) { --dado-1: var(--azul); --dado-1-rgb: var(--azul-rgb); }
+/* a variação (▲ +27% / ▼ −26%): subir em grafite, cair em ferrugem */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-var-ok { color: var(--cor-ok-txt); background: var(--cor-ok-suave); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-var-er { color: var(--cor-erro-txt); background: var(--cor-erro-suave); }
+/* "Ao vivo": o ponto no dourado da casa, o texto neutro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo { color: var(--txt-2); background: transparent; border-color: var(--lin-fio, var(--linha)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .selo-vivo .selo-vivo-dot { background: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .18); }
+/* ---- ÍCONES do menu: traço 1,6, 16px, cantos redondos (a família nova está em shell/iconesAlfa.tsx) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ico, .ba-ico svg) { width: 16px; height: 16px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-ico svg { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-item.on .ba-ico svg { stroke-width: 1.8; }
+
+/* ---- BOTÕES: uma régua só — 32px, canto 8, fio fino, sem degradê ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .gp-sc-ger, .fjb-btn) { border-radius: 8px; letter-spacing: 0; }
+/* secundário no claro: branco, fio cinza, sombra de 1px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: #18181B; background: #FFFFFF; border: 1px solid #E4E4E7; box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  color: #09090B; background: #FAFAFA; border-color: #D4D4D8;
+}
+/* secundário no escuro: transparente, fio claro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status) {
+  color: #E4E4E7; background: transparent; border: 1px solid rgba(255, 255, 255, .12); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 :is(.btn-sec, .p-btn.btn-pri.btn-mini, .pn-link, .fin-btn.fin-ok, .cv2-bt, .ev-st-acao, .ev-btn-conv, .calx-hojebtn, .calx-seta, .gp-sc-ger, .pn-fin-ok, .fjb-btn, .ctx-status):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .2);
+}
+/* principal (claro): preto, canto 8, um fio de luz no alto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(0, 0, 0, .16);
+}
+/* botões de ícone e campos: canto 8; o foco é um anel dourado suave */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.ib, .ib2, .tool, .d5-ib) { border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(input.inp, select.inp, textarea.inp, .wa-busca, .kb-busca, .d5-sel select) { border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(input.inp, select.inp, textarea.inp, .d5-sel select):focus-visible {
+  outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .18);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.p-btn, .pn-link, .fin-btn, .ib, .ib2):focus-visible { outline: 2px solid rgba(var(--azul-rgb), .55); outline-offset: 2px; }
+/* "Voltou a pagar" (Saúde da carteira): era azul-petróleo — vira o cinza médio da paleta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.pn-prop i.ok2, .pn-ponto.ok2, .pn-leg-q.ok2, .pn .pn-prop .ok2) { background: #A1A1AA; }
+
+/* =====================================================================
+   21/11 (3) — BARRA LATERAL mais profissional (dono: "tem como deixar essa
+   aba mais profissional"): menos elementos gritando, mais ordem.
+   - rótulos dos grupos sem caixa alta, pequenos e apagados;
+   - item ativo NEUTRO (texto branco sobre um cinza leve) com só o ícone no
+     dourado e um filete dourado à esquerda — sai a pílula marrom com texto dourado;
+   - busca sem moldura, contador neutro, mais respiro entre os grupos;
+   - quando abre por cima do conteúdo, um fio e uma sombra limpa na borda.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app {
+  --ba-mudo: #9C9CA6;
+  --ba-rotulo: #62626B;
+  --ba-hover: rgba(255, 255, 255, .045);
+  --ba-ativo: rgba(255, 255, 255, .075);
+  --ba-ativo-tx: #FFFFFF;
+  --ba-ativo-ico: var(--azul);
+  --ba-badge-bg: rgba(255, 255, 255, .09);
+  --ba-badge-tx: #D4D4D8;
+  --ba-badge-on-tx: #FFFFFF;
+  --ba-sombra-trilho: 1px 0 0 rgba(255, 255, 255, .06), 24px 0 48px -12px rgba(0, 0, 0, .55);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra {
+  /* grupos: mais respiro; o rótulo em minúsculas, pequeno e apagado */
+  & .ba-grupos { gap: 14px; }
+  & .ba-grupo-rot { margin-bottom: 3px; padding: 0 9px; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ba-rotulo); }
+  /* itens: texto médio; o ativo é neutro, com o filete dourado */
+  & .ba-item { position: relative; font-weight: 450; letter-spacing: 0; }
+  & .ba-item-tx { letter-spacing: 0; }
+  & .ba-item.on { font-weight: 550; }
+  & .ba-item.on::before {
+    content: ''; position: absolute; left: 0; top: 50%; width: 2.5px; height: 14px; margin-top: -7px;
+    border-radius: 0 2px 2px 0; background: var(--azul);
+  }
+  /* busca: um campo discreto, sem moldura; o atalho apagado */
+  & .ba-item.ba-busca { border-color: transparent; background: rgba(255, 255, 255, .05); color: #8A8A93; }
+  & .ba-item.ba-busca:hover { background: rgba(255, 255, 255, .075); color: #D4D4D8; }
+  & .ba-item.ba-busca .ba-kbd { border-color: transparent; background: rgba(255, 255, 255, .06); color: #7C7C86; box-shadow: none; }
+  /* contador: pílula neutra, menor */
+  & .ba-badge { min-width: 18px; height: 17px; font-size: 10px; font-weight: 600; }
+  /* cabeçalho: nome e ambiente mais contidos; a seta e o botão de fixar apagados */
+  & .ba-ws-nome { font-size: 12.5px; font-weight: 600; letter-spacing: .005em; }
+  & .ba-ws-amb { font-size: 11px; color: #7C7C86; }
+  & .ba-ws-seta, & .ba-cab-bt { color: #62626B; }
+  & .ba-pe { border-top-color: rgba(255, 255, 255, .06); }
+}
+/* a marca: sem o halo em volta (o brilho no alto do quadrado fica) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-barra .ba-ws-marca {
+  width: 30px; height: 30px; border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26), inset 0 -2px 4px rgba(120, 58, 0, .25);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ba-barra .ba-ws-marca svg { width: 18px; height: 18px; }
+
+/* =====================================================================
+   21/11 (4) — WHATSAPP (Atendimento) e CONVERSAS (Cobrança)
+   As telas em que a equipe passa o dia, na mesma régua: sem papel de
+   parede, balões limpos, etiquetas neutras (cor só para o que pede
+   atenção), nomes sem negrito pesado e o celular das Conversas sem o verde.
+   ===================================================================== */
+
+/* ---- A. a conversa: fundo liso, balões com fio fino ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs { background-image: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs { background-color: #F6F6F7; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs { background-color: #0C0C0E; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha { border-radius: 12px; box-shadow: none; }
+/* recebida: branca; enviada (atendente ou IA): um dourado bem claro — o lado da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs .bolha.rec { background: #FFFFFF; border: 1px solid #E9E9EC; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .wa-msgs .bolha.env2 { background: #FCF4E4; border: 1px solid #F2DFB8; color: #18181B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs .bolha.rec { background: #17171A; border: 1px solid rgba(255, 255, 255, .07); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .wa-msgs .bolha.env2 { background: rgba(245, 168, 46, .1); border: 1px solid rgba(245, 168, 46, .2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha.env2.bot { border-left-width: 1px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha .bt-tag { font-size: 10.5px; font-weight: 500; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .bolha .hh { font-size: 10.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-msgs .dia { font-size: 10.5px; font-weight: 500; color: var(--txt-3); background: transparent; border-color: transparent; }
+
+/* ---- B. nomes e etiquetas: nada de negrito pesado; etiqueta neutra em caixa alta miúda ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .nm-tx { font-size: 12.5px; font-weight: 550; letter-spacing: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-ctopo .idw .nm { font-size: 14px; font-weight: 600; letter-spacing: -.005em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .ctx-topo .n2 { font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.av2, .zp-av) { font-weight: 550; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.cchip, .wa-hchip) {
+  font-size: 10px; font-weight: 500; letter-spacing: .04em; border-radius: 5px;
+  color: var(--txt-2); background: transparent; border: 1px solid var(--lin-fio, var(--linha)); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.cchip, .wa-hchip) i.pt { background: currentColor !important; opacity: .5; }
+/* o que pede atenção (Humano, Espera 33 min): dourado, sem moldura */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .cchip:is(.alerta, .espera) {
+  color: var(--cor-alerta-txt); background: var(--cor-alerta-suave); border-color: transparent;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip { border-radius: 5px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip .etqchip-nm { font-weight: 500; }
+
+/* ---- C. a lista: a conversa aberta em cinza leve com o filete dourado; hora e contador contidos ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2.ativa {
+  background: rgba(var(--tint), .045); border-left-color: var(--azul);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .h2 { font-weight: 450; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .conv2 .nl { font-weight: 600; color: #1B1206; background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-scr-btn span { font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .wa-scr-btn span.ct { font-weight: 600; }
+
+/* ---- D. a ficha (painel da direita): títulos de bloco sem caixa alta, pequenos e apagados ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.ctx-b .ctx-t, .fjb .fjb-h) {
+  font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-3);
+}
+
+/* ---- E. o celular das Conversas: a paleta do aparelho sai do verde do WhatsApp para a da casa ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .zp-tel {
+  --zp-verde: #18181B; --zp-acao: #18181B; --zp-badge: #EE9A1C; --zp-badge-txt: #1B1206;
+  --zp-chip-on: #18181B; --zp-chip-on-txt: #FFFFFF;
+  --zp-conv-fundo: #F4F4F5; --zp-papel: none; --zp-in: #FFFFFF; --zp-out: #FCF1DC;
+  --zp-tique-lida: #B8730E; --zp-ia: #71717A; --zp-cit-cliente: #52525B;
+  --zp-onda-on: #EE9A1C; --zp-onda-ponto: #EE9A1C; --zp-ambar: #C77A0A; --zp-rubro: #B4532A;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .zp-tel {
+  --zp-verde: #F5A82E; --zp-acao: #F5A82E; --zp-badge: #F5A82E; --zp-badge-txt: #1B1206;
+  --zp-chip-on: #2A2A2E; --zp-chip-on-txt: #FFFFFF;
+  --zp-conv-fundo: #0C0C0E; --zp-papel: none; --zp-in: #1C1C1F; --zp-out: #3A2A0E;
+  --zp-tique-lida: #F5A82E; --zp-ia: #A1A1AA; --zp-cit-cliente: #D4D4D8;
+  --zp-onda-on: #F5A82E; --zp-onda-ponto: #F5A82E; --zp-rubro: #E27B52;
+}
+/* os avatares de iniciais (cada um tinha uma cor): todos no cinza da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .zp-tel .zp-av { background: #E9E9EC !important; color: #3F3F46; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .zp-tel .zp-av { background: #2A2A2E !important; color: #D4D4D8; }
+/* etiquetas do cliente (Urgente, Revisão de contrato…): a bolinha colorida de cada uma vira neutra — o nome já diz qual é */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip > i { background: var(--txt-3) !important; opacity: .7; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .etqchip { color: var(--txt-2); background: transparent; border: 1px solid var(--lin-fio, var(--linha)); }
+
+/* =====================================================================
+   21/11 (5) — TABELAS e números
+   - sai a fonte "de máquina" (mono) dos telefones, datas e horários: tudo na
+     Inter, com algarismos alinhados em coluna;
+   - os botões de cada linha ficam discretos (sem moldura) e só ganham
+     contorno quando o mouse passa na linha — menos ruído em tabela longa;
+   - avatares de iniciais menores e mais leves.
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 { --mono: var(--fonte); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.num, td, time, .d5-tel, .zp-hora) { font-variant-numeric: tabular-nums; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 :is(.d5-tel, .ct-tel, td.d.num, .reg-quando, .pn-fin-mes) { font-family: var(--fonte); letter-spacing: 0; }
+@media (hover: hover) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody tr:not(:hover):not(:focus-within) td :is(.p-btn, .pn-link, .fin-btn, .ev-st-acao, .ev-btn-conv, .pn-fin-ok, .pn-fin-nao):not(.btn-perigo) {
+    border-color: transparent; background: transparent; box-shadow: none; color: var(--txt-2);
+  }
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .palco tbody td :is(.av2, .pn-av, .ev-av, .d5-av) {
+  width: 26px; height: 26px; min-width: 26px; font-size: 10px; font-weight: 550; letter-spacing: .02em;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 0; box-shadow: none;
+}
+/* Dashboard: o nome de cada número sem negrito pesado */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .d5-pg .d5-tab :is(.d5-pessoa, .d5-nome b) { font-weight: 550; letter-spacing: 0; }
+
+/* =====================================================================
+   21/11 (6) — ACESSO com a cara do sistema (dono: "deixa a tela de login
+   mais profissional"): duas metades — à esquerda a marca sobre o preto,
+   como a barra lateral; à direita o painel claro com o formulário, como o
+   palco. Texto e campos na MESMA régua da esquerda; o dourado fica na
+   marca, no filete e na seta do botão. Vale para todas as telas de acesso
+   (login, senha, convite, página não encontrada).
+   ===================================================================== */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2.tela-login {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); align-items: stretch; justify-content: stretch;
+  gap: 0; padding: 12px; min-height: 100dvh; overflow: visible; background: #09090B !important;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2.tela-login > :is(.luz2, .grao) { display: none; }
+/* a marca no canto, igual ao topo da barra lateral */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo { position: absolute; top: 38px; left: 44px; gap: 10px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo-nome { color: #F4F4F5; font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-rodape { position: absolute; left: 44px; right: auto; bottom: 36px; margin: 0; text-align: left; color: #6F6F78; font-size: 11.5px; letter-spacing: 0; }
+/* metade da marca */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel {
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; overflow: hidden;
+  padding: 32px 48px 84px 32px; border-radius: 20px; color: #F4F4F5;
+  background: radial-gradient(640px 440px at 0% 100%, rgba(245, 168, 46, .10), transparent 72%);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-arte {
+  position: absolute; right: -14%; top: 50%; width: min(600px, 96%); aspect-ratio: 1; transform: translateY(-56%);
+  color: rgba(255, 255, 255, .075); pointer-events: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-arte path { stroke-width: 1.2px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-arte path + path { color: rgba(245, 168, 46, .26); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-txt { position: relative; max-width: 360px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-fio { display: block; width: 28px; height: 2px; margin-bottom: 18px; border-radius: 1px; background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-tit { margin: 0; font-size: 22px; font-weight: 500; line-height: 1.3; letter-spacing: -.02em; color: #F4F4F5; text-wrap: balance; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-amb { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 12.5px; color: #8A8A93; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-amb span + span::before {
+  content: ''; display: inline-block; width: 3px; height: 3px; margin-right: 10px; border-radius: 50%; background: #55555C; vertical-align: middle;
+}
+/* metade do formulário: o mesmo painel arredondado do sistema */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-palco {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0;
+  padding: 48px 24px; border-radius: 20px;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .lg-palco { background: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .lg-palco { background: #111113; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card {
+  width: 372px; max-width: 100%; padding: 0; border: 0; border-radius: 0;
+  background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card::before, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card::after { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .marca2 { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card > .caps { text-align: left; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card :is(h1, .p-display) { margin: 6px 0; text-align: left; font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -.02em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .sub { margin-bottom: 26px; text-align: left; font-size: 13px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .campo { margin-bottom: 16px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .campo label { font-size: 12px; font-weight: 500; color: var(--txt-2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card :is(input.inp, .controle input) { height: 40px; border-radius: 8px; font-size: 13.5px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .entrar {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; margin-top: 8px; border: 0; border-radius: 8px; box-shadow: none;
+  font-size: 13.5px; font-weight: 550; letter-spacing: 0; transform: none;
+  transition: background-color .16s ease;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .lg-card .entrar { color: #FFFFFF; background: #09090B; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .lg-card .entrar:hover:not(:disabled) { background: #232327; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .lg-card .entrar { color: #1B1206; background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-fund) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 12%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .entrar-seta { display: block; flex: none; transition: transform .18s ease; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-fund) .v2 .lg-card .entrar-seta { color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .entrar:hover:not(:disabled) .entrar-seta { transform: translateX(3px); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .lg-pe { margin-top: 26px; padding-top: 16px; text-align: left; font-size: 11.5px; line-height: 1.65; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-card .lg-sec { justify-content: flex-start; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-txt { animation: rvf-sobe .5s var(--rvf-ease) .08s backwards; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel-arte { animation: rvf-arte 1.1s ease backwards; }
+}
+@keyframes rvf-arte { from { opacity: 0; } }
+/* tela estreita: a marca vira uma faixa no alto e o formulário ocupa o painel inteiro */
+@media (max-width: 900px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2.tela-login { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-painel { display: none; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-topo { position: static; display: flex; padding: 8px 8px 0; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-rodape { position: static; padding-bottom: 4px; text-align: center; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-fund) .v2 .lg-palco { padding: 36px 20px; }
+}

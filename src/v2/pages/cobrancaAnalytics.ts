@@ -51,9 +51,13 @@ export interface ClienteAnalise {
   engajamento: { tipo: TipoMsg; enviada: boolean; respondeu: boolean }[];
   faturamentoTotal: number;   // soma paga histórica
   ultimaResposta: string | null;
+  ativo?: boolean;            // Reviza: situacao !== 'cancelado' (demo: sempre ativo, campo ausente)
+  cancelado?: boolean;        // Reviza: está na aba Cancelados (ativo=false, mas NÃO é Novo)
 }
 
-const MESES = ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
+const MESES = import.meta.env.VITE_PREVIA === 'true'
+  ? Array.from({ length: 6 }, (_, k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })
+  : ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
 
 /* padrão de pagamento por comportamento (6 meses, mais recente ao fim) */
 const PADRAO: Record<Comportamento, StatusMes[]> = {
@@ -70,6 +74,8 @@ export const CICLO_DIA: Record<string, number> = { D01: 1, D02: 2, D03: 3, D04: 
 export const CICLOS_LISTA = Object.entries(CICLO_DIA).map(([codigo, dia]) => ({ codigo, dia })).sort((a, b) => a.codigo.localeCompare(b.codigo));
 const CICLOS_G = Object.keys(CICLO_DIA);
 const ATEND_G = ['Augusto', 'Eduardo', 'Junior', 'Garcia', 'Emillyn', 'Paty', 'Alexandra', 'Leandro'];
+/** os mesmos 8 comerciais da demo, pra telas que listam o time (ex.: Avisos) */
+export const ATENDENTES_DEMO = ATEND_G;
 const PRIMEIROS = ['Maria', 'José', 'Antônio', 'João', 'Francisco', 'Ana', 'Luiz', 'Paulo', 'Carlos', 'Manoel', 'Pedro', 'Francisca', 'Marcos', 'Raimundo', 'Sebastião', 'Antônia', 'Marcelo', 'Jorge', 'Márcia', 'Geraldo', 'Adriana', 'Sandra', 'Fernando', 'Rita', 'Rosa', 'Terezinha', 'Cleusa', 'Ivone', 'Nara', 'Rosana', 'Sônia', 'Vera', 'Cláudia', 'Marlene', 'Neusa', 'Osvaldo', 'Gilberto', 'Vanderlei', 'Ademar', 'Lourdes', 'Nelson', 'Cícero', 'Elza', 'Waldir'];
 const SOBRENOMES = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 'Soares', 'Fernandes', 'Vieira', 'Barbosa', 'Rocha', 'Dias', 'Nunes', 'Moreira', 'Cardoso', 'Teixeira', 'Correia', 'Cavalcante', 'Machado', 'Freitas', 'Pinto', 'Monteiro', 'Mendes', 'Ramos', 'Araújo'];
 
@@ -130,18 +136,28 @@ export interface MetricaAtendente {
 }
 
 export function metricasPorAtendente(cs: ClienteAnalise[]): MetricaAtendente[] {
+  // nome NORMALIZADO (trim+caixa): 'EMILLYN' e 'emillyn' são a mesma pessoa
   const map = new Map<string, ClienteAnalise[]>();
-  for (const c of cs) { const a = map.get(c.atendente) ?? []; a.push(c); map.set(c.atendente, a); }
-  return [...map.entries()].map(([nome, lista]) => {
-    const emDia = lista.filter((c) => c.comportamento === 'em_dia' || c.comportamento === 'voltou').length;
+  const rotulo = new Map<string, string>();
+  for (const c of cs) {
+    const chave = c.atendente.trim().toUpperCase();
+    if (!rotulo.has(chave)) rotulo.set(chave, c.atendente.trim());
+    const a = map.get(chave) ?? []; a.push(c); map.set(chave, a);
+  }
+  return [...map.entries()].map(([chave, lista]) => {
+    const nome = rotulo.get(chave) ?? chave;
+    // fluxo sobre quem gera cobrança AGORA (c.ativo — na Reviza é a carteira em
+    // cobrança; ver linhaParaCliente); faturamento é histórico
+    const av = lista.filter((c) => c.ativo !== false);
+    const emDia = av.filter((c) => c.comportamento === 'em_dia' || c.comportamento === 'voltou').length;
     const respond = lista.filter((c) => c.engajamento.some((e) => e.respondeu)).length;
     return {
       nome, clientes: lista.length,
       faturamento: lista.reduce((s, c) => s + c.faturamentoTotal, 0),
-      recorrencia: lista.reduce((s, c) => s + c.mensalidade, 0),
-      emAtraso: lista.filter((c) => c.comportamento === 'faltou' || c.comportamento === 'inadimplente').length,
-      adimplencia: Math.round((emDia / lista.length) * 100),
-      taxaResposta: Math.round((respond / lista.length) * 100),
+      recorrencia: av.reduce((s, c) => s + c.mensalidade, 0),
+      emAtraso: av.filter((c) => c.comportamento === 'faltou' || c.comportamento === 'inadimplente').length,
+      adimplencia: av.length ? Math.round((emDia / av.length) * 100) : 0,
+      taxaResposta: lista.length ? Math.round((respond / lista.length) * 100) : 0,
     };
   }).sort((a, b) => b.faturamento - a.faturamento);
 }
@@ -168,27 +184,123 @@ export interface ResumoCarteira {
   respostaPorTipo: { tipo: TipoMsg; enviadas: number; respostas: number }[];
 }
 
+/* ---------- séries mensais de recebimento (demo e real usam a MESMA conta:
+   o que entrou de fato em cada competência, lido das células pagas) ---------- */
+export interface SerieMes { competencia: string; valor: number }
+export interface CicloSerie { codigo: string; clientes: number; serie: SerieMes[] }
+export interface AtendSerie { nome: string; clientes: number; adimplencia: number; serie: SerieMes[] }
+
+const valorCelulaPaga = (raw: string): number => {
+  const e = estadoCelula(raw ?? '');
+  return e.estado === 'pago' ? (e.valor ?? 0) : 0;
+};
+const serieDe = (lista: ClienteAnalise[], comps: string[]): SerieMes[] =>
+  comps.map((competencia, k) => ({ competencia, valor: lista.reduce((s, c) => s + valorCelulaPaga(c.celulas[k] ?? ''), 0) }));
+
+export const competenciasDe = (cs: ClienteAnalise[]): string[] => cs[0]?.meses.map((m) => m.competencia) ?? [];
+
+/** recebido por ciclo × competência (o que entrou do D01, D02… em cada mês).
+    'N cli.' conta a carteira em cobrança — o MESMO número dos chips da Gestão. */
+export function seriePorCiclo(cs: ClienteAnalise[]): CicloSerie[] {
+  const comps = competenciasDe(cs);
+  const map = new Map<string, ClienteAnalise[]>();
+  for (const c of cs) { const a = map.get(c.ciclo) ?? []; a.push(c); map.set(c.ciclo, a); }
+  return [...map.entries()]
+    .map(([codigo, lista]) => ({ codigo, clientes: lista.filter((c) => c.ativo !== false).length, serie: serieDe(lista, comps) }))
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+/** recebido por atendente × competência (como cada um está indo, mês a mês).
+    Adimplência sobre a MESMA população da aba Atendentes (carteira em cobrança)
+    — antes contava todos e o mesmo comercial mostrava % diferente em cada tela. */
+export function seriePorAtendente(cs: ClienteAnalise[]): AtendSerie[] {
+  const comps = competenciasDe(cs);
+  const map = new Map<string, ClienteAnalise[]>();
+  const rotulo = new Map<string, string>();
+  for (const c of cs) {
+    const chave = c.atendente.trim().toUpperCase();
+    if (!rotulo.has(chave)) rotulo.set(chave, c.atendente.trim());
+    const a = map.get(chave) ?? []; a.push(c); map.set(chave, a);
+  }
+  return [...map.entries()].map(([chave, lista]) => {
+    const av = lista.filter((c) => c.ativo !== false);
+    const emDia = av.filter((c) => c.comportamento === 'em_dia' || c.comportamento === 'voltou').length;
+    // clientes = carteira EM COBRANÇA (mesma população do topo do painel e dos ciclos);
+    // antes contava os Novos junto e a coluna somava mais que a carteira
+    return { nome: rotulo.get(chave) ?? chave, clientes: av.length, adimplencia: av.length ? Math.round((emDia / av.length) * 100) : 0, serie: serieDe(lista, comps) };
+  }).filter((a) => a.clientes > 0 || a.serie.some((s) => s.valor > 0));
+}
+
 export function resumoCarteira(cs: ClienteAnalise[]): ResumoCarteira {
+  // fluxo (recorrência/atraso/adimplência/saúde) sobre quem gera cobrança AGORA
+  // (c.ativo — na Reviza/blob é a carteira EM COBRANÇA; o seed mockup não marca
+  // ativo → passa por !== false); faturamento é histórico
+  const at = cs.filter((c) => c.ativo !== false);
   const comps: Comportamento[] = ['em_dia', 'voltou', 'faltou', 'inadimplente'];
   const porComportamento = comps.map((comp) => {
-    const l = cs.filter((c) => c.comportamento === comp);
+    const l = at.filter((c) => c.comportamento === comp);
     return { comp, n: l.length, valor: l.reduce((s, c) => s + c.mensalidade, 0) };
   });
-  const faturamentoMensal = MESES.map((competencia, k) => ({
-    competencia, valor: cs.reduce((s, c) => s + (c.meses[k].status === 'paga' ? c.mensalidade : 0), 0),
+  // competências REAIS dos clientes (a lista fixa MESES é só do seed mockup e
+  // ficava para trás quando a grade ganhava colunas novas)
+  const compsDe = competenciasDe(cs);
+  const faturamentoMensal = (compsDe.length ? compsDe : MESES).map((competencia, k) => ({
+    competencia, valor: cs.reduce((s, c) => s + (c.meses[k]?.status === 'paga' ? c.mensalidade : 0), 0),
   }));
   const tipos: TipoMsg[] = ['antes', 'cobranca', 'depois', 'remarketing'];
   const respostaPorTipo = tipos.map((tipo) => {
     const env = cs.flatMap((c) => c.engajamento).filter((e) => e.tipo === tipo && e.enviada);
     return { tipo, enviadas: env.length, respostas: env.filter((e) => e.respondeu).length };
   });
-  const emDia = cs.filter((c) => c.comportamento === 'em_dia' || c.comportamento === 'voltou').length;
+  const emDia = at.filter((c) => c.comportamento === 'em_dia' || c.comportamento === 'voltou').length;
+  // recebido no mês = competência do MÊS CORRENTE (fallback: último mês não-futuro)
+  const agora = new Date();
+  const ym = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+  const recebidoMes = (faturamentoMensal.find((f) => f.competencia === ym)
+    ?? [...faturamentoMensal].reverse().find((f) => f.competencia < ym))?.valor ?? 0;
   return {
     faturamentoTotal: cs.reduce((s, c) => s + c.faturamentoTotal, 0),
-    recorrencia: cs.reduce((s, c) => s + c.mensalidade, 0),
-    recebidoMes: faturamentoMensal[faturamentoMensal.length - 2]?.valor ?? 0,
-    emAtrasoValor: cs.filter((c) => c.comportamento === 'faltou' || c.comportamento === 'inadimplente').reduce((s, c) => s + c.mensalidade, 0),
-    adimplencia: Math.round((emDia / cs.length) * 100),
+    recorrencia: at.reduce((s, c) => s + c.mensalidade, 0),
+    recebidoMes,
+    emAtrasoValor: at.filter((c) => c.comportamento === 'faltou' || c.comportamento === 'inadimplente').reduce((s, c) => s + c.mensalidade, 0),
+    adimplencia: at.length ? Math.round((emDia / at.length) * 100) : 0,
     porComportamento, faturamentoMensal, respostaPorTipo,
   };
+}
+
+/* ---------- histórico MÊS A MÊS dos indicadores do Painel (dono 14/11: os cards de métrica
+   com gráfico). Demo e real usam a MESMA conta, lida do status de cada cliente em cada
+   competência (o mesmo que pinta a Gestão):
+   - em cobrança no mês = status paga, nao_paga ou atraso (prevista = desconto ainda ativo/futuro)
+   - recorrência  = soma das mensalidades de quem estava em cobrança no mês
+   - em atraso    = soma das mensalidades de quem NÃO pagou no mês
+   - adimplência  = quem pagou ÷ (quem pagou + quem não pagou); o "aguardando entrada"
+                    (atraso) fica fora da conta até virar pago ou não pago
+   ---------- */
+export interface HistoricoMes {
+  competencia: string;
+  clientes: number;
+  recorrencia: number;
+  emAtraso: number;
+  /** null = ninguém com mês fechado (pago ou não pago) nessa competência */
+  adimplencia: number | null;
+}
+
+export function historicoMensal(cs: ClienteAnalise[]): HistoricoMes[] {
+  // a MESMA população dos números de agora (resumoCarteira/resumoCarteiraReal): quem está EM
+  // COBRANÇA hoje — os Novos (débito ainda descontando) e os Cancelados ficam fora
+  const at = cs.filter((c) => c.ativo !== false);
+  return competenciasDe(cs).map((competencia, k) => {
+    let clientes = 0, recorrencia = 0, emAtraso = 0, pagos = 0, naoPagos = 0;
+    for (const c of at) {
+      const st = c.meses[k]?.status;
+      if (st !== 'paga' && st !== 'nao_paga' && st !== 'atraso') continue;
+      clientes++;
+      recorrencia += c.mensalidade;
+      if (st === 'paga') pagos++;
+      else if (st === 'nao_paga') { naoPagos++; emAtraso += c.mensalidade; }
+    }
+    const fechados = pagos + naoPagos;
+    return { competencia, clientes, recorrencia, emAtraso, adimplencia: fechados ? Math.round((pagos / fechados) * 100) : null };
+  });
 }

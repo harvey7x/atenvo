@@ -102,7 +102,8 @@ html:root[data-visual="corp"] .v2 .btn-pri {
 html:root[data-visual="corp"] .v2 .btn-pri::after { display: none; }
 html:root[data-visual="corp"] .v2 .btn-pri:hover:not(:disabled) {
   transform: none;
-  background: #0050E6;               /* Carbon Blue 60 hover */
+  background: var(--platina-a);      /* mantém a assinatura do acento (era #0050E6 fixo = azul mesmo no dourado) */
+  filter: brightness(.92);           /* feedback enterprise = escurecer, acompanhando o acento (ouro/verde/azul) */
 }
 
 /* ---- geometria: pílulas de dado viram retângulo suave (4px).
@@ -123,14 +124,18 @@ html:root[data-visual="corp"] .v2 .kpi .val { letter-spacing: -.01em; }
    var(--azul) resolve o valor do acento por tema (skinAurora define
    --azul em dark e light). --platina-txt-rgb não é consumido no v2.
    ============================================================ */
+/* Fallback do acento: as telas família-login (Login/senha/Onboarding) NÃO
+   importam a skinAurora, então --azul fica indefinido lá e o gradiente do
+   botão primário quebrava (fundo transparente). O 2º arg de var() garante a
+   cor-assinatura mesmo sem a skin; nas páginas do shell --azul vence. */
 html:root[data-visual="corp"][data-acento="verde"] .v2 {
-  --platina-a: var(--azul);
-  --platina-b: var(--azul);
+  --platina-a: var(--azul, #3BD689);
+  --platina-b: var(--azul, #3BD689);
   --platina-txt: #FFFFFF;
 }
 html:root[data-visual="corp"][data-acento="dourado"] .v2 {
-  --platina-a: var(--azul);
-  --platina-b: var(--azul);
+  --platina-a: var(--azul, #F0BC4E);
+  --platina-b: var(--azul, #F0BC4E);
   --platina-txt: #241A05;   /* texto escuro sobre o ouro (branco não aguenta) */
 }
 /* play do áudio: segue a assinatura nos DOIS temas (era prata no dark e

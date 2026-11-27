@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { baixarCsv, csvDe, dataBr, nomeComData } from '../lib/planilha';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
+import { isRevizaMode } from '@/lib/supabase';
+import { temRecurso } from '../data/config/recursos';
+import { mostrarValor, useCampos, useValoresNoCartao } from '@/data/camposPersonalizados';
+import { rotuloBotao, useConfigVenda } from '@/data/vendaOrigem';
 import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import {
   KANBAN_REAL, PROGRESSO_KANBAN, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
@@ -22,13 +27,15 @@ import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials, avatarColor } from '@/lib/avatar';
-import { fotoIlustrativa } from '../lib/fotoIlustrativa';
+import { useFotoReal } from '../lib/fotosReais';
 import { useVisibilidade } from '@/lib/visibilidade';
+import { donosDosCardsDaPrevia } from '../data/config/equipes';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { BotaoPrimario, BotaoSec, DrawerV2, EstadoErro, ModalV2 } from '../components';
+import { KanbanLista } from './kanban/KanbanLista';
 import './kanban.css';
 import './kanban-pro.css';
 
@@ -165,8 +172,10 @@ const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12
 // Kanban PRO (29/10): ícones dos chips do card
 const IcRelogio = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Ic>;
 const IcCal = () => <Ic><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></Ic>;
-const IcEtapas = () => <Ic><path d="M4 17h4v-4h4V9h4V5h4" /></Ic>;
 const IcAlerta = () => <Ic><path d="M12 4 2.8 19.5h18.4L12 4z" /><path d="M12 10v4M12 17h.01" /></Ic>;
+const IcAlvo = () => <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none" /></Ic>; // Foco
+const IcSetaLado = ({ esq }: { esq?: boolean }) => <Ic>{esq ? <path d="m14.5 6-6 6 6 6" /> : <path d="m9.5 6 6 6-6 6" />}</Ic>;
+const IcBaixar = () => <Ic><path d="M12 4v11" /><path d="m7.5 10.5 4.5 4.5 4.5-4.5" /><path d="M5 19.5h14" /></Ic>; // Exportar
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -256,7 +265,7 @@ function CarregandoKanban() {
   const pct = pctProgresso(p);
   return (
     <div className="kb-pg kb-pro">
-      <div className="kb-carr" role="status" aria-live="polite" aria-busy>
+      <div className="kb-carr" role="status" aria-live="polite" aria-busy data-carregando-proprio>
         <div className="kb-carr-fundo" aria-hidden>
           {[4, 3, 4, 2, 3, 2].map((n, i) => (
             <div key={i} className="kb-carr-col">
@@ -286,7 +295,7 @@ export default function KanbanV2() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const demo = !KANBAN_REAL;
-  const [seed, setSeed] = useState<SeedKb>(seedKb);
+  const [seed, setSeed] = useState<SeedKb>(() => { const s0 = seedKb(); return { ...s0, leads: donosDosCardsDaPrevia(s0.leads) }; });
   const demoSeq = useRef(0);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
@@ -357,6 +366,11 @@ export default function KanbanV2() {
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
+  // Quadro | Lista (26/11, como no CRM do sistema de antes) — fica lembrado no navegador de cada um
+  const listaLigada = isRevizaMode && temRecurso('crm-extra');
+  const [vista, setVistaSt] = useState<'quadro' | 'lista'>(() => { try { return localStorage.getItem('reviza-kb-vista') === 'lista' ? 'lista' : 'quadro'; } catch { return 'quadro'; } });
+  const setVista = (v: 'quadro' | 'lista') => { setVistaSt(v); try { localStorage.setItem('reviza-kb-vista', v); } catch { /* sem navegador */ } };
+  const emLista = listaLigada && vista === 'lista';
   const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
   const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
   // FILTRO COMPLETO do board (dono 27/08): benefício, banco da ficha, período de entrada.
@@ -373,7 +387,9 @@ export default function KanbanV2() {
 
   /* ---------- dados (demo | real) ---------- */
   const colunasBase = demo ? seed.colunas : k.colunas;
-  const leads = demo ? seed.leads : k.leads;
+  // equipes (23/11), demonstração: cada pessoa vê os cards dos clientes que pode ver — os dela e, se for
+  // gerente, os das pessoas da equipe (no sistema de verdade o recorte vem da consulta)
+  const leads = demo ? (vis.veTodos ? seed.leads : seed.leads.filter((l) => vis.podeVer(l.respId))) : k.leads;
   const colunas = useMemo(
     () => (ordemOtim ? ordemOtim.map((id) => colunasBase.find((c) => c.id === id)).filter(Boolean) as KColuna[] : colunasBase),
     [ordemOtim, colunasBase],
@@ -387,6 +403,15 @@ export default function KanbanV2() {
   const vacuoQ = useVacuoRepasses();
   const repassePorOpp = useMemo(() => repassesPorOportunidade(vacuoQ.data ?? []), [vacuoQ.data]);
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
+  // campos do cliente marcados para o cartão (26/11, migration 110): até 3, embaixo do nome
+  const camposLigados = isRevizaMode && temRecurso('campos');
+  const camposQ = useCampos(camposLigados);
+  const camposCartao = useMemo(() => (camposLigados ? (camposQ.data ?? []) : []).filter((c) => c.ativo && c.noCartao).slice(0, 3), [camposQ.data, camposLigados]);
+  const valoresCartaoQ = useValoresNoCartao(useMemo(() => leads.map((l) => l.contatoId ?? ''), [leads]), camposCartao);
+  const camposDoLead = (l: KLead): { nome: string; valor: string }[] => {
+    const v = l.contatoId ? valoresCartaoQ.data?.[l.contatoId] : undefined;
+    return v ? camposCartao.filter((c) => v[c.id]).map((c) => ({ nome: c.nome, valor: mostrarValor(c, v[c.id]) })) : [];
+  };
   // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
   const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
     ? Object.fromEntries(Object.entries(seed.fichaStatus).map(([id, st]) => [id, {
@@ -429,6 +454,16 @@ export default function KanbanV2() {
     return true;
   };
   const nFiltrosAtivos = (filtroBenef.size ? 1 : 0) + (filtroBanco.size ? 1 : 0) + ((filtroDataDe || filtroDataAte) ? 1 : 0) + (filtroResp ? 1 : 0) + (filtroOrigem ? 1 : 0);
+  const exportarPlanilha = () => {
+    const nomeCol = new Map(colunas.map((c) => [c.id, c.nome]));
+    const linhas: (string | number | null)[][] = [['Cliente', 'Telefone', 'E-mail', 'Etapa', 'Responsável', 'Origem', 'Etiquetas', 'Banco', 'Benefício', 'Valor', 'Entrou em', 'Última mudança', 'Observações']];
+    for (const l of leadsVisiveis) {
+      linhas.push([l.nome, l.telefone, l.email, (l.colunaId ? nomeCol.get(l.colunaId) : '') ?? '', l.respNome, l.origem,
+        [...new Set([...(l.etiquetas ?? []), ...(l.contatoEtiquetas ?? [])])].join(', '), l.instituicao, l.tipoBeneficio, l.valor,
+        dataBr(l.entradaEm || l.criadoEm), dataBr(l.movimentadoEm), l.observacoes]);
+    }
+    baixarCsv(nomeComData('kanban'), csvDe(linhas));
+  };
   const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp) && passaAvancados(l)), [leads, term, termDig, filtroOrigem, filtroResp, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
@@ -695,6 +730,37 @@ export default function KanbanV2() {
     };
     autoRaf.current = requestAnimationFrame(passo);
   };
+  /* BORDAS DO QUADRO (crítica 12/11: "a 4ª coluna fica cortada na borda, sem indicação de rolagem"):
+     com mais colunas que a tela, a borda que ainda tem coluna esmaece e ganha uma seta de rolagem */
+  const [bordas, setBordas] = useState({ esq: false, dir: false });
+  const medirBordas = () => {
+    const el = boardRef.current;
+    if (!el) return;
+    const esq = el.scrollLeft > 4;
+    const dir = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setBordas((b) => (b.esq === esq && b.dir === dir ? b : { esq, dir }));
+  };
+  const medirBordasRef = useRef(medirBordas);
+  medirBordasRef.current = medirBordas;
+  // o quadro só existe depois do carregamento: observa quando o elemento aparece (ou troca), sem recriar a cada render
+  const bordasObs = useRef<{ el: HTMLElement | null; ro: ResizeObserver | null }>({ el: null, ro: null });
+  useEffect(() => {
+    const el = boardRef.current;
+    if (bordasObs.current.el === el) return;
+    bordasObs.current.ro?.disconnect();
+    bordasObs.current = { el, ro: null };
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => medirBordasRef.current());
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    bordasObs.current.ro = ro;
+    medirBordasRef.current();
+  });
+  useEffect(() => () => bordasObs.current.ro?.disconnect(), []);
+  const rolarQuadro = (lado: 1 | -1) => {
+    const el = boardRef.current;
+    if (el) el.scrollBy({ left: lado * Math.max(276, Math.round(el.clientWidth * 0.75)), behavior: 'smooth' });
+  };
 
   const mover = async (id: string, colId: string) => {
     const lead = leads.find((l) => l.id === id);
@@ -932,19 +998,22 @@ export default function KanbanV2() {
 
   return (
     <div className="kb-pg kb-pro">
+      {/* crítica 12/11: título sozinho, como na Cobrança (a explicação fica no title do título);
+          a busca desceu para a barra de filtros — no topo fica só a ação principal */}
       <div className="ph sobe">
         <div>
-          <h2>Kanban</h2>
-          <p>Funil comercial · cada card = 1 oportunidade em andamento{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
+          <h2 title="Funil comercial: cada cartão é uma oportunidade em andamento">Kanban</h2>
         </div>
         <div className="acoes">
-          <div className="kb-busca">
-            <IcBusca />
-            <input
-              className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome, telefone, e-mail, benefício, serviço, instituição, responsável ou etiqueta..."
-            />
-          </div>
+          {/* no celular a busca mora aqui, numa linha só dela (a barra de filtros vira uma fileira que rola) */}
+          {!vazioFunil && (
+            <div className="kb-busca so-cel">
+              <IcBusca />
+              <input className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads..." />
+            </div>
+          )}
+          {/* Exportar planilha (25/11): o que está na tela agora (busca e filtros valem), para o Excel */}
+          {podeConfig && !vazioFunil && <BotaoSec onClick={exportarPlanilha} title="Baixa uma planilha com os cartões que estão na tela agora (a busca e os filtros valem)">Exportar planilha</BotaoSec>}
           {podeConfig && <BotaoSec onClick={abrirNovaColuna}>Nova coluna</BotaoSec>}
           <BotaoPrimario onClick={() => abrirNovoLead()}>＋ Novo lead</BotaoPrimario>
         </div>
@@ -956,15 +1025,22 @@ export default function KanbanV2() {
         <>
 
           <div className="kb-barra sobe">
-            <div className="kb-ord" role="group" aria-label="Ordenar os cards">
+            {listaLigada && (
+              <div className="kb-vista" role="radiogroup" aria-label="Ver como">
+                {([['quadro', 'Quadro'], ['lista', 'Lista']] as const).map(([v, r]) => (
+                  <button key={v} type="button" role="radio" aria-checked={vista === v} onClick={() => setVista(v)}>{r}</button>
+                ))}
+              </div>
+            )}
+            {!emLista && <div className="kb-ord" role="group" aria-label="Ordenar os cards">
               <span className="kb-ord-l">Ordenar</span>
               {(['urgencia', 'recencia', 'lembrete'] as SortModo[]).map((m) => (
                 <button key={m} type="button" className={'kb-fchip' + (sortModo === m ? ' on' : '')} aria-pressed={sortModo === m} onClick={() => setSortModo(m)}>{ROTULO_SORT[m]}</button>
               ))}
-            </div>
+            </div>}
             <button type="button" className={'kb-fchip foco' + (foco ? ' on' : '')} aria-pressed={foco}
               title="Mostra só os leads que exigem ação agora — sem esconder o board" onClick={() => setFoco((f) => !f)}>
-              ◆ Foco{foco ? ' ativo' : ''}
+              <IcAlvo />Foco{foco ? ' ativo' : ''}
             </button>
             {cargaPorResp.length > 1 && (
               <button type="button" className={'kb-fchip' + (equipe ? ' on' : '')} aria-pressed={equipe}
@@ -987,8 +1063,16 @@ export default function KanbanV2() {
               Filtros{nFiltrosAtivos > 0 && <span className="c num">{nFiltrosAtivos}</span>}
             </button>
             <button type="button" className="kb-fchip" title={`Baixar os ${leadsVisiveis.length} lead(s) do recorte atual em CSV (abre no Excel) — respeita busca e filtros`} onClick={exportarCsv}>
-              ⇩ Exportar
+              <IcBaixar />Exportar
             </button>
+            <div className="kb-busca so-desk">
+              <IcBusca />
+              <input
+                className="inp" aria-label="Buscar leads" value={search} onChange={(e) => setSearch(e.target.value)}
+                title="Busca por nome, telefone, e-mail, benefício, serviço, instituição, responsável ou etiqueta"
+                placeholder="Buscar leads..."
+              />
+            </div>
           </div>
 
           {/* v3 F2 — Carga por responsável (opt-in): quem está sobrecarregado; clicar filtra o board */}
@@ -1033,8 +1117,17 @@ export default function KanbanV2() {
         </div>
       )}
 
+      {emLista && !vazioFunil && (
+        <KanbanLista leads={foco ? leadsVisiveis.filter(ehCritico) : leadsVisiveis} colunas={colunas} etiquetas={etiquetas}
+          nomeDe={(l) => tituloTelefone(l.nome) ?? nomeExibicao(l.nome)} colunaDe={colunaDoLead} aoAbrir={setDetId}
+          aoAbrirConversa={(l) => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }} />
+      )}
+      <div className={'kb-quadro' + (bordas.esq ? ' f-esq' : '') + (bordas.dir ? ' f-dir' : '')} style={emLista ? { display: 'none' } : undefined}>
+      {bordas.esq && (
+        <button type="button" className="kb-seta esq" aria-label="Rolar o quadro para a esquerda" title="Colunas anteriores" onClick={() => rolarQuadro(-1)}><IcSetaLado esq /></button>
+      )}
       <div
-        className="kb-scroll" ref={boardRef}
+        className="kb-scroll" ref={boardRef} onScroll={medirBordas}
         onDragOver={(e) => { ptr.current = { x: e.clientX, y: e.clientY }; if (dragId.current) iniciarAutoScroll(); }}
       >
         <div className="kb-cols">
@@ -1072,7 +1165,7 @@ export default function KanbanV2() {
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
                 repasse={repassePorOpp.get(l.id) ?? null}
-                fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                fichaInfo={fichaResumoMap[l.id]} campos={camposDoLead(l)} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
                 aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
                 menuAberto={menu?.kind === 'card' && menu.id === l.id}
@@ -1107,7 +1200,7 @@ export default function KanbanV2() {
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
                   {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
                   <span className="kb-cab-ic" aria-hidden />
-                  <span className="n" title={col.nome}>{col.nome}</span>
+                  <span className="n" title={col.entrada ? col.nome + ' · coluna de entrada: recebe os novos leads dos canais' : col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
                   <span className="q num">{todosCol.length.toLocaleString('pt-BR')}</span>
                   <button type="button" className="kb-col-add" aria-label={'Adicionar lead em ' + col.nome} title="Adicionar lead" onClick={(e) => { e.stopPropagation(); abrirNovoLead(col.id); }}><IcMais /></button>
@@ -1164,6 +1257,10 @@ export default function KanbanV2() {
             </div>
           )}
         </div>
+      </div>
+      {bordas.dir && (
+        <button type="button" className="kb-seta dir" aria-label="Rolar o quadro para a direita" title="Próximas colunas" onClick={() => rolarQuadro(1)}><IcSetaLado /></button>
+      )}
       </div>
 
       {/* dropdown "⋮" (card ou coluna) em PORTAL — fora do overflow da coluna e do stacking do card;
@@ -1450,6 +1547,7 @@ export default function KanbanV2() {
           aoAbrirConversa={() => {
             nav((detLead.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(detLead.conversaOrigemId ?? '')}`);
           }}
+          aoMarcarVenda={isRevizaMode && !admAtivo ? (colId) => { const id = detLead.id; setDetId(null); void mover(id, colId); } : undefined}
         />
       )}
     </div>
@@ -1471,9 +1569,9 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, campos = [], optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; campos?: { nome: string; valor: string }[]; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
@@ -1525,15 +1623,16 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   const nomeCard = fone ?? nomeExibicao(l.nome);
 
   // Kanban PRO (29/10, dono: "mais minimalista, profissional"): nome + 1 linha cinza + chips
-  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto ILUSTRATIVA).
+  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto do cliente).
   const subtitulo = [benefLbl, ...metaPartes].filter(Boolean).join(' · ');
-  const foto = fotoIlustrativa(l.nome, l.contatoId ?? l.id);
+  // 24/11: a foto REAL do WhatsApp do cliente; quem esconde a foto fica só com o responsável
+  const foto = useFotoReal(l.contatoId ?? null, l.nome);
   const estado = badge
     ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
-    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `parado ${dp}d`, msg: false }
+    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `Parado ${dp}d`, msg: false }
     : { cls: '', txt: haDe(l.atualizadoEm || l.criadoEm), msg: false };
   const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '') + (dataFull ? ` · no funil desde ${dataFull}` : '')
-    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização';
+    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` + (dataFull ? ` · no funil desde ${dataFull}` : '') : 'Última atualização';
 
   return (
     <div
@@ -1573,6 +1672,12 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
       {subtitulo && <div className="kc-meta" title={subtitulo}>{subtitulo}</div>}
+      {/* campos do cliente marcados em Configurações › Campos do cliente */}
+      {campos.length > 0 && (
+        <dl className="kc-campos">
+          {campos.map((c) => <div key={c.nome} title={`${c.nome}: ${c.valor}`}><dt>{c.nome}</dt><dd>{c.valor}</dd></div>)}
+        </dl>
+      )}
 
       {/* BANCOS DA FICHA (dono: "muito importante"): o banco do cliente em destaque; REVs em contorno */}
       {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (
@@ -1604,16 +1709,24 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
           {estado.txt}
         </span>
         {/* com ação no selo ("Retomar · 122d"), a data sai do pé para o selo caber inteiro (fica no title) */}
-        {dataCurta && !badge && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
-        {mostraProg && (
-          <span className={'kc-chip num' + (noGanho ? ' ok' : '')} title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
-            <IcEtapas />{progVal}/{nEtapas}
-          </span>
-        )}
+        {/* idem com "Parado Xd": a data vai para o title do selo e o pé cabe numa linha só */}
+        {dataCurta && !badge && !paradoAtivo && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
+        {/* etapa do funil (crítica 12/11: o "0/5" sem rótulo virou uma barrinha de N segmentos — a etapa
+            atual e as anteriores preenchidas; a frase completa fica no title e no leitor de tela) */}
+        {mostraProg && (() => {
+          const etapaN = noGanho ? nEtapas : Math.min(nEtapas, progVal + 1);
+          const rotulo = noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Etapa ${etapaN} de ${nEtapas} · ${colAtual?.nome ?? ''}`;
+          return (
+            <span className={'kc-etapas' + (noGanho ? ' ok' : '')} title={rotulo} role="img" aria-label={rotulo}>
+              {Array.from({ length: nEtapas }, (_, i) => <i key={i} className={i < etapaN ? 'on' : undefined} />)}
+            </span>
+          );
+        })()}
         <span className="kc-pessoas">
           <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
             style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '?'}</span>
-          <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title="Foto ilustrativa" draggable={false} />
+          {foto && <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title={nomeCard} draggable={false}
+            referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         </span>
       </div>
     </div>
@@ -2069,10 +2182,13 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
    (componente v1 reusado INTEIRO no real — bytes idênticos) e
    RelacionamentoContatoBox. No demo, a ficha vira leitura semeada.
    ================================================================ */
-function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFechar, aoEditar, aoAbrirConversa }: {
+function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFechar, aoEditar, aoAbrirConversa, aoMarcarVenda }: {
   demo: boolean; l: KLead; colunas: KColuna[]; eventosDemo?: OppEvento[]; fichaDemoStatus?: string;
   aoFechar: () => void; aoEditar: () => void; aoAbrirConversa: () => void;
+  /** o botão de venda (Reviza, 26/11): leva o card para a etapa de ganho, com a confirmação de sempre */
+  aoMarcarVenda?: (colunaId: string) => void;
 }) {
+  const nomeVenda = rotuloBotao(useConfigVenda().data);
   const eventosQ = useOportunidadeEventos(demo ? null : l.id);
   const eventos = demo ? (eventosDemo ?? []) : (eventosQ.data ?? []);
   const etiquetasCat = useEtiquetas().data ?? [];
@@ -2101,8 +2217,13 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
               {etapaCol && <span className="kd-etapa"><span className="pt" style={{ background: etapaCol.cor }} />{etapaCol.nome}</span>}
               {l.status === 'ganho' && <span className="kd-flag ganho">Ganho</span>}
               {l.status === 'perdido' && <span className="kd-flag perdido">Perdido</span>}
-              {paradoDet && <span className="kd-flag parado">parado {dpDet}d</span>}
+              {paradoDet && <span className="kd-flag parado">Parado {dpDet}d</span>}
             </div>
+            {aoMarcarVenda && (() => {
+              const ganho = colunas.find((c) => c.resultado === 'ganho');
+              if (!ganho || l.status !== 'em_andamento' || etapaCol?.resultado === 'ganho' || etapaCol?.resultado === 'perdido') return null;
+              return <button type="button" className="kd-venda" title={`${nomeVenda}: leva o card para ${ganho.nome}`} onClick={() => aoMarcarVenda(ganho.id)}>{nomeVenda}</button>;
+            })()}
           </div>
         </div>
       <div className="kb-sec-h">Contato</div>

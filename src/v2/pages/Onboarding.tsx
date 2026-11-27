@@ -5,6 +5,8 @@ import '../tokens.css';
 import '../base.css';
 import '../components/componentes.css';
 import './login.css';
+import { LogoAtenvo } from '../components/LogoAtenvo';
+import { MolduraAcesso } from './MolduraAcesso';
 
 /**
  * Onboarding v2 — paridade total com src/pages/Onboarding.tsx: usuário
@@ -33,14 +35,12 @@ export default function OnboardingV2({ onProvision }: { onProvision: (nome: stri
   }
 
   return (
-    <div className="v2 tela-login">
-      <div className="luz2" />
-      <div className="grao" />
+    <MolduraAcesso>
       <div className="lg-card vidro pg-entra">
-        <div className="marca2">A</div>
-        <div className="caps">Bem-vindo ao Atenvo</div>
+        <LogoAtenvo className="marca2" />
+        <div className="caps">Bem-vindo ao Reviza CRM</div>
         <h1 className="p-display">Crie sua organização.</h1>
-        <div className="sub">Para começar, dê um nome à empresa que você vai gerenciar na Atenvo.</div>
+        <div className="sub">Para começar, informe o nome da empresa que você vai gerenciar.</div>
 
         <div className={erro ? 'lg-banner show erro' : 'lg-banner'} role="alert">{erro}</div>
 
@@ -57,8 +57,8 @@ export default function OnboardingV2({ onProvision }: { onProvision: (nome: stri
             onChange={(e) => { setNome(e.target.value); setErro(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter') void enviar(); }}
           />
-          <small style={{ display: 'block', fontSize: 11, color: 'var(--txt-3)', marginTop: 6 }}>
-            Endereço: <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10.5, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 5, padding: '1px 5px' }}>{slug || 'empresa'}</code>
+          <small className="lg-slug">
+            Endereço: <code>{slug || 'empresa'}</code>
           </small>
         </div>
 
@@ -66,6 +66,6 @@ export default function OnboardingV2({ onProvision }: { onProvision: (nome: stri
           {busy ? 'Criando…' : 'Criar organização'}
         </button>
       </div>
-    </div>
+    </MolduraAcesso>
   );
 }

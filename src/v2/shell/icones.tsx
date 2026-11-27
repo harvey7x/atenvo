@@ -32,6 +32,10 @@ export const ICONES: Record<string, ReactNode> = {
   agendamentos: (
     <Ic><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></Ic>
   ),
+  // Tarefas: caixa com o visto
+  tarefas: (
+    <Ic><rect x="3.5" y="3.5" width="17" height="17" rx="3" /><path d="m8.5 12 2.5 2.5 4.5-5" /></Ic>
+  ),
   presenciais: (
     <Ic><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></Ic>
   ),

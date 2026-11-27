@@ -2,6 +2,10 @@
 # sw.js velho = app instalado preso numa versão antiga.
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
+/sw-r2.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/sw-r3.js
+  Cache-Control: no-cache, no-store, must-revalidate
 /manifest.webmanifest
   Cache-Control: no-cache
 

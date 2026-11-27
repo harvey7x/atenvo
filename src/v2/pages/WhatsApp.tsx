@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
+import { FIXAR_MINHA_LIGADO, useFixarParaMim, useMinhasFixadas } from '@/data/fixadasMinhas';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAtendimentoActions } from '@/data/atendimento';
 import { useScripts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script, type ScriptCategoria, type VarCtx } from '@/data/scripts';
 import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
@@ -24,6 +25,12 @@ import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dat
 import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
+import { donosDaPrevia } from '../data/config/equipes';
+import { temRecurso } from '../data/config/recursos';
+import { isRevizaMode } from '@/lib/supabase';
+import { BarraSelecao, BuscaNaConversa, DesempenhoChat, EncaminharMensagem, ProximasReunioes } from '../components/ConversaExtras';
+import { baixarTexto, linkDaConversa, nomeArquivoConversa, textoDaConversa } from '../lib/exportarConversa';
+import { TarefasDaConversa } from './tarefas/TarefasDaConversa';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
@@ -43,13 +50,29 @@ import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
+import { MidiasPainel, MidiasResumo, VideoAberto } from '../components/MidiasContato';
+import { textoDoMotivo, useRegistrarFechamento, type MotivoFechamento } from '@/data/fechamento';
+import { opcoesDeFechamento, useMotivos } from '@/data/motivosFechamento';
+import { rotuloBotao, useConfigVenda } from '@/data/vendaOrigem';
+import { CamposDoCliente } from '../components/CamposDoCliente';
+import { FinanceiroDoCliente } from '../components/FinanceiroDoCliente';
+import { CofrePortao } from '../components/CofrePortao';
+import { AplicarSequencia } from '../components/AplicarSequencia';
+import '../pages/automacoes.css';
+import { useCofreDaConversa } from '@/data/cofre';
+import { DocumentosDaConversa, ResumoAtendimento, iaPropriaLigada } from '../components/IaPropria';
+import { useIaDisponivel, useSugerirResposta } from '@/data/iaPropria';
+import { midiasDaConversa, type AbaMidia, type ItemMidia } from '../lib/midiasConversa';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
-import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Skeleton } from '../components';
+import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Segmentado, Skeleton } from '../components';
+import { IcNota } from '../components/NotaInterna';
+import { useCriarNota, useNotasLocais, mesclarNotas, mencaoEmCurso, filtrarMembros, inserirMencao, juntarNomes, validarNota, EQUIPE_DEMO_NOTAS, NOTA_MAX, type Membro } from '@/data/notasInternas';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
 import { seedWa } from './whatsappSeed';
+import { formatarTelefone } from '../lib/telefone';
 import { PaletaScripts, SCRIPTS_DEMO, CATEGORIAS_DEMO } from './scriptsPaleta';
 import './whatsapp.css';
 import './whatsappPro.css'; // atendimento renovado (dono 29/10) — só age com [data-inbox-pro] na raiz
@@ -85,7 +108,7 @@ const ABA_PV_KEY = 'atenvo-pv-aba';
 // Pós-venda (/pos-venda), que reaproveita este mesmo inbox em modo 'posvenda' (pedido do dono 19/11).
 const TABS_ATEND = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['ia', 'IA'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 const TABS_PV = [['fechados', 'Todos'], ['pvaguarda', 'Aguardando resposta']] as const;
 type TabId = typeof TABS_ATEND[number][0] | typeof TABS_PV[number][0];
@@ -111,7 +134,7 @@ function IniciandoWhatsApp() {
   const p = useProgressoCarga(PROGRESSO_WA);
   const pct = pctProgresso(p);
   return (
-    <div className="wa-carr" role="status" aria-live="polite" aria-busy>
+    <div className="wa-carr" role="status" aria-live="polite" aria-busy data-carregando-proprio>
       <div className="wa-carr-caixa">
         <span className="wa-carr-ic" aria-hidden><IcWa /></span>
         <strong>Iniciando o WhatsApp</strong>
@@ -147,8 +170,33 @@ const IcRaio = () => <Ic><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></Ic>;
 const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6" /><path d="M17.5 7.5h4.5" /><path d="M19.75 5.25v4.5" /></Ic>;
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
+// crítica 12/11: os emojis (🔕 🗄️ 📌) do cromo viram ícones de traço; voltar/dados no celular
+const IcSilencio = () => <Ic><path d="M9.5 20.5a2.5 2.5 0 0 0 5 0" /><path d="M17.5 13.5V11a5.5 5.5 0 0 0-8.6-4.5M6.5 9.6V16L5 18h12.5" /><path d="m3.5 3.5 17 17" /></Ic>;
+const IcArquivo = () => <Ic><rect x="3.5" y="4.5" width="17" height="4.5" rx="1.2" /><path d="M5 9v9.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V9" /><path d="M10 13h4" /></Ic>;
+const IcVoltar = () => <Ic><path d="m14.5 6-6 6 6 6" /></Ic>;
+const IcOk = () => <Ic><path d="m5 12.5 4.5 4.5L19 7.5" /></Ic>;
+const IcInfo = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><path d="M12 8h.01" /></Ic>;
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp'; x: number; y: number; acima?: boolean } | null;
+/* telefone no formato único (crítica 12/11): "(51) •••••-4407"; fora do padrão brasileiro, a máscara de sempre */
+const numeroMascarado = (n: string | null | undefined) => {
+  const f = formatarTelefone(n, { mascarar: true });
+  return f && f.includes('•') ? f : mascararNumero(n);
+};
+/* hora da última mensagem na lista (uma só marca de tempo por linha): hoje "14:38", ontem "Ontem",
+   na semana o dia ("seg."), antes a data ("12/11") — fuso de São Paulo */
+const FUSO = 'America/Sao_Paulo';
+function horaDaLista(ms: number | null | undefined, agoraMs: number): string {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const dia = (x: Date) => x.toLocaleDateString('pt-BR', { timeZone: FUSO });
+  const hoje = new Date(agoraMs);
+  if (dia(d) === dia(hoje)) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO });
+  if (dia(d) === dia(new Date(agoraMs - 86_400_000))) return 'Ontem';
+  if (agoraMs - ms < 6 * 86_400_000) return d.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: FUSO });
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO });
+}
+
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp' | 'lista'; x: number; y: number; acima?: boolean } | null;
 
 /* ==================================================================
    Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO entre a lista de
@@ -423,8 +471,20 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   }, []);
   useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
 
-  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
-  const { demo, contacts, current, currentId, relogioMs } = inbox;
+  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => donosDaPrevia(seedWa()), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
+  const { demo, contacts: contactsBase, current, currentId, relogioMs } = inbox;
+  // fixar só para mim (26/11): a conversa sobe só na MINHA lista — entra como "fixada" na ordenação de sempre
+  const minhasFixadas = useMinhasFixadas();
+  const fixarParaMim = useFixarParaMim();
+  const fixarMinhaLigado = FIXAR_MINHA_LIGADO();
+  const contacts = useMemo(() => (minhasFixadas.size === 0 ? contactsBase
+    : contactsBase.map((c) => (minhasFixadas.has(c.id) && !c.fixada ? { ...c, fixada: true, fixadaMinha: true } : c))), [contactsBase, minhasFixadas]);
+  const alternarFixarMinha = (id: string, fixar: boolean) => {
+    fixarParaMim.mutate({ conversaId: id, fixar }, { onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Não foi possível fixar.' }) });
+  };
+  // NOTA INTERNA (migration 99): a nota escrita nesta tela entra no fio na hora (na demonstração, fica só aqui)
+  const notasLocais = useNotasLocais(current.id || null);
+  const msgsFio = useMemo(() => mesclarNotas(current.msgs, notasLocais), [current.msgs, notasLocais]);
   // visibilidade (22/10): os satélites da conversa aberta (atividades, agendadas, IA) só para conversa
   // que está na lista do usuário — deep-link/sessão para conversa de outro não busca nada dela
   const idVisivel = vis.veTodos ? currentId : (current.id || '');
@@ -449,6 +509,19 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
   /* ---------- UI ---------- */
   const [draft, setDraft] = useState('');
+  // nota interna (migration 99): modo do compositor, rascunho próprio, quem foi escolhido no @ e o @ em digitação
+  const [modoNota, setModoNota] = useState(false);
+  /* SUGERIR RESPOSTA (25/11, IA com a chave da própria empresa): a IA escreve um RASCUNHO; o atendente revisa e envia */
+  const sugerirLigado = iaPropriaLigada();
+  const iaDisp = useIaDisponivel(sugerirLigado);
+  const sugerir = useSugerirResposta();
+  const [sugestaoDe, setSugestaoDe] = useState<{ texto: string; antes: string } | null>(null);
+  const [draftNota, setDraftNota] = useState('');
+  const [notaEscolhidos, setNotaEscolhidos] = useState<Membro[]>([]);
+  const [mencaoAtiva, setMencaoAtiva] = useState<{ inicio: number; termo: string } | null>(null);
+  const [mencaoIdx, setMencaoIdx] = useState(0);
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
   // lembra a última aba usada (quem trabalha pelo "Meus" reabre no "Meus")
   const [tab, setTab] = useState<TabId>(() => {
     try { const t = localStorage.getItem(abaKey); return TABS.some(([id]) => id === t) ? (t as TabId) : (posVenda ? 'fechados' : 'todos'); } catch { return posVenda ? 'fechados' : 'todos'; }
@@ -456,13 +529,23 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   // aba Iris: só Matheus/Murilo, e só depois da RPC responder (o servidor é a proteção real)
   const { eIris, mapa: irisMapa, carteiraIds: irisCarteira } = useIrisCarteira();
   const [irisFiltro, setIrisFiltro] = useState<'todos' | 'carteira' | 'meus' | 'fechados'>('todos');
+  // 26/11 (igual ao sistema que a Reviza usava antes): modo privacidade, várias conversas de uma vez, buscar na conversa, desempenho
+  const [privado, setPrivado] = useState<boolean>(() => { try { return localStorage.getItem('reviza-wa-privado') === '1'; } catch { return false; } });
+  const alternarPrivado = () => setPrivado((v) => { const n = !v; try { localStorage.setItem('reviza-wa-privado', n ? '1' : '0'); } catch { /* aba privada */ } return n; });
+  const [selecao, setSelecao] = useState<Set<string> | null>(null);
+  const [selOcupado, setSelOcupado] = useState(false);
+  const [buscaConv, setBuscaConv] = useState(false);
+  const [desempenhoAberto, setDesempenhoAberto] = useState(false);
+  const [encaminharMsg, setEncaminharMsg] = useState<WaMessage | null>(null);
   // aba 'iris' guardada mas sem permissão: cai em 'todos' (sem apagar a preferência)
   const tabEf: TabId = tab === 'iris' && !eIris ? 'todos' : tab;
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(abaKey, t); } catch { /* privado */ } };
   // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
-  const abas = (vis.veTodos || posVenda ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
-  useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
+  // equipes (23/11): o gerente também tem "Todos" e "Não atribuídos", já recortados para a equipe dele
+  const veMaisQueOSeu = vis.veTodos || vis.veEquipe;
+  const abas = (veMaisQueOSeu || posVenda ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
+  useEffect(() => { if (!veMaisQueOSeu && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [veMaisQueOSeu, tab]);
   // atalho ?aba=fechados (Central do Radar → "Abrir a aba Fechados"): troca a aba e limpa a URL.
   // Fechados abre no grupo "Aguardando resposta": aberto (só nesta sessão) e com a lista no topo.
   const abaParam = params.get('aba');
@@ -573,13 +656,33 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const [scrPop, setScrPop] = useState<DOMRect | null>(null); // seletor de scripts (mesmo tratamento glass)
   const scrBtnRef = useRef<HTMLButtonElement>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
-  const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
-  useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
+  // ficha do contato aberta/recolhida: escolha LEMBRADA neste aparelho (crítica 12/11)
+  const [ctxAberto, setCtxAberto] = useState(() => { try { return (localStorage.getItem('atenvo-wa-ctx') ?? sessionStorage.getItem('atenvo-wa-ctx')) !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
+  /* CELULAR (≤760px): um painel por vez — a lista, a conversa ou a ficha. O CSS do sistema
+     (reviza-sistema.css §16) mostra só o painel de data-cel-painel; no computador o atributo não age. */
+  const [celPainel, setCelPainel] = useState<'lista' | 'conversa' | 'ficha'>('lista');
+  const abrirFichaCel = () => { setCtxAberto(true); setCelPainel('ficha'); };
   const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string; anexoPath?: string } | null>(null);
+  /* "Mídia, documentos e links" (dono 25/11): null = painel de dados normal; uma aba = a tela de arquivos no lugar dele */
+  const [midiasAba, setMidiasAba] = useState<AbaMidia | null>(null);
+  const [videoAberto, setVideoAberto] = useState<{ url: string | null; nome?: string; mensagemId?: string } | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
+  // MOTIVO AO FECHAR (25/11, recurso 'motivos-fechamento'): o motivo escolhido e o detalhe
+  const [motivoFech, setMotivoFech] = useState<MotivoFechamento | null>(null);
+  // a lista do "Fechar conversa": a de Configurações › Motivos de fechamento (migration 110) ou a fixa
+  const motivosQ = useMotivos();
+  const opcoesFech = opcoesDeFechamento(motivosQ.data);
+  // o cofre de conversas (26/11, migration 113): a conversa trancada só mostra o conteúdo com a senha do cofre
+  const cofre = useCofreDaConversa(isRevizaMode && temRecurso('cofre'));
+  const noCofre = (id: string | undefined | null) => !!id && cofre.trancada(id) && !cofre.aberta(id);
+  // Automações › Sequências (26/11, migration 116): aplicar um modelo na conversa
+  const [seqAberta, setSeqAberta] = useState(false);
+  const [motivoFechDet, setMotivoFechDet] = useState('');
+  const registrarFechamento = useRegistrarFechamento();
   const [devolverConfirm, setDevolverConfirm] = useState(false);
   // "Responder por" (dono 29/10): trocar de número pede confirmação — o cliente passa a receber de outro celular
   const [trocaCanal, setTrocaCanal] = useState<{ id: string; alias: string } | null>(null);
@@ -613,12 +716,62 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [pop]);
-  useEffect(() => { setEditMode(false); }, [currentId]);
+  useEffect(() => { setEditMode(false); setMidiasAba(null); setVideoAberto(null); }, [currentId]);
+  const midias = useMemo(() => midiasDaConversa(current?.msgs), [current?.msgs]);
+  // ?midias=fotos|documentos|audios|links abre a tela de arquivos direto (link da prévia e de outras telas)
+  const midiasParam = params.get('midias');
+  useEffect(() => {
+    if (midiasParam && ['fotos', 'documentos', 'audios', 'links'].includes(midiasParam) && currentId) { setCtxAberto(true); setMidiasAba(midiasParam as AbaMidia); }
+  }, [midiasParam, currentId]);
+  const abrirFotoDoPainel = (it: ItemMidia, url: string | null) => {
+    if (it.m.tipo === 'video') { setVideoAberto({ url, nome: it.m.nome, mensagemId: it.m.id }); return; }
+    if (url) setLightbox({ url, nome: it.m.nome, mensagemId: it.m.id });
+  };
+  /* "Ver na conversa": rola SÓ o fio (nunca scrollIntoView — ele arrasta a página e some o topo) e acende a bolha */
+  const irParaMensagem = (id: string) => {
+    setVideoAberto(null);
+    const box = msgsRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(id)}"]`);
+    if (!box || !el) return;
+    if (celPainel === 'ficha') setCelPainel('conversa');
+    const topo = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTo({ top: Math.max(0, topo - box.clientHeight / 2 + el.offsetHeight / 2), behavior: 'smooth' });
+    el.classList.remove('mdc-piscar'); void el.offsetWidth; el.classList.add('mdc-piscar');
+    window.setTimeout(() => el.classList.remove('mdc-piscar'), 1800);
+  };
   /* autoscroll do chat ao trocar/receber */
   useEffect(() => {
     const el = msgsRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [currentId, current.msgs.length]);
+  }, [currentId, msgsFio.length]);
+
+  useEffect(() => { setBuscaConv(false); }, [currentId]);
+  /* várias conversas de uma vez (26/11): as mesmas ações do menu ⋯, uma conversa por vez */
+  const acaoLote = async (tipo: 'lida' | 'naolida' | 'fixar' | 'arquivar') => {
+    if (!selecao || !selecao.size) return;
+    const ids = [...selecao];
+    setSelOcupado(true);
+    try {
+      for (const id of ids) {
+        if (tipo === 'lida') await inbox.marcarLida(true, id);
+        else if (tipo === 'naolida') await inbox.marcarLida(false, id);
+        else if (tipo === 'fixar') await inbox.fixar(true, id);
+        else await inbox.arquivar(true, id, true);
+      }
+      const feito = tipo === 'lida' ? 'marcadas como lidas' : tipo === 'naolida' ? 'marcadas como não lidas' : tipo === 'fixar' ? 'fixadas no topo' : 'arquivadas';
+      aoAvisar({ tom: 'ok', texto: `${ids.length} ${ids.length === 1 ? 'conversa' : 'conversas'} ${feito}.` });
+      setSelecao(null);
+    } finally { setSelOcupado(false); }
+  };
+  const exportarConversa = () => {
+    const nome = nomeExibicao(current);
+    baixarTexto(nomeArquivoConversa(nome), textoDaConversa({ nome, telefone: current.phone ? numeroMascarado(current.phone) : null }, msgsFio));
+    aoAvisar({ tom: 'ok', texto: 'Conversa exportada (as notas internas ficam de fora).' });
+  };
+  const copiarLink = async () => {
+    try { await navigator.clipboard.writeText(linkDaConversa(current.id)); aoAvisar({ tom: 'ok', texto: 'Link da conversa copiado.' }); }
+    catch { aoAvisar({ tom: 'erro', texto: 'Não deu para copiar. Tente de novo.' }); }
+  };
 
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
@@ -660,6 +813,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const scriptsResumo = useScriptsResumoEtapas().data;
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
+  // Conversa PRESA neste canal (conversas.canal_preso_id): o cliente foi entregue a este número
+  // e mensagem dele em OUTRO número não move mais o atendimento. Sem o selo o atendente não tem
+  // como saber por que o oficial parou de assumir a conversa.
+  const presoNoSel = WA_REAL && !!current.canalPresoId && current.canalPresoId === inbox.canalSel?.id;
   // canal oficial (Cloud API/Meta) × número conectado por QR (Evolution) — sinalização na fila,
   // no topo da conversa, no "Responder por:" e no filtro de números. Transporte DESCONHECIDO
   // (demo, canais ainda carregando, canal removido fora de realCanais) fica neutro: não se
@@ -739,6 +896,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   useEffect(() => {
     if (!conversaParam) return;
     inbox.selecionarPorDeepLink(conversaParam);
+    setCelPainel('conversa');
     // revela o alvo: sem faceta ativa escondendo o card. Fechado/perdido moram SÓ nas abas
     // próprias — cair no 'todos' deixaria o card invisível (contatos ainda não carregados
     // caem no 'todos' como antes; a conversa em si abre do mesmo jeito).
@@ -749,11 +907,25 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     // Fechado mora na tela Pós-venda; qualquer outro, no atendimento — manda pro lado certo.
     if (alvo && posVenda && varianteAlvo !== 'ganho') { nav('/whatsapp?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
     if (alvo && !posVenda && varianteAlvo === 'ganho') { nav('/pos-venda?conversa=' + encodeURIComponent(conversaParam), { replace: true }); return; }
-    setTab(posVenda ? 'fechados' : eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
+    setTab(posVenda ? 'fechados' : eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos || vis.veEquipe ? 'todos' : 'meus');
     limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
-      document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // rolar SÓ o container da lista — nunca scrollIntoView(): ele rola todos os
+      // ancestrais scrolláveis pra centralizar o card, inclusive o shell .app-v2.
+      // O shell é overflow:hidden (sem barra), mas ainda aceita scroll PROGRAMÁTICO;
+      // scrollIntoView o empurrava ~68px e o topbar sumia sem como voltar (tela "bugada"
+      // ao abrir conversa pelo Kanban). Ver [[rota-fullbleed-altura]].
+      const alvo = document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`);
+      const lista = alvo?.closest('.wa-lista');
+      if (alvo && lista) {
+        const ar = alvo.getBoundingClientRect(), lr = lista.getBoundingClientRect();
+        const delta = (ar.top - lr.top) - (lista.clientHeight - ar.height) / 2;
+        lista.scrollTo({ top: lista.scrollTop + delta, behavior: 'smooth' });
+      }
+      // guarda: se algum caminho já deixou o shell deslocado, devolve ao topo
+      const shell = document.querySelector('.app-v2');
+      if (shell && shell.scrollTop !== 0) shell.scrollTop = 0;
       // só limpa o parâmetro DEPOIS de rolar: apagá-lo muda conversaParam→null, o que
       // dispara o cleanup deste effect (clearTimeout). Se limpássemos antes, o timer
       // morreria antes dos 220ms e a rolagem nunca ocorreria (regressão vs v1).
@@ -790,7 +962,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   };
   const passaTab = (c: WaContact, t: TabId) => {
     // 2ª camada da visibilidade (a lista já vem recortada): cliente de outro nunca entra
-    if (!vis.podeVer(c.respId)) return false;
+    if (!vis.podeVer(c.respId, c.canalId)) return false;
     if (t === 'arquivadas') return !!c.arquivada;
     // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
     // de TODAS as listas de atendimento, inclusive "Todos", pra não se misturar com
@@ -820,6 +992,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
       : t === 'naolidas' ? (c.unread ?? 0) > 0
+      // IA (26/11): as conversas em que a IA está atendendo agora
+      : t === 'ia' ? (!!c.iaAtiva || c.iaStatus === 'ativa' || c.iaStatus === 'handoff')
       : (c.unread ?? 0) > 0 || !!c.aguardando;
   };
   const tabCounts = useMemo(() => {
@@ -890,6 +1064,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const abrirProximoRadar = (id: string) => {
     if (visiveis.some((c) => c.id === id)) {
       inbox.selectContact(id);
+      setCelPainel('conversa');
       window.setTimeout(() => document.querySelector(`[data-cid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }), 60);
       return;
     }
@@ -936,14 +1111,71 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  }, [draft]);
+  }, [draft, draftNota, modoNota]);
   const sendDisabled = draft.trim() === '' || inbox.semDestino || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const midiaDisabled = inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio({ id: c.id, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom, ativo: true }).ok);
   const agendarDisabled = inbox.semDestino || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || canaisAgendaveis.length === 0));
+
+  /* ---------- NOTA INTERNA com @ (25/11, migration 99) ----------
+     O compositor troca entre "Mensagem" (vai para o cliente) e "Nota interna" (fica na conversa só para a equipe).
+     Cada modo tem o seu rascunho: um texto da nota nunca vira mensagem por engano ao trocar de modo. A nota não
+     depende do número do WhatsApp (não é enviada): número desconectado, "não incomodar" etc. não a bloqueiam. */
+  const notasLigadas = temRecurso('notas');
+  const notaAtiva = modoNota && notasLigadas && !!current.id;
+  const criarNota = useCriarNota();
+  // quem pode ser marcado: as pessoas ativas da empresa (na demonstração, a equipe de exemplo), sem a própria pessoa
+  const membrosMencao = useMemo<Membro[]>(
+    () => (WA_REAL ? usuarios : EQUIPE_DEMO_NOTAS).filter((u) => u.id !== user?.id).map((u) => ({ id: u.id, nome: u.nome })),
+    [usuarios, user?.id],
+  );
+  const sugestoesMencao = useMemo(
+    () => (notaAtiva && mencaoAtiva ? filtrarMembros(membrosMencao, mencaoAtiva.termo) : []),
+    [notaAtiva, mencaoAtiva, membrosMencao],
+  );
+  const listaMencaoAberta = sugestoesMencao.length > 0;
+  useEffect(() => { setSugestaoDe(null); setModoNota(false); setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }, [currentId]);
+  const atualizarMencao = (ta: HTMLTextAreaElement) => {
+    const m = mencaoEmCurso(ta.value, ta.selectionStart ?? ta.value.length);
+    setMencaoAtiva((atual) => (atual?.inicio === m?.inicio && atual?.termo === m?.termo ? atual : m));
+    setMencaoIdx(0);
+  };
+  const escolherMencao = (p: Membro) => {
+    const ta = textareaRef.current;
+    if (!ta || !mencaoAtiva) return;
+    const r = inserirMencao(draftNota, mencaoAtiva.inicio, ta.selectionStart ?? draftNota.length, p.nome);
+    setDraftNota(r.texto);
+    setNotaEscolhidos((l) => (l.some((x) => x.id === p.id) ? l : [...l, p]));
+    setMencaoAtiva(null);
+    window.requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(r.cursor, r.cursor); });
+  };
+  const trocarModo = (m: 'mensagem' | 'nota') => {
+    setModoNota(m === 'nota'); setMencaoAtiva(null);
+    window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
+  };
+  const salvarNota = () => {
+    if (!current.id || criarNota.isPending) return;
+    const erro = validarNota(draftNota);
+    if (erro) { aoAvisar({ tom: 'erro', texto: erro }); return; }
+    const conversaId = current.id;
+    criarNota.mutate(
+      { conversaId, texto: draftNota, escolhidos: notaEscolhidos, autorNome: user?.name?.trim() || 'Você' },
+      {
+        onSuccess: (r) => {
+          if (currentIdRef.current === conversaId) { setDraftNota(''); setNotaEscolhidos([]); setMencaoAtiva(null); }
+          aoAvisar({ tom: 'ok', texto: r.marcados.length
+            ? `Nota salva. ${juntarNomes(r.marcados.map((x) => x.nome))} ${r.marcados.length === 1 ? 'vai' : 'vão'} receber o aviso.`
+            : 'Nota salva. Só a equipe vê.' });
+        },
+        onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Não foi possível salvar a nota.' }),
+      },
+    );
+  };
+  // notas da equipe nesta conversa (as automáticas do sistema ficam de fora da conta)
+  const notasDaEquipe = useMemo(() => msgsFio.filter((m) => m.tipo === 'nota_interna' && !m.nota?.automatica), [msgsFio]);
   // itens do fio memoizados: construirItensConversa formata Intl.DateTimeFormat por mensagem;
   // sem memo isso refazia a cada tecla do composer / tick de 60s. Só depende das mensagens.
-  const itensConversa = useMemo(() => construirItensConversa(current.msgs, (m) => m.tsISO ?? null), [current.msgs]);
+  const itensConversa = useMemo(() => construirItensConversa(msgsFio, (m) => m.tsISO ?? null), [msgsFio]);
   // ---- PEÇA 3: HANDOFF como EVENTO no fio ----
   // "A IA pediu um humano" é o alerta operacional crítico — entra como DIVISOR no ponto
   // certo do fluxo: antes da primeira mensagem após precisa_humano_em; sem timestamp (ou
@@ -1150,26 +1382,38 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
     return out;
   };
 
+  /* aba sem conversas (crítica 12/11): o centro não segue mostrando a conversa de outra aba. A BUSCA não
+     conta — procurar outro cliente no meio do atendimento não fecha a conversa aberta. */
+  const carregandoLista = WA_REAL && inbox.live.isLoading && contacts.length === 0;
+  const abaVazia = !foco && !buscaAtiva && visiveis.length === 0 && !carregandoLista && !(WA_REAL && inbox.live.isError && contacts.length === 0);
+  const temConversa = !!current.id && !abaVazia;
+
   /* ---------- render ---------- */
   return (
-    <div className="wa-pg">
+    <div className={'wa-pg' + (privado ? ' wa-privado' : '')} data-cel-painel={!temConversa ? 'lista' : foco && celPainel === 'lista' ? 'conversa' : celPainel}>
+      <EncaminharMensagem m={encaminharMsg} mascarar={numeroMascarado} aoFechar={() => setEncaminharMsg(null)}
+        conversas={contacts.filter((c) => c.id !== current.id && vis.podeVer(c.respId, c.canalId) && !c.arquivada)}
+        aoEnviar={async (alvoId) => { const nome = await inbox.encaminhar(encaminharMsg!, alvoId); setEncaminharMsg(null); aoAvisar({ tom: 'ok', texto: `Encaminhada para ${nome}.` }); }} />
+      <DesempenhoChat aberto={desempenhoAberto} aoFechar={() => setDesempenhoAberto(false)} aoAbrirResumo={() => { setDesempenhoAberto(false); nav('/dashboard?aba=resumo'); }} />
       {/* ===================== FILA ===================== */}
       {!foco && (
         <aside className="wa-fila">
           <div className="wa-ftopo">
             <div className="l1">
-              <h3>Conversas</h3>
+              <h3>{posVenda ? 'Carteira de clientes' : 'Conversas'}</h3>
               <div className="bts">
                 <button type="button" className={'ib2' + (filtrosAtivos ? ' on' : '')} title={filtrosAtivos ? `Filtros ativos (${resumoFiltros.length})` : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}>
                   <IcFunil />{filtrosAtivos && <span className="fbadge num">{resumoFiltros.length}</span>}
                 </button>
                 <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
+                <button type="button" className={'ib2' + (privado || selecao ? ' on' : '')} title="Mais opções da lista" aria-label="Mais opções da lista" onClick={(e) => abrirPop('lista', e)}><IcDots /></button>
               </div>
             </div>
             <div className="wa-busca">
               <IcBusca />
               <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            {privado && <div className="wa-priv-faixa" role="status"><span>Telefones e mensagens escondidos.</span><button type="button" onClick={alternarPrivado}>Mostrar</button></div>}
             {tabEf === 'iris' && (
               <div className="wa-iris-filtros" role="group" aria-label="Filtrar carteira da Iris">
                 {([['todos', 'Todos'], ['carteira', 'Carteira Iris'], ['meus', 'Meus'], ['fechados', 'Fechados']] as const).map(([id, rot]) => (
@@ -1191,7 +1435,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   <button
                     key={id} type="button" role="tab" aria-selected={tabEf === id}
                     className={'wa-aba' + (tabEf === id ? ' on' : '')}
-                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
+                    title={id === 'pendentes' ? (isRevizaMode ? 'Mensagens não lidas e clientes esperando resposta.' : 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.')
+                      : id === 'ia' ? 'Conversas em que a IA está atendendo agora.'
                       : id === 'iris' ? 'Carteira da Iris: leads reatribuídos e seus clientes atendidos pela Iris.'
                       : id === 'pvaguarda' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
@@ -1234,7 +1479,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 ))}
               </div>
             ) : visiveis.length === 0 ? (
-              <div className="wa-vazio">Nenhuma conversa nesta aba.</div>
+              <div className="wa-vazio">{buscaAtiva ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa nesta aba.'}</div>
             ) : (
               grupos.map(([respId, lista]) => {
                 // "Todos" é lista única (sem cabeçalho) — nunca recolhe
@@ -1264,28 +1509,43 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   )}
                   {!fechado && lista.map((c) => {
                     const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
-                    const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
                     const alertas = alertasDe(c);
                     const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
                     const sit = situacaoDe(c);
                     const transporte = transporteDe(c.canalId);
-                    const oficial = transporte === 'cloud_api';
+                    const dica = [
+                      `Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'}`,
+                      `Canal: ${tituloCanal(c.chip, transporte)}`,
+                      finalizado ? 'Finalizado' : c.status || 'Em atendimento',
+                      c.lastAtMs ? 'Última mensagem ' + tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time,
+                      wait ? wait.label : '',
+                      c.iaAtiva ? 'IA atendendo' : '',
+                      ...alertas,
+                      c.tags.length ? 'Etiquetas: ' + c.tags.join(', ') : '',
+                    ].filter(Boolean).join(' · ');
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
-                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
-                        title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: ${tituloCanal(c.chip, transporte)} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
-                        onClick={() => inbox.selectContact(c.id)}
+                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '') + (selecao ? ' selecionando' : '') + (selecao?.has(c.id) ? ' sel' : '')}
+                        title={dica} aria-pressed={selecao ? selecao.has(c.id) : undefined}
+                        onClick={() => {
+                          if (selecao) { setSelecao((s0) => { const n = new Set(s0 ?? []); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; }); return; }
+                          inbox.selectContact(c.id); setCelPainel('conversa');
+                        }}
                       >
-                        <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} />{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
+                        {selecao && <span className={'wa-sel-ck' + (selecao.has(c.id) ? ' on' : '')} aria-hidden>{selecao.has(c.id) && <IcOk />}</span>}
+                        <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} /></span>
                         <span className="tx">
                           <span className="n">
-                            {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
-                            {c.arquivada && <span className="fl" title="Arquivada">🗄️</span>}
-                            {nomeExibicao(c)}
+                            {c.silenciada && <span className="fl" title="Silenciada" aria-label="Silenciada"><IcSilencio /></span>}
+                            {c.arquivada && <span className="fl" title="Arquivada" aria-label="Arquivada"><IcArquivo /></span>}
+                            <span className="nm-tx">{nomeExibicao(c)}</span>
+                            {c.iaAtiva && <span className="ia-ic" title="A IA está atendendo esta conversa" aria-label="IA atendendo"><IcBot /></span>}
                             {tabEf === 'iris' && irisMapa.get(c.id)?.atendente_original_nome && <span className="cchip iris-era" title="Atendente original">Era: {irisMapa.get(c.id)?.atendente_original_nome}</span>}
                           </span>
-                          <span className="p">{c.last || '—'}</span>
+                          <span className="p">{noCofre(c.id)
+                            ? <span className="cofre-lista"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>Conversa trancada</span>
+                            : (c.last || '—')}</span>
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>; })()}
                             {/* Radar: UM selo logo após a situação (pedido > último > 2º > 1º) + Ligar à parte; só do dono */}
@@ -1306,17 +1566,16 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                           </span>
                         </span>
                         <span className="m">
-                          <span className="h2 num" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
+                          <span className="h2 num">{c.lastAtMs ? horaDaLista(c.lastAtMs, relogioMs) : c.time}</span>
                           {(c.unread ?? 0) > 0 && <span className="nl num" title={`${c.unread} não lidas`}>{(c.unread ?? 0) > 99 ? '99+' : c.unread}</span>}
-                          {wait && <span className={'cr num' + (atrasado ? ' g' : '')}>{wait.label.replace('Aguardando ', '').replace('há ', '')}</span>}
                         </span>
                         {!posVenda && (
                         <span
                           role="button" tabIndex={-1}
-                          className={'wa-pin' + (c.fixada ? ' on' : '')}
-                          title={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
-                          aria-label={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
-                          onClick={(e) => { e.stopPropagation(); void inbox.fixar(!c.fixada, c.id); }}
+                          className={'wa-pin' + (c.fixada ? ' on' : '') + (c.fixadaMinha ? ' minha' : '')}
+                          title={c.fixadaMinha ? 'Fixada só para você · clique para desafixar' : c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          aria-label={c.fixadaMinha ? 'Desafixar (fixada só para você)' : c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          onClick={(e) => { e.stopPropagation(); if (c.fixadaMinha) alternarFixarMinha(c.id, false); else void inbox.fixar(!c.fixada, c.id); }}
                         ><IcPin /></span>
                         )}
                       </button>
@@ -1327,6 +1586,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               })
             )}
           </div>
+          {selecao && (
+            <BarraSelecao n={selecao.size} ocupado={selOcupado}
+              aoLida={() => void acaoLote('lida')} aoNaoLida={() => void acaoLote('naolida')} aoFixar={() => void acaoLote('fixar')} aoArquivar={() => void acaoLote('arquivar')}
+              aoTodas={() => setSelecao(new Set(visiveis.map((c) => c.id)))} aoCancelar={() => setSelecao(null)} />
+          )}
         </aside>
       )}
 
@@ -1340,26 +1604,27 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         )}
         {!current.id && WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
           <IniciandoWhatsApp />
-        ) : !current.id ? (
+        ) : !temConversa ? (
           <div className="wa-conv-vazia">
             <IcWa />
-            <div className="t">Selecione uma conversa</div>
-            <div className="d">Escolha uma conversa na lista ou inicie um novo atendimento.</div>
+            <div className="t">{abaVazia ? 'Nenhuma conversa nesta aba' : 'Selecione uma conversa'}</div>
+            <div className="d">{abaVazia ? 'Escolha outra aba ou inicie um novo atendimento.' : 'Escolha uma conversa na lista ou inicie um novo atendimento.'}</div>
             <BotaoPrimario onClick={() => setNovaConversa(true)}>Nova conversa</BotaoPrimario>
           </div>
         ) : (
           <>
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
-              <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
+              <button type="button" className="ib2 wa-cel-volta" title="Voltar para a lista" aria-label="Voltar para a lista de conversas" onClick={() => setCelPainel('lista')}><IcVoltar /></button>
+              <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente atualizar nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
-                  {current.phone ? mascararNumero(current.phone) : 'sem número'}
+                  <span className="tel">{current.phone ? numeroMascarado(current.phone) : 'sem número'}</span>
                   <SituacaoChipTopo lead={current} demo={demo} />
                   {inbox.canalSel
-                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}</span>
-                    : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
+                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + numeroMascarado(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'oficial (API do WhatsApp/Meta)' : 'número conectado por QR Code'}${presoNoSel ? `\n\nAtendimento preso neste número: mensagem do cliente em outro número não traz a conversa de volta. Para soltar, responda por outro número aqui pelo painel.` : ''}`}>{canalEhCloud && <IcOk />}{inbox.canalSel.alias}{presoNoSel && <span className="preso" aria-label="Atendimento preso neste número"><IcPin /></span>}</span>
+                    : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' && <IcOk />}{current.chip}</span>; })()}
                   {WA_REAL && canalEhCloud && janelaQ.data && (
                     <span className={'janela' + (janelaQ.data.aberta ? '' : ' fechada')} title={janelaQ.data.aberta ? 'Dentro das 24 horas: dá para responder com texto livre por este número.' : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
                       {rotuloJanela(janelaQ.data)}
@@ -1412,11 +1677,13 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   <BotaoMini title="Abrir a ficha deste cliente na Fila da Iris"
                     onClick={() => nav('/fila-iris?cliente=' + encodeURIComponent(current.contatoId!))}>Abrir na fila</BotaoMini>
                 )}
-                {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
+                {!ctxAberto && <BotaoMini className="wa-dados-desk" title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
+                <button type="button" className="ib2 wa-cel-so" title="Dados do contato" aria-label="Abrir os dados do contato" onClick={abrirFichaCel}><IcInfo /></button>
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
             </div>
+            {buscaConv && <BuscaNaConversa msgs={msgsFio} aoIr={irParaMensagem} aoFechar={() => setBuscaConv(false)} />}
 
             {/* PEÇA 1 — BARRA DE ESTADO DA IA: faixa fixa sob o cabeçalho, visível sempre que há
                 sessão de IA. Superfície SÓLIDA de propósito (faixa de estado, não overlay → sem
@@ -1469,8 +1736,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               </div>
             )}
 
+            {current && cofre.trancada(current.id) && cofre.aberta(current.id) && (
+              <div className="cofre-aberta" role="status">Conversa do cofre aberta nesta aba até {new Date(cofre.ateQuando(current.id) ?? Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.<button type="button" onClick={() => cofre.fechar(current.id)}>Fechar agora</button></div>
+            )}
             <div className="wa-msgs" ref={msgsRef}>
-              {itensFio.map((item, i) =>
+              {current && noCofre(current.id) ? (
+                <CofrePortao aoAbrir={(senha) => cofre.abrir(current.id, senha)}
+                  aoTirar={async (senha) => { const r = await cofre.tirar(current.id, senha); if (r === 'ok') aoAvisar({ tom: 'ok', texto: 'Conversa tirada do cofre.' }); return r; }} />
+              ) : itensFio.map((item, i) =>
                 item.tipo === 'handoff' ? (
                   /* PEÇA 3 — o alerta é perceptível sem gritar: hairline + glifo + bolinha âmbar
                      (a única cor) + tinta levíssima, no ponto do handoff */
@@ -1504,6 +1777,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     key={item.msg.id ?? item.msg.cid ?? 'i' + i}
                     m={item.msg} demo={demo} nomeCliente={nomeExibicao(current)}
                     retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino} optout={optout}
+                    aoEncaminhar={(m) => setEncaminharMsg(m)}
+                    aoReagir={inbox.semDestino ? undefined : (m, e) => void inbox.reagir(m, e)}
                     aoResponder={(m) => {
                       inbox.setReplyTo({
                         id: m.id ?? '', idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo,
@@ -1577,7 +1852,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 </div>
               ))}
 
-              {inbox.replyTo && (
+              {inbox.replyTo && !notaAtiva && (
                 <div className="reply-box">
                   <div>
                     <div className="rem">Respondendo a {inbox.replyTo.remetente}</div>
@@ -1587,6 +1862,40 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                 </div>
               )}
 
+              {!inbox.iaTrava && (<>
+              {/* NOTA INTERNA (migration 99): Mensagem vai para o cliente; Nota interna fica só para a equipe */}
+              {notasLigadas && !!current.id && (
+                <div className="wa-modo">
+                  <Segmentado<'mensagem' | 'nota'>
+                    rotulo="O que escrever" valor={notaAtiva ? 'nota' : 'mensagem'} aoMudar={trocarModo}
+                    opcoes={[{ valor: 'mensagem', rotulo: 'Mensagem' }, { valor: 'nota', rotulo: 'Nota interna' }]}
+                  />
+                </div>
+              )}
+              {listaMencaoAberta && (() => {
+                const idx = Math.min(mencaoIdx, sugestoesMencao.length - 1);
+                return (
+                  <div className="wa-mencoes" id="wa-mencoes" role="listbox" aria-label="Marcar alguém da equipe">
+                    <div className="wa-mencoes-t">Marcar alguém da equipe</div>
+                    {sugestoesMencao.map((p, i) => (
+                      <button
+                        key={p.id} type="button" role="option" aria-selected={i === idx} className={'wa-mencao' + (i === idx ? ' on' : '')}
+                        onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setMencaoIdx(i)} onClick={() => escolherMencao(p)}
+                      >
+                        <span className="av" aria-hidden>{initials(p.nome)}</span><span className="nm">{p.nome}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {sugestaoDe && !notaAtiva && draft === sugestaoDe.texto && (
+                <div className="sug-aviso" role="status">
+                  <span>Rascunho escrito pela IA: confira antes de enviar.</span>
+                  <button type="button" className="lnk" onClick={() => { setDraft(sugestaoDe.antes); setSugestaoDe(null); textareaRef.current?.focus(); }}>Desfazer</button>
+                </div>
+              )}
+              </>)}
               {inbox.iaTrava ? (
                 /* trava do envio (dono, 12/11): com a Iris atendendo, o atendente não interrompe sem pausar.
                    O botão pausa a Iris nesta conversa e destrava a caixa; quem pausou fica registrado. */
@@ -1602,16 +1911,50 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   </button>
                 </div>
               ) : (
-              <div className="cmsg">
+              <div className={'cmsg' + (notaAtiva ? ' cmsg-nota' : '')}>
                 <textarea
-                  ref={textareaRef} rows={1} value={draft} placeholder={placeholder} disabled={composerBloqueado}
-                  onChange={(e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+                  ref={textareaRef} rows={1}
+                  value={notaAtiva ? draftNota : draft}
+                  placeholder={notaAtiva ? 'Nota só para a equipe. Use @ para marcar alguém.' : placeholder}
+                  disabled={notaAtiva ? false : composerBloqueado}
+                  maxLength={notaAtiva ? NOTA_MAX : undefined}
+                  aria-label={notaAtiva ? 'Nota interna para a equipe' : undefined}
+                  aria-autocomplete={notaAtiva ? 'list' : undefined}
+                  aria-controls={listaMencaoAberta ? 'wa-mencoes' : undefined}
+                  onChange={(e) => {
+                    if (notaAtiva) { setDraftNota(e.target.value); atualizarMencao(e.target); } else setDraft(e.target.value);
+                    e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                  }}
+                  onSelect={notaAtiva ? (e) => atualizarMencao(e.currentTarget) : undefined}
+                  onBlur={notaAtiva ? () => setMencaoAtiva(null) : undefined}
                   onKeyDown={(e) => {
+                    if (notaAtiva) {
+                      if (listaMencaoAberta) {
+                        const n = sugestoesMencao.length;
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setMencaoIdx((i) => (Math.min(i, n - 1) + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
+                          return;
+                        }
+                        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                          e.preventDefault(); escolherMencao(sugestoesMencao[Math.min(mencaoIdx, n - 1)]); return;
+                        }
+                        // Esc fecha só a lista (não sai do modo de foco da página)
+                        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMencaoAtiva(null); return; }
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); salvarNota(); }
+                      return;
+                    }
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); return; }
                     // "/" com a mensagem vazia abre o painel de scripts (a via mais rápida do teclado)
                     if (e.key === '/' && draft === '' && scripts.length > 0 && !composerBloqueado) { e.preventDefault(); abrirScripts('barra'); }
                   }}
                 />
+                {notaAtiva ? (
+                  <div className="tools nota-tools">
+                    <span className="nota-dica"><IcNota />Só a equipe vê. O cliente não recebe.</span>
+                  </div>
+                ) : (
                 <div className="tools">
                   <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
                   <button type="button" className="tool" title="Enviar vídeo" disabled={midiaDisabled} onClick={() => setVideoModal(true)}><IcVideo /></button>
@@ -1628,13 +1971,29 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                       <IcRaio /><span>Scripts</span><span className="ct">{scripts.length}</span>
                     </button>
                   )}
+                  {sugerirLigado && iaDisp.data?.configurada && !notaAtiva && (
+                    <button type="button" className={'tool wa-sug-btn' + (sugerir.isPending ? ' girando' : '')} disabled={composerBloqueado || sugerir.isPending}
+                      aria-label={sugerir.isPending ? 'A IA está escrevendo a sugestão' : 'Sugerir resposta com IA'}
+                      title="Sugerir resposta: a IA escreve um rascunho lendo a conversa e os scripts da empresa. Nada é enviado sozinho: confira e envie."
+                      onClick={async () => {
+                        const antes = draft;
+                        try {
+                          const texto = await sugerir.mutateAsync({ conversaId: current.id });
+                          setDraft(texto); setSugestaoDe({ texto, antes });
+                          requestAnimationFrame(() => { const t = textareaRef.current; if (t) { t.focus(); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 220) + 'px'; } });
+                        } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'A IA não conseguiu sugerir agora. Tente de novo.' }); }
+                      }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.4 2.4M15.3 15.3l2.4 2.4M6.3 17.7l2.4-2.4M15.3 8.7l2.4-2.4" /></svg>
+                    </button>
+                  )}
                   <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>
                   <button type="button" className="tool" title="Compartilhar contato" disabled={midiaDisabled} onClick={() => setCtModal(true)}><IcContato /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
                 </div>
+                )}
                 {/* Responder por (dono 29/10): compacto, no vão ao lado do relógio. Mostra o número atual;
                     trocar abre a lista e pede confirmação (o cliente passa a receber de outro celular). */}
-                {(() => {
+                {!notaAtiva && (() => {
                   const sel = demo ? null : inbox.canalSel;
                   const nome = demo ? inbox.replyChip : inbox.realCanais.length === 0 ? 'Nenhum número conectado' : sel?.alias ?? 'Escolher número';
                   const cloud = sel?.transporte === 'cloud_api';
@@ -1651,7 +2010,16 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                     </button>
                   );
                 })()}
-                <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+                {notaAtiva ? (
+                  <button
+                    type="button" className={'env-b env-nota' + (draftNota.trim() ? ' pronto' : '')} title="Salvar a nota (Enter). Shift+Enter quebra a linha."
+                    aria-label="Salvar nota interna" disabled={!draftNota.trim() || criarNota.isPending} onClick={salvarNota}
+                  >
+                    {criarNota.isPending ? 'Salvando…' : 'Salvar nota'}
+                  </button>
+                ) : (
+                  <button type="button" className={'env-b' + (draft.trim() ? ' pronto' : '')} title="Enviar" aria-label="Enviar mensagem" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+                )}
               </div>
               )}
             </div>
@@ -1662,18 +2030,23 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
       {/* ===================== CONTEXTO =====================
           O reabrir "Dados" agora é um botão irmão na fileira de ações do cabeçalho
           (.wa-ctopo .dir, condicionado a !ctxAberto) — não flutua mais solto sobre o header. */}
-      {current.id && (
+      {temConversa && (
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">
+          {midiasAba && !noCofre(current.id) ? (
+            <MidiasPainel midias={midias} demo={demo} aba={midiasAba} aoTrocarAba={setMidiasAba} aoVoltar={() => setMidiasAba(null)}
+              aoAbrirFoto={abrirFotoDoPainel} aoIrParaMensagem={irParaMensagem} />
+          ) : (<>
           <div className="ctx-topo spot">
-            <div className="av2">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
+            <button type="button" className="ib2 wa-cel-volta ctx-volta" title="Voltar para a conversa" aria-label="Voltar para a conversa" onClick={() => setCelPainel('conversa')}><IcVoltar /></button>
+            <div className="av2">{initials(nomeExibicao(current))}<FotoCliente atualizar nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
             <div className="n2">{nomeExibicao(current)}</div>
             <div className="t2 num">
-              {current.phone ? mascararNumero(current.phone) : 'sem número'}
+              {current.phone ? numeroMascarado(current.phone) : 'sem número'}
               {current.phone && <button type="button" className="cp" title="Copiar telefone" onClick={copiarTelefone}><IcCopy /></button>}
             </div>
             <div className="bb">
-              <BotaoMini onClick={() => setCtxAberto(false)}>Recolher</BotaoMini>
+              <BotaoMini className="wa-dados-desk" onClick={() => setCtxAberto(false)}>Recolher</BotaoMini>
               {editMode
                 ? <BotaoPrimario mini disabled={salvandoEdicao} onClick={salvarEdicao}>{salvandoEdicao ? 'Salvando…' : 'Salvar'}</BotaoPrimario>
                 : <BotaoPrimario mini onClick={iniciarEdicao}>Editar</BotaoPrimario>}
@@ -1701,6 +2074,17 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           )}
 
+          {/* campos personalizados do cliente (26/11, migration 110): os de Configurações › Campos do cliente */}
+          {isRevizaMode && temRecurso('campos') && <CamposDoCliente key={current.contatoId ?? current.id} contatoId={current.contatoId ?? null} />}
+          {isRevizaMode && temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
+          {!noCofre(current.id) && (<>
+          <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
+            rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
+
+          {/* IA com a chave da própria empresa (25/11): só na Reviza, com o recurso 'ia-propria' */}
+          <ResumoAtendimento conversaId={current.id} msgs={current.msgs} demo={demo} />
+          </>)}
+
           <div className="ctx-b spot">
             <div className="ctx-t">Status</div>
             <button type="button" className="ctx-status" onClick={(e) => abrirPop('status', e)}>
@@ -1712,6 +2096,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} senhaIdentificada={senhasIdent[current.id]} />
 
           <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
+          {/* Financeiro do cliente (26/11, migration 112): o que comprou e o que está em cobrança, e o "Novo lançamento" */}
+          {isRevizaMode && temRecurso('financeiro') && <FinanceiroDoCliente key={'fin-' + (current.contatoId ?? current.id)} contatoId={current.contatoId ?? null} />}
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
@@ -1766,18 +2152,35 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             </div>
           </div>
 
-          {(atividadesQ.data ?? []).length > 0 && (
+          {/* Tarefas da equipe (25/11): as abertas deste cliente e o "Criar tarefa" ligado a esta conversa */}
+          {temRecurso('tarefas') && <TarefasDaConversa key={current.id} conversaId={current.id} contatoId={current.contatoId ?? null} clienteNome={nomeExibicao(current)} />}
+
+          {((atividadesQ.data ?? []).length > 0 || (notasLigadas && notasDaEquipe.length > 0)) && (
             <div className="ctx-b spot">
               <div className="ctx-t">Atividade do atendimento</div>
+              {/* notas internas da equipe nesta conversa (migration 99): quantas e um atalho para a última */}
+              {notasLigadas && notasDaEquipe.length > 0 && (
+                <div className="cx-l ativ-notas">
+                  <span className="k"><IcNota />Notas da equipe</span>
+                  <span className="v">
+                    <button type="button" className="lk cx-lk" title="Mostrar a última nota interna na conversa"
+                      onClick={() => { const ult = notasDaEquipe[notasDaEquipe.length - 1]; if (ult?.id) irParaMensagem(ult.id); }}>
+                      <span className="num">{notasDaEquipe.length}</span> · ver a última
+                    </button>
+                  </span>
+                </div>
+              )}
+              {(atividadesQ.data ?? []).length > 0 && (
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
-                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Central de Avisos' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Central de Avisos' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo === 'fechado' ? 'fechou a conversa' : a.tipo}
                     {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
                   </li>
                 ))}
               </ul>
+              )}
             </div>
           )}
 
@@ -1801,13 +2204,14 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
             <div className="cx-l"><span className="k"><IcWa /></span><span className="v">{current.origin}</span></div>
             <div className="cx-l"><span className="k">Última interação</span><span className="v num">{current.lastInter || current.time}</span></div>
           </div>
+          </>)}
          </div>
         </aside>
       )}
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro vidro-pro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro vidro-pro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' || pop.kind === 'lista' ? 'menu' : undefined}>
           {pop.kind === 'filtro' && (() => {
             const etqs = etiquetasQ.data ?? [];
             const termoEtq = buscaEtqFiltro.trim().toLowerCase();
@@ -1928,7 +2332,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
               {(current.unread ?? 0) > 0
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
-              {!posVenda && <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>}
+              {!posVenda && <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? (fixarMinhaLigado ? 'Desafixar para todos' : 'Desafixar conversa') : (fixarMinhaLigado ? 'Fixar para todos' : 'Fixar conversa no topo')}</button>}
+              {!posVenda && fixarMinhaLigado && !current.fixada && (
+                <button type="button" className="it" onClick={() => { setPop(null); alternarFixarMinha(current.id, !minhasFixadas.has(current.id)); }}>{minhasFixadas.has(current.id) ? 'Desafixar só para mim' : 'Fixar só para mim'}</button>
+              )}
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
               {current.id && (iaEstado?.existe || iaAtiva) && (
@@ -1936,12 +2343,36 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — desliga e você assume') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — reativa a IA' : 'Liga a IA nesta conversa')}
                   onClick={() => { setPop(null); void alternarIa(); }}>{iaAtiva ? 'Desligar a IA nesta conversa' : 'Ligar a IA nesta conversa'}</button>
               )}
+              {isRevizaMode && temRecurso('automacoes') && (
+                <button type="button" className="it" onClick={() => { setPop(null); setSeqAberta(true); }}>Aplicar uma sequência</button>
+              )}
+              {isRevizaMode && temRecurso('agenda') && (
+                <button type="button" className="it" onClick={() => { setPop(null); nav(`/agenda?nova=1&conversa=${encodeURIComponent(current.id)}&cliente=${encodeURIComponent(nomeExibicao(current))}`); }}>Agendar reunião</button>
+              )}
+              {!noCofre(current.id) && <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>}
+              <button type="button" className="it" onClick={() => { setPop(null); void copiarLink(); }}>Copiar link da conversa</button>
+              {!noCofre(current.id) && <button type="button" className="it" onClick={() => { setPop(null); exportarConversa(); }}>Exportar conversa</button>}
+              {cofre.ligado && !cofre.trancada(current.id) && (
+                <button type="button" className="it" onClick={() => { setPop(null); void cofre.trancar(current.id).then(() => aoAvisar({ tom: 'ok', texto: 'Conversa trancada no cofre. Para ler, só com a senha do cofre.' })).catch((x) => aoAvisar({ tom: 'erro', texto: (x as Error).message })); }}>Trancar no cofre</button>
+              )}
+              {cofre.ligado && cofre.trancada(current.id) && cofre.aberta(current.id) && (
+                <button type="button" className="it" onClick={() => { setPop(null); cofre.fechar(current.id); }}>Fechar o cofre desta conversa</button>
+              )}
               {iaBarSinal && (
                 <button type="button" className="it" disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar." onClick={() => { setPop(null); void recomecarIa(); }}>Recomeçar atendimento da IA</button>
               )}
               {statusFechada && current.status !== statusFechada.nome && (
                 <button type="button" className="it" onClick={() => { setPop(null); setFecharConfirm(true); }}>Fechar conversa</button>
               )}
+            </>
+          )}
+          {pop.kind === 'lista' && (
+            <>
+              <button type="button" className="it" onClick={() => { setPop(null); setSelecao(new Set()); }}>Selecionar conversas</button>
+              {isRevizaMode && temRecurso('resumo-dia') && currentOrg.role === 'admin' && (
+                <button type="button" className="it" onClick={() => { setPop(null); setDesempenhoAberto(true); }}>Desempenho do chat</button>
+              )}
+              <button type="button" className="it" onClick={() => { setPop(null); alternarPrivado(); }}>{privado ? 'Mostrar telefones e mensagens' : 'Ocultar telefones e mensagens'}</button>
             </>
           )}
           {pop.kind === 'resp' && (() => {
@@ -2037,7 +2468,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           aoFechar={() => setNovaConversa(false)}
           aoIniciar={async (canalId, tel, nome) => {
             const ok = await inbox.iniciarNovaConversa(canalId, tel, nome);
-            if (ok) { setNovaConversa(false); window.setTimeout(() => textareaRef.current?.focus(), 60); }
+            if (ok) { setNovaConversa(false); setCelPainel('conversa'); window.setTimeout(() => textareaRef.current?.focus(), 60); }
             return ok;
           }}
         />
@@ -2108,6 +2539,38 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         }}
         aoCancelar={() => setTrocaCanal(null)}
       />
+      {temRecurso('motivos-fechamento') ? (
+        <ModalV2 aberto={fecharConfirm} aoFechar={() => setFecharConfirm(false)} titulo="Fechar conversa" largura={460}
+          rodape={<>
+            <BotaoSec onClick={() => setFecharConfirm(false)}>Cancelar</BotaoSec>
+            <BotaoPrimario disabled={!textoDoMotivo(motivoFech, motivoFechDet) || registrarFechamento.isPending}
+              onClick={async () => {
+                const motivo = textoDoMotivo(motivoFech, motivoFechDet); if (!motivo) return;
+                setFecharConfirm(false);
+                if (statusFechada) await aplicarStatus(statusFechada.id);
+                try { await registrarFechamento.mutateAsync({ conversaId: current.id, motivo }); }
+                catch { aoAvisar({ tom: 'erro', texto: 'A conversa foi fechada, mas o motivo não foi guardado.' }); }
+                setMotivoFech(null); setMotivoFechDet('');
+              }}>Fechar conversa</BotaoPrimario>
+          </>}>
+          <div className="fch-corpo" data-fechar-motivo>
+            <p className="fch-sub">{statusFechada ? `A conversa fica como "${statusFechada.nome}". Dá para reabrir depois, mudando o status.` : 'A conversa sai da lista de abertas.'} Por que está fechando?</p>
+            <div className="fch-opcoes" role="radiogroup" aria-label="Motivo do fechamento">
+              {opcoesFech.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={motivoFech === m} className={motivoFech === m ? 'on' : undefined} onClick={() => setMotivoFech(m)}>
+                  <span className="bolinha" aria-hidden />{m}
+                </button>
+              ))}
+            </div>
+            <label className="fch-det">
+              <span>{motivoFech === 'Outro motivo' ? 'Qual é o motivo?' : 'Detalhe (opcional)'}</span>
+              <input className="inp" value={motivoFechDet} maxLength={240} placeholder={motivoFech === 'Outro motivo' ? 'Escreva o motivo' : 'Ex.: já fechou com outra empresa'}
+                onChange={(e) => setMotivoFechDet(e.target.value)} />
+            </label>
+            <p className="fch-nota">O motivo fica na atividade do atendimento, no painel do cliente.</p>
+          </div>
+        </ModalV2>
+      ) : (
       <ConfirmDialogV2
         aberto={fecharConfirm}
         titulo="Fechar conversa"
@@ -2116,6 +2579,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         aoConfirmar={() => { setFecharConfirm(false); if (statusFechada) aplicarStatus(statusFechada.id); }}
         aoCancelar={() => setFecharConfirm(false)}
       />
+      )}
       <ConfirmDialogV2
         aberto={devolverConfirm}
         titulo="Devolver para a fila"
@@ -2188,6 +2652,11 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           }}
         />
       )}
+      {seqAberta && current && (
+        <AplicarSequencia conversaId={current.id} cliente={nomeExibicao(current)} canalPadrao={inbox.replyCanalId || current.canalId || null}
+          canais={canaisAgendaveis.map((c) => ({ id: c.id, alias: c.alias, numero: c.numero, status: c.status, envioRestrito: c.envioRestrito }))}
+          aoFechar={() => setSeqAberta(false)} aoAvisar={aoAvisar} />
+      )}
       {agendarAberto && (
         <AgendarMensagemModalV2
           aberto modo={agEditId ? 'editar' : 'criar'} demo={demo}
@@ -2230,6 +2699,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
         enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
+      {videoAberto && <VideoAberto url={videoAberto.url} nome={videoAberto.nome} aoFechar={() => setVideoAberto(null)}
+        aoIrParaMensagem={videoAberto.mensagemId ? () => irParaMensagem(videoAberto.mensagemId!) : undefined} />}
       {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} mensagemId={lightbox.mensagemId} anexoPath={lightbox.anexoPath} contatoId={current?.contatoId ?? null} aoFechar={() => setLightbox(null)} />}
     </div>
   );
@@ -2247,7 +2718,8 @@ function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
   // assume — inclusive para mover/reabrir um cliente fechado. O chip fica só p/ conversa sem opp.
   if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).length > 0)) return null;
   const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
-  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>;
+  // selo neutro com o ponto na cor da etapa (crítica 12/11: a etapa pintava o chip inteiro de dourado)
+  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ ['--pt-cor']: cor } as React.CSSProperties) : undefined}><i className="pt" aria-hidden />{sit.texto}</span>;
 }
 
 /* ================================================================
@@ -2271,6 +2743,8 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const mover = useMoverOportunidade();
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
+  // o nome do botão de venda (Configurações › Botão de venda; padrão "Contrato fechado")
+  const nomeVenda = rotuloBotao(useConfigVenda().data);
   const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' | 'ganho' }>(null);
   const admSt = useAdmStatus().data;
   const admAtivo = admSt?.ativo ?? false;
@@ -2320,6 +2794,12 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
           {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
       </span>
+      {/* Reviza (26/11): o "Contrato fechado" que a equipe usava no sistema de antes — leva o card para a etapa de ganho */}
+      {isRevizaMode && (() => {
+        const ganho = colunas.find((c) => c.resultado === 'ganho');
+        if (!ganho || colAtual?.resultado === 'ganho' || colAtual?.resultado === 'perdido') return null;
+        return <BotaoMini className="wa-contrato" title={`${nomeVenda}: leva o card para ${ganho.nome}`} disabled={movBusy} onClick={() => aoTrocarColuna(ganho.id)}>{nomeVenda}</BotaoMini>;
+      })()}
       <ModalV2
         aberto={!!motivoModal}
         aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
@@ -2407,11 +2887,12 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar, s
             // própria coluna do Kanban (Documentos, Remarketing, Lead qualificado, etc.).
             const st = opp.status;
             const etapaNome = (opp.colunaNome || '').trim();
-            let fase: string, icon: string, titulo: string, sub: string;
-            if (st === 'ganho')          { fase = 'var(--verde)'; icon = '✓'; titulo = 'Cliente fechado'; sub = 'Ganho · negócio concluído'; }
-            else if (st === 'perdido')   { fase = 'var(--rubro)'; icon = '✕'; titulo = 'Cliente perdido'; sub = 'Oportunidade encerrada'; }
-            else if (st === 'cancelado') { fase = 'var(--txt-3)'; icon = '–'; titulo = 'Cancelado'; sub = 'Oportunidade cancelada'; }
-            else                         { fase = opp.colunaCor || '#6366f1'; icon = '●'; titulo = etapaNome || 'Em andamento'; sub = 'Etapa atual no funil'; }
+            // ícones de traço (crítica 12/11: nada de caractere de texto como ícone)
+            let fase: string, icon: React.ReactNode, titulo: string, sub: string;
+            if (st === 'ganho')          { fase = 'var(--verde)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>; titulo = 'Cliente fechado'; sub = 'Ganho · negócio concluído'; }
+            else if (st === 'perdido')   { fase = 'var(--rubro)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 7l10 10M17 7 7 17" /></svg>; titulo = 'Cliente perdido'; sub = 'Oportunidade encerrada'; }
+            else if (st === 'cancelado') { fase = 'var(--txt-3)'; icon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 12h10" /></svg>; titulo = 'Cancelado'; sub = 'Oportunidade cancelada'; }
+            else                         { fase = opp.colunaCor || '#6366f1'; icon = <i className="ctx-fase-pt" />; titulo = etapaNome || 'Em andamento'; sub = 'Etapa atual no funil'; }
             return (
               <div className="ctx-fase" style={{ ['--fase']: fase } as React.CSSProperties}>
                 <span className="ic" aria-hidden>{icon}</span>
@@ -2536,7 +3017,7 @@ function ChecklistDocsCtx({ contatoId, demo }: { contatoId: string | null; demo:
                   <input type="checkbox" checked={it.feito}
                     onChange={(e) => chk.toggle(it.slug, e.target.checked)} />
                   <span className="chk-lb">{it.rotulo}</span>
-                  {!it.obrigatorio && <span className="chk-opt">opcional</span>}
+                  {!it.obrigatorio && <span className="chk-opt">(opcional)</span>}
                 </label>
               ))}
             </div>
@@ -2623,21 +3104,22 @@ function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, 
       <div className="campo" style={{ marginBottom: 8 }}>
         <input className="inp" placeholder="Buscar atendente…" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
-      <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10 }}>
+      <div className="wa-transf-lista" role="listbox" aria-label="Atendentes">
         {filtrados.length === 0 && <div className="ctx-nota">Nenhum atendente encontrado.</div>}
         {filtrados.map((u) => (
           <button
-            key={u.id} type="button" disabled={u.id === atualId}
+            key={u.id} type="button" role="option" aria-selected={sel === u.id} disabled={u.id === atualId}
+            className={'wa-transf-item' + (sel === u.id ? ' on' : '')}
             style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(var(--tint),.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(var(--tint),.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
             onClick={() => setSel(u.id)}
           >
             {u.nome}{u.id === meuId ? ' (você)' : ''}{u.id === atualId ? ' · atual' : ''}
-            {u.papel && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--txt-3)' }}>{u.papel === 'gestor' ? 'Supervisor' : u.papel}</span>}
+            {u.papel && <small>{u.papel === 'gestor' ? 'Supervisor' : u.papel === 'admin' ? 'Administrador' : u.papel === 'atendente' ? 'Atendente' : u.papel}</small>}
           </button>
         ))}
       </div>
       <div className="campo">
-        <label>Motivo da transferência *</label>
+        <label>Motivo da transferência</label>
         <input className="inp" maxLength={280} placeholder="Ex.: atendimento presencial, especialista, ausência…" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       </div>
     </ModalV2>
@@ -2707,7 +3189,9 @@ function VincularModal({ telInicial, conversaId, canalId, demo, aoFechar, aoVinc
 /* Cartão PADRÃO do atendimento — é o único que a casa compartilha hoje. Mesmo nome/número
    que o bot do fluxo de crédito manda (bot-runner CARD_ATENDIMENTO_NOME / CARD_MURILLO):
    o cliente vê o MESMO contato, venha do bot ou do atendente. Mudar aqui e lá junto. */
-const CONTATO_PADRAO = { nome: 'CAF Atendimento', telefone: '555191035329' };
+/* REVIZA (11/11): sem cartão padrão — o do Atenvo era o "CAF Atendimento" (número da CAF) e não pode ir
+   para cliente da ALFA. Quando a ALFA tiver o número de atendimento, ele entra aqui ({ nome, telefone }). */
+const CONTATO_PADRAO: { nome: string; telefone: string } | null = null;
 
 /* ================================================================
    Compartilhar contato (vCard) — picker do composer. O cartão PADRÃO
@@ -2731,7 +3215,7 @@ function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
   const filtra = (l: { nome: string; telefone: string }[]) =>
     q ? l.filter((x) => x.nome.toLowerCase().includes(q) || (q.replace(/\D+/g, '') && x.telefone.includes(q.replace(/\D+/g, '')))) : l;
   // O padrão nunca é filtrado pela busca (é o atalho da casa) e some das outras listas p/ não duplicar.
-  const semPadrao = (l: { nome: string; telefone: string }[]) => l.filter((x) => x.telefone !== CONTATO_PADRAO.telefone);
+  const semPadrao = (l: { nome: string; telefone: string }[]) => (CONTATO_PADRAO ? l.filter((x) => x.telefone !== CONTATO_PADRAO.telefone) : l);
   const eq = filtra(semPadrao(equipe));
   const cv = filtra(semPadrao(conversas)).slice(0, 30);
   const telAvulsoDig = telAvulso.replace(/\D+/g, '');
@@ -2753,22 +3237,24 @@ function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
         {/* Botão principal = cartão PADRÃO enquanto ninguém digitar um contato avulso. Se o
             atendente começou a digitar, ele fica travado até o avulso estar completo — nunca
             envia o padrão "por engano" no lugar do que a pessoa estava escrevendo. */}
-        <BotaoPrimario mini disabled={busy || (avulsoTocado && !avulsoOk)}
-          onClick={() => (avulsoOk ? enviar(nomeAvulso.trim(), telAvulsoDig) : enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone))}>
-          {busy ? 'Enviando…' : avulsoOk ? 'Enviar contato' : `Enviar ${CONTATO_PADRAO.nome}`}
+        <BotaoPrimario mini disabled={busy || (avulsoTocado && !avulsoOk) || (!CONTATO_PADRAO && !avulsoOk)}
+          onClick={() => (avulsoOk ? enviar(nomeAvulso.trim(), telAvulsoDig) : CONTATO_PADRAO && enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone))}>
+          {busy ? 'Enviando…' : avulsoOk || !CONTATO_PADRAO ? 'Enviar contato' : `Enviar ${CONTATO_PADRAO.nome}`}
         </BotaoPrimario>
       </>}
     >
       <p className="p-modal-msg">O cliente recebe como cartão de contato nativo do WhatsApp, pronto para salvar.</p>
-      <div className="ctp-sec">Padrão do atendimento</div>
-      <div className="ctp-item ctp-padrao">
-        <span className="ct-av" aria-hidden>{initials(CONTATO_PADRAO.nome)}</span>
-        <span className="ct-inf">
-          <span className="ct-nm">{CONTATO_PADRAO.nome}</span>
-          <span className="ct-tel num">+{CONTATO_PADRAO.telefone}</span>
-        </span>
-        <BotaoMini disabled={busy} onClick={() => enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone)}>Enviar</BotaoMini>
-      </div>
+      {CONTATO_PADRAO && (<>
+        <div className="ctp-sec">Padrão do atendimento</div>
+        <div className="ctp-item ctp-padrao">
+          <span className="ct-av" aria-hidden>{initials(CONTATO_PADRAO.nome)}</span>
+          <span className="ct-inf">
+            <span className="ct-nm">{CONTATO_PADRAO.nome}</span>
+            <span className="ct-tel num">+{CONTATO_PADRAO.telefone}</span>
+          </span>
+          <BotaoMini disabled={busy} onClick={() => enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone)}>Enviar</BotaoMini>
+        </div>
+      </>)}
       <input className="inp" placeholder="Buscar por nome ou número…" value={busca} onChange={(e) => setBusca(e.target.value)} />
       <div className="ctp-lista">
         {eq.length > 0 && <div className="ctp-sec">Equipe</div>}

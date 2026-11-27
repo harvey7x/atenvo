@@ -3,6 +3,8 @@
 // .p-display (600, gradiente platina) — Ordem de Mudança de Design nº 1
 // aposentou a Newsreader; o destaque vem de peso e luz, não de outra fonte.
 import '@fontsource-variable/instrument-sans';
-// Mono SÓ para identificadores pequenos (telefone, CPF, horário) na camada
-// "Linear" — o arquivo da fonte só baixa quando [data-linear] a usa.
+// Mono SÓ para identificadores pequenos (telefone, hora, código) no estilo Linear
+// da Reviza (reviza-linear.css) — o arquivo da fonte só baixa quando a página a usa.
 import '@fontsource-variable/jetbrains-mono';
+// Inter: a fonte NEUTRA da Reviza (dono 21/11: "fontes profissionais, neutras") — reviza-fundacao.css
+import '@fontsource-variable/inter';

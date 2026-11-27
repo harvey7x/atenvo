@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { docDosMetadados } from './documentosIa';
 import { focusManager, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
@@ -215,6 +216,9 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       viaTelefone: m.origem === 'telefone',
       origemBot: m.origem === 'bot' || undefined,
       transcricao: (m.metadados as { transcricao?: string } | null)?.transcricao || undefined,
+      doc: docDosMetadados(m.metadados as Record<string, unknown> | null) ?? undefined,
+      minhaReacao: ((m.metadados as { minha_reacao?: string } | null)?.minha_reacao) || undefined,
+      reacaoCliente: ((m.metadados as { reacao_cliente?: string } | null)?.reacao_cliente) || undefined,
       status: m.status ?? undefined,
       erro: m.erro_envio ?? undefined,
       tipo: m.tipo,
@@ -236,7 +240,18 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       contato: (m.metadados?.contato?.nome && m.metadados?.contato?.telefone)
         ? { nome: String(m.metadados.contato.nome), telefone: String(m.metadados.contato.telefone) }
         : undefined,
+      // nota interna da equipe (migration 99: origem 'nota', com autor e marcados) ou automática do sistema
+      nota: m.tipo === 'nota_interna' ? notaDosMetadados(m) : undefined,
     } as WaMessage));
+}
+
+function notaDosMetadados(m: DbMsg): NonNullable<WaMessage['nota']> {
+  const meta = (m.metadados ?? {}) as { autor_nome?: unknown; mencoes_nomes?: unknown };
+  return {
+    autorNome: typeof meta.autor_nome === 'string' && meta.autor_nome.trim() ? meta.autor_nome.trim() : undefined,
+    mencoesNomes: Array.isArray(meta.mencoes_nomes) ? meta.mencoes_nomes.filter((x): x is string => typeof x === 'string') : [],
+    automatica: m.origem !== 'nota',
+  };
 }
 
 export function mapConversa(c: DbConv): WaContact {
@@ -635,7 +650,8 @@ export function useWaConversations() {
   // também na saída (select): o cache nunca remove um card — conversa transferida para outra
   // pessoa, ou carregada por outro usuário nesta mesma aba, não pode aparecer.
   const vis = useVisibilidade();
-  const soDoUsuario = vis.veTodos ? null : vis.uid ?? '';
+  // gerente de equipe: sem recorte aqui — o banco já entrega só o que é da equipe dele (migration 93)
+  const soDoUsuario = vis.veTodos || vis.veEquipe ? null : vis.uid ?? '';
   definirEscopoLista(orgId, soDoUsuario);
   const recortar = useCallback(
     (lista: WaContact[]) => (soDoUsuario === null ? lista : lista.filter((c) => !!soDoUsuario && c.respId === soDoUsuario)),
@@ -1017,6 +1033,11 @@ export function useSendWaMessage() {
   });
 }
 
+/** Reação (26/11): emoji numa mensagem da conversa; '' tira. O servidor manda pelo WhatsApp e grava na mensagem. */
+export async function waReagir(conversaId: string, mensagemId: string, emoji: string, canalId?: string | null): Promise<void> {
+  await invoke<{ ok: boolean }>('evolution-send', { action: 'reagir', conversa_id: conversaId, mensagem_id: mensagemId, emoji, ...(canalId ? { canal_id: canalId } : {}) });
+}
+
 /** Assumir / transferir / liberar o responsável do atendimento (via Edge Function segura). */
 export function useAtribuirAtendimento() {
   const { currentOrg } = useOrg();
@@ -1089,7 +1110,7 @@ export function useIniciarConversaWa() {
   // visibilidade (22/10): quem não vê todos não abre (nem move de número) a conversa de cliente
   // de outra pessoa; contato NOVO criado por ele já nasce dele (senão sumiria da própria lista)
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useMutation({
     mutationFn: async (input: { canalId: string; telefone: string; nome?: string }): Promise<{ conversaId: string; reused: boolean }> => {
       const org = currentOrg.id;
@@ -1661,7 +1682,7 @@ export function useAgendamentosOrg() {
   const { currentOrg } = useOrg();
   // visibilidade (22/10): quem não vê todos só vê os agendamentos dos clientes DELE
   const vis = useVisibilidade();
-  const soDe = vis.veTodos ? null : vis.uid;
+  const soDe = vis.veTodos || vis.veEquipe ? null : vis.uid; // gerente de equipe: o banco recorta (migration 93)
   return useQuery({
     queryKey: ['mensagens-agendadas-org', currentOrg.id, soDe ?? 'todos'],
     enabled: WA_REAL && (vis.veTodos || !!soDe),

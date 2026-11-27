@@ -1,0 +1,427 @@
+// REVIZA (23/11): cópia da função do Atenvo que está no ar, adaptada ao Reviza por
+// ~/reviza-sist/porte-atendimento/porta-funcoes.py — conexões "revizaatd_", tabela atd_integracoes, pasta atd-midia.
+// evolution-manage — ações do conector de WhatsApp por QR Code.
+// action: create | qr | status | disconnect | remove | reconnect | ocultar
+// 'ocultar' remove o canal da LISTA (status 'removido') SEM apagar histórico; funciona em canal já desconectado.
+// v10: 'remove' é EXCLUSÃO DEFINITIVA — apaga a instância na Evolution e EXCLUI o registro local
+//      (integracoes + canais). Conversas/mensagens/oportunidades são preservadas via FKs ON DELETE SET NULL.
+import { corsHeaders, json } from './cors.ts';
+import { adminClient, getUser, requireOrgAdmin } from './client.ts';
+import { evolution, evolutionConfigured, extractQr } from './evolution.ts';
+
+const QR_TTL = 60; // segundos para o contador de expiração na interface
+
+function normalizeNumber(jid?: string | null): string | null {
+  if (!jid) return null;
+  return jid.replace(/@.*/, '').replace(/[^0-9]/g, '') || null;
+}
+
+// LGPD: mascara número/JID preservando prefixo + últimos 4 (mesmo padrão do evolution-webhook).
+function maskJid(v: unknown): string | null {
+  if (typeof v !== 'string' || !v) return null;
+  const at = v.indexOf('@');
+  const num = at >= 0 ? v.slice(0, at) : v;
+  const dom = at >= 0 ? v.slice(at) : '';
+  const d = num.replace(/\D/g, '');
+  const masked = d.length >= 8 ? `${d.slice(0, 4)}****${d.slice(-4)}` : (d ? '****' : num);
+  return masked + dom;
+}
+
+// Comparação constante-time (mesmo padrão do evolution-webhook) para o gate por secret.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  try {
+    if (!evolutionConfigured()) return json({ error: 'Evolution não configurada (defina EVOLUTION_API_URL e EVOLUTION_API_KEY).' }, 503);
+
+    const admin = adminClient();
+    const body = await req.json().catch(() => ({}));
+    const action: string = body.action;
+
+    // C2 (ops): refresh_webhook — re-empurra o setWebhook nas instâncias CONECTADAS, no lugar,
+    // SEM reconectar/QR e sem derrubar a sessão. Gated pelo webhook secret (x-webhook-secret),
+    // não por JWT: é ação de operação/rotação. Só reescreve config de webhook na Evolution (nenhum dado).
+    if (action === 'refresh_webhook') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      const url2 = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/evolution-webhook`;
+      const { data: conectados } = await admin.from('canais')
+        .select('nome_interno, instancia_externa')
+        .eq('provider', 'evolution').eq('status_integracao', 'conectado').not('instancia_externa', 'is', null);
+      const refreshed: unknown[] = [];
+      for (const c of conectados ?? []) {
+        const inst = c.instancia_externa as string;
+        try {
+          await evolution.setWebhook(inst, url2, exp);
+          // Lê de volta a config na Evolution p/ PROVAR (sem vazar o secret): URL sem ?secret e header presente.
+          const cfg = await evolution.getWebhook(inst).catch(() => null) as Record<string, unknown> | null;
+          const w = (cfg?.webhook ?? cfg ?? {}) as Record<string, unknown>;
+          const storedUrl = String(w.url ?? '');
+          const hdrs = (w.headers ?? {}) as Record<string, unknown>;
+          refreshed.push({
+            canal: c.nome_interno, ok: true,
+            url_sem_secret: storedUrl.length > 0 && !/[?&]secret=/.test(storedUrl),
+            header_x_webhook_secret_armazenado: Object.keys(hdrs).some((k) => k.toLowerCase() === 'x-webhook-secret'),
+          });
+        } catch (e) { refreshed.push({ canal: c.nome_interno, ok: false, erro: (e as Error).message }); }
+      }
+      return json({ ok: true, refreshed });
+    }
+
+    // C2 (ops): rotate_webhook_secret — rotaciona o segredo do webhook ATOMICAMENTE no servidor.
+    // Autentica com o secret ATUAL (antigo). Gera um novo (crypto), grava em webhook_config, re-empurra
+    // por header nas instâncias conectadas, lê de volta e auto-testa. O secret NOVO nunca sai do servidor
+    // (retorna só mascarado + status). Sem reconectar/QR, sem query string, sem migration.
+    if (action === 'rotate_webhook_secret') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const cur = wc0?.secret ?? '';
+      if (!cur || !safeEqual(req.headers.get('x-webhook-secret') ?? '', cur)) return json({ error: 'unauthorized' }, 401);
+      const novo = 'whk_' + crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      const { error: upErr } = await admin.from('webhook_config').update({ secret: novo }).eq('chave', 'whatsapp');
+      if (upErr) return json({ error: 'falha_update', detalhe: upErr.message }, 500);
+      const url2 = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/evolution-webhook`;
+      const { data: conectados } = await admin.from('canais')
+        .select('nome_interno, instancia_externa')
+        .eq('provider', 'evolution').eq('status_integracao', 'conectado').not('instancia_externa', 'is', null);
+      const refreshed: unknown[] = [];
+      for (const c of conectados ?? []) {
+        const inst = c.instancia_externa as string;
+        try {
+          await evolution.setWebhook(inst, url2, novo);
+          const cfg = await evolution.getWebhook(inst).catch(() => null) as Record<string, unknown> | null;
+          const w = (cfg?.webhook ?? cfg ?? {}) as Record<string, unknown>;
+          const storedUrl = String(w.url ?? '');
+          const hdrs = (w.headers ?? {}) as Record<string, unknown>;
+          refreshed.push({ canal: c.nome_interno, ok: true,
+            url_sem_secret: storedUrl.length > 0 && !/[?&]secret=/.test(storedUrl),
+            header_x_webhook_secret_armazenado: Object.keys(hdrs).some((k) => k.toLowerCase() === 'x-webhook-secret') });
+        } catch (e) { refreshed.push({ canal: c.nome_interno, ok: false, erro: (e as Error).message }); }
+      }
+      // Auto-teste server-side (não expõe o secret): novo->200, antigo->401, sem secret->401.
+      const st = (h: string | null) => fetch(url2, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(h ? { 'x-webhook-secret': h } : {}) }, body: '{}' }).then((r) => r.status).catch(() => 0);
+      const selftest = { header_novo: await st(novo), header_antigo: await st(cur), sem_secret: await st(null) };
+      return json({ ok: true, rotacionado: true, novo_mascarado: novo.slice(0, 4) + '…' + novo.slice(-3), tamanho: novo.length, refreshed, selftest });
+    }
+
+    // OPS (READ-ONLY): list_instances — lista instâncias na Evolution e correlaciona com os canais do Atenvo.
+    // Gated por x-webhook-secret. NÃO faz logout/delete. ownerJid mascarado (LGPD). Só diagnóstico.
+    if (action === 'list_instances') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      let raw: unknown;
+      try { raw = await evolution.fetchAllInstances(); }
+      catch (e) { return json({ error: 'evolution_falhou', detalhe: (e as Error).message }, 502); }
+      // Reviza: o servidor de conexão é compartilhado — só as conexões do Atendimento do Reviza aparecem aqui
+      const arr = (Array.isArray(raw) ? raw : []).filter((o) => String((o as Record<string, unknown>)?.name ?? (o as Record<string, unknown>)?.instanceName ?? '').startsWith('revizaatd_'));
+      const { data: canais } = await admin.from('canais')
+        .select('id, nome_interno, instancia_externa, status_integracao, numero_conectado').eq('provider', 'evolution');
+      const byInst = new Map((canais ?? []).filter((c) => c.instancia_externa).map((c) => [c.instancia_externa as string, c]));
+      const itens = arr.map((i) => {
+        const o = (((i as Record<string, unknown>).instance ?? i) ?? {}) as Record<string, unknown>;
+        const name = ((o.name ?? o.instanceName) as string) ?? null;
+        const status = ((o.connectionStatus ?? o.status ?? o.state) as string) ?? null;
+        const owner = ((o.ownerJid ?? o.owner) as string) ?? null;
+        const digits = (owner ?? '').replace(/\D/g, '');
+        const canal = name ? byInst.get(name) : undefined;
+        const canalRemovido = canal ? canal.status_integracao === 'removido' : null;
+        const orfa = !canal || canalRemovido === true;
+        const numCanal = ((canal?.numero_conectado as string) ?? '').replace(/\D/g, '');
+        const rel1390 = digits.endsWith('1390') || numCanal.endsWith('1390');
+        return {
+          instanceName: name, connectionStatus: status, ownerJid: maskJid(owner),
+          numero_final: digits ? digits.slice(-4) : null,
+          canal_atenvo: canal ? `${canal.nome_interno} (${canal.status_integracao})` : null,
+          canal_removido: canalRemovido, orfa, relacionada_1390: rel1390,
+          recomenda_limpeza: orfa && rel1390,
+          risco: !orfa ? 'NAO LIMPAR: canal nao-removido aponta p/ ela'
+               : (rel1390 ? 'baixo: orfa do 1390' : 'NAO MEXER: orfa fora do escopo 1390'),
+        };
+      });
+      return json({ ok: true, total_evolution: arr.length, itens });
+    }
+
+    // OPS: delete_orphan_instance — logout+delete de UMA instância ÓRFÃ na Evolution.
+    // TRAVA: recusa se qualquer canal NÃO-removido apontar para ela (protege ANDRIUS/URA/ativos).
+    // Não apaga nada no Atenvo (canais/conversas/mensagens/contatos intactos). Gated por x-webhook-secret.
+    if (action === 'delete_orphan_instance') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      const alvo = (body.instance ?? '').toString().trim();
+      if (!alvo) return json({ error: 'instance é obrigatório.' }, 400);
+      const { data: dono } = await admin.from('canais')
+        .select('id, nome_interno, organizacao_id, status_integracao').eq('instancia_externa', alvo).maybeSingle();
+      if (dono && dono.status_integracao !== 'removido') {
+        return json({ error: 'instancia_em_uso', canal: dono.nome_interno, status: dono.status_integracao }, 409);
+      }
+      const passos: Record<string, string> = {};
+      try { await evolution.logout(alvo); passos.logout = 'ok'; } catch (e) { passos.logout = `falhou: ${(e as Error).message}`; }
+      try { await evolution.remove(alvo); passos.delete = 'ok'; } catch (e) { passos.delete = `falhou: ${(e as Error).message}`; }
+      // auditoria (best-effort): resolve a org pelo canal cujo id origina o instanceName
+      const hex = alvo.replace(/^revizaatd_/, '').split('_')[0];
+      const canalId = hex.length === 32
+        ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` : null;
+      const { data: origem } = canalId
+        ? await admin.from('canais').select('organizacao_id, nome_interno').eq('id', canalId).maybeSingle()
+        : { data: null };
+      const org = (dono?.organizacao_id ?? origem?.organizacao_id) as string | undefined;
+      if (org) {
+        await admin.from('audit_log').insert({
+          organizacao_id: org, usuario_id: null, acao: 'evolution_instancia_orfa_removida', entidade: 'canais',
+          entidade_id: canalId, dados_depois: { instance: alvo, passos, canal_origem: origem?.nome_interno ?? null },
+        });
+      }
+      return json({ ok: true, instance: alvo, passos, auditado: !!org });
+    }
+
+    // OPS: run_delivery_test — dispara AGORA o mesmo teste técnico de entrega dos canais conectados
+    // (mesmo destino/texto/registro do teste automático em connection.update=open). Útil quando o canal
+    // já conectou antes do deploy, ou p/ re-testar sem reconectar/QR. Gated por x-webhook-secret.
+    // Travas idênticas: só whatsapp conectado, sem conflito, com instância, nunca self-send.
+    // NÃO cria lead/conversa (texto casa com o filtro health_check) e NÃO altera envio_restrito.
+    if (action === 'run_delivery_test') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      // Reviza: o teste de entrega do Atenvo manda para um número do CAF — desligado aqui
+      return json({ error: 'teste de entrega desligado no Reviza' }, 400);
+      const DEST = '5551998872825';
+      const TXT = 'Teste de entrega Atenvo: canal conectado com sucesso.';
+      const { data: alvos } = await admin.from('canais')
+        .select('id, nome_interno, organizacao_id, instancia_externa, numero_conectado, conflito_com')
+        .eq('provider', 'evolution').eq('tipo', 'whatsapp').eq('status_integracao', 'conectado')
+        .not('instancia_externa', 'is', null);
+      const resultados: unknown[] = [];
+      for (const c of alvos ?? []) {
+        if (c.conflito_com) { resultados.push({ canal: c.nome_interno, pulado: 'canal_em_conflito' }); continue; }
+        if (((c.numero_conectado as string) ?? '').replace(/\D/g, '') === DEST) {
+          resultados.push({ canal: c.nome_interno, pulado: 'self_send' }); continue;
+        }
+        const t0 = Date.now();
+        let ok = false, msgId: string | null = null, erro: string | null = null;
+        try {
+          const r = await evolution.sendText(c.instancia_externa as string, DEST, TXT);
+          msgId = r?.key?.id ?? null; ok = !!msgId; if (!ok) erro = 'resposta sem key.id';
+        } catch (e) { erro = (e as Error).message; }
+        await admin.from('canal_health_runs').insert({
+          organizacao_id: c.organizacao_id, canal_id: c.id, executado_em: new Date().toISOString(),
+          tipo: 'entrega_conexao', sucesso: false,                    // só vira true no ACK REAL
+          status_resultado: ok ? 'aguardando_ack' : 'erro', erro, erro_tipo: ok ? null : 'infra',
+          message_id: msgId, instancia_externa: c.instancia_externa, target_phone: DEST,
+          latencia_ms: Date.now() - t0, dados: { aguardando_ack: ok, origem: 'manual:run_delivery_test' },
+        });
+        resultados.push({ canal: c.nome_interno, enviado_aceito: ok, message_id: msgId, erro });
+      }
+      return json({ ok: true, destino: DEST, resultados });
+    }
+
+    const user = await getUser(req);
+    if (!user) return json({ error: 'Não autenticado.' }, 401);
+    const orgId: string = body.organizacao_id;
+    if (!orgId) return json({ error: 'organizacao_id é obrigatório.' }, 400);
+    const guard = await requireOrgAdmin(admin, user.id, orgId);
+    if (!guard.ok) return json({ error: guard.reason }, 403);
+
+    const supaUrl = Deno.env.get('SUPABASE_URL')!;
+    // Segredo SEMPRE da tabela webhook_config (fonte única de verdade). NUNCA do env: evita URL/segredo defasado.
+    const { data: wc } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+    const secret = wc?.secret ?? '';
+    // C2: o segredo vai no HEADER x-webhook-secret (setWebhook/createInstance), NUNCA na URL.
+    const webhookUrl = `${supaUrl}/functions/v1/evolution-webhook`;
+
+    // -------- CREATE: valida assinatura + vaga, cria canal (reserva vaga) e instância --------
+    if (action === 'create') {
+      const alias: string = (body.alias ?? '').toString().trim();
+      const fonteSlug: string = (body.fonte ?? 'outra').toString().trim();
+      if (!alias) return json({ error: 'Informe o alias do canal.' }, 400);
+
+      const { data: org } = await admin.from('organizacoes').select('assinatura_status').eq('id', orgId).single();
+      if (!org || !['ativa', 'isenta'].includes(org.assinatura_status)) {
+        return json({ error: 'Assinatura inativa. Assine o plano antes de conectar um WhatsApp.' }, 402);
+      }
+      const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
+      const { count: usados } = await admin.from('canais')
+        .select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('ativo', true);
+      if ((usados ?? 0) >= (lim?.limite_whatsapps ?? 0)) {
+        return json({ error: 'Limite de WhatsApp atingido. Contrate um WhatsApp adicional.' }, 409);
+      }
+
+      let fonteId: string | null = null;
+      const { data: f } = await admin.from('fontes_aquisicao').select('id').eq('organizacao_id', orgId).eq('slug', fonteSlug).maybeSingle();
+      if (f) fonteId = f.id;
+      else {
+        const { data: nf } = await admin.from('fontes_aquisicao')
+          .insert({ organizacao_id: orgId, nome: alias, slug: fonteSlug }).select('id').maybeSingle();
+        fonteId = nf?.id ?? null;
+      }
+
+      const { data: canal, error: ec } = await admin.from('canais').insert({
+        tipo: 'whatsapp', nome_interno: alias, organizacao_id: orgId,
+        fonte_aquisicao_id: fonteId, provider: 'evolution', status_integracao: 'sincronizando', ativo: true,
+      }).select('id').single();
+      if (ec) return json({ error: ec.message }, 409);
+
+      const instanceName = `revizaatd_${(canal.id as string).replace(/-/g, '')}`;
+      await admin.from('canais').update({ instancia_externa: instanceName }).eq('id', canal.id);
+      await admin.from('atd_integracoes').insert({
+        provedor: 'evolution', canal_id: canal.id, organizacao_id: orgId,
+        status: 'sincronizando', config: { instance: instanceName },
+      });
+
+      try {
+        const created = await evolution.createInstance(instanceName, webhookUrl, secret);
+        // garante o webhook ATUAL (URL/segredo da tabela), independente de variações do create inline
+        try { await evolution.setWebhook(instanceName, webhookUrl, secret); } catch { /* tolerante */ }
+        let qr = extractQr(created);
+        if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
+        return json({ canal_id: canal.id, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
+      } catch (e) {
+        await admin.from('atd_integracoes').delete().eq('canal_id', canal.id);
+        await admin.from('canais').delete().eq('id', canal.id);
+        return json({ error: `Falha ao criar instância: ${(e as Error).message}` }, 502);
+      }
+    }
+
+    const canalId: string = body.canal_id;
+    if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
+    const { data: canal } = await admin.from('canais')
+      .select('id, instancia_externa, organizacao_id, ativo, status_integracao').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
+    if (!canal) return json({ error: 'Canal não encontrado.' }, 404);
+    // Canal APOSENTADO/removido não pode reconectar nem gerar QR (evita ressuscitar sessão zumbi do mesmo número).
+    if (canal.status_integracao === 'removido' && (action === 'reconnect' || action === 'qr'))
+      return json({ error: 'Este canal foi removido/aposentado. Crie um novo WhatsApp em vez de reconectá-lo.', code: 'canal_removido' }, 409);
+
+    // RECONNECT: reusa o MESMO canal histórico (preserva nome/origem/gestor/relatórios) e cria uma
+    // NOVA instância Evolution. Usado quando o canal está desconectado (sem sessão).
+    if (action === 'reconnect') {
+      const { data: org } = await admin.from('organizacoes').select('assinatura_status').eq('id', orgId).single();
+      if (!org || !['ativa', 'isenta'].includes(org.assinatura_status)) {
+        return json({ error: 'Assinatura inativa. Assine o plano antes de reconectar.' }, 402);
+      }
+      // Reconectar REUSA o mesmo canal histórico (mesmo canal_id) — NÃO cria canal novo. Só CONSOME vaga
+      // quando o canal estava DESATIVADO (ativo=false); um canal já ativo (ex.: desconectado, mas com a vaga
+      // mantida) NÃO consome outra vaga. O trigger trg_limite_canais (exclui o próprio id) é o backstop.
+      if (canal.ativo === false) {
+        const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
+        const { count: usados } = await admin.from('canais')
+          .select('id', { count: 'exact', head: true })
+          .eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('ativo', true);
+        if ((usados ?? 0) >= (lim?.limite_whatsapps ?? 0)) {
+          return json({ error: 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' }, 409);
+        }
+      }
+      const instanceName = `revizaatd_${canalId.replace(/-/g, '')}_${Date.now().toString(36)}`;
+      const { error: upErr } = await admin.from('canais').update({ instancia_externa: instanceName, status_integracao: 'sincronizando', ativo: true }).eq('id', canalId);
+      if (upErr) return json({ error: /limite/i.test(upErr.message) ? 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' : 'Não foi possível reconectar o canal.' }, 409);
+      await admin.from('atd_integracoes').insert({ provedor: 'evolution', canal_id: canalId, organizacao_id: orgId, status: 'sincronizando', config: { instance: instanceName } });
+      try {
+        const created = await evolution.createInstance(instanceName, webhookUrl, secret);
+        try { await evolution.setWebhook(instanceName, webhookUrl, secret); } catch { /* tolerante */ }
+        let qr = extractQr(created);
+        if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
+        return json({ canal_id: canalId, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
+      } catch (e) {
+        await admin.from('atd_integracoes').delete().eq('canal_id', canalId);
+        await admin.from('canais').update({ status_integracao: 'desconectado', ativo: false, instancia_externa: null }).eq('id', canalId);
+        return json({ error: `Falha ao criar instância: ${(e as Error).message}` }, 502);
+      }
+    }
+
+    // OCULTAR: remove o canal da LISTA de conexões sem apagar nada. Marca status 'removido'
+    // (a listagem já filtra status <> 'removido'). Encerra a sessão se ainda houver instância.
+    // PRESERVA canal, conversas, mensagens, contatos, oportunidades, cobranças, origem e relatórios.
+    // Funciona mesmo com o canal já desconectado (sem instância) — por isso vem ANTES do guard abaixo.
+    // "Rodar teste agora" (painel de Integrações): dispara o teste de entrega deste canal, ignorando
+    // slot/pausa (é ato humano). JWT + admin/supervisor já validados acima; delega ao wa-health-check
+    // (fonte única da regra) com o secret lido do banco — nunca exposto ao front.
+    if (action === 'testar_entrega') {
+      if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
+      const { data: hc } = await admin.from('webhook_config').select('secret').eq('chave', 'health_check').maybeSingle();
+      if (!hc?.secret) return json({ error: 'health_check_secret_ausente' }, 503);
+      const r = await fetch(`${Deno.env.get('SUPABASE_URL')!}/functions/v1/wa-health-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-health-secret': hc.secret as string },
+        body: JSON.stringify({ tipo: 'entrega_automatica', canal_id: canalId }),
+      });
+      const body2 = await r.json().catch(() => null);
+      return json({ ok: r.ok, ...(body2 ?? {}) }, r.ok ? 200 : 502);
+    }
+
+    if (action === 'ocultar') {
+      const inst = canal.instancia_externa as string | null;
+      if (inst) {
+        try { await evolution.logout(inst); } catch { /* sessão já pode estar encerrada */ }
+        try { await evolution.remove(inst); } catch { /* instância pode já não existir */ }
+      }
+      await admin.from('atd_integracoes').delete().eq('canal_id', canalId); // registro técnico descartável
+      await admin.from('canais').update({
+        status_integracao: 'removido', ativo: false, instancia_externa: null,
+      }).eq('id', canalId);
+      return json({ ok: true });
+    }
+
+    const instance = canal.instancia_externa as string;
+    if (!instance) return json({ error: 'Canal sem sessão ativa. Use Reconectar.' }, 409);
+
+    if (action === 'qr') {
+      // Toda RECONEXÃO re-aplica o webhook ATUAL (URL/segredo nunca defasados) antes de gerar o QR.
+      try { await evolution.setWebhook(instance, webhookUrl, secret); } catch { /* tolerante */ }
+      const qr = extractQr(await evolution.connect(instance));
+      return json({ qr_base64: qr, expires_in: QR_TTL });
+    }
+
+    if (action === 'status') {
+      const st = await evolution.connectionState(instance);
+      const state = st?.instance?.state ?? 'close';
+      if (state === 'open') {
+        let numero: string | null = null;
+        try {
+          const inst = await evolution.fetchInstance(instance) as unknown;
+          const arr = Array.isArray(inst) ? inst : (inst as { instance?: unknown })?.instance ? [inst] : [];
+          const owner = (arr[0] as Record<string, unknown>)?.ownerJid ?? (arr[0] as Record<string, unknown>)?.owner;
+          numero = normalizeNumber(owner as string | undefined);
+        } catch { /* tolerante */ }
+        await admin.from('canais').update({
+          status_integracao: 'conectado', ativo: true,
+          numero_conectado: numero, conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString(),
+        }).eq('id', canalId);
+        await admin.from('atd_integracoes').update({ status: 'conectado', ultima_sincronizacao: new Date().toISOString() }).eq('canal_id', canalId);
+        return json({ state, connected: true, numero });
+      }
+      return json({ state, connected: false });
+    }
+
+    if (action === 'disconnect') {
+      try { await evolution.logout(instance); } catch { /* já pode estar desconectado */ }
+      await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canalId);
+      await admin.from('atd_integracoes').update({ status: 'desconectado' }).eq('canal_id', canalId);
+      return json({ ok: true });
+    }
+
+    if (action === 'remove') {
+      // DESCONEXÃO (não é mais exclusão): encerra a sessão/instância na Evolution e DESATIVA o canal,
+      // PRESERVANDO todo o histórico — canal, conversas, mensagens, contatos, oportunidades, cobranças,
+      // origem, métricas/relatórios, snapshots e a configuração comercial do chip. NÃO faz DELETE em canais.
+      try { await evolution.logout(instance); } catch { /* já pode estar desconectada */ }
+      try { await evolution.remove(instance); } catch { /* instância pode já não existir */ }
+      await admin.from('atd_integracoes').delete().eq('canal_id', canalId); // registro técnico descartável
+      await admin.from('canais').update({
+        status_integracao: 'desconectado', ativo: false, instancia_externa: null,
+      }).eq('id', canalId);
+      return json({ ok: true });
+    }
+
+    return json({ error: 'Ação inválida.' }, 400);
+  } catch (e) {
+    return json({ error: (e as Error).message ?? 'Erro inesperado.' }, 500);
+  }
+});

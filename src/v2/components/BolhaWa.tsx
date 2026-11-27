@@ -5,6 +5,8 @@ import type { WaMessage } from '@/data/whatsappDemo';
 import { traduzErroEnvio } from '@/data/scripts';
 import { initials } from '@/lib/avatar';
 import { ackOf, fmtTam, mmss, ONDA } from '../lib/waUi';
+import { TranscreverAudio, transcricaoGuardada } from './IaPropria';
+import { NotaInterna } from './NotaInterna';
 
 /* ------------------------------------------------------------------
    Bolha de mensagem do inbox (extraída de src/v2/pages/WhatsApp.tsx,
@@ -20,6 +22,26 @@ export const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h1
 const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
+const IcEncaminhar = () => <Ic><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0-5 5v6" /></Ic>;
+const IcRosto = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" /><path d="M9 9.5h.01M15 9.5h.01" /></Ic>;
+/** os 6 de sempre (os mesmos do WhatsApp) */
+export const EMOJIS_REACAO = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+function BotaoReagir({ m, aoReagir }: { m: WaMessage; aoReagir: (m: WaMessage, emoji: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <span className={'reagir' + (aberto ? ' on' : '')} onMouseLeave={() => setAberto(false)}>
+      <button type="button" className="resp-btn reag-btn" title="Reagir" aria-label="Reagir com emoji" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}><IcRosto /></button>
+      {aberto && (
+        <span className="reag-pop" role="menu" aria-label="Escolher a reação">
+          {EMOJIS_REACAO.map((e) => (
+            <button key={e} type="button" role="menuitem" className={m.minhaReacao === e ? 'on' : undefined} aria-label={'Reagir com ' + e}
+              onClick={() => { setAberto(false); aoReagir(m, m.minhaReacao === e ? '' : e); }}>{e}</button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
 const IcChave = () => <Ic><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9-9" /><path d="m17 6 3 3" /><path d="m15 8 2 2" /></Ic>;
 const IcArroba = () => <Ic><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
@@ -40,14 +62,21 @@ export const IcBot = () => (
    selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
    imagem/vídeo/documento, quoted, ticks, falha, responder.
    ================================================================ */
-export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar }: {
+export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar, aoEncaminhar, aoReagir }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
+  /** encaminhar para outra conversa (26/11) */
+  aoEncaminhar?: (m: WaMessage) => void;
+  /** reagir com emoji (26/11); '' tira a reação */
+  aoReagir?: (m: WaMessage, emoji: string) => void;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string, mensagemId?: string, anexoPath?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
   /** "Identificar senha / e-mail" (dono 29/10) — só no inbox; o mobile não passa. `selecionado` = trecho marcado no balão */
   aoIdentificar?: (m: WaMessage, campo: 'senha' | 'email', selecionado: string) => void;
 }) {
   const raizRef = useRef<HTMLDivElement>(null);
+  // "Transcrever" (IA com a chave da própria empresa): o texto aparece na hora; no servidor ele fica gravado na mensagem
+  const [transcLocal, setTranscLocal] = useState<string | null>(() => (m.tipo === 'audio' ? transcricaoGuardada(m, demo) : null));
+  const transcricao = m.transcricao || transcLocal;
   const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
   // bolha otimista carrega a mídia LOCAL (objectURL) — renderiza na hora, sem URL assinada
@@ -62,6 +91,8 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.anexoPath, precisaUrl]);
+  // NOTA INTERNA da equipe (migration 99): cartão próprio no meio do fio, nunca uma bolha do lado do cliente/nosso
+  if (m.tipo === 'nota_interna') return <NotaInterna m={m} />;
   // mídia do fluxo do robô não tem anexo no bucket privado: toca direto da URL pública (antes caía em "indisponível")
   const url = m.localUrl ?? urlAssinada ?? (m.anexoPath ? null : m.midiaUrl ?? null);
   // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
@@ -98,13 +129,17 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   );
 
   return (
-    <div ref={raizRef} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
+    <div ref={raizRef} data-mid={m.id} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
       )}
+      {m.id && aoReagir && !m.nota && !falhou && <BotaoReagir m={m} aoReagir={aoReagir} />}
+      {m.id && aoEncaminhar && !m.nota && ((m.text || '').trim() || m.anexoPath) && (
+        <button type="button" className="resp-btn enc-btn" title="Encaminhar" aria-label="Encaminhar para outra conversa" onClick={() => aoEncaminhar(m)}><IcEncaminhar /></button>
+      )}
       {/* Identificar senha do INSS / e-mail na mensagem do CLIENTE (texto ou transcrição). mousedown sem
           default: o trecho marcado com o mouse continua selecionado e vira a sugestão. */}
-      {aoIdentificar && m.dir === 'in' && !!(m.text || m.transcricao) && (
+      {aoIdentificar && m.dir === 'in' && !!(m.text || transcricao) && (
         <span className="ident-btns">
           {(['senha', 'email'] as const).map((campo) => (
             <button
@@ -157,7 +192,10 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
           ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
           : m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} localUrl={m.localUrl ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
+          : <>
+              <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} localUrl={m.localUrl ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
+              {!transcricao && <TranscreverAudio m={m} demo={demo} aoTranscrever={setTranscLocal} />}
+            </>
       )}
       {m.tipo === 'documento' && (
         <div className="doc2">
@@ -188,13 +226,19 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
         </div>
       )}
       {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && !m.contato && <WaTexto texto={m.text} />}
-      {m.transcricao && <div className="transc">“{m.transcricao}”</div>}
+      {transcricao && <div className="transc">“{transcricao}”</div>}
       {falhaActs}
       <div className="hh num">
         {m.viaTelefone && <span className="fone-tag" title="Enviada pelo celular"><IcTel />Enviada pelo celular</span>}
         {m.time}
         {ack && <span className={'tick ' + ack.cls} title={ack.cls === 'falhou' ? traduzErroEnvio(m.erro ?? '') : ack.title}>{ack.s}</span>}
       </div>
+      {(m.minhaReacao || m.reacaoCliente) && (
+        <span className="reacoes" aria-label="Reações">
+          {m.reacaoCliente && <span className="r" title="Reação do cliente">{m.reacaoCliente}</span>}
+          {m.minhaReacao && <span className="r nossa" title="Reação da equipe">{m.minhaReacao}</span>}
+        </span>
+      )}
     </div>
   );
 }

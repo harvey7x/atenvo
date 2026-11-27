@@ -262,7 +262,8 @@ export default function PosVendaV2() {
                       </div>
                     </div>
                     <div className="pv-fone-chat">
-                      {msgsSel.slice(-4).map((m, i) => (
+                      {/* o "celular" mostra o que o cliente viu: nota interna e aviso do sistema ficam de fora */}
+                      {msgsSel.filter((m) => m.tipo !== 'nota_interna' && m.tipo !== 'sistema').slice(-4).map((m, i) => (
                         <div key={i} className={'pv-bolha' + (m.dir === 'out' ? ' out' : '')}>
                           <span className="tx">{m.text || (m.tipo === 'audio' ? 'Mensagem de áudio' : m.tipo === 'imagem' ? 'Imagem' : m.tipo === 'documento' ? `Documento — ${m.nome ?? ''}` : m.tipo === 'video' ? 'Vídeo' : '—')}</span>
                           {m.time && <span className="hr num">{m.time}</span>}

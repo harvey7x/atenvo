@@ -1,13 +1,20 @@
+import { ResumoDiaAba } from './dashboardV5/ResumoDiaAba';
+import { FinanceiroAba } from './dashboardV5/FinanceiroAba';
+import { CrmAba } from './dashboardV5/CrmAba';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
+import { DASH_V5_MAX_DIAS, DASH_V5_REAL, MSG_ABA_NAO_LIGADA, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { useDashAtendentesAba, useDashCampanhas, useDashIris } from '@/data/dashboardV5.abas';
+import { useDashAnuncios } from '@/data/anuncios';
+import { useDashAoVivo } from '@/data/aoVivo';
+import { temRecurso } from '../data/config/recursos';
 import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
 import { CardVidro, EstadoErro, Segmentado } from '../components';
 import { Cabecalho, rotuloPeriodoV5 } from './dashboardV5/Cabecalho';
-import { Kpis, KpisSkeleton } from './dashboardV5/Kpis';
+import { KpisSkeleton } from './dashboardV5/Kpis';
+import { KpisCartoes } from './dashboardV5/KpisCartoes';
 import { PorNumero, PorNumeroSkeleton } from './dashboardV5/PorNumero';
 import { Motivos, MotivosSkeleton } from './dashboardV5/Motivos';
 import { Mapa, MapaSkeleton } from './dashboardV5/Mapa';
@@ -17,6 +24,9 @@ import { Campanhas, CampanhasSkeleton } from './dashboardV5/Campanhas';
 import { AtendentesAba, AtendentesAbaSkeleton } from './dashboardV5/AtendentesAba';
 import { IrisAba, IrisAbaSkeleton } from './dashboardV5/IrisAba';
 import { Vigia } from './dashboardV5/Vigia';
+import { AnunciosAba, AnunciosAbaSkeleton } from './dashboardV5/AnunciosAba';
+import { AoVivoAba, AoVivoAbaSkeleton } from './dashboardV5/AoVivoAba';
+import { TempoResposta } from './dashboardV5/TempoResposta';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
@@ -24,19 +34,27 @@ import './dashboardV5/dashboardV5.css';
    Visão geral (os seis itens de 21/10, como sempre) · Campanhas (melhor do
    dia/semana/mês, ondas, retornos, parente) · Atendentes (os dois relógios,
    campanha × atendente, carteira) · Iris (funil, documentos, tempo e o VIGIA,
-   que muda de casa para cá). O período é GLOBAL, acima da linha de abas.
+   que muda de casa para cá). 27/11: entram as abas do Reviza (Ao vivo, Anúncios,
+   Resumo do dia, Financeiro e CRM). O período é GLOBAL, acima da linha de abas.
    Uma RPC por aba + período; cada aba só busca quando aberta. Demo é o
    contrato: em `vite --mode demo` os mesmos hooks devolvem as fixtures.
    ------------------------------------------------------------------ */
 
 const ABAS = [
   { valor: 'geral', rotulo: 'Visão geral' },
+  { valor: 'aovivo', rotulo: 'Ao vivo' }, // 25/11: as conversas abertas AGORA, uma coluna por atendente, equipe ou etiqueta (só com o recurso 'ao-vivo')
   { valor: 'campanhas', rotulo: 'Campanhas' },
+  { valor: 'anuncios', rotulo: 'Anúncios' }, // 25/11: os anúncios do Facebook — investido, custo por lead, qual campanha roda melhor (só com o recurso 'anuncios')
   { valor: 'atendentes', rotulo: 'Atendentes' },
   { valor: 'iris', rotulo: 'Iris' },
+  { valor: 'resumo', rotulo: 'Resumo do dia' }, // 25/11: o dia da equipe numa tela só + o aviso no sino (só com o recurso 'resumo-dia')
+  { valor: 'financeiro', rotulo: 'Financeiro' }, // 26/11: receita, cobranças, por responsável e por produto (só com o recurso 'financeiro')
+  { valor: 'crm', rotulo: 'CRM' }, // 26/11: estados, funil por etapa, etiquetas, próximas reuniões e tarefas (só com o recurso 'crm-extra')
 ] as const;
 type AbaDash = typeof ABAS[number]['valor'];
-const ehAba = (v: string | null): v is AbaDash => ABAS.some((a) => a.valor === v);
+/** as abas desta instalação: Anúncios e Ao vivo só com o recurso ligado (a parte do servidor existe) */
+const abasVisiveis = () => ABAS.filter((a) => (a.valor !== 'anuncios' || temRecurso('anuncios')) && (a.valor !== 'aovivo' || temRecurso('ao-vivo')) && (a.valor !== 'resumo' || temRecurso('resumo-dia')) && (a.valor !== 'financeiro' || temRecurso('financeiro')) && (a.valor !== 'crm' || temRecurso('crm-extra')));
+const ehAba = (v: string | null): v is AbaDash => abasVisiveis().some((a) => a.valor === v);
 
 /** teto do personalizado em diferença de datas (fim − início): 44 = 45 dias, o teto da RPC */
 const MAX_DIF = DASH_V5_MAX_DIAS - 1;
@@ -60,7 +78,7 @@ function useHojeSP(): string {
    chamada só ao banco, então a barra é de espera (sem porcentagem inventada). */
 function CarregandoDash() {
   return (
-    <div className="d5-carr" role="status" aria-live="polite">
+    <div className="d5-carr" role="status" aria-live="polite" data-carregando-proprio>
       <div className="d5-carr-caixa">
         <span className="d5-carr-ic" aria-hidden><i /><i /><i /><i /></span>
         <strong>Carregando o Dashboard</strong>
@@ -74,6 +92,8 @@ function CarregandoDash() {
 /** Erro da aba quando não há nem dado velho; com dado velho, só o aviso em cima. */
 function ErroAba({ q }: { q: { isError: boolean; error: unknown; refetch: () => unknown; data: unknown } }) {
   if (!q.isError) return null;
+  // a rotina não existe neste servidor: é um aviso calmo, não um erro para tentar de novo
+  if ((q.error as Error)?.message === MSG_ABA_NAO_LIGADA) return <p className="d5-aviso" role="status">{MSG_ABA_NAO_LIGADA}</p>;
   if (q.data) {
     return (
       <p className="d5-aviso" role="status">
@@ -121,11 +141,13 @@ export default function DashboardV2() {
   const qCamp = useDashCampanhas(periodo, aba === 'campanhas');
   const qAt = useDashAtendentesAba(periodo, aba === 'atendentes');
   const qIris = useDashIris(periodo, aba === 'iris');
+  const qAn = useDashAnuncios(periodo, aba === 'anuncios');
+  const qAo = useDashAoVivo(aba === 'aovivo');
   const d = q.data;
   const carregando = !d;
 
   // esmaecer na troca de período: o da aba aberta
-  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : aba === 'atendentes' ? qAt : qIris;
+  const qAtivo = aba === 'geral' ? q : aba === 'campanhas' ? qCamp : aba === 'anuncios' ? qAn : aba === 'aovivo' ? qAo : aba === 'iris' ? qIris : qAt;
   const trocando = qAtivo.isPlaceholderData && qAtivo.isFetching;
 
   // o trecho do anterior que a busca comparou: sai do MESMO instante com que o hook cortou
@@ -146,7 +168,8 @@ export default function DashboardV2() {
     <div className="d5-pg" aria-busy={trocando || undefined}>
       <Cabecalho
         preset={preset} setPreset={setPreset} periodo={periodo}
-        rotulo={rotuloPeriodoV5(preset, periodo, hoje)}
+        rotulo={aba === 'aovivo' ? 'Agora, ao vivo: atualiza sozinho a cada 30 segundos' : aba === 'resumo' ? 'Um dia só: escolha o dia logo abaixo' : aba === 'financeiro' ? 'O período e o responsável ficam logo abaixo' : rotuloPeriodoV5(preset, periodo, hoje)}
+        semPeriodo={aba === 'aovivo' || aba === 'resumo' || aba === 'financeiro'}
         ini={ini} fim={fim} setIni={setIni} setFim={setFim} hoje={hoje}
         mesCaf={mesCaf} setMesCaf={setMesCaf}
         geradoEm={(qAtivo.data as { geradoEm?: string } | undefined)?.geradoEm ?? d?.geradoEm ?? null}
@@ -157,7 +180,7 @@ export default function DashboardV2() {
 
       <nav className="d5-abas" aria-label="Seções do dashboard">
         <Segmentado<AbaDash>
-          opcoes={ABAS.map((a) => ({ valor: a.valor, rotulo: a.rotulo }))}
+          opcoes={abasVisiveis().map((a) => ({ valor: a.valor, rotulo: a.rotulo }))}
           valor={aba} aoMudar={setAba} rotulo="Seção do dashboard" />
       </nav>
 
@@ -178,7 +201,9 @@ export default function DashboardV2() {
               </p>
             )}
 
-            {carregando ? <KpisSkeleton /> : <Kpis k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} />}
+            {/* os 4 números do topo como cards de métrica com gráfico (dono 14/11), no período do topo;
+                os de antes (Kpis) ficam só para o esqueleto da primeira carga */}
+            {carregando ? <KpisSkeleton /> : <KpisCartoes k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} periodo={periodo} hoje={hoje} rotuloPeriodo={rotuloPeriodoV5(preset, periodo, hoje)} />}
 
             <div className="d5-linha2">
               {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}
@@ -205,8 +230,32 @@ export default function DashboardV2() {
         </>
       )}
 
+      {aba === 'aovivo' && (
+        <>
+          <ErroAba q={qAo} />
+          {qAo.data
+            ? <AoVivoAba d={qAo.data} />
+            : !qAo.isError && <AoVivoAbaSkeleton />}
+        </>
+      )}
+
+      {aba === 'resumo' && <ResumoDiaAba hoje={hoje} />}
+      {aba === 'financeiro' && <FinanceiroAba />}
+      {aba === 'crm' && <CrmAba />}
+
+      {aba === 'anuncios' && (
+        <>
+          <ErroAba q={qAn} />
+          {qAn.data
+            ? <AnunciosAba d={qAn.data} periodo={periodo} hoje={hoje} comparacao={comparacao} />
+            : !qAn.isError && <AnunciosAbaSkeleton />}
+        </>
+      )}
+
       {aba === 'atendentes' && (
         <>
+          {/* 25/11: tempo de resposta da equipe com meta — consulta própria, aparece mesmo se o resto da aba não estiver ligado */}
+          {temRecurso('tempo-resposta') && <TempoResposta periodo={periodo} hoje={hoje} comparacao={comparacao} />}
           <ErroAba q={qAt} />
           {qAt.data
             ? <AtendentesAba d={qAt.data} periodo={periodo} hoje={hoje} />

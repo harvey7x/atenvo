@@ -1,7 +1,10 @@
 import { Suspense, type ReactNode } from 'react';
 // lazy com auto-recarga: chunk que sumiu após deploy novo força 1 reload (recargaChunk.ts)
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
-import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, useParams, type RouteObject } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, Outlet, useParams, type RouteObject } from 'react-router-dom';
+import { isRevizaMode } from '@/lib/supabase';
+import { DESTINO_PADRAO_V2 } from '@/v2/destino';
+import { temRecurso, type Recurso } from '@/v2/data/config/recursos';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 // Guardas do v1 ficam estáticas: são minúsculas e só usam os contextos que já estão no entry.
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -16,6 +19,7 @@ import '@/components/MediaComposer.css';
 import '@/components/AudioRecorder.css';
 import '@/components/FichaJudicialModal.css';
 import '@/components/RelacionamentoContatoBox.css';
+import { Cobrancas } from '@/pages/Cobrancas';
 // Páginas e shell do v1 SOB DEMANDA (perf 20/10): antes eram import estático e arrastavam o v1
 // inteiro (JS ~845 kB + ~340 kB de CSS de página) para o bundle de entrada de TODA rota. Agora
 // o v1 é UM chunk (src/pages/rotasV1.ts) que só baixa ao abrir /v1/*; o import() é cacheado,
@@ -43,8 +47,10 @@ const PlanoUso = lazy(() => v1().then((m) => ({ default: m.PlanoUso })));
 const Maturacao = lazy(() => v1().then((m) => ({ default: m.Maturacao })));
 
 // ===== Redesign Platina (design-ref/CONTRATO.md): AGORA as rotas OFICIAIS. Tudo sob demanda. =====
+const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
 const LoginV2 = lazy(() => import('@/v2/pages/Login'));
+const ProgressMetricCardDemo = lazy(() => import('@/components/progress-metric-card-demo'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
@@ -56,6 +62,7 @@ const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
+const ConfigAmbienteV2 = lazy(() => import('@/v2/pages/config/ConfigAmbiente'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
@@ -63,8 +70,14 @@ const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const FilaIrisV2 = lazy(() => import('@/v2/pages/FilaIris'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
+const ChatEquipeV2 = lazy(() => import('@/v2/pages/ChatEquipe'));
+const NovidadesV2 = lazy(() => import('@/v2/pages/Novidades'));
+const TarefasV2 = lazy(() => import('@/v2/pages/Tarefas'));
+const AgendaV2 = lazy(() => import('@/v2/pages/Agenda'));
+const AutomacoesV2 = lazy(() => import('@/v2/pages/Automacoes'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
+const FormularioPublico = lazy(() => import('@/v2/pages/publico/FormularioPublico'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
@@ -84,8 +97,16 @@ const CoexistenciaV2 = lazy(() => import('@/v2/pages/Coexistencia'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
 
+// Instância Reviza: só existe /cobrancas/* — qualquer rota de Atendimento (v1, mobile) redireciona.
+function RevizaGate({ children }: { children: ReactNode }) {
+  return isRevizaMode ? <Navigate to="/cobrancas/painel" replace /> : <>{children}</>;
+}
 function Lz({ children }: { children: ReactNode }) {
   return <Suspense fallback={null}>{children}</Suspense>;
+}
+// tela que depende de uma peça do servidor (config/recursos.ts): sem ela nesta instalação, volta ao WhatsApp
+function ComRecurso({ r, children }: { r: Recurso; children: ReactNode }) {
+  return temRecurso(r) ? <>{children}</> : <Navigate to="/whatsapp" replace />;
 }
 
 // Compat: bookmarks do preview antigo (/v2/<x>) caem na rota oficial equivalente (/<x>).
@@ -97,7 +118,13 @@ function RedirDeV2() {
 const routes: RouteObject[] = [
   // ============ ROTAS OFICIAIS = Platina (o corte) ============
   { path: '/login', element: <Lz><LoginV2 /></Lz> },
+  // demonstração do card de métrica (dono 14/11), página inteira e só fora da produção (dev e prévia)
+  ...(import.meta.env.DEV || import.meta.env.VITE_PREVIA === 'true'
+    ? [{ path: '/progress-metric-card', element: <Lz><ProgressMetricCardDemo /></Lz> }]
+    : []),
   { path: '/redefinir-senha', element: <Lz><RedefinirSenhaV2 /></Lz> },
+  // formulário de captação (26/11): a página que o CLIENTE abre, sem login (Automações › Formulários)
+  { path: '/f/:slug', element: <Lz><FormularioPublico /></Lz> },
   { path: '/definir-senha', element: <Lz><DefinirSenhaV2 /></Lz> },
   {
     element: <Lz><RequireAuthV2 /></Lz>,
@@ -108,7 +135,7 @@ const routes: RouteObject[] = [
       // montado (realtime + otimista sobrevivem à navegação lista ↔ conversa).
       {
         path: 'm',
-        element: <Lz><MobileShell /></Lz>,
+        element: <RevizaGate><Lz><MobileShell /></Lz></RevizaGate>,
         children: [
           { index: true, element: <Lz><ListaConversasMobile /></Lz> },
           { path: ':conversaId', element: <Lz><ConversaMobile /></Lz> },
@@ -120,7 +147,8 @@ const routes: RouteObject[] = [
         element: <Lz><GateMobileApp><AppShellV2 /></GateMobileApp></Lz>,
         children: [
           // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
-          { index: true, element: <Navigate to="/whatsapp" replace /> },
+          // Reviza: entra pela Cobrança (o coração dela); quem é só do Atendimento o shell leva ao WhatsApp.
+          { index: true, element: <Navigate to={isRevizaMode ? DESTINO_PADRAO_V2 : '/whatsapp'} replace /> },
           // Visibilidade (22/10, pedido do dono): só o admin vê a carteira de todos — as telas de
           // GESTÃO (visão da equipe inteira) ficam só para ele: Dashboard, Relatórios, Recuperação,
           // Disparo e Cobranças. As de trabalho (inbox, Kanban, Contatos…) mostram só os clientes de cada um.
@@ -140,6 +168,16 @@ const routes: RouteObject[] = [
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
           // Presenciais (dono 29/10): calendário dos atendimentos presenciais + aviso no grupo
           { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
+          // Chat da equipe (dono 25/11): conversa entre colegas; sem o recurso 'chat-equipe' a tela volta ao WhatsApp
+          { path: 'chat-equipe', element: <Lz><ChatEquipeV2 /></Lz> },
+          // O que mudou (25/11): as novidades do sistema, cada uma com o botão que leva até ela
+          { path: 'novidades', element: <Lz><NovidadesV2 /></Lz> },
+          // Tarefas da equipe (25/11): lista e quadro, prazo, prioridade, responsável e subtarefas (recurso 'tarefas')
+          { path: 'tarefas', element: <ComRecurso r="tarefas"><Lz><TarefasV2 /></Lz></ComRecurso> },
+          // Agenda (26/11, igual ao sistema que a Reviza usava antes): dia, semana, mês e lista (recurso 'agenda')
+          { path: 'agenda', element: <ComRecurso r="agenda"><Lz><AgendaV2 /></Lz></ComRecurso> },
+          // Atendimento › Automações (26/11): Sequências e Automação por palavras
+          { path: 'automacoes/:secao?', element: <ComRecurso r="automacoes"><Lz><AutomacoesV2 /></Lz></ComRecurso> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'fila-iris', element: <Lz><FilaIrisV2 /></Lz> },
@@ -152,8 +190,8 @@ const routes: RouteObject[] = [
           { path: 'simulador', element: <Lz><SimuladorV2 /></Lz> },
           // Cobranças saiu do sistema (dono 22/10) — links antigos caem no inbox (o Dashboard
           // é só do admin desde a visibilidade de 22/10; o inbox todo mundo vê)
-          { path: 'cobrancas', element: <Navigate to="/whatsapp" replace /> },
-          { path: 'cobrancas/:secao', element: <Navigate to="/whatsapp" replace /> },
+          { path: 'cobrancas', element: <Navigate to="/cobrancas/painel" replace /> },
+          { path: 'cobrancas/:secao', element: <Lz><CobrancasV2 /></Lz> },
           { path: 'ferramentas', element: <Navigate to="/ferramentas/unificador" replace /> },
           { path: 'ferramentas/:tool', element: <Lz><FerramentasV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RequireRoleV2 role="admin"><RelatoriosV2 /></RequireRoleV2></Lz> },
@@ -170,6 +208,10 @@ const routes: RouteObject[] = [
           { path: 'ia', element: <Lz><RequireRoleV2 role="admin"><IaV2 /></RequireRoleV2></Lz> },
           { path: 'fluxos', element: <Lz><RequireRoleV2 role="admin"><FluxosV2 /></RequireRoleV2></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
+          // AMBIENTE CONFIGURAÇÕES da Reviza (22/11): /config/<seção> — WhatsApp, Usuários e acessos, Registros, Minha conta
+          { path: 'config', element: <Lz><ConfigAmbienteV2 /></Lz> },
+          { path: 'config/:secao', element: <Lz><ConfigAmbienteV2 /></Lz> },
+          { path: 'config/:secao/:servico', element: <Lz><ConfigAmbienteV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
           // Coexistência (Embedded Signup da Meta): rota escondida, sem link no menu.
           { path: 'coexistencia', element: <Lz><RequireRoleV2 role="admin"><CoexistenciaV2 /></RequireRoleV2></Lz> },
@@ -181,6 +223,7 @@ const routes: RouteObject[] = [
   // ============ v1 preservado em /v1/* (fallback técnico, sem link; nada deletado) ============
   {
     path: '/v1',
+    element: <RevizaGate><Outlet /></RevizaGate>,
     children: [
       { path: 'login', element: <Lz><Login /></Lz> },
       { path: 'redefinir-senha', element: <Lz><RedefinirSenha /></Lz> },
@@ -200,7 +243,7 @@ const routes: RouteObject[] = [
               { path: 'agendamentos', handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true }, element: <Lz><AgendamentosMensagens /></Lz> },
               { path: 'relacionamento', handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true }, element: <Lz><Relacionamento /></Lz> },
               { path: 'scripts', handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true }, element: <Lz><Scripts /></Lz> },
-              { path: 'cobrancas', element: <Navigate to="/whatsapp" replace /> },
+              { path: 'cobrancas', handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true }, element: <Cobrancas /> },
               { path: 'integracoes', handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true }, element: <Lz><Integracoes /></Lz> },
               { path: 'relatorios', handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true }, element: <Lz><Relatorios /></Lz> },
               { path: 'configuracoes', handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true }, element: <Lz><Configuracoes /></Lz> },

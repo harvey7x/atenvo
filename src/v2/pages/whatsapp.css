@@ -388,7 +388,7 @@
 .v2 .doc2 { display: flex; align-items: center; gap: 9px; min-width: 200px; }
 .v2 .doc2 .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(var(--tint), .08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .v2 .doc2 .ic svg { width: 15px; height: 15px; color: var(--txt-2); }
-.v2 .doc2 .inf { min-width: 0; flex: 1; }
+.v2 .doc2 .inf { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; } /* nome em cima, tipo·tamanho embaixo (eram spans colados: "x.pdfPDF · 305 KB") */
 .v2 .doc2 .nm { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .doc2 .mt { font-size: 10px; color: var(--txt-3); }
 .v2 .doc2 .acts { display: flex; gap: 8px; margin-top: 3px; }
@@ -1028,3 +1028,26 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
   border-color: rgba(var(--verde-rgb), .35); background: rgba(var(--verde-rgb), .08); letter-spacing: .05em; }
 .v2 .conv2 .cchip.iris svg { width: 9px; height: 9px; flex-shrink: 0; }
 .v2 .conv2 .cchip.iris .pulso { width: 5px; height: 5px; border-radius: 99px; background: var(--verde); flex-shrink: 0; animation: wa-iris-pulso 1.8s ease-in-out infinite; }
+/* Fechar conversa com MOTIVO (25/11) */
+.fch-corpo { display: flex; flex-direction: column; gap: 12px; }
+.fch-sub { margin: 0; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
+.fch-opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fch-opcoes button { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--linha); background: none;
+  font: 13px var(--fonte); color: var(--txt); cursor: pointer; text-align: left; }
+.fch-opcoes button:hover { background: rgba(var(--tint), .05); }
+.fch-opcoes button.on { border-color: var(--accent); }
+.fch-opcoes .bolinha { width: 14px; height: 14px; flex: 0 0 auto; border-radius: 50%; border: 1.5px solid var(--txt-3); }
+.fch-opcoes button.on .bolinha { border: 4px solid var(--accent); }
+.fch-opcoes button:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+.fch-det { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--txt-2); }
+.fch-nota { margin: 0; font-size: 11.5px; color: var(--txt-3); }
+@media (max-width: 520px) { .fch-opcoes { grid-template-columns: 1fr; } }
+
+/* Sugerir resposta (25/11): o botão ao lado de Scripts e o aviso de rascunho da IA */
+.v2 .wa-sug-btn svg { width: 16px; height: 16px; }
+.v2 .wa-sug-btn.girando svg { animation: sug-gira 1.2s linear infinite; }
+@keyframes sug-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .v2 .wa-sug-btn.girando svg { animation: none; opacity: .5; } }
+.v2 .sug-aviso { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 6px 10px; border-radius: 8px;
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); font-size: 12px; color: var(--txt-2); }
+.v2 .sug-aviso .lnk { margin-left: auto; border: 0; background: none; padding: 0; font: 12px var(--fonte); color: var(--txt); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }

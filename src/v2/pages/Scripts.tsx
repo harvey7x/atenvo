@@ -11,6 +11,7 @@ import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
   DrawerV2, EstadoErro, EstadoVazio, Input, LinhaToggle, ModalV2, Segmentado, Skeleton,
 } from '../components';
+import { rotuloVariavel } from './scriptsPaleta/variaveis';
 import './scripts.css';
 
 /* ------------------------------------------------------------------
@@ -45,9 +46,27 @@ const Estrela = ({ cheia }: { cheia: boolean }) => cheia
 
 /** Realce tipográfico das {{variáveis}} — o v1 mostra o texto cru na lista,
     então aqui só destacamos, sem substituir (substituição fica no preview). */
+/* crítica 12/11: fora do modo de edição a variável aparece com o NOME HUMANO, na fonte do sistema e em
+   neutro ("primeiro nome do cliente"); o {{token}} fica no title. O texto da mensagem não muda. */
+const ROTULO_VAR_SCRIPT: Record<string, string> = {
+  nome_cliente: 'nome do cliente', primeiro_nome_cliente: 'primeiro nome do cliente', nome_atendente: 'nome do atendente',
+  email_atendente: 'e-mail do atendente', nome_empresa: 'nome da empresa', telefone: 'telefone', data_atual: 'data de hoje',
+};
+const nomeHumanoVar = (token: string) => {
+  const nome = token.replace(/^\{\{\s*|\s*\}\}$/g, '').toLowerCase();
+  return ROTULO_VAR_SCRIPT[nome] ?? rotuloVariavel(nome);
+};
 function DestacaVars({ texto }: { texto: string }) {
-  return <>{texto.split(/(\{\{[^}]+\}\})/g).map((p, i) => /^\{\{[^}]+\}\}$/.test(p) ? <em className="var-hl" key={i}>{p}</em> : p)}</>;
+  return <>{texto.split(/(\{\{[^}]+\}\})/g).map((p, i) => /^\{\{[^}]+\}\}$/.test(p) ? <em className="var-hl var-nome" key={i} title={p}>{nomeHumanoVar(p)}</em> : p)}</>;
 }
+const IcLixoScr = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M4 7h16M9.5 7V4.8h5V7M18.5 7l-.8 12.2a1.6 1.6 0 0 1-1.6 1.5H7.9a1.6 1.6 0 0 1-1.6-1.5L5.5 7M10 11v6M14 11v6" />
+  </svg>
+);
+const IcFecharScr = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>
+);
 function variaveisDe(textos: string[]): string[] {
   const achadas = new Set<string>();
   for (const t of textos) for (const m of t.matchAll(/\{\{[^}]+\}\}/g)) achadas.add(m[0]);
@@ -137,8 +156,7 @@ export default function ScriptsV2() {
     return true;
   }), [scripts, cat, favOnly, canalFiltro, busca]);
 
-  // galeria: favoritos no topo (atalho) + seções por categoria, "Sem categoria" ao final
-  const favoritos = useMemo(() => lista.filter((s) => s.favorito), [lista]);
+  // galeria: seções por categoria, "Sem categoria" ao final (favorito = filtro + estrela no cartão)
   const secoes = useMemo(() => {
     const ordem: { id: string | null; nome: string }[] = [
       ...cats.map((c) => ({ id: c.id as string | null, nome: c.nome })),
@@ -434,11 +452,7 @@ export default function ScriptsV2() {
     <>
       <div className="ph sobe">
         <div>
-          <h2>Scripts</h2>
-          <p>
-            Biblioteca de mensagens e sequências — os scripts ativos viram respostas rápidas no atendimento.
-            {demo ? ' · modo demonstração (nada é gravado)' : ''}
-          </p>
+          <h2 title="Biblioteca de mensagens e sequências: os scripts ativos viram respostas rápidas no atendimento.">Scripts</h2>
         </div>
         <div className="acoes">
           <BotaoSec onClick={() => setCatsModal(true)}>Gerenciar categorias</BotaoSec>
@@ -520,16 +534,8 @@ export default function ScriptsV2() {
             </CardVidro>
           ) : (
             <div className="sobe" style={{ animationDelay: '.12s' }}>
-              {!favOnly && favoritos.length > 0 && (
-                <div className="ars-secao">
-                  <div className="ars-secao-cab">
-                    <span className="scr-estrela" aria-hidden><Estrela cheia /></span>
-                    <span className="caps">Favoritos</span>
-                    <span className="qtd num">{favoritos.length}</span>
-                  </div>
-                  <div className="ars-fav-strip">{favoritos.map((s) => cartao(s, true))}</div>
-                </div>
-              )}
+              {/* crítica 12/11: a faixa "Favoritos" repetia cartões das categorias logo abaixo — favorito agora
+                  é só o filtro ("Favoritos") e a estrela do cartão, como na paleta do WhatsApp */}
               {secoes.map((sec) => (
                 <div key={sec.id ?? 'sem'} className="ars-secao">
                   <div className="ars-secao-cab">
@@ -539,7 +545,7 @@ export default function ScriptsV2() {
                   <div className="ars-grade">{sec.itens.map((s) => cartao(s))}</div>
                 </div>
               ))}
-              <p style={{ fontSize: 10.5, color: 'var(--txt-3)' }}>
+              <p style={{ fontSize: 12, color: 'var(--txt-3)' }}>
                 {lista.length} {lista.length === 1 ? 'script' : 'scripts'}
               </p>
             </div>
@@ -551,16 +557,20 @@ export default function ScriptsV2() {
       {det && (
         <DrawerV2 aberto aoFechar={() => setDetId(null)}>
           <div className="cab">
-            {catName(det.categoriaId) || 'Script'} › {det.titulo || 'Sem título'}
-            <button type="button" className="fechar-p" aria-label="Fechar" onClick={() => setDetId(null)}>×</button>
+            <span className="scr-det-tit">{catName(det.categoriaId) || 'Script'} › {det.titulo || 'Sem título'}</span>
+            <button type="button" className={det.favorito ? 'scr-fav on' : 'scr-fav'} aria-pressed={det.favorito}
+              aria-label={det.favorito ? 'Remover dos favoritos' : 'Favoritar'} title={det.favorito ? 'Remover dos favoritos' : 'Favoritar'}
+              onClick={() => acoes.favoritar(det).catch(() => setAviso({ tom: 'erro', texto: 'Não foi possível atualizar o favorito.' }))}>
+              <Estrela cheia={det.favorito} />
+            </button>
+            <button type="button" className="fechar-p" aria-label="Fechar" title="Fechar" onClick={() => setDetId(null)}><IcFecharScr /></button>
           </div>
           <div className="corpo" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <CanalPills canais={det.canais} />
-              {det.favorito && <span className="scr-estrela" title="Favorito"><Estrela cheia /></span>}
               {!det.ativo && <BadgeStatus tom="neutro">Inativo</BadgeStatus>}
             </div>
-            {det.descricao && <p style={{ fontSize: 11.5, color: 'var(--txt-2)', lineHeight: 1.5 }}>{det.descricao}</p>}
+            {det.descricao && <p style={{ fontSize: 12, color: 'var(--txt-2)', lineHeight: 1.5 }}>{det.descricao}</p>}
             {det.tags.length > 0 && (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {det.tags.map((t) => <em className="ag-pill" key={t} style={{ fontStyle: 'normal' }}>{t}</em>)}
@@ -595,7 +605,7 @@ export default function ScriptsV2() {
                               <span className="tip">{TIPO_LABEL[et.tipo]}</span>
                               <span className="arq">{et.nome ?? TIPO_LABEL[et.tipo].toLowerCase()}</span>
                             </div>
-                            {et.tamanho ? <div style={{ fontSize: 10, color: 'var(--txt-3)', marginTop: 3 }} className="num">{formatarTamanho(et.tamanho)}</div> : null}
+                            {et.tamanho ? <div style={{ fontSize: 11, color: 'var(--txt-3)', marginTop: 3 }} className="num">{formatarTamanho(et.tamanho)}</div> : null}
                             {et.conteudo?.trim() ? <div style={{ marginTop: 4 }}><DestacaVars texto={et.conteudo} /></div> : null}
                           </>
                         )}
@@ -609,17 +619,17 @@ export default function ScriptsV2() {
               <div>
                 <div className="caps" style={{ marginBottom: 6 }}>Variáveis usadas</div>
                 <div className="scr-vars">
-                  {detVars.map((v) => <span key={v} className="scr-var leitura">{v}</span>)}
+                  {detVars.map((v) => <span key={v} className="scr-var leitura var-nome" title={v}>{nomeHumanoVar(v)}</span>)}
                 </div>
               </div>
             )}
           </div>
           <div className="scr-det-acoes">
-            <BotaoMini onClick={() => abrirEditar(det)}>Editar</BotaoMini>
-            <BotaoMini onClick={() => acoes.favoritar(det).catch(() => setAviso({ tom: 'erro', texto: 'Falha.' }))}>{det.favorito ? 'Desfavoritar' : 'Favoritar'}</BotaoMini>
-            <BotaoMini onClick={() => duplicar(det)}>Duplicar</BotaoMini>
-            <BotaoMini onClick={() => copiar(det)}>Copiar</BotaoMini>
-            <button type="button" className="p-btn btn-perigo btn-mini" onClick={() => pedirExcluir(det)}>Excluir</button>
+            <button type="button" className="scr-det-lixo" aria-label="Excluir script" title="Excluir script" onClick={() => pedirExcluir(det)}><IcLixoScr /></button>
+            <span className="scr-det-esp" />
+            <BotaoSec onClick={() => duplicar(det)}>Duplicar</BotaoSec>
+            <BotaoSec onClick={() => copiar(det)}>Copiar</BotaoSec>
+            <BotaoPrimario onClick={() => abrirEditar(det)}>Editar</BotaoPrimario>
           </div>
         </DrawerV2>
       )}
@@ -656,7 +666,7 @@ export default function ScriptsV2() {
           <div className="scr-col">
             <div className="form-2col">
               <div className={errs.titulo ? 'campo invalida' : 'campo'} style={{ marginBottom: 0 }}>
-                <label htmlFor="scr-titulo">Título *</label>
+                <label htmlFor="scr-titulo">Título</label>
                 <Input id="scr-titulo" value={cfg.titulo} onChange={(e) => setCfg((f) => ({ ...f, titulo: e.target.value }))} placeholder="Nome do script" disabled={salvando} />
                 {errs.titulo && <small className="hint">{errs.titulo}</small>}
               </div>
@@ -679,7 +689,7 @@ export default function ScriptsV2() {
               </div>
             </div>
             <div className={errs.canal ? 'campo invalida' : 'campo'} style={{ marginBottom: 0 }}>
-              <label>Canal *</label>
+              <label>Canal</label>
               <div className="scr-canais">
                 <Chip ativo={cfg.wa} onClick={() => setCfg((f) => ({ ...f, wa: !f.wa }))}>WhatsApp</Chip>
                 <Chip ativo={cfg.fb} onClick={() => setCfg((f) => ({ ...f, fb: !f.fb }))}>Facebook</Chip>

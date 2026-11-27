@@ -10,11 +10,13 @@ export type Tema = 'dark' | 'light';
 const PREFIXO = 'atenvo-tema';
 export const chaveTema = (escopo?: string): string => (escopo ? `${PREFIXO}:${escopo}` : PREFIXO);
 
-export function lerTema(escopo?: string): Tema {
+/** `padrao`: o tema de quem ainda não escolheu (sem escolha gravada). Escolha gravada sempre vence. */
+export function lerTema(escopo?: string, padrao: Tema = 'dark'): Tema {
   try {
-    return localStorage.getItem(chaveTema(escopo)) === 'light' ? 'light' : 'dark';
+    const v = localStorage.getItem(chaveTema(escopo));
+    return v === 'light' || v === 'dark' ? v : padrao;
   } catch {
-    return 'dark';
+    return padrao;
   }
 }
 

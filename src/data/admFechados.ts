@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 
 /* ------------------------------------------------------------------
@@ -25,6 +25,8 @@ export function useAdmStatus() {
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async (): Promise<AdmStatus> => {
+      // demonstração = o sistema de verdade: na Reviza não existe o sistema do administrativo (adm_status volta desligado)
+      if (!REAL && isRevizaMode) return { ativo: false, ultimaLeituraEm: null, completos: 0, placar: false, assinar: false };
       if (!REAL) return { ativo: true, ultimaLeituraEm: new Date(Date.now() - 3 * 60_000).toISOString(), completos: 327, placar: true, assinar: true };
       const { data, error } = await supabase!.rpc('adm_status', { p_org: orgId });
       if (error) throw error;

@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { buscarKeyset } from '@/data/paginacao';
 
-export const COB_REAL = isSupabaseConfigured && !!supabase;
+// Na instância REVIZA o backend de cobranças do ATENVO não existe — estas queries ficam desligadas.
+export const COB_REAL = isSupabaseConfigured && !!supabase && !isRevizaMode;
 
 export type ParcelaStatus = 'prevista' | 'paga' | 'nao_paga' | 'cancelada';
 
@@ -144,6 +145,10 @@ function useInvalidar() {
   return (id?: string | null) => {
     qc.invalidateQueries({ queryKey: ['cobrancas', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['cobrancas-metricas', currentOrg.id] });
+    // Clientes/Atendentes/Ciclos leem estas queries (cobrancaCiclos.ts) — sem
+    // invalidar junto, criar/baixar/cancelar deixava os números velhos por 30s+
+    qc.invalidateQueries({ queryKey: ['cob-clientes', currentOrg.id] });
+    qc.invalidateQueries({ queryKey: ['cob-ciclos', currentOrg.id] });
     if (id) qc.invalidateQueries({ queryKey: ['cobranca', currentOrg.id, id] });
   };
 }

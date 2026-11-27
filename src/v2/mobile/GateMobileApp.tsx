@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { isRevizaMode } from '@/lib/supabase';
 
 /* ------------------------------------------------------------------
    Gate GLOBAL do app autenticado — decisão do dono 18/09: no CELULAR
@@ -20,8 +21,12 @@ import { Navigate, useLocation } from 'react-router-dom';
    — 10+ chamadores navegam assim (sino, Kanban, Dashboard, Contatos…).
    ------------------------------------------------------------------ */
 
-/** Fonte única do critério "é celular" — GateWhatsApp usa a MESMA (nunca divergem). */
+/** Fonte única do critério "é celular" — GateWhatsApp usa a MESMA (nunca divergem).
+    REVIZA: nunca. Lá o /m não existe (o RevizaGate devolve para /cobrancas/painel, que passava de novo
+    por aqui — laço infinito que travava a Cobrança inteira no celular); o celular segue no shell, com o
+    layout de celular da própria Reviza, como antes do Atendimento entrar. */
 export const ehCelular = () =>
+  !isRevizaMode &&
   window.matchMedia('(pointer: coarse)').matches &&
   Math.min(window.screen.width, window.screen.height) <= 600;
 

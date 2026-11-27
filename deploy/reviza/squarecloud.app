@@ -1,0 +1,9 @@
+DISPLAY_NAME=Reviza Cobrancas
+DESCRIPTION=Sistema de gestao de cobrancas da Reviza (ALFA GROUP)
+MAIN=server.js
+MEMORY=512
+VERSION=recommended
+RUNTIME=nodejs
+SUBDOMAIN=reviza
+AUTORESTART=true
+START=node server.js

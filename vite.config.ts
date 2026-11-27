@@ -23,7 +23,7 @@ const guardaCacheAssets = () => ({
   },
 });
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     guardaCacheAssets(),
     react(),
@@ -35,17 +35,28 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false, // registro manual em src/main.tsx (controle p/ Fase 2: push)
+      // Reviza (Square Cloud): sob o Cloudflare da Square (não dá pra purgar), um SW
+      // que UM DIA foi servido com immutable fica preso no edge por ~1 ano e o
+      // reg.update() nunca vê versão nova. Já aconteceu com /sw.js (11/09) e DE NOVO
+      // com /sw-r2.js (17/09: age 6 dias, cf HIT immutable) mesmo o server.js já
+      // mandando no-store — a cópia envenenada é de um deploy antigo. A saída é
+      // sempre uma URL NOVA (edge limpo). sw-r3.js nasce sob o server.js correto
+      // (no-store → edge nunca cacheia) então é o ÚLTIMO rename: /sw.js e /sw-r2.js
+      // viram kill-switch (build.sh) p/ resgatar quem está preso neles.
+      // Demo/Atenvo (CF Pages) seguem com sw.js: lá o public/_headers sempre impediu
+      // o edge-cache. NÃO reusar sw.js/sw-r2.js na Reviza.
+      filename: mode === 'reviza' ? 'sw-r3.js' : 'sw.js',
       manifest: {
         id: '/',
-        name: 'Atenvo',
-        short_name: 'Atenvo',
+        name: 'ALFA GROUP',
+        short_name: 'ALFA GROUP',
         description: 'Plataforma de Atendimento e Gestão',
         lang: 'pt-BR',
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        theme_color: '#0A0B0D',
-        background_color: '#0A0B0D',
+        theme_color: '#0A0908',
+        background_color: '#0A0908',
         icons: [
           { src: '/icons/pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/pwa-512.png', sizes: '512x512', type: 'image/png' },
@@ -61,7 +72,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
           /^\/assets\//, /^\/opus\//, /^\/icons\//,
-          /^\/sw\.js$/, /^\/manifest\.webmanifest$/, /^\/favicon\.svg$/,
+          /^\/sw\.js$/, /^\/sw-r2\.js$/, /^\/sw-r3\.js$/, /^\/manifest\.webmanifest$/, /^\/favicon\.svg$/,
         ],
         skipWaiting: true,
         clientsClaim: true,
@@ -76,4 +87,4 @@ export default defineConfig({
     },
   },
   server: { port: 5173 },
-});
+}));

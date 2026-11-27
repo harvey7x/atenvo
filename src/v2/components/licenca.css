@@ -1,0 +1,93 @@
+/* ============================================================
+   Mensalidade da plataforma (LicencaGate) — prefixo lic-.
+   Dois momentos:
+   1) .lic-faixa — aviso âmbar fixo no topo do conteúdo (filho do
+      .principal, entre a topbar e o palco; flex-shrink 0 para o
+      palco encolher junto, nunca cortar);
+   2) .lic-veu — takeover de bloqueio em tela cheia (portal .v2),
+      fundo SÓLIDO (sem vidro: é um estado sério, não uma festa),
+      card central no padrão do tema (claro/escuro via tokens).
+   Tokens only (contrato v2): âmbar da casa p/ a faixa, platina no CTA.
+   ============================================================ */
+
+/* ---------- faixa de aviso (admins, dia 1º → dia 5 14h) ---------- */
+.v2 .lic-faixa {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 22px;
+  font-size: 13px; color: var(--txt);
+  background: var(--ambar-bg);
+  border-bottom: 1px solid rgba(var(--ambar-rgb), .30);
+}
+.v2 .lic-faixa-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--ambar);
+  box-shadow: 0 0 0 3px rgba(var(--ambar-rgb), calc(.22 * var(--fx)));
+}
+.v2 .lic-faixa-tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .lic-faixa-tx b { font-weight: 600; }
+.v2 .lic-faixa-prazo {
+  margin-left: 10px; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: var(--ambar);
+  background: rgba(var(--ambar-rgb), .14);
+  border: 1px solid rgba(var(--ambar-rgb), .28);
+}
+.v2 .lic-faixa-btn { flex-shrink: 0; }
+
+/* ---------- miolo Pix (modal da faixa + takeover) ---------- */
+.v2 .lic-pix { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.v2 .lic-qr {
+  width: 220px; height: 220px; display: block;
+  border-radius: 12px; background: #FFFFFF; padding: 10px;
+  border: 1px solid var(--linha);
+}
+.v2 .lic-copia-rot {
+  margin-top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .lic-copia { display: flex; align-items: center; gap: 8px; width: 100%; }
+.v2 .lic-copia-tx {
+  flex: 1; min-width: 0; height: 33px; padding: 0 10px;
+  font-size: 12px; color: var(--txt-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(var(--tint), .045);
+  border: 1px solid rgba(var(--tint), .10); border-radius: var(--r-ctl);
+}
+.v2 .lic-copia-tx:focus { outline: none; border-color: rgba(var(--tint), .25); color: var(--txt); }
+.v2 .lic-sem-pix { margin: 4px 0 0; font-size: 13px; color: var(--txt-2); text-align: center; }
+.v2 .lic-modal-sub { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
+
+/* ---------- takeover de bloqueio (todos, dia 5 14h → Pix cair) ---------- */
+.v2 .lic-veu {
+  position: fixed; inset: 0; z-index: 1400; /* acima da intro (1300) e de todo o resto */
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto; padding: 40px 24px;
+  background: var(--base); /* sólido de propósito: nada do app vaza por trás */
+  animation: lic-fade .3s var(--ease);
+}
+.v2 .lic-card {
+  width: min(430px, 100%); margin: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 30px 28px 24px; text-align: center;
+  background: var(--vidro-a);
+  border: 1px solid var(--fio-b); border-radius: var(--r-card);
+  box-shadow: var(--sombra-2);
+}
+.v2 .lic-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .lic-valor { font-size: 30px; font-weight: 650; letter-spacing: -.01em; color: var(--txt); }
+.v2 .lic-texto { margin: 0 0 4px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); max-width: 340px; }
+.v2 .lic-aviso {
+  margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ambar);
+  background: var(--ambar-bg); border: 1px solid rgba(var(--ambar-rgb), .25);
+  border-radius: var(--r-ctl); padding: 8px 12px;
+}
+.v2 .lic-cta { margin-top: 6px; min-width: 180px; }
+.v2 .lic-nota { margin: 2px 0 0; font-size: 11.5px; color: var(--txt-3); }
+
+@keyframes lic-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .v2 .lic-veu { animation: none; }
+}

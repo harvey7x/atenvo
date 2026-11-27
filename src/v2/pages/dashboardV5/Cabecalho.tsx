@@ -41,7 +41,7 @@ export function rotuloPeriodoV5(preset: PresetDash, p: Periodo, hoje: string): s
 
 export function Cabecalho({
   preset, setPreset, periodo, rotulo, ini, fim, setIni, setFim, hoje,
-  mesCaf, setMesCaf, geradoEm, atualizando, aoAtualizar, demo,
+  mesCaf, setMesCaf, geradoEm, atualizando, aoAtualizar, demo, semPeriodo = false,
 }: {
   preset: PresetDash; setPreset: (p: PresetDash) => void;
   periodo: Periodo; rotulo: string;
@@ -49,6 +49,8 @@ export function Cabecalho({
   mesCaf: number; setMesCaf: (fn: (m: number) => number) => void;
   geradoEm: string | null; atualizando: boolean; aoAtualizar: () => void;
   demo: boolean;
+  /** a aba não depende do período (Ao vivo: é sempre AGORA) — o seletor sai, o "Atualizado às" fica */
+  semPeriodo?: boolean;
 }) {
   return (
     <header className="d5-cab">
@@ -57,14 +59,14 @@ export function Cabecalho({
         <p><span>{rotulo}</span></p>
       </div>
       <div className="d5-cab-ctl">
-        <div className="d5-cab-per">
+        {!semPeriodo && <div className="d5-cab-per">
           <Segmentado opcoes={PRESETS_V5} valor={preset} aoMudar={setPreset} rotulo="Período" />
           {preset === 'mes_caf' && (
             <div className="d5-mes" role="group" aria-label="Mês comercial">
               <button type="button" className="d5-ib" aria-label="Mês anterior" onClick={() => setMesCaf((m) => m - 1)}>
                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              <span className="num" title={`Mês comercial da casa, o mesmo do CAF: do dia 11 ao dia 10 seguinte (${periodo.label})`}>{rotuloMes(periodo, hoje)}</span>
+              <span className="num" title={`Mês comercial da casa: do dia 11 ao dia 10 seguinte (${periodo.label})`}>{rotuloMes(periodo, hoje)}</span>
               <button type="button" className="d5-ib" aria-label="Próximo mês" disabled={mesCaf >= 0} onClick={() => setMesCaf((m) => Math.min(0, m + 1))}>
                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
@@ -77,7 +79,7 @@ export function Cabecalho({
               <Input type="date" value={fim} min={ini} max={hoje} onChange={(e) => e.target.value && setFim(e.target.value)} aria-label="Data final" />
             </div>
           )}
-        </div>
+        </div>}
         <div className="d5-atual">
           <span className="num" aria-live="polite">
             {atualizando ? 'Atualizando…' : geradoEm ? `Atualizado às ${hhmm(geradoEm)}` : ''}

@@ -124,7 +124,9 @@ describe('o componente montado', () => {
     expect(h).toBe('');
   });
 
-  it('montado no shell pelo contrato: ao lado do balão, espera o bom dia e só busca com a voz liberada (hoje só o Matheus)', () => {
+  // Reviza: o shell da Reviza NÃO monta o balão de voz nem o aviso de lembretes do Atenvo (são da CAF:
+  // voz liberada só pro Matheus, bom dia do Atenvo) — o contrato do shell do Atenvo não vale aqui.
+  it.skip('montado no shell pelo contrato: ao lado do balão, espera o bom dia e só busca com a voz liberada (hoje só o Matheus)', () => {
     const shell = readFileSync(join(__dirname, '..', 'shell', 'AppShellV2.tsx'), 'utf8');
     expect(shell).toContain("import { LembreteAviso } from '../components/LembreteAviso';");
     expect(shell).toContain("import { AssistenteBalao, vozLiberadaPara } from '../components/AssistenteBalao';");

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 import { WA_REAL, useWaCanais } from '@/data/whatsapp';
@@ -15,10 +15,14 @@ import {
   traduzCfg,
 } from '@/data/configuracoes';
 import { DEMO_MODE } from '@/lib/demo';
+import { isRevizaMode } from '@/lib/supabase';
+import { AbaUsuarios } from './RevizaUsuarios';
+import { usePapel } from '../data/cobranca/sessao';
 import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
 import { tempoCelula } from '../lib/tempo';
+import { formatarTelefone } from '../lib/telefone';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
@@ -37,10 +41,14 @@ import './configuracoes.css';
    ------------------------------------------------------------------ */
 
 const TABS = [
-  { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais' },
+  { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais e integrações' },
   { id: 'atendimento', label: 'Atendimento' }, { id: 'notif', label: 'Notificações' }, { id: 'prefs', label: 'Preferências' },
 ];
-const TAB_IDS = TABS.map((t) => t.id);
+/* REVIZA (dono 11/11: "em configurações, criar usuários que nem na Reviza — criar, excluir, mudar de senha"):
+   a aba Equipe do Atenvo (convites por e-mail) dá lugar aos Usuários da Reviza — a MESMA tela de
+   Cobranças → Usuários, com os ambientes de cada pessoa. Só o administrador vê. */
+const TABS_REVIZA = TABS.flatMap((t) => (t.id === 'equipe' ? [{ id: 'usuarios', label: 'Usuários' }] : [t]));
+const TAB_IDS = [...TABS.map((t) => t.id), 'usuarios'];
 const PAPEL_LABEL: Record<string, string> = { admin: 'Administrador', supervisor: 'Supervisor', atendente: 'Atendente' };
 const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', convidado: 'Convite pendente', pendente: 'Convite pendente', expirado: 'Convite expirado' };
 const STATUS_TOM: Record<string, TomStatus> = { ativo: 'ok', inativo: 'neutro', convidado: 'atencao', pendente: 'atencao', expirado: 'erro' };
@@ -51,21 +59,25 @@ const WA_ST: Record<string, { t: string; tom: TomStatus }> = {
 const TIPO_ORIGEM: Record<string, string> = { trafego: 'Tráfego', ura: 'URA', organico: 'Orgânico', indicacao: 'Indicação', campanha: 'Campanha', parceiro: 'Parceiro', outro: 'Outro' };
 const DIAS_SEMANA = [{ i: 0, l: 'Dom' }, { i: 1, l: 'Seg' }, { i: 2, l: 'Ter' }, { i: 3, l: 'Qua' }, { i: 4, l: 'Qui' }, { i: 5, l: 'Sex' }, { i: 6, l: 'Sáb' }];
 
-const NOTIF_EMAIL = [
-  { k: 'novos_leads', t: 'Novos contatos e leads', d: 'Receba um email quando um novo contato entrar.' },
-  { k: 'sem_resposta', t: 'Mensagens não respondidas', d: 'Resumo de mensagens de clientes sem resposta.' },
-  { k: 'cobrancas_vencendo', t: 'Cobranças vencendo', d: 'Avisos de parcelas próximas do vencimento.' },
-  { k: 'resumo_diario', t: 'Resumo diário', d: 'Um panorama do dia enviado de manhã.' },
-  { k: 'convite_aceito', t: 'Convite aceito', d: 'Aviso quando alguém aceitar um convite.' },
+/* cada aviso pertence a um ambiente (crítica 12/11: opções da Cobrança apareciam dentro do Atendimento) —
+   a tela agrupa por ambiente e mostra só os grupos a que a pessoa tem acesso */
+type AmbNotif = 'atendimento' | 'cobrancas' | 'geral';
+const NOTIF_EMAIL: { k: string; t: string; d: string; amb: AmbNotif; soAtenvo?: boolean }[] = [
+  { k: 'novos_leads', t: 'Novos contatos e leads', d: 'Receba um e-mail quando um novo contato entrar.', amb: 'atendimento' },
+  { k: 'sem_resposta', t: 'Mensagens não respondidas', d: 'Resumo de mensagens de clientes sem resposta.', amb: 'atendimento' },
+  { k: 'cobrancas_vencendo', t: 'Cobranças vencendo', d: 'Avisos de parcelas próximas do vencimento.', amb: 'cobrancas' },
+  { k: 'resumo_diario', t: 'Resumo diário', d: 'Um panorama do dia enviado de manhã.', amb: 'geral' },
+  { k: 'convite_aceito', t: 'Convite aceito', d: 'Aviso quando alguém aceitar um convite.', amb: 'geral', soAtenvo: true },
 ];
-const NOTIF_APP = [
-  { k: 'push', t: 'Notificações push', d: 'Alertas em tempo real na plataforma.' },
-  { k: 'som', t: 'Som de notificação', d: 'Toque sonoro ao receber atendimento.' },
-  { k: 'aguardando', t: 'Cliente aguardando atendimento', d: 'Destaque quando alguém espera resposta.' },
-  { k: 'novos_membros', t: 'Novos membros na equipe', d: 'Aviso quando alguém entrar na equipe.' },
-  { k: 'cobrancas', t: 'Cobranças', d: 'Alertas de cobranças e pagamentos.' },
-  { k: 'mencoes', t: 'Menções e atribuições', d: 'Quando você for atribuído a um atendimento.' },
+const NOTIF_APP: { k: string; t: string; d: string; amb: AmbNotif; soAtenvo?: boolean }[] = [
+  { k: 'push', t: 'Notificações push', d: 'Alertas em tempo real na plataforma.', amb: 'geral' },
+  { k: 'som', t: 'Som de notificação', d: 'Toque sonoro ao receber atendimento.', amb: 'geral' },
+  { k: 'aguardando', t: 'Cliente aguardando atendimento', d: 'Destaque quando alguém espera resposta.', amb: 'atendimento' },
+  { k: 'novos_membros', t: 'Novos membros na equipe', d: 'Aviso quando alguém entrar na equipe.', amb: 'geral' },
+  { k: 'cobrancas', t: 'Cobranças', d: 'Alertas de cobranças e pagamentos.', amb: 'cobrancas' },
+  { k: 'mencoes', t: 'Menções e atribuições', d: 'Quando você for atribuído a um atendimento.', amb: 'atendimento' },
 ];
+const ROTULO_AMB_NOTIF: Record<AmbNotif, string> = { atendimento: 'Atendimento', cobrancas: 'Cobranças', geral: 'Geral' };
 
 /* avatar com iniciais (sem cores por nome do v1: platina neutro; foto quando houver) */
 function iniciais(n: string) { const p = (n || '').trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
@@ -94,6 +106,22 @@ interface SeedCfg {
   canais: { id: string; alias: string; numero: string | null; status: string; origemTipo: string | null; gestorNome: string | null }[];
   fb: { id: string; pagina_id: string; pagina_nome: string | null; estado: string }[];
   contatos: { id: string; nome: string; telefone: string | null }[];
+}
+/** Reviza: papel de verdade (profiles.papel) → rótulo da tela — o currentOrg.role só sabe admin/gestor/atendente */
+const ROTULO_PAPEL_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
+/** Reviza: o login é o "usuário" (a conta é usuario@reviza.local — o domínio não aparece) */
+const loginReviza = (email: string | null | undefined) => String(email ?? '').replace(/@reviza\.local$/i, '');
+/** Reviza: os dados de exemplo com a empresa (ALFA GROUP) e a pessoa logada (nome, papel e usuário dela) */
+function seedReviza(b: SeedCfg, nome: string | null, papel: string | null, email: string | null): SeedCfg {
+  const quem = nome?.trim() || 'Administrador';
+  const login = loginReviza(email) || quem.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/)[0] || 'admin';
+  return {
+    ...b,
+    perfil: { ...b.perfil, nome: quem, email: login, cargo: (papel && ROTULO_PAPEL_REVIZA[papel]) || '' },
+    org: { ...b.org, nome: 'ALFA GROUP', nomeFantasia: 'ALFA GROUP', email: 'contato@alfagroup.com.br' },
+    canais: b.canais.map((c) => ({ ...c, gestorNome: c.gestorNome ? quem : null })),
+    fb: b.fb.map((f) => ({ ...f, pagina_nome: 'ALFA GROUP' })),
+  };
 }
 function seedCfg(): SeedCfg {
   const dia = 86_400_000; const agora = Date.now();
@@ -130,7 +158,13 @@ function seedCfg(): SeedCfg {
   };
 }
 
-export default function ConfiguracoesV2() {
+/* AMBIENTE CONFIGURAÇÕES da Reviza (22/11): cada seção desta tela virou um item do menu do ambiente
+   (/config/conta, /config/atendimento, /config/notificacoes, /config/preferencias). `abaFixa` mostra
+   UMA seção, com o título dela e sem a lista de abas; o endereço antigo (/configuracoes) leva para lá. */
+const ABA_PARA_CONFIG: Record<string, string> = { conta: 'conta', usuarios: 'usuarios', canais: 'whatsapp', atendimento: 'atendimento', notif: 'notificacoes', prefs: 'preferencias' };
+const TITULO_ABA_FIXA: Record<string, string> = { conta: 'Conta', atendimento: 'Regras do atendimento', notif: 'Notificações', prefs: 'Preferências' };
+
+export default function ConfiguracoesV2({ abaFixa }: { abaFixa?: string } = {}) {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -142,8 +176,11 @@ export default function ConfiguracoesV2() {
   const [searchParams] = useSearchParams();
   const sectionParam = searchParams.get('section');
   const initialTab = searchParams.get('tab');
-  const [tab, setTab] = useState(initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'conta');
-  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]);
+  // Reviza: o administrador abre direto nos Usuários (é o que esta tela ganhou); quem não é admin não tem a aba
+  const abas = isRevizaMode ? TABS_REVIZA.filter((t) => t.id !== 'usuarios' || podeAdmin) : TABS;
+  const abaPadrao = isRevizaMode && podeAdmin ? 'usuarios' : 'conta';
+  const [tab, setTab] = useState(abaFixa ?? (initialTab && abas.some((t) => t.id === initialTab) ? initialTab : abaPadrao));
+  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab) && abas.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [aviso, setAviso] = useState<Aviso>(null);
   // o retorno FLUTUA (movimento.css .cfg-aviso) em vez de empurrar a página: sucesso sai
@@ -153,7 +190,9 @@ export default function ConfiguracoesV2() {
     const t = setTimeout(() => setAviso(null), 4200);
     return () => clearTimeout(t);
   }, [aviso]);
-  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? seedCfg() : null));
+  // Reviza: o shell só monta a página com o perfil já carregado — papel e nome de verdade no exemplo
+  const sessaoR = usePapel().data;
+  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? (isRevizaMode ? seedReviza(seedCfg(), sessaoR?.nome ?? user?.name ?? null, sessaoR?.papel ?? null, user?.email ?? null) : seedCfg()) : null));
 
   // cascata de entrada roda UMA vez (carga da página); trocas de aba não re-animam
   const primeiraCarga = useRef(true);
@@ -170,12 +209,15 @@ export default function ConfiguracoesV2() {
     }
   }, [tab]);
 
+  // Reviza: o endereço antigo abre a seção correspondente do ambiente Configurações
+  if (isRevizaMode && !abaFixa) return <Navigate to={`/config/${ABA_PARA_CONFIG[initialTab ?? ''] ?? ''}`} replace />;
+
   return (
     <>
       <div className="ph sobe">
         <div>
-          <h2>Configurações</h2>
-          <p>Perfil, equipe e comportamento do sistema.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
+          {abaFixa && <div className="cob-migalha">Configurações</div>}
+          <h2>{abaFixa ? (TITULO_ABA_FIXA[abaFixa] ?? 'Configurações') : 'Configurações'}</h2>
         </div>
       </div>
 
@@ -188,14 +230,14 @@ export default function ConfiguracoesV2() {
 
       {DEMO_MODE && podeAdmin && <DemoResetCard demo={demo} aoAvisar={setAviso} />}
 
-      <div className="cfg" ref={raizRef}>
-        <CardVidro sobe className="cfg-nav" atraso={0.08} role="tablist" aria-label="Seções de configurações">
-          {TABS.map((t) => (
+      <div className={abaFixa ? 'cfg cfg-so' : 'cfg'} ref={raizRef}>
+        {!abaFixa && <CardVidro sobe className="cfg-nav" atraso={0.08} role="tablist" aria-label="Seções de configurações">
+          {abas.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'it on' : 'it'} onClick={() => setTab(t.id)}>
               {t.label}
             </button>
           ))}
-        </CardVidro>
+        </CardVidro>}
 
         {/* paridade v1: as 6 seções ficam SEMPRE montadas e alternam por CSS —
             edições não salvas, filtros e menus sobrevivem à troca de aba */}
@@ -203,9 +245,14 @@ export default function ConfiguracoesV2() {
           <section className={tab === 'conta' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelConta anima={anima && abaInicial === 'conta'} demo={demo} seed={seed} setSeed={setSeed} aoAvisar={setAviso} podeGerenciar={podeGerenciar} />
           </section>
-          <section className={tab === 'equipe' ? 'cfg-aba on' : 'cfg-aba'}>
+          {isRevizaMode && podeAdmin && (
+            <section className={tab === 'usuarios' ? 'cfg-aba on' : 'cfg-aba'}>
+              <AbaUsuarios demo={false} gestor={podeAdmin} />
+            </section>
+          )}
+          {!isRevizaMode && <section className={tab === 'equipe' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelEquipe anima={anima && abaInicial === 'equipe'} demo={demo} seed={seed} setSeed={setSeed} aoAvisar={setAviso} podeAdmin={podeAdmin} podeGerenciar={podeGerenciar} meuId={demo ? 'u-demo' : user?.id} />
-          </section>
+          </section>}
           <section className={tab === 'canais' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelCanais anima={anima && abaInicial === 'canais'} demo={demo} seed={seed} podeGerenciar={podeGerenciar} onNav={navigate} />
           </section>
@@ -278,7 +325,10 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
 
   const perfil = demo ? seed?.perfil ?? null : perfilQ.data ?? null;
   const orgDado = demo ? seed?.org ?? null : orgQ.data ?? null;
-  const email = demo ? seed?.perfil.email : user?.email;
+  // Reviza: não há e-mail — a conta é o USUÁRIO (login), que só o administrador troca (Usuários)
+  const papelR = usePapel().data?.papel ?? null;
+  const rotuloPapel = isRevizaMode ? ((papelR && ROTULO_PAPEL_REVIZA[papelR]) || '—') : (PAPEL_LABEL[currentOrg.role === 'gestor' ? 'supervisor' : currentOrg.role] || currentOrg.role);
+  const email = demo ? seed?.perfil.email : isRevizaMode ? loginReviza(user?.email) : user?.email;
 
   const [form, setForm] = useState({ nome: '', telefone: '', cargo: '' });
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -360,7 +410,7 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
             <Av n={form.nome || 'U'} src={avatarSrc} />
             <div className="pi">
               <div className="nm">{form.nome || '—'}</div>
-              <div className="rl">{PAPEL_LABEL[currentOrg.role === 'gestor' ? 'supervisor' : currentOrg.role] || currentOrg.role} · {email}</div>
+              <div className="rl">{rotuloPapel} · {email}</div>
             </div>
             <div className="pa">
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) trocarFoto(f); e.currentTarget.value = ''; }} />
@@ -378,10 +428,10 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
               <Input id="cfa-cargo" value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} placeholder="Ex.: Atendente, Gestor" />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-email">Email</label>
+              <label htmlFor="cfa-email">{isRevizaMode ? 'Usuário' : 'E-mail'}</label>
               <div className="cfa-email">
-                <Input id="cfa-email" type="email" value={email || ''} readOnly />
-                <BotaoSec onClick={() => setEmailModal(true)}>Alterar</BotaoSec>
+                <Input id="cfa-email" type={isRevizaMode ? 'text' : 'email'} value={email || ''} readOnly title={isRevizaMode ? 'O usuário de entrada é trocado pelo administrador, em Usuários' : undefined} />
+                {!isRevizaMode && <BotaoSec onClick={() => setEmailModal(true)}>Alterar</BotaoSec>}
               </div>
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -423,7 +473,7 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
               <Input id="cfa-otel" value={org.telefone} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, telefone: e.target.value })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-oemail">Email</label>
+              <label htmlFor="cfa-oemail">E-mail</label>
               <Input id="cfa-oemail" type="email" value={org.email} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, email: e.target.value })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -858,12 +908,12 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="cfg-sec" style={{ marginBottom: 4 }}>WhatsApp</div>
-          <p style={{ fontSize: 11.5, color: 'var(--txt-2)', marginBottom: 13 }}>Resumo das conexões. A gestão (conectar/remover) fica em Integrações.</p>
+          <p style={{ fontSize: 12, color: 'var(--txt-2)', marginBottom: 13 }}>Resumo das conexões. Para conectar ou remover um número, abra Integrações.</p>
         </div>
         <BotaoSec onClick={() => onNav('/integracoes')}>Abrir Integrações</BotaoSec>
       </div>
       {waIndisponivel ? (
-        <p style={{ fontSize: 11.5, color: 'var(--txt-3)', padding: '10px 0' }}>Disponível com o backend configurado.</p>
+        <p style={{ fontSize: 12, color: 'var(--txt-3)', padding: '10px 0' }}>Os canais ainda não estão disponíveis nesta instalação.</p>
       ) : (!demo && waQ.isLoading) ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-hidden><Skeleton altura={44} raio={10} /><Skeleton altura={44} raio={10} largura="80%" /></div>
       ) : wa.length === 0 ? (
@@ -875,7 +925,7 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
             <div className="tx">
               <div className="t">{c.alias}</div>
               <div className="d">
-                {c.numero || 'Sem número'}
+                {formatarTelefone(c.numero) || 'Sem número'}
                 {TIPO_ORIGEM[c.origemTipo || ''] ? ' · ' + TIPO_ORIGEM[c.origemTipo as string] : ''}
                 {c.gestorNome ? ' · Gestor: ' + c.gestorNome : ''}
               </div>
@@ -955,7 +1005,7 @@ function PainelConfigAtendimento({ anima, demo, seed, setSeed, aoAvisar, podeGer
               <Input id="cfa-semresp" type="number" min={1} value={c.tempo_sem_resposta_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_sem_resposta_min: Number(e.target.value) || 0 })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-inat">Tempo de inatividade p/ encerrar (min)</label>
+              <label htmlFor="cfa-inat">Tempo de inatividade para encerrar (min) <span className="cfa-embreve" title="O encerramento automático por inatividade ainda não está ativo; a regra fica salva.">Em breve</span></label>
               <Input id="cfa-inat" type="number" min={0} value={c.tempo_inatividade_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_inatividade_min: Number(e.target.value) || 0 })} />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -974,12 +1024,9 @@ function PainelConfigAtendimento({ anima, demo, seed, setSeed, aoAvisar, podeGer
               </div>
             </div>
             <div className="campo" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
-              <label htmlFor="cfa-msg">Mensagem fora do horário</label>
+              <label htmlFor="cfa-msg">Mensagem fora do horário <span className="cfa-embreve" title="A resposta automática fora do horário ainda não está ativa; a mensagem fica salva.">Em breve</span></label>
               <textarea id="cfa-msg" className="inp" rows={2} value={c.mensagem_fora_horario} disabled={dis} onChange={(e) => setC({ ...c, mensagem_fora_horario: e.target.value })} placeholder="Ex.: Nosso horário é das 8h às 18h. Retornaremos em breve." style={{ height: 'auto', padding: '8px 11px', resize: 'vertical', fontFamily: 'var(--fonte)' }} />
             </div>
-          </div>
-          <div className="cfa-nota" style={{ marginTop: 12 }}>
-            A aplicação automática (auto-resposta fora do horário, encerramento por inatividade, distribuição automática) depende de automação no backend — ainda não disponível; as regras ficam salvas e prontas.
           </div>
           {podeGerenciar && (
             <div className="cfa-rodape">
@@ -1202,6 +1249,10 @@ function PainelNotif({ anima, demo, seed, setSeed, aoAvisar }: {
   const [p, setP] = useState<Prefs | null>(null);
   const fonte = demo ? seed?.prefs ?? null : prefsQ.data ?? null;
   useEffect(() => { if (fonte) setP(fonte); }, [fonte]);
+  // só os grupos dos ambientes da pessoa (na Reviza, pelo perfil; fora dela, os dois)
+  const ambientesP = usePapel().data?.ambientes;
+  const temAmb = (a: 'cobrancas' | 'atendimento') => !isRevizaMode || !ambientesP || ambientesP.includes(a);
+  const gruposNotif: AmbNotif[] = [...(temAmb('atendimento') ? ['atendimento' as const] : []), ...(temAmb('cobrancas') ? ['cobrancas' as const] : []), 'geral'];
 
   async function flip(grupo: 'notif_email' | 'notif_app', k: string, v: boolean) {
     if (!p) return;
@@ -1216,23 +1267,27 @@ function PainelNotif({ anima, demo, seed, setSeed, aoAvisar }: {
   return (
     <CardVidro spot sobe={anima} className="cfg-painel" atraso={0.15}>
       <div className="cfg-sec" style={{ marginBottom: 4 }}>Notificações</div>
-      <p style={{ fontSize: 11.5, color: 'var(--txt-2)', marginBottom: 12 }}>Preferências individuais. As alterações são salvas automaticamente.</p>
-      <div className="cfa-nota" style={{ marginBottom: 12 }}>
-        O envio real de e-mail/push depende de integração de entrega — <b>Integração de envio pendente</b>. Suas preferências são persistidas mesmo assim.
-      </div>
+      <p style={{ fontSize: 12, color: 'var(--txt-2)', marginBottom: 12 }}>Preferências individuais. As alterações são salvas automaticamente.</p>
       {!p ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-hidden><Skeleton altura={30} raio={8} /><Skeleton altura={30} raio={8} largura="76%" /><Skeleton altura={30} raio={8} largura="60%" /></div>
       ) : (
         <>
-          <div className="cfg-sec" style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--txt-3)', marginBottom: 6 }}>Por email</div>
-          {NOTIF_EMAIL.map((n) => (
-            <LinhaToggle key={n.k} ligado={!!p.notif_email[n.k]} aoMudar={(v) => flip('notif_email', n.k, v)} titulo={n.t} descricao={n.d} />
-          ))}
-          <div className="cfg-div" />
-          <div className="cfg-sec" style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--txt-3)', marginBottom: 6 }}>No aplicativo</div>
-          {NOTIF_APP.map((n) => (
-            <LinhaToggle key={n.k} ligado={!!p.notif_app[n.k]} aoMudar={(v) => flip('notif_app', n.k, v)} titulo={n.t} descricao={n.d} />
-          ))}
+          {gruposNotif.map((amb, gi) => {
+            const linhas = [
+              ...NOTIF_EMAIL.filter((n) => n.amb === amb && (!n.soAtenvo || !isRevizaMode)).map((n) => ({ ...n, grupo: 'notif_email' as const })),
+              ...NOTIF_APP.filter((n) => n.amb === amb && (!n.soAtenvo || !isRevizaMode)).map((n) => ({ ...n, grupo: 'notif_app' as const })),
+            ];
+            return (
+              <div key={amb}>
+                {gi > 0 && <div className="cfg-div" />}
+                <div className="cfg-sec cfa-grupo-notif">{ROTULO_AMB_NOTIF[amb]}</div>
+                {linhas.map((n) => (
+                  <LinhaToggle key={n.grupo + n.k} ligado={!!p[n.grupo][n.k]} aoMudar={(v) => flip(n.grupo, n.k, v)}
+                    titulo={<>{n.t}<span className="cfa-canal-notif">{n.grupo === 'notif_email' ? 'E-mail' : 'No aplicativo'}</span></>} descricao={n.d} />
+                ))}
+              </div>
+            );
+          })}
         </>
       )}
     </CardVidro>
@@ -1299,7 +1354,7 @@ function PainelPrefs({ anima, demo, seed, setSeed, aoAvisar }: {
               <select id="cfa-p-home" className="inp" value={p.pagina_inicial} onChange={(e) => persist({ pagina_inicial: e.target.value })}>
                 <option value="/whatsapp">WhatsApp</option>
                 <option value="/kanban">Kanban</option>
-                <option value="/relatorios">Relatórios</option>
+                {!isRevizaMode && <option value="/relatorios">Relatórios</option>}
               </select>
               <div className="cfa-desc-c">Tela exibida ao entrar.</div>
             </div>

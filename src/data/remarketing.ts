@@ -4,7 +4,7 @@
    roda em modo demonstração com seeds locais (nada é gravado). */
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { isRevizaMode, supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useVisibilidade } from '@/lib/visibilidade';
 
@@ -266,7 +266,8 @@ export function useNotificacoes() {
   const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
     queryKey: ['notificacoes', currentOrg.id, soDe ?? 'todos'],
-    enabled: vis.veTodos || !!soDe,
+    // instância Reviza: a tabela 'notificacoes' do banco dedicado é OUTRA (central de avisos da cobrança)
+    enabled: !isRevizaMode && (vis.veTodos || !!soDe),
     staleTime: 10_000, refetchInterval: 30_000,
     queryFn: async (): Promise<Notificacao[]> => {
       if (!REMARKETING_REAL) return DEMO_NOTIFS;

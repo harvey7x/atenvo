@@ -1,0 +1,275 @@
+/* =====================================================================
+   Cards de métrica da Reviza (CartaoMetrica.tsx). Reusa as classes do
+   Progress Metric Card (pmc-*: gráfico pequeno, balão, troca curva/barras,
+   menu do período — CSS injetado pelo componente) e aqui põe a medida e a
+   cara da casa. Formato de 21/11: ícone + título em cima; número à esquerda
+   e gráfico pequeno à direita; a variação num selo discreto embaixo.
+   Especificidade: .v2 .pmc-root.rvm (0,3,0) vence o .pmc-root do card.
+   Classes com prefixo rvm-/rvo- (cm-* e mtc-* já existem em outras telas).
+   ===================================================================== */
+
+/* ---- grade: 4 (ou 3) por linha · 2 em tela média · 1 no celular ---- */
+.v2 .pmc-grade-caixa { container-type: inline-size; container-name: pmcgrade; min-width: 0; }
+.v2 .pmc-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.v2 .pmc-grade[data-col="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container pmcgrade (max-width: 1000px) {
+  .v2 .pmc-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container pmcgrade (max-width: 760px) {
+  .v2 .pmc-grade[data-col="3"] { grid-template-columns: minmax(0, 1fr); }
+}
+@container pmcgrade (max-width: 520px) {
+  .v2 .pmc-grade { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+
+/* ---- o card ---- */
+.v2 .pmc-root.rvm {
+  --pmc-card: var(--vidro-a);
+  --pmc-text: var(--txt);
+  --pmc-muted: rgba(var(--tint), .08);
+  --pmc-muted-text: var(--txt-3);
+  --pmc-border: var(--lin-fio, var(--linha));
+  --pmc-ring: var(--cor-acento-fio, rgba(var(--tint), .3));
+  --rvm-pad: 16px;
+  --rvm-sombra: 0 18px 40px -18px rgba(0, 0, 0, .7);
+  min-height: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px var(--rvm-pad) 12px;
+  overflow: visible;                 /* o menu do período e o balão podem passar da borda */
+  border: 1px solid var(--pmc-border);
+  border-radius: var(--r-cartao, 12px);
+  background: var(--vidro-a);
+  box-shadow: none;
+  font-family: var(--fonte);
+  font-size: 13px;
+  color: var(--txt);
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s ease, border-color .22s ease;
+}
+:root[data-tema="light"] .v2 .pmc-root.rvm { --rvm-sombra: 0 16px 36px -16px rgba(16, 24, 40, .2); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .v2 .pmc-root.rvm:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: var(--rvm-sombra);
+    border-color: var(--lin-fio-hover, rgba(var(--tint), .16));
+    z-index: 3;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .v2 .pmc-root.rvm:hover { border-color: var(--lin-fio-hover, rgba(var(--tint), .16)); }
+}
+
+/* cabeçalho: ícone + título à esquerda; período, campanha ou selo à direita */
+.v2 .pmc-root.rvm .rvm-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
+.v2 .pmc-root.rvm .rvm-cab-esq { display: flex; align-items: center; min-width: 0; }
+.v2 .pmc-root.rvm .rvm-ico { display: none; }
+.v2 .pmc-root.rvm .rvm-tit {
+  margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12.5px; font-weight: 500; letter-spacing: 0; color: var(--txt-2);
+}
+.v2 .pmc-root.rvm .rvm-tit-det { font-size: 11.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-tit-ajuda { display: inline-flex; align-items: center; gap: 4px; }
+.v2 .pmc-root.rvm .rvm-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; }
+.v2 .pmc-root.rvm .pmc-period__btn { font-size: 12px; gap: 2px; padding: 2px 4px 2px 6px; border-radius: 6px; color: var(--txt-3); white-space: nowrap; }
+.v2 .pmc-root.rvm .pmc-period__btn:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .pmc-root.rvm .pmc-period__chevron { width: 14px; height: 14px; }
+.v2 .pmc-root.rvm .pmc-menu { min-width: 132px; border-radius: 10px; padding: 4px; gap: 2px; background: var(--rp-menu, var(--surface)); box-shadow: var(--sombra-2, 0 12px 32px rgba(0, 0, 0, .3)); }
+.v2 .pmc-root.rvm .pmc-menu__option { padding: 6px 10px; font-size: 12.5px; border-radius: 7px; }
+.v2 .pmc-root.rvm .rvm-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; max-width: 58%;
+  height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--pmc-border);
+  background: rgba(var(--tint), .04); color: var(--txt-2);
+  font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .pmc-root.rvm .rvm-chip i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+
+/* o meio: o número (e a linha miúda) à esquerda; o gráfico pequeno à direita */
+.v2 .pmc-root.rvm .rvm-meio { display: flex; align-items: flex-end; gap: 14px; min-height: 46px; }
+.v2 .pmc-root.rvm .rvm-num { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; min-width: 0; max-width: 100%; }
+.v2 .pmc-root.rvm .rvm-linha { display: flex; align-items: baseline; gap: 6px; }
+.v2 .pmc-root.rvm .rvm-val {
+  font-size: var(--fs-26, 26px); font-weight: var(--fw-titulo, 650); letter-spacing: -.02em; line-height: 1.1;
+  font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--lin-branco, var(--txt));
+}
+.v2 .pmc-root.rvm .rvm-un { font-size: 12.5px; font-weight: 500; color: var(--txt-3); white-space: nowrap; }
+.v2 .pmc-root.rvm .rvm-numsub { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pmc-root.rvm .rvm-numsub b { color: var(--txt-2); font-weight: 550; font-variant-numeric: tabular-nums; }
+.v2 .pmc-root.rvm .rvm-graf { position: relative; z-index: 2; flex: 1 1 0; min-width: 64px; height: 46px; }
+.v2 .pmc-root.rvm .pmc-tip { border-radius: 8px; padding: 6px 10px; background: var(--rp-menu, var(--surface)); box-shadow: var(--sombra-2, 0 10px 28px rgba(0, 0, 0, .3)); }
+.v2 .pmc-root.rvm .pmc-tip__row { font-size: 12.5px; font-weight: 600; }
+.v2 .pmc-root.rvm .pmc-tip-wrap[data-side="right"] .pmc-tip { transform: translate(16px, -50%); }
+.v2 .pmc-root.rvm .rvm-graf.rvm-graf-carregando { border-radius: 8px; background: rgba(var(--tint), .04); animation: pmc-pulse 2s cubic-bezier(.4, 0, .6, 1) infinite; }
+.v2 .pmc-root.rvm.rvm-carregando .rvm-val { color: var(--txt-3); }
+@media (prefers-reduced-motion: reduce) { .v2 .pmc-root.rvm .rvm-graf.rvm-graf-carregando { animation: none; } }
+
+/* rodapé: o selo da variação + a comparação; a troca curva/barras aparece ao passar o mouse */
+.v2 .pmc-root.rvm .rvm-pe { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin-top: auto; }
+.v2 .pmc-root.rvm .rvm-delta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-var {
+  display: inline-flex; align-items: center; gap: 3px; margin-right: 7px; padding: 2px 6px; border-radius: 6px; vertical-align: middle;
+  font-size: 11.5px; font-weight: 550; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.v2 .pmc-root.rvm .rvm-var svg { width: 11px; height: 11px; }
+.v2 .pmc-root.rvm .rvm-t-bom { color: var(--cor-ok-txt, var(--verde)); background: var(--cor-ok-suave, rgba(var(--verde-rgb), .12)); }
+.v2 .pmc-root.rvm .rvm-t-ruim { color: var(--cor-erro-txt, var(--rubro)); background: var(--cor-erro-suave, rgba(var(--rubro-rgb), .12)); }
+.v2 .pmc-root.rvm .rvm-t-neutro { color: var(--txt-2); background: rgba(var(--tint), .07); }
+.v2 .pmc-root.rvm .rvm-delta .d5-var { display: inline-flex; align-items: center; gap: 7px; }
+.v2 .pmc-root.rvm .rvm-delta .d5-var-ctx { font-size: 12px; color: var(--txt-3); }
+.v2 .pmc-root.rvm .pmc-toggle { padding: 1px; border-radius: 7px; background: transparent; border-color: var(--pmc-border); }
+.v2 .pmc-root.rvm .pmc-toggle__btn { width: 24px; height: 22px; border-radius: 6px; }
+.v2 .pmc-root.rvm .pmc-toggle__btn svg { width: 13px; height: 13px; }
+@media (hover: hover) {
+  .v2 .pmc-root.rvm:not(.rvm-series) .rvm-pe .pmc-toggle { opacity: 0; transition: opacity .18s ease; }
+  /* parado, o seletor de vista sai do fluxo: o texto da variação usa a linha inteira (não corta) */
+  .v2 .pmc-root.rvm:not(.rvm-series):not(:hover):not(:focus-within) .rvm-pe .pmc-toggle { position: absolute; pointer-events: none; }
+  .v2 .pmc-root.rvm:not(.rvm-series):is(:hover, :focus-within) .rvm-pe .pmc-toggle { opacity: 1; }
+}
+
+/* ---- bloco de cards com o título por fora ---- */
+.v2 .rvm-bloco { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2 .rvm-bloco-cab { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.v2 .rvm-bloco-tx { min-width: 0; }
+.v2 .rvm-bloco-tit { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-16, 16px); font-weight: 600; letter-spacing: -.012em; color: var(--txt); }
+.v2 .rvm-bloco-sub { margin: 3px 0 0; max-width: 78ch; font-size: 12.5px; line-height: 1.45; color: var(--txt-3); }
+.v2 .rvm-bloco-acao { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.v2 .rvm-nota { margin: -2px 0 0; font-size: 12px; color: var(--txt-3); }
+
+/* ---- "Carteira agora": número com a barra proporcional embaixo ---- */
+.v2 .rvm-celbar { display: inline-flex; flex-direction: column; align-items: center; gap: 5px; }
+.v2 .rvm-barra { display: block; width: 104px; height: 4px; overflow: hidden; border-radius: 3px; background: rgba(var(--tint), .07); }
+.v2 .rvm-barra i { display: block; height: 100%; border-radius: 3px; background: var(--dado-1); }
+.v2 .rvm-barra-alerta i { background: var(--rubro); }
+
+/* =====================================================================
+   CARD DE VÁRIAS SÉRIES (as ondas) e o gráfico dele (rvo-*)
+   ===================================================================== */
+.v2 .pmc-root.rvm.rvm-series { gap: 12px; padding: 18px 20px 14px; --rvm-pad: 20px; }
+.v2 .pmc-root.rvm .rvm-series-cab { align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; }
+.v2 .pmc-root.rvm .rvm-series-tx { min-width: 0; }
+.v2 .pmc-root.rvm .rvm-series-tit { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-16, 16px); font-weight: 600; letter-spacing: -.012em; color: var(--txt); }
+.v2 .pmc-root.rvm .rvm-series-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-series-acao { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.v2 .pmc-root.rvm .rvm-series-acao .d5-ondas-sels { display: inline-flex; gap: 8px; }
+.v2 .pmc-root.rvm .rvm-series-topo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; }
+.v2 .pmc-root.rvm .rvm-leg { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.v2 .pmc-root.rvm .rvm-leg-bt {
+  display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; color: var(--txt-2);
+  font: inherit; font-size: 12px; cursor: pointer; transition: opacity .15s ease, background-color .15s ease;
+}
+.v2 .pmc-root.rvm .rvm-leg-bt:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .pmc-root.rvm .rvm-leg-bt:focus-visible { outline: 2px solid var(--pmc-ring); outline-offset: 1px; }
+.v2 .pmc-root.rvm .rvm-leg-bt i { width: 8px; height: 8px; flex: none; border-radius: 3px; }
+.v2 .pmc-root.rvm .rvm-leg-bt b { font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] { opacity: .45; }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] i { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-leg-bt[aria-pressed="false"] .rvm-leg-nome { text-decoration: line-through; }
+.v2 .pmc-root.rvm .rvm-leg-nota { font-size: 11px; font-weight: 500; color: var(--txt-3); }
+.v2 .pmc-root.rvm .rvm-leg-er { color: var(--cor-erro-txt, var(--rubro)); }
+.v2 .pmc-root.rvm.rvm-series .rvm-pe { padding-top: 10px; border-top: 1px solid var(--linha); }
+.v2 .pmc-root.rvm .rvm-series-stats { gap: 8px; font-size: 12px; white-space: nowrap; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .v2 .pmc-root.rvm.rvm-series:hover { transform: none; box-shadow: none; }   /* é um gráfico para ler, não um número para destacar */
+}
+
+/* o gráfico: escala à esquerda (34px), o desenho e os dias embaixo (20px) */
+.v2 .rvo { position: relative; height: 264px; padding: 8px 0 22px 38px; }
+.v2 .rvo-vazio { display: flex; align-items: center; height: 120px; padding: 0; font-size: 12.5px; color: var(--txt-3); }
+.v2 .rvo-escala { position: absolute; left: 0; top: 8px; bottom: 22px; width: 30px; }
+.v2 .rvo-escala span { position: absolute; right: 0; transform: translateY(-50%); font-size: 10.5px; color: var(--txt-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2 .rvo-plot { position: relative; height: 100%; outline: none; border-radius: 6px; cursor: crosshair; touch-action: pan-y; }
+.v2 .rvo-plot:focus-visible { box-shadow: 0 0 0 2px var(--pmc-ring); }
+.v2 .rvo-grade { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(var(--tint), .09); pointer-events: none; }
+.v2 .rvo-grade.rvo-base { border-top: 1px solid rgba(var(--tint), .14); }
+.v2 .rvo-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.v2 .rvo-barras { position: absolute; inset: 0; display: flex; align-items: flex-end; pointer-events: none; }
+/* barras empilhadas (24/11, "mais bonito"): cada pedaço é uma peça própria com canto arredondado e degradê leve
+   (como as barrinhas dos cartões), o de cima com o topo bem redondo; o total em cima da coluna; passar o mouse num
+   dia apaga os outros; passar o mouse num nome da legenda acende só aquela série. */
+.v2 .rvo-col { position: relative; flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.v2 .rvo-pilha { display: flex; flex-direction: column-reverse; gap: 2px; width: min(44px, 52%); min-height: 0; transition: opacity .16s ease; }
+.v2 .rvo-pilha i {
+  display: block; min-height: 3px; border-radius: 3px;
+  background: var(--c); background: linear-gradient(180deg, var(--c) 0%, color-mix(in srgb, var(--c) 80%, #fff) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2); transition: opacity .16s ease;
+}
+.v2 .rvo-pilha i:last-of-type { border-top-left-radius: 8px; border-top-right-radius: 8px; }
+html[data-tema="dark"] .v2 .rvo-pilha i { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, #fff) 0%, var(--c) 100%); box-shadow: none; }
+.v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-pilha { opacity: .36; }
+.v2 .rvo-barras.com-destaque .rvo-pilha i:not(.dest) { opacity: .16; }
+/* no escuro, laranja transparente vira marrom: o que apaga vira cinza (sem cor) em vez de transparente */
+html[data-tema="dark"] .v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-pilha { opacity: 1; filter: grayscale(1) brightness(.5); }
+html[data-tema="dark"] .v2 .rvo-barras.com-destaque .rvo-pilha i:not(.dest) { opacity: 1; filter: grayscale(1) brightness(.32); }
+.v2 .rvo-tot {
+  position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none;
+  font-size: 11px; font-weight: 500; line-height: 1; color: var(--txt-3); font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 1px 4px; border-radius: 4px; background: var(--pmc-card, var(--vidro-a));   /* a linha da média não risca o número */
+  transition: color .16s ease, opacity .16s ease;
+}
+.v2 .rvo-col.on .rvo-tot { color: var(--txt); font-weight: 600; }
+.v2 .rvo-barras.com-ativo .rvo-col:not(.on) .rvo-tot, .v2 .rvo-barras.com-destaque .rvo-tot { opacity: .4; }
+/* a linha da média passa por trás das colunas; o tracejadinho igual no rodapé diz o que ela é */
+.v2 .rvo-media { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(var(--tint), .34); pointer-events: none; }
+.v2 .pmc-root.rvm .rvm-stat-media { display: inline-flex; align-items: center; gap: 4px; }
+.v2 .pmc-root.rvm .rvm-tracejado { width: 14px; height: 0; border-top: 1.5px dashed rgba(var(--tint), .45); margin-right: 2px; }
+.v2 .rvo-guia { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid rgba(var(--tint), .22); pointer-events: none; }
+.v2 .rvo-ponto {
+  position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 2.5px var(--vidro-a), 0 0 0 3.5px rgba(var(--tint), .12);
+}
+.v2 .rvo-balao {
+  position: absolute; top: 6px; z-index: 5; pointer-events: none; min-width: 168px;
+  display: flex; flex-direction: column; gap: 5px; padding: 9px 11px; border-radius: 10px;
+  transform: translateX(12px);
+  background: var(--rp-menu, var(--surface)); border: 1px solid var(--pmc-border);
+  box-shadow: var(--sombra-2, 0 12px 32px rgba(0, 0, 0, .28));
+  font-size: 12px; color: var(--txt-2);
+}
+.v2 .rvo-balao.esq { transform: translateX(calc(-100% - 12px)); }
+.v2 .rvo-balao.bar { transform: translateX(32px); }
+.v2 .rvo-balao.bar.esq { transform: translateX(calc(-100% - 32px)); }
+.v2 .rvo-balao-l.zero { opacity: .42; }
+.v2 .rvo-balao-t { font-size: 12px; font-weight: 600; color: var(--txt); margin-bottom: 1px; }
+.v2 .rvo-balao-l { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.v2 .rvo-balao-l i { width: 7px; height: 7px; flex: none; border-radius: 2px; }
+.v2 .rvo-balao-l span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rvo-balao-l b { color: var(--txt); font-weight: 600; font-variant-numeric: tabular-nums; }
+.v2 .rvo-balao-tot { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--linha); }
+.v2 .rvo-eixo { position: absolute; left: 38px; right: 0; bottom: 0; height: 16px; }
+.v2 .rvo-eixo span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; font-size: 10.5px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .rvo-eixo span[data-lado="ini"] { transform: none; }
+.v2 .rvo-eixo span[data-lado="fim"] { transform: translateX(-100%); }
+.v2 .rvo-eixo span.on { color: var(--txt); font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) {
+  .v2 .rvo-svg { animation: rvo-revela .9s cubic-bezier(.4, 0, .2, 1) backwards; }
+  .v2 .rvo-pilha { transform-origin: bottom; animation: rvo-cresce .55s cubic-bezier(.2, .8, .2, 1) backwards; }
+  .v2 .rvo-balao { animation: rvo-surge .14s ease-out backwards; }
+  .v2 .rvo-tot { animation: rvo-surge .3s ease-out backwards; }
+  .v2 .rvo-guia, .v2 .rvo-ponto, .v2 .rvo-balao { transition: left .1s ease-out, top .1s ease-out; }
+}
+@keyframes rvo-revela { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes rvo-cresce { from { transform: scaleY(0); } }
+@keyframes rvo-surge { from { opacity: 0; } }
+@media (max-width: 760px) {
+  .v2 .rvo { height: 216px; }
+  .v2 .pmc-root.rvm .rvm-series-stats { display: none; }
+}
+
+/* =====================================================================
+   OS INDICADORES DAS OUTRAS TELAS (Novos, Cancelados, Envios, Registros,
+   Conversas, Atendentes, Números…): sobem e crescem um pouco ao passar o
+   mouse, como os cards de métrica. Não têm histórico: sem gráfico.
+   ===================================================================== */
+html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  position: relative;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s ease, border-color .22s ease;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .7);
+    z-index: 3;
+  }
+  html[data-barra-alfa][data-barra-alfa][data-barra-alfa][data-barra-alfa][data-tema="light"]:not(#rv-met) .v2 :is(.kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover {
+    box-shadow: 0 16px 36px -16px rgba(16, 24, 40, .2);
+  }
+}

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   WA_REAL, useWaConversations, useWaMensagens, useSendWaMessage, useAtribuirAtendimento,
   useWaCanais, useWaCanalEnvioSaude, useIniciarConversaWa,
-  waMarcarLida, waArquivar, waFixar, removerMensagemFalha, subirMidiaWa,
+  waMarcarLida, waArquivar, waFixar, waReagir, removerMensagemFalha, subirMidiaWa,
   buscarConversasAgora, patchOtimistaLista, pedirBuscaAlvo, useIaEstadoConversa, useIaPausarParaResponder,
 } from '@/data/whatsapp';
 import { WA_CONTACTS, type WaContact, type WaMessage } from '@/data/whatsappDemo';
@@ -92,6 +92,17 @@ export function useInboxWhatsApp(opts: {
   const visRef = useRef(vis);
   visRef.current = vis;
   const naListaVisivel = !!currentId && (vis.veTodos || (live.data ?? []).some((c) => c.id === currentId));
+  // demonstração/prévia: a conversa aberta de início é a primeira do exemplo. Se ela não é de quem está
+  // olhando (visibilidade e equipes), abre a primeira que a pessoa pode ver — ou nenhuma
+  const veEquipeDemo = vis.veEquipe; const veTodosDemo = vis.veTodos; const uidDemo = vis.uid;
+  useEffect(() => {
+    if (WA_REAL || veTodosDemo) return;
+    const pode = (c: WaContact) => visRef.current.podeVer(c.respId, c.canalId);
+    const atual = contacts.find((c) => c.id === currentId);
+    if (atual && pode(atual)) return;
+    const primeira = contacts.find(pode);
+    if ((primeira?.id ?? '') !== currentId) setCurrentId(primeira?.id ?? '');
+  }, [contacts, currentId, veEquipeDemo, veTodosDemo, uidDemo]);
   const msgsQ = useWaMensagens(WA_REAL && naListaVisivel ? currentId : null);
   const historicoRef = useRef<WaMessage[] | undefined>(undefined);
   historicoRef.current = msgsQ.data;
@@ -112,7 +123,7 @@ export function useInboxWhatsApp(opts: {
       // falhou: a recarga completa já foi pedida — segue protegida por mais alguns segundos
       if (!ok) { alvoPendenteRef.current = { id, ate: Date.now() + 8_000 }; return; }
       alvoPendenteRef.current = null;
-      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId));
+      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId, c.canalId));
       if (lista) setCurrentId((cur) => (cur === id ? selecaoValida(cur, lista) : cur));
     });
   }, [orgId, qc]);
@@ -622,20 +633,26 @@ export function useInboxWhatsApp(opts: {
   // da recarga completa de antes; o UPDATE de conversas do realtime confirma (e o confirmar() no
   // sucesso recarimba contra busca que leu antes do commit). Erro = desfaz os campos tocados +
   // recarga completa (raro).
-  const marcarLida = useCallback(async (lida: boolean) => {
-    if (!current.id) return;
-    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { unread: lida ? 0 : 1 })); return; }
+  // por id (26/11): a seleção de várias conversas usa as mesmas ações; sem id = a conversa aberta.
+  // `silencioso` = sem o aviso de sucesso (a seleção avisa uma vez no fim).
+  const marcarLida = useCallback(async (lida: boolean, conversaId?: string) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    const naoLidasAntes = conversaId ? (contacts.find((c) => c.id === conversaId)?.unread ?? 0) : (current.unread ?? 0);
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { unread: lida ? 0 : 1 })); return; }
     // mesma regra da RPC wa_marcar_lida: lida → 0; não lida → greatest(nao_lidas, 1)
-    const otimista = patchOtimistaLista(qc, orgId, current.id, { unread: lida ? 0 : Math.max(current.unread ?? 0, 1) });
-    try { await waMarcarLida(current.id, lida); otimista.confirmar(); }
+    const otimista = patchOtimistaLista(qc, orgId, id, { unread: lida ? 0 : Math.max(naoLidasAntes, 1) });
+    try { await waMarcarLida(id, lida); otimista.confirmar(); }
     catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao marcar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current.id, current.unread, orgId]);
-  const arquivar = useCallback(async (arq: boolean) => {
-    if (!current.id) return;
-    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { arquivada: arq })); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); return; }
-    const otimista = patchOtimistaLista(qc, orgId, current.id, { arquivada: arq });
-    try { await waArquivar(current.id, arq); otimista.confirmar(); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); }
+  }, [current.id, current.unread, orgId, contacts]);
+  const arquivar = useCallback(async (arq: boolean, conversaId?: string, silencioso?: boolean) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    const okTxt = arq ? 'Conversa arquivada' : 'Conversa desarquivada';
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { arquivada: arq })); if (!silencioso) aoAvisar({ tom: 'ok', texto: okTxt }); return; }
+    const otimista = patchOtimistaLista(qc, orgId, id, { arquivada: arq });
+    try { await waArquivar(id, arq); otimista.confirmar(); if (!silencioso) aoAvisar({ tom: 'ok', texto: okTxt }); }
     catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao arquivar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id, orgId]);
@@ -651,6 +668,38 @@ export function useInboxWhatsApp(opts: {
     catch (e) { setContacts((cur) => patchConversa(cur, id, { fixada: !fix })); otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao fixar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id, orgId]);
+  /* encaminhar (26/11, igual ao sistema que a Reviza usava antes): a mensagem — texto ou a mídia já guardada — vai para
+     OUTRA conversa, pelo número dela. O servidor confere tudo de novo (quem pode, opt-out, número conectado). */
+  const encaminhar = useCallback(async (m: WaMessage, alvoId: string): Promise<string> => {
+    const alvo = contacts.find((c) => c.id === alvoId);
+    if (!alvo) throw new Error('Conversa de destino não encontrada.');
+    const temMidia = !!m.anexoPath && ['imagem', 'video', 'audio', 'documento'].includes(m.tipo ?? '');
+    const texto = m.tipo === 'audio' ? '' : (m.text || '').trim();
+    if (!temMidia && !texto) throw new Error('Esta mensagem não tem o que encaminhar.');
+    if (!WA_REAL) return alvo.name;
+    await sendMut.mutateAsync({
+      conversaId: alvoId, canalId: alvo.canalId ?? null, text: texto || undefined,
+      ...(temMidia ? { midiaPath: m.anexoPath, midiaTipo: m.tipo, midiaMime: m.mime, midiaNome: m.nome, midiaTamanho: m.tamanho ?? undefined } : {}),
+    });
+    return alvo.name;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts]);
+  /* reagir (26/11): emoji na mensagem; otimista no histórico aberto, desfaz se o WhatsApp recusar */
+  const reagir = useCallback(async (m: WaMessage, emoji: string) => {
+    if (!m.id || !current.id) return;
+    const patch = (v: string | undefined) => qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (Array.isArray(old) ? old.map((x) => (x.id === m.id ? { ...x, minhaReacao: v } : x)) : old));
+    const antes = m.minhaReacao ?? undefined;
+    setContacts((cur) => cur.map((c) => (c.id !== current.id ? c : { ...c, msgs: c.msgs.map((x) => (x.id === m.id ? { ...x, minhaReacao: emoji || undefined } : x)) })));
+    patch(emoji || undefined);
+    if (!WA_REAL) return;
+    try { await waReagir(current.id, m.id, emoji, replyCanalId || current.canalId); }
+    catch (e) {
+      setContacts((cur) => cur.map((c) => (c.id !== current.id ? c : { ...c, msgs: c.msgs.map((x) => (x.id === m.id ? { ...x, minhaReacao: antes } : x)) })));
+      patch(antes);
+      aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'O WhatsApp não aceitou a reação.' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current.id, current.canalId, replyCanalId]);
   /** patch local otimista de edição (nome/email/observações/responsável) — o await fica na página (acoes.atualizarContato). */
   const aplicarEdicaoLocal = useCallback((patch: Partial<WaContact>) => {
     if (current.id) setContacts((cur) => patchConversa(cur, current.id, patch));
@@ -664,7 +713,7 @@ export function useInboxWhatsApp(opts: {
     // antes de selecionar. Se a busca falhar ou não trouxer a conversa, cai na recarga completa.
     tentadosRef.current.add(r.conversaId);
     const ok = await buscarConversasAgora(orgId, { ids: [r.conversaId] });
-    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId));
+    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId, c.canalId));
     if (!ok || !naLista) await live.refetch();
     canalManualRef.current = canalId;
     setReplyCanalId(canalId);
@@ -696,6 +745,6 @@ export function useInboxWhatsApp(opts: {
     enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
     scriptEnviarEtapa, scriptEnviarMidia,
     atribuindo, assumir, devolver, transferir,
-    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa,
+    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa, encaminhar, reagir,
   };
 }

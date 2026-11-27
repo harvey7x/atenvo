@@ -1,0 +1,53 @@
+/* ATENDIMENTO › AUTOMAÇÕES (26/11). Neutros do tema; o laranja só nos botões principais. */
+.v2 .aut { display: flex; flex-direction: column; gap: 14px; }
+.v2 .aut .ph .acoes { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
+.v2 .aut .ph > div:first-child { min-width: 0; flex: 1 1 auto; }
+.v2 .aut .ph .cfga-sub { max-width: 560px; }
+.v2 .aut-barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .aut-busca { width: 240px; height: 34px; font-size: 13px; margin-left: auto; }
+.v2 .aut-barra > .p-btn:last-child, .v2 .aut-barra > button:last-child:not([role]) { margin-left: auto; }
+.v2 .aut-busca + .p-btn, .v2 .aut-busca + button { margin-left: 0; }
+.v2 .aut-seqs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.v2 .aut-seqs > li { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--linha); }
+.v2 .aut-seqs > li:first-child { border-top: 0; padding-top: 2px; }
+.v2 .aut-seqs > li.desl .aut-seq-tx b { color: var(--txt-3); }
+.v2 .aut-seq-tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .aut-seq-tx b { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.v2 .aut-seq-tx span { font-size: 12.5px; color: var(--txt-2); line-height: 1.45; }
+.v2 .aut-seq-tx small { font-size: 12px; color: var(--txt-3); line-height: 1.45; }
+.v2 .aut-seq-tx small b { font-size: 12px; color: var(--txt); font-weight: 600; }
+.v2 .aut-seq-ac { display: flex; align-items: center; gap: 10px; flex: none; }
+.v2 .aut-mini { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.v2 .aut-mini li { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; font-size: 12px; color: var(--txt-2); }
+.v2 .aut-mini li em { font-style: normal; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.aut-grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.aut-grade2 .pn-us-campo > span { font-size: 12px; font-weight: 500; color: var(--txt-2); }
+.aut-passos { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.aut-passos > li { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); }
+.aut-passo-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.aut-passo-n { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 600; color: var(--txt); background: rgba(var(--tint), .08); }
+.aut-passo-espera { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); }
+.aut-passos .aut-passo-cab .inp { height: 30px; font-size: 12.5px; width: auto; min-width: 0; flex: none; }
+.aut-passos .aut-passo-cab .aut-passo-tipo { margin-left: auto; }
+.aut-passo-ac { display: inline-flex; gap: 2px; }
+.aut-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.aut-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 7px; font-size: 12.5px; color: var(--txt); box-shadow: 0 0 0 1px var(--linha) inset; background: rgba(var(--tint), .03); }
+.aut-tag em { font-style: normal; font-size: 11px; color: var(--txt-3); }
+.aut-tag button { all: unset; cursor: pointer; padding: 0 3px; color: var(--txt-3); }
+.aut-tag button:hover { color: var(--txt); }
+.aut-linha { display: flex; gap: 8px; }
+.aut-linha .inp:first-child { flex: 1; min-width: 0; }
+.aut-linha select.inp { width: 140px; }
+.aut-teste .badge, .aut-teste [class*="badge"] { align-self: flex-start; margin-top: 6px; }
+@media (max-width: 640px) { .aut-grade2 { grid-template-columns: minmax(0, 1fr); } .v2 .aut-busca { width: 100%; margin-left: 0; } }
+/* aplicar uma sequência (no WhatsApp) */
+.aplseq-quando { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.aplseq-op { all: unset; cursor: pointer; font-size: 12.5px; padding: 6px 12px; border-radius: 7px; box-shadow: 0 0 0 1px var(--linha) inset; color: var(--txt-2); }
+.aplseq-op.on { background: rgba(var(--tint), .08); color: var(--txt); font-weight: 600; box-shadow: 0 0 0 1px rgba(var(--tint), .3) inset; }
+.aplseq-op:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+.aplseq-quando .inp { height: 32px; font-size: 12.5px; width: auto; }
+.aplseq-previa { margin: 0; padding: 10px 12px; list-style: none; display: flex; flex-direction: column; gap: 6px; border-radius: 10px; background: rgba(var(--tint), .03); box-shadow: 0 0 0 1px var(--linha) inset; }
+.aplseq-previa li { display: grid; grid-template-columns: 118px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.aplseq-previa em { font-style: normal; color: var(--txt-2); font-variant-numeric: tabular-nums; text-transform: capitalize; }
+.aplseq-previa span { color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aplseq-previa small { font-size: 11px; color: var(--txt-3); }

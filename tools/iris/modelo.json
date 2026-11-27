@@ -1,0 +1,21 @@
+{
+  "tipo": "atendente-atenvo",
+  "versao": 1,
+  "para": "[NOME DO CLIENTE]",
+  "feitoEm": "[DD/MM/AAAA]",
+  "nota": "[O QUE MUDOU NESTA VERSAO, EM UMA FRASE]",
+  "nome": "Iris",
+  "provedor": "gemini",
+  "modelo": "gemini-3.6-flash",
+  "personaPrompt": "[TEXTO DA PERSONALIDADE E INSTRUCOES]",
+  "conhecimento": "[O QUE A EMPRESA FAZ, PRECOS, PRAZOS, ENDERECO, PERGUNTAS FREQUENTES]",
+  "comportamentos": {
+    "horario": { "ativo": true, "inicio": "09:00", "fim": "19:00" },
+    "janela": { "inicio": "07:30", "fim": "21:30" },
+    "nudges_ativos": true,
+    "max_chamadas_dia": 500,
+    "proibidos": [],
+    "permitir_emojis": false,
+    "simular_digitacao": true
+  }
+}

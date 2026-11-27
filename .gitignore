@@ -11,3 +11,5 @@ atenvo-dist-*.zip
 !.env.example
 .DS_Store
 preview.log
+dist-previa
+dist-previa-*

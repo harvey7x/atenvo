@@ -9,6 +9,7 @@ export type SlaTipo =
   | 'parado_ha_muito_tempo'
   | 'prazo_2_dias_em_risco'
   | 'prazo_2_dias_estourado'
+  | 'janela_expirando'
   | 'vacuo_aviso'
   | 'robo_ligar'
   | 'vacuo_cutucada'
@@ -63,6 +64,7 @@ export const TIPO_META: Record<SlaTipo, { label: string; emoji: string }> = {
   parado_ha_muito_tempo: { label: 'Parado no Kanban', emoji: '⏳' },
   prazo_2_dias_em_risco: { label: 'Prazo em risco', emoji: '⏰' },
   prazo_2_dias_estourado: { label: '2 dias sem fechamento', emoji: '🚨' },
+  janela_expirando: { label: 'Janela fechando', emoji: '⌛' },
   // Radar de Atendimento: avisos escalonados (amarelo=1º, vermelho=2º, crítico=último) — negociação
   vacuo_aviso: { label: 'Cliente em negociação aguardando', emoji: '•' },
   // Radar: cliente FECHADO aguardando resposta — fila própria, separada da negociação (dono 29/10)
@@ -124,6 +126,7 @@ export function fraseTipo(t: SlaTipo): string {
     case 'parado_ha_muito_tempo': return 'Parado no Kanban';
     case 'prazo_2_dias_em_risco': return 'Perto do prazo de 2 dias';
     case 'prazo_2_dias_estourado': return '2 dias sem fechamento';
+    case 'janela_expirando': return 'Janela de 24h fechando';
     default: return tipoLabel(t);
   }
 }

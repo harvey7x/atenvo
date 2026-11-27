@@ -1,0 +1,10 @@
+/* DASHBOARD › FINANCEIRO (26/11): as barras com valor em reais precisam de mais espaço que as de contagem */
+.v2 .fin .rsd-escolha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .fin-resp { width: 200px; height: 34px; font-size: 13px; }
+.v2 .fin-barras li { grid-template-columns: minmax(110px, 1.2fr) minmax(70px, 2fr) 104px; }
+.v2 .fin-barras .rsd-b-n { white-space: nowrap; }
+.v2 .fin-lnk { all: unset; cursor: pointer; color: var(--txt); font-weight: 500; text-decoration: underline; text-decoration-color: rgba(var(--tint), .3); text-underline-offset: 3px; }
+.v2 .fin-lnk:hover { text-decoration-color: currentColor; }
+.v2 .fin-lnk:focus-visible { outline: 2px solid var(--txt); outline-offset: 2px; }
+.v2 .fin-tab td, .v2 .fin-tab th { text-align: center; }
+.v2 .fin-tab td:first-child, .v2 .fin-tab th:first-child { text-align: left; }

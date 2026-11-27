@@ -1,0 +1,579 @@
+/* =====================================================================
+   GRAFITE (dono 21/11, referência de painel financeiro escuro): "vamos
+   deixar o nosso sistema nessa pegada".
+   - a barra lateral FIXA, num painel de cantos arredondados, com os grupos
+     em caixa alta (abrem e fecham) e os itens INTERLIGADOS por uma linha;
+   - ESCURO: chão preto + cartões em cinza grafite;
+   - CLARO: chão em branco mais escuro + cartões brancos (a barra também
+     fica clara);
+   - o destaque puxa para o laranja da referência; o item ativo do menu é
+     uma pílula com o laranja entrando pela direita; botão principal laranja.
+   Mesma chave das camadas anteriores ([data-moldura] + [data-barra-alfa]).
+   Importado por ÚLTIMO; o prefixo leva DOIS :not(#id) — vence todas as
+   camadas de antes (um id cada) sem depender da ordem.
+
+   22/11 — LOGO NOVA DO DONO ("a outra tava muito escura, muito laranja…
+   coloca as cores do sistema para algo mais assim"): a cor principal sai
+   da própria letra da logo, que vai do creme ao laranja:
+     creme #FCEBDB · pêssego #FAB882 · principal #F48349 · brasa #ED642E
+   O destaque fica mais claro e mais suave que o dourado de antes; o
+   degradê creme→laranja é a assinatura (botão principal, coluna acesa do
+   gráfico, painel das telas de acesso). Os cinzas ganham um fio de calor
+   (o preto da logo puxa para o marrom) e a queda/atraso vai para o
+   tijolo, para não se confundir com o laranja.
+
+   23/11 — ESCURO DE VERDADE (dono: "na cor escura tá com uma cor muito
+   amarronzada, eu preciso de um escuro"): os cinzas do ESCURO voltam ao
+   neutro do dia 21/11 (preto + grafite, sem o fio de calor) e o laranja
+   deixa de ser usado translúcido sobre o preto — ver a seção 12. O tema
+   claro não mudou.
+   ===================================================================== */
+
+/* ---- 0. CORES ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 {
+  --base: #0A0A0B;
+  --vidro-a: #151517; --vidro-b: #151517; --surface: #1C1C1F;
+  --linha: #222226; --fio-a: #27272B; --fio-b: #27272B; --line-2: #27272B;
+  --txt: #F2F2F3; --txt-2: #A8A8AF; --txt-3: #7D7D86;
+  --rp-elev: #232327; --rp-menu: #18181B; --rp-campo: #101012; --rp-campo-fio: #2A2A2F; --rp-campo-fio-hover: #3B3B41;
+  --rp-trilho: #101012; --rp-cartao-solido: #151517;
+  --lin-branco: #FAFAFA; --lin-nevoa: #D6D6DA; --lin-fio: #232327; --lin-fio-hover: #36363C;
+  --lin-grafite: #232327; --lin-obsidiana: #1C1C1F; --lin-tinta-botao: #0A0A0B;
+  --d5-fio: #202024; --d5-fio-forte: #2D2D32;
+  --azul: #F48349; --azul-rgb: 244, 131, 73; --platina-a: #F48349; --platina-b: #F48349;
+  --gf-creme: #FCEBDB; --gf-pessego: #FAB882; --gf-brasa: #ED642E; --gf-tinta-bt: #2B1205;
+  /* a queda/atraso em tijolo (vermelho queimado): o laranja agora é a cor do destaque */
+  --rubro: #CC5345; --rubro-rgb: 204, 83, 69; --rubro-bg: rgba(255, 255, 255, .06);
+  --cor-erro-txt: #E27467; --cor-erro-suave: rgba(255, 255, 255, .06);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 {
+  --base: #EFEDEA;
+  --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #F8F6F4;
+  --linha: #E9E6E2; --fio-a: #E0DCD7; --fio-b: #E0DCD7;
+  --txt: #141210; --txt-2: #4E4944; --txt-3: #777069;
+  --azul: #ED642E; --azul-rgb: 237, 100, 46; --platina-a: #ED642E; --platina-b: #ED642E; --rv-tinta: #B84A1C;
+  --gf-creme: #FCEBDB; --gf-pessego: #FAB882; --gf-brasa: #D9541F; --gf-tinta-bt: #2B1205;
+  --rubro: #B03A2E; --rubro-rgb: 176, 58, 46; --rubro-bg: rgba(176, 58, 46, .09);
+  --cor-erro-txt: #A23226; --cor-erro-suave: rgba(176, 58, 46, .09);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco { --lin-fio: #E6E2DD; --linha: #EBE8E4; --d5-fio: #EBE8E4; }
+
+/* ---- 1. O CHÃO: uma cor só de ponta a ponta; barra e topo acompanham o tema ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 { background: var(--base) !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-app {
+  --ba-fundo: #0A0A0B; --ba-menu: #18181B; --ba-mudo: #9A9AA3; --ba-rotulo: #6E6E77;
+  --ba-ativo-tx: #FFFFFF; --ba-ativo-ico: #FFFFFF; --ba-foco: rgba(244, 131, 73, .75);
+  --gf-barra: #131315; --gf-barra-fio: rgba(255, 255, 255, .06); --gf-arvore: rgba(255, 255, 255, .14);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app {
+  --ba-fundo: #EFEDEA; --ba-fio: rgba(20, 18, 16, .08); --ba-txt: #141210; --ba-mudo: #59534D; --ba-rotulo: #8D8780;
+  --ba-hover: rgba(20, 18, 16, .05); --ba-ativo: rgba(20, 18, 16, .06); --ba-ativo-tx: #141210; --ba-ativo-ico: #141210;
+  --ba-badge-bg: rgba(20, 18, 16, .07); --ba-badge-tx: #4E4944; --ba-badge-on-tx: #141210;
+  --ba-kbd-fio: rgba(20, 18, 16, .1); --ba-kbd-bg: rgba(20, 18, 16, .04); --ba-kbd-tx: #777069;
+  --ba-menu: #FFFFFF; --ba-sombra-menu: 0 20px 40px -14px rgba(20, 18, 16, .22);
+  --ba-sombra-trilho: 1px 0 0 rgba(20, 18, 16, .08), 24px 0 48px -16px rgba(20, 18, 16, .18);
+  --ba-foco: rgba(237, 100, 46, .7);
+  --gf-barra: #FFFFFF; --gf-barra-fio: rgba(20, 18, 16, .08); --gf-arvore: rgba(20, 18, 16, .17);
+}
+/* no claro, o texto da barra e do topo é escuro (a moldura de antes era preta nos dois temas) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 :is(.ba-barra, .p-topbar) {
+  --txt: #141210; --txt-2: #4E4944; --txt-3: #777069; --tint: 22, 25, 31;
+  --linha: #E9E6E2; --vidro-a: #FFFFFF; --vidro-b: #FFFFFF; --surface: #FFFFFF;
+  --rp-menu: #FFFFFF; --rp-elev: #F5F2EF; --rp-campo: #FFFFFF; --rp-campo-fio: #E0DCD7;
+  --lin-fio: #E6E2DD; --lin-branco: #141210;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.app-v2 .p-topbar { background: var(--ba-fundo); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra { background: var(--gf-barra); border-right: 1px solid var(--gf-barra-fio); }
+
+/* ---- 2. A BARRA FIXA: um painel arredondado sobre o chão ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 { --ba-cheia: 252px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-barra {
+  box-sizing: border-box; padding: 10px 0 10px 10px; overflow: visible; background: transparent; border-right: 0; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-in {
+  box-sizing: border-box; width: 100%; padding: 12px 10px 10px;
+  border: 1px solid var(--gf-barra-fio); border-radius: 18px; background: var(--gf-barra);
+}
+/* fixa: o botão de recolher sai do topo; a trilha começa na régua do conteúdo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-alternar { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-topo { padding-left: 14px; }
+
+/* grupos: título em caixa alta com a seta; clicar abre e fecha */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupos { gap: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo-rot {
+  height: 24px; margin: 0; padding: 0 6px 0 10px; border-radius: 7px;
+  font-size: 10.5px; font-weight: 500; line-height: 1; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ba-rotulo); transition: color .16s ease, opacity .15s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra button.ba-grupo-rot:hover:not(:disabled) { color: var(--ba-txt); }
+
+/* itens interligados: um tronco que desce do título e um ramo curvo até cada item */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item {
+  position: relative; width: auto; margin-left: 24px;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item::before {
+  content: ''; position: absolute; left: -13px; top: -3px; width: 10px; height: calc(50% + 3px); margin: 0;
+  border: solid var(--gf-arvore); border-width: 0 0 1px 1px; border-radius: 0 0 0 8px; background: none; pointer-events: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="trilho"]) .ba-barra .ba-grupo[role="group"] > .ba-item:not(:last-child)::after {
+  content: ''; position: absolute; left: -13px; top: -3px; bottom: -3px; width: 0;
+  border-left: 1px solid var(--gf-arvore); pointer-events: none;
+}
+/* (fora dos grupos — Configurações e Sair — não há ramo nem o filete de antes) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra :is(.ba-pe, .ba-grupo:not([role="group"])) .ba-item::before { content: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="trilho"] .ba-barra .ba-item::before { content: none; }
+
+/* o item: 32px, canto 9; o ativo é a pílula cinza com um fio laranja na borda direita (23/11: no escuro o degradê laranja virava marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item { padding: 5px 8px 5px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 450; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo { gap: 2px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
+  color: #FFFFFF; font-weight: 500;
+  background: rgba(255, 255, 255, .075);
+  box-shadow: inset -2px 0 0 var(--azul), inset 0 0 0 1px rgba(255, 255, 255, .05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on {
+  color: #141210; font-weight: 500;
+  background: linear-gradient(90deg, rgba(20, 18, 16, .055) 0%, rgba(20, 18, 16, .04) 42%, rgba(var(--azul-rgb), .34) 100%);
+  box-shadow: inset 0 0 0 1px rgba(20, 18, 16, .05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
+/* peças da barra que tinham cor fixa de fundo preto: seguem o tema */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra :is(.ba-ws-amb, .ba-ws-seta, .ba-cab-bt) { color: var(--ba-rotulo); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-pe { border-top-color: var(--gf-barra-fio); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca { background: rgba(20, 18, 16, .045); color: #777069; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca:hover { background: rgba(20, 18, 16, .07); color: #141210; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .p-app:not([data-barra="gaveta"]) .ba-barra .ba-item.ba-busca .ba-kbd { background: rgba(20, 18, 16, .06); color: #777069; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-grupo[role="group"]::before { background: rgba(20, 18, 16, .12); }
+
+/* ---- 3. O CONTEÚDO: sem painel em volta — os cartões ficam direto sobre o chão ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco { margin: 0; border-radius: 0; background: transparent; box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina { background: var(--base); }
+/* telas de trabalho (WhatsApp, Pós-venda, Kanban): a tela inteira é UM painel */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco:has(> .pagina.cheia) { margin: 0 12px 12px; border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--gf-barra-fio); }
+@media (max-width: 760px) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco:has(> .pagina.cheia) { margin: 0 8px 8px; border-radius: 14px; }
+}
+/* cartões: cinza grafite sobre o preto, sem risco forte em volta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  background: var(--vidro-a); border-color: rgba(255, 255, 255, .055); box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) {
+  background: #FFFFFF; border-color: #E6E2DD; box-shadow: 0 1px 2px rgba(20, 18, 16, .04);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { --pmc-card: var(--vidro-a); --pmc-border: var(--lin-fio); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico { background: rgba(var(--azul-rgb), .14); color: var(--azul); }
+
+/* ---- 4. BOTÃO PRINCIPAL: o laranja da logo com o texto escuro (branco sobre ele não dá leitura), nos dois temas ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  color: var(--gf-tinta-bt); background: var(--azul); border: 1px solid transparent; border-radius: 9px; box-shadow: none; font-weight: 550;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini) svg { color: var(--gf-tinta-bt); }
+
+/* ---- 5. GRÁFICO de barras: as colunas em grafite e a escolhida acesa com o degradê da logo (creme → pêssego → laranja) ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col .pn-graf-bar { border-radius: 8px 8px 3px 3px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col:not(.on) .pn-graf-bar { background: #2A2A2F; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar {
+  background: linear-gradient(180deg, var(--gf-creme) 0%, var(--gf-pessego) 32%, var(--azul) 100%);
+  box-shadow: 0 0 26px -6px rgba(var(--azul-rgb), .6);
+}
+
+/* ---- 6. Conversas: o que era dourado fixo acompanha o laranja ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: #26262B; border: 1px solid rgba(255, 255, 255, .07); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-verde: #F48349; --zp-acao: #F48349; --zp-badge: #F48349; --zp-tique-lida: #F48349; --zp-onda-on: #F48349; --zp-onda-ponto: #F48349; --zp-out: #2A2A2F; --zp-rubro: #CC5345; --zp-ambar: #F48349; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .zp-tel { --zp-badge: #ED642E; --zp-onda-on: #ED642E; --zp-onda-ponto: #ED642E; --zp-tique-lida: #D9591F; --zp-ambar: #D9591F; --zp-out: #FDEBDD; --zp-rubro: #B03A2E; }
+
+/* ---- 7. nada cortado: com a barra fixa os cartões ficam mais estreitos — a descrição quebra a linha em vez de virar "…" ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-saude .pn-saude-rot small { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* ---- 8. A MARCA (logo do dono; a de 22/11 é a peça de vidro com o R do creme ao laranja): a imagem já traz o próprio fundo e o próprio brilho ---- */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca { width: 34px; height: 34px; border-radius: 0; background: none; box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca :is(svg, img) { width: 34px; height: 34px; filter: drop-shadow(0 3px 9px rgba(var(--azul-rgb), .30)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-topo-marca { width: 32px; height: 32px; }
+/* no painel da marca (telas de acesso): a logo grande, com o clarão quente atrás */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo {
+  display: block; position: absolute; left: 50%; top: 44%; width: clamp(120px, 15vw, 176px); height: auto; aspect-ratio: 1;
+  transform: translate(-50%, -50%); filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .55)); pointer-events: none;
+}
+/* o painel da marca: preto, com um halo cinza muito leve atrás da logo (23/11: a luz quente do canto saiu — deixava o preto marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2.tela-login { background: #070708 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel {
+  background: radial-gradient(560px 460px at 50% 44%, rgba(255, 255, 255, .055), transparent 70%);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { color: var(--gf-tinta-bt); background: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { background: color-mix(in srgb, var(--azul), #fff 14%); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar-seta { color: var(--gf-tinta-bt); }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-painel-logo { animation: rvf-arte 1s ease backwards; }
+}
+
+/* =====================================================================
+   9. VARREDURA DAS TELAS (dono 21/11: "faz uma varredura nas abas para
+   deixar mais profissional, atraente e organizado") — 27 telas, nos dois temas.
+   ===================================================================== */
+/* 9.1 UMA COR DE DESTAQUE SÓ: o tom de "atenção" é o mesmo laranja da logo (antes convivia com um dourado antigo em 8 telas) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --ambar: #F48349; --ambar-rgb: 244, 131, 73; --ambar-bg: rgba(255, 255, 255, .06); --cor-alerta-txt: #F48349; --cor-alerta-suave: rgba(255, 255, 255, .06); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --ambar: #D9591F; --ambar-rgb: 217, 89, 31; --ambar-bg: rgba(237, 100, 46, .12); --cor-alerta-txt: #B84A1C; --cor-alerta-suave: rgba(237, 100, 46, .13); }
+/* 9.2 cartões: um raio só (as Ferramentas usavam 12 e o resto 14) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { border-radius: 14px; }
+/* 9.3 título da página: o do Dashboard era maior (23px) que o das outras telas (19px) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .d5-cab-tits h2 { font-size: 19px; font-weight: 600; letter-spacing: -.015em; }
+/* 9.4 Kanban: a bolinha de cada coluna vinha em azul, roxo, verde e rosa — fica neutra */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kb-pro .kb-cab-ic { border-color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ctx-tag { border-color: var(--lin-fio, var(--linha)) !important; }
+/* 9.5 nada menor que 10px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-graf-x small, .calx-ag-dia i, .wa-grupo .seta) { font-size: 10px; }
+/* 9.6 nada cortado com "…" onde é informação (prévia de mensagem e nome em lista continuam cortando) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-num-meta, .ev-fx-meta, .cv2-kpi > i) { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; }
+/* 9.7 pesos: o teto é 600 também nestes números */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-saude-n, .pn-eq-adim-v, .rl-acao, .cm-num-av, .calx-mes-rot, .calx-daynum, .pr-dia-n) { font-weight: 600; }
+/* 9.8 indicadores das outras telas na família do Painel: o ícone num quadradinho dourado ao lado do rótulo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpi-ic {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(var(--azul-rgb), .14); color: var(--azul);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpi-cab { display: flex; align-items: center; gap: 9px; min-height: 26px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-kpi-rot:has(> .kpi-ic) { display: inline-flex; align-items: center; gap: 9px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-kpi-cab:has(.kpi-ic) { min-height: 26px; align-items: center; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi) .kpi-ic { transition: transform .2s var(--rvf-ease), background-color .2s ease; }
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi):hover .kpi-ic { transform: scale(1.06); background: rgba(var(--azul-rgb), .2); }
+}
+/* 9.9 Registros: os indicadores sem altura sobrando e os filtros numa linha só */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .kpis > .kpi { min-height: 0; }
+/* (22/11: com Atendimento e Configurações são 7 áreas — os filtros ficam em duas linhas certas: as áreas numa, período/pessoa/busca na outra) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-filtros { flex-wrap: wrap; row-gap: 10px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-area { flex: 1 1 100%; flex-wrap: nowrap; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-area .chips { flex-wrap: wrap; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .reg-fil-dir { margin-left: 0; }
+/* 9.10 formulários: um rótulo só — 12px, médio, sem caixa alta ("Novo cliente" usava caixa alta miúda) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal :is(.nc-rot, .pn-us-campo > label, .pn-us-rot) { font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal { border-radius: 14px; }
+/* 9.11 a conta no pé da barra: o avatar no dourado da casa */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta { border-color: var(--gf-barra-fio); background: rgba(var(--tint), .025); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ba-conta-av { background: rgba(var(--azul-rgb), .16); color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-app[data-barra="aberta"] .ba-barra .ba-pe { margin-top: 6px; padding-top: 6px; }
+
+/* =====================================================================
+   10. ACABAMENTO (dono 21/11: "se tiver como deixar a cara mais bonita,
+   aquele detalhe de profissional, eu quero que tu faça"). Tudo discreto.
+   ===================================================================== */
+/* 10.1 o clarão da marca: um tom muito leve no alto à direita do chão — SÓ no claro (23/11: no escuro ele deixava o preto amarronzado) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: var(--base); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .palco > .pagina:not(.cheia) { background: radial-gradient(1100px 540px at 90% -180px, rgba(var(--azul-rgb), .06), transparent 62%), var(--base); }
+/* 10.2 cartões: um fio de luz no alto (profundidade) e a borda acende no dourado ao passar o mouse nos indicadores */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.vidro:not(.p-modal), .pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile) { transition: border-color .2s ease, transform .2s var(--rvf-ease), box-shadow .2s ease; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover { border-color: rgba(var(--azul-rgb), .32); }
+/* 10.3 botão principal: o degradê da letra da logo (claro em cima, laranja embaixo), fio de luz no alto, sombra curta; afunda 1px ao clicar */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 1px 2px rgba(0, 0, 0, .22), 0 8px 18px -10px rgba(var(--azul-rgb), .6);
+  transition: filter .16s ease, transform .12s ease, box-shadow .16s ease;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
+  filter: brightness(1.07);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .25); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--azul), var(--gf-creme) 46%) 0%, var(--azul) 62%, color-mix(in srgb, var(--azul), var(--gf-brasa) 70%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 8px 18px -10px rgba(var(--azul-rgb), .7);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar:hover:not(:disabled) { filter: brightness(1.07); }
+/* 10.4 "Ao vivo": o ponto pulsa devagar */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .selo-vivo .selo-vivo-dot { animation: gf-pulso 2.6s ease-out infinite; }
+}
+@keyframes gf-pulso { 0% { box-shadow: 0 0 0 0 rgba(var(--azul-rgb), .5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(var(--azul-rgb), 0); } }
+/* 10.5 barras de rolagem finas, na cor do tema */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .palco * { scrollbar-width: thin; scrollbar-color: rgba(var(--tint), .2) transparent; }
+/* 10.6 o avatar do topo na mesma linha do cartão da conta */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { background: rgba(var(--azul-rgb), .16); color: var(--azul); border: 1px solid rgba(var(--azul-rgb), .28); font-weight: 600; }
+
+/* =====================================================================
+   11. LOGO NOVA (dono 22/11): o que ainda guardava o dourado de antes
+   ===================================================================== */
+/* o texto de realce no claro (estrela de favorito, "hoje" do calendário, marca de escolhido) descia para um marrom-dourado */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 { --cor-acento-txt: #B84A1C; }
+/* o balão enviado no claro era um creme amarelado: vai para o creme da logo */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura][data-tema="light"]:not(#rv-graf):not(#rv-g2) .v2 .wa-msgs .bolha.env2 { background: #FDF0E6; border-color: #F5D9C4; }
+
+/* =====================================================================
+   12. ESCURO DE VERDADE (dono 23/11: "o sistema na cor escura tá com uma
+   cor muito amarronzada, eu preciso de um escuro"). O marrom vinha de três
+   lugares: (a) os cinzas com fio de calor do dia 22/11 — voltaram ao neutro
+   na seção 0; (b) o clarão laranja no chão — saiu na 10.1; (c) laranja
+   TRANSLÚCIDO por cima do preto, que na tela vira marrom.
+   REGRA DO ESCURO: superfície é preto ou cinza neutro; o laranja só entra
+   SÓLIDO (texto, ícone, linha, ponto, botão, coluna acesa). Para conferir:
+   ~/reviza-sist/tools/quente.cjs lista tudo que estiver pintado em tom quente.
+   ===================================================================== */
+/* 12.1 quadradinho do ícone dos indicadores e os avatares: fundo cinza, o laranja fica no desenho */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-ico, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .kpi-ic { background: rgba(255, 255, 255, .06); color: var(--azul); }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.kpi, .pn-kpi):hover .kpi-ic { background: rgba(255, 255, 255, .1); }
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-conta-av, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { background: rgba(255, 255, 255, .08); color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-topbar .avatar-btn { border-color: rgba(255, 255, 255, .1); }
+/* 12.2 sem halo laranja em volta: a logo da barra, a coluna acesa do gráfico e o botão principal */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ba-barra .ba-ws-marca :is(svg, img) { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .5)); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar { box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 1px 2px rgba(0, 0, 0, .45); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(0, 0, 0, .45); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), 0 1px 2px rgba(0, 0, 0, .45); }
+/* 12.3 indicadores: ao passar o mouse a borda clareia (o laranja a 32% sobre o grafite dava um fio marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .palco :is(.pmc-root.rvm, .kpi, .pn-kpi, .cv2-kpi, .rg-tile):hover { border-color: rgba(255, 255, 255, .16); }
+/* 12.4 gráficos de linha: a linha continua laranja; o preenchimento embaixo vira uma névoa cinza (laranja a 20% sobre o grafite é marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.pmc-chart__svg, .rvo-svg) linearGradient stop { stop-color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient stop:first-child { stop-opacity: .2; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient stop:nth-child(2) { stop-opacity: .05; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient stop:first-child { stop-opacity: .07; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rvo-svg linearGradient:first-child stop:first-child { stop-opacity: .13; }
+/* 12.4b (24/11) gráficos SEMPRE em barras: no escuro as barras dos cartões ficam laranja SÓLIDO (pêssego no topo → laranja na base,
+   igual à barra do mês atual do Painel). A névoa branca acima continua só para degradês de área, que não aparecem mais. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient[id^="bar-"] stop:first-child { stop-color: var(--gf-pessego); stop-opacity: 1; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-chart__svg linearGradient[id^="bar-"] stop:last-child { stop-color: var(--azul); stop-opacity: 1; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .d5-graf-svg :is(.d5-graf-stop-topo, .d5-graf-stop-meio, .d5-graf-stop-base) { stop-opacity: 1; }
+/* 12.5 selos, ícones e marcas que tinham fundo laranja translúcido: fundo cinza, a cor fica no texto/desenho */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cfgw-amb.cobrancas, .cfgi-ic.on, .cfgw-ok-ic, .cfgr-passos-lista i, .cfgo-conf i, .cv2-n, .cv2-av.p, .ev-st-ic.atencao) { background: rgba(255, 255, 255, .06); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .cfgi-nota { background: rgba(255, 255, 255, .035); border-color: rgba(255, 255, 255, .09); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cfgw-amb.cobrancas, .cfgi-ic.on) { border-color: rgba(255, 255, 255, .1); }
+/* 12.6 Gestão de cobranças: o risco do cabeçalho da planilha em laranja cheio e fino (2px a 60% sobre o grafite dava marrom) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c { box-shadow: inset 0 -1px 0 var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-c.plx-c-sep { box-shadow: inset 0 -1px 0 var(--azul), inset 2px 0 0 var(--plx-sep); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-lin-cab .plx-rn { box-shadow: inset 0 -1px 0 var(--azul); }
+/* 12.7 o "acento suave" (aba e opção escolhidas, caixa de resultado, anel de foco) era laranja a 14% com borda a 42%: no escuro vira
+   cinza claro. O dia de hoje nos calendários fica com o fundo cinza e a borda laranja CHEIA. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 { --cor-acento-suave: rgba(255, 255, 255, .08); --cor-acento-fio: rgba(255, 255, 255, .3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.calx-cell.hoje, .calx-cell.hoje:hover, .calx-cell.hoje.sel, .pr-dia.hoje, .ev-data.hoje) { background: rgba(255, 255, 255, .06); border-color: var(--azul); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pr-dia.hoje.sel { box-shadow: inset 0 0 0 1px var(--azul); }
+/* 12.8 botão ligado da barra da planilha e o ícone da fase na ficha do WhatsApp: mesma regra (fundo cinza, borda cinza clara) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .plx-bt.on { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ctx-fase .ic { background: rgba(255, 255, 255, .06); }
+
+/* 26/11 (varredura visual, regra do dono: "gráficos SEMPRE em barras, laranja só sólido"): as barras de atividade de
+   Agendamentos/Relatórios (.barv) deixam o degradê das camadas de baixo — dias comuns no cinza do trilho, HOJE na cor
+   de dado sólida, sem brilho. A mesma linguagem das barras do Painel e do Dashboard. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .barv { background: rgba(var(--tint), .12); box-shadow: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv { background: rgba(255, 255, 255, .1); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .barv.hoje2 { background: var(--accent); box-shadow: none; }
+
+/* 26/11 (acabamento, dono: "bem organizado, bem bonito"):
+   · ESTADO VAZIO com presença: ícone maior num quadrado com fio, na cor de dado (sólida); título um pouco maior.
+   · LISTAS (Sequências, Regras, Formulários, Webhooks, Disparos): a linha acende no hover e os botões aparecem com ela.
+   · CARTÕES de métrica e seções: fio mais limpo e o número em peso médio com dígitos alinhados. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado { padding: 34px 20px 30px; gap: 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .ic {
+  width: 48px; height: 48px; margin-bottom: 10px; border-radius: 13px; color: var(--accent); --ic-g: 22px;
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .t { font-size: 14px; letter-spacing: -.01em; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .s { max-width: 360px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .estado .acao { margin-top: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li) {
+  margin: 0 -19px; padding-left: 19px; padding-right: 19px; border-radius: 0; transition: background .12s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(var(--tint), .035); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.aut-seqs > li, .cfgwh-lista > li, .dsp-lista > li, .cfgm-lista > li):hover { background: rgba(255, 255, 255, .035); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvm-val { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+/* 26/11 (dono: "tela ridícula de feio… não tem botões em branco"): CHIP DE ESCOLHA, uma regra só para o sistema todo.
+   Etapas, etiquetas, responsável e dias (Disparos/Formulários), canal do Script, ambientes do Usuário, etiquetas do Contato,
+   quem recebe o Aviso, filtros do Kanban. Fundo branco e fio visível no claro; grafite e fio claro no escuro; o marcado vira
+   preto com letra branca (a mesma linguagem do "Todos" dos segmentados). Antes, o fio era rgba(tint,.11) sobre fundo quase
+   branco = texto solto. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa, .fp-dia) {
+  background: #FFFFFF; border: 1px solid #D9D5CF; box-shadow: none; color: var(--txt); font-weight: 500; font-size: 12.5px;
+  padding: 6px 12px; border-radius: 8px; line-height: 1.2; transition: background .12s, border-color .12s;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa):hover { border-color: #B8B2AA; background: #FBFAF8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on, .frm-dia.on, .cfga-pessoa.on, .chip[aria-pressed="true"]) {
+  background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; box-shadow: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on) i { outline: 2px solid rgba(255, 255, 255, .5); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .chip.limpar { border-style: dashed; opacity: .8; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa input { accent-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa.on input { accent-color: #FFFFFF; }
+/* escuro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa) { background: #1E1E21; border-color: #35353A; color: var(--txt); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip, .frm-etq, .frm-dia, .cfga-pessoa):hover { background: #26262A; border-color: #4A4A50; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.chip.on, .frm-etq.on, .frm-dia.on, .cfga-pessoa.on, .chip[aria-pressed="true"]) { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .cfga-pessoa.on input { accent-color: #111110; }
+/* as seções internas das janelas (Quem recebe · Mensagem · Número e ritmo · Perguntas · O card que nasce) ganham fio e respiro */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { padding: 14px 16px 16px; border-color: #E3DFD9; background: #FFFFFF; gap: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { background: #19191B; border-color: #2C2C30; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco legend { padding: 0 8px; color: var(--txt-2); }
+/* a lista de atendentes do "Transferir": cada pessoa é um item com fio, o escolhido fica preto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-lista { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item {
+  all: unset; display: flex; gap: 8px; align-items: center; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--linha); background: var(--vidro-a); color: var(--txt); font-size: 12.5px; cursor: pointer;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:hover { border-color: #B8B2AA; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on { background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on small { color: rgba(255, 255, 255, .7); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:disabled { opacity: .55; cursor: default; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item small { margin-left: auto; font-size: 10.5px; color: var(--txt-3); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:focus-visible { outline: 2px solid var(--txt); outline-offset: 1px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on small { color: rgba(0, 0, 0, .6); }
+/* o estilo inline antigo do item (Atenvo) sai de cena na Reviza */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item[style] { background: var(--vidro-a) !important; border: 1px solid var(--linha) !important; opacity: 1 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #1D1C1A !important; border-color: #1D1C1A !important; color: #FFFFFF !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item.on[style] { background: #F2F0EC !important; border-color: #F2F0EC !important; color: #111110 !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-transf-item:disabled[style] { opacity: .55 !important; }
+
+/* 26/11 (dono: "mais preenchido, nada muito solto, profissional, calmo"). RITMO ÚNICO DE ESPAÇO: 12px entre blocos em todo o
+   sistema (era 14–16, com cartões de meia largura flutuando). Cartões de métrica mais baixos. Título da página mais perto do
+   conteúdo. Cartão sem sombra flutuante e sem "pulo" no hover (calma); o relevo é o fio. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn, .cfgw, .rsd, .cfgimp, .cfgwh, .aut) { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pmc-grade, .pn-kpis, .kpis, .rsd-duas, .cfgm-grade, .d5-linha2, .cfgi-grade) { gap: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ph { margin-bottom: 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm { padding: 14px 16px 12px; min-height: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm.rvm-fixo .rvm-meio { padding: 6px 0 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm .rvm-val { font-size: 24px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm:hover { transform: none; box-shadow: none; border-color: #CFCAC3; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .pmc-root.rvm:hover { border-color: #3A3A40; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card { padding: 16px 18px 16px !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card-cab { margin-bottom: 12px; }
+/* cartão de meia largura sozinho na linha (Botão de venda, Cofre, Importação) não fica flutuando: a grade estica o par */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-grade, .rsd-duas, .cfgv-grade) { align-items: stretch; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-grade, .rsd-duas) > .pn-card { height: 100%; box-sizing: border-box; }
+/* estado vazio dentro do cartão: altura mínima para o cartão não virar uma tira fina */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-card > .estado { min-height: 220px; justify-content: center; }
+/* tabelas: linhas um pouco mais baixas e constantes (36px), títulos de coluna em 10.5px */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cfgm-tab, .cfgw-tab, .pn-us-tab, .kbl-tab, .d5-tab) tbody td { padding-top: 9px; padding-bottom: 9px; }
+
+/* 26/11 (dono, foto do "Novo disparo": "QUEM RECEBE fora da linha… título tem que ser título"). As seções das janelas
+   (Quem recebe · Mensagem · Número e ritmo · Perguntas · O card que nasce · Agendamento) deixam o <legend> cortando a borda:
+   o título entra DENTRO do cartão, na mesma margem do conteúdo, em peso forte, com um fio embaixo; os subtítulos (Etapas,
+   Etiquetas, Responsável…) viram rótulos pequenos e iguais; os chips ficam numa grade regular com o mesmo respiro. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco { padding: 0 16px 16px; gap: 14px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > legend {
+  float: left; width: 100%; box-sizing: border-box; margin: 0 0 2px; padding: 12px 0 10px; border-bottom: 1px solid var(--linha);
+  font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--txt);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > legend::after { content: ''; display: block; clear: both; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco > .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-bloco .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-us-form > .pn-us-campo > span,
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-us-form > label.pn-us-campo > span {
+  font-size: 12px; font-weight: 500; color: var(--txt-2); line-height: 1.2;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.frm-etqs, .frm-dias) { gap: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.frm-etq, .frm-dia) { min-height: 32px; padding: 0 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .frm-dia { min-width: 44px; justify-content: center; }
+/* "Começa" (daqui a 1 minuto · em outro horário): o mesmo chip */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aplseq-op { background: #FFFFFF; box-shadow: none; border: 1px solid #D9D5CF; color: var(--txt); font-weight: 500; min-height: 32px; display: inline-flex; align-items: center; border-radius: 8px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aplseq-op.on { background: #1D1C1A; border-color: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .aplseq-op { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .aplseq-op.on { background: #F2F0EC; border-color: #F2F0EC; color: #111110; }
+/* a contagem "N pessoas recebem" vira uma faixa discreta, não um parágrafo vermelho solto */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta { padding: 9px 12px; border-radius: 8px; background: rgba(var(--tint), .045); border: 1px solid var(--linha); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-conta.erro { background: rgba(214, 69, 69, .06); border-color: rgba(214, 69, 69, .25); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .dsp-amostra { margin-top: -6px; }
+
+/* ===== 26/11 — AUDITORIA PROFUNDA (4 revisores, 55 telas + 41 janelas, claro e escuro). Correções de raiz: ===== */
+/* 1. Botão principal: laranja SÓLIDO (a regra do dono); o degradê com "fio de luz" sai; hover só escurece um pouco. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):not(:disabled),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .lg-card .entrar {
+  background: var(--azul); box-shadow: none; filter: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):hover:not(:disabled) { background: color-mix(in srgb, var(--azul) 88%, #000); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .btn-pri:not(.btn-mini):active:not(:disabled) { transform: none; box-shadow: none; background: color-mix(in srgb, var(--azul) 80%, #000); }
+/* 2. Botão principal DESLIGADO: visível (laranja claro com letra escura), não "texto morto". */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-btn.btn-pri:disabled { background: color-mix(in srgb, var(--azul) 22%, #fff); color: color-mix(in srgb, var(--azul) 70%, #000); border-color: transparent; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .p-btn.btn-pri:disabled { background: color-mix(in srgb, var(--azul) 30%, #111); color: color-mix(in srgb, var(--azul) 70%, #fff); }
+/* 3. Mini-gráficos dos cartões e pilhas do gráfico mensal: sólidos, sem brilho (o degradê das camadas de baixo). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvo-pilha i { background: var(--c) !important; box-shadow: none !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rvo-svg path[fill^="url("] { opacity: 0; }
+/* 4. Ação em TABELA como texto solto ("Editar", "Gerenciar", "Conectar de novo", "Marcar débito parado", "Preencher",
+      "Excluir", "Esvaziar", "Apagar"): vira botão pequeno com fio, o mesmo das listas; a destrutiva fica vermelha. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq, .cfgc-tab, .pn-us-tab) :is(button.lnk, button.lk, .pn-link, .cfig-rot, button.pn-fin-nao, .num-remover),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) > button:not(.p-btn):not(.pn-fin-ok):not(.fin-btn) {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 7px;
+  border: 1px solid #D9D5CF; background: #FFFFFF; color: var(--txt); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq, .cfgc-tab, .pn-us-tab) :is(button.lnk, button.lk, .pn-link, .cfig-rot, button.pn-fin-nao, .num-remover),
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) > button:not(.p-btn):not(.pn-fin-ok):not(.fin-btn) { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.lnk, button.lk, .pn-link):hover { border-color: #B8B2AA; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.pn-fin-nao, .num-remover, .btn-perigo:not(.p-btn)) { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); }
+/* :not(td): a célula da tabela também usa .pn-fin-acoes; virar inline-flex a encolhia a 16px e os botões saíam por cima da coluna ao lado (27/11) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes):not(td):not(th) { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 td.pn-fin-acoes { white-space: nowrap; }
+/* 5. Checkbox nativo no escuro (Avisos, Campos, Equipes, Webhooks, Formulários): acento no tema. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #F2F0EC; color-scheme: dark; }
+/* 6. Chip de variável ({nome}, meia parcela…): um chip de verdade, com fio, nos dois temas (Régua, Envios, Avisos, Scripts, Retomada). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.cc-var, .scr-var, .cfga-var, .rtm-var) { background: #FFFFFF; border: 1px solid #D9D5CF; color: var(--txt); border-radius: 6px; padding: 1px 7px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.cc-var, .scr-var, .cfga-var, .rtm-var) { background: #26262A; border-color: #3A3A40; color: var(--txt); }
+/* 7. Botão ao lado de um campo ("Pôr", "Adicionar", "Criar"): mesma altura do campo, centrado. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha { align-items: stretch; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha > .p-btn, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .aut-linha > select.inp { height: auto; min-height: 36px; }
+/* 8. Área de texto com 1 linha (Agenda, Produto, Aviso, Sequência, Presencial): no mínimo 3 linhas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal textarea.inp, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal textarea { min-height: 76px; height: auto; line-height: 1.45; padding-top: 8px; padding-bottom: 8px; resize: vertical; }
+/* 9. Abas: um estilo só (o segmentado preto). As sublinhadas de Envios viram o mesmo pill; a de Retomada idem. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-abas { box-shadow: none; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(var(--tint), .06); width: max-content; max-width: 100%; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba { padding: 5px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 500; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on { background: #1D1C1A; color: #FFFFFF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on::after { display: none; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .ev-aba.on { background: #F2F0EC; color: #111110; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .rtm-aba.on { background: #1D1C1A; color: #FFFFFF; border-color: #1D1C1A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .rtm-aba.on { background: #F2F0EC; color: #111110; border-color: #F2F0EC; }
+/* 10. Menu ⋯ da conversa cortado no último item: cabe na tela e rola quando não cabe. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-pop { max-height: min(420px, calc(100vh - 120px)); }
+/* 11. Barra lateral: o último item não some no esmaecido (reserva o espaço do fade); conectores da árvore começam no 1º item. */
+html[data-barra-alfa] .v2 .ba-grupos { padding-bottom: 52px; }
+html[data-barra-alfa] .v2 .ba-grupo > .ba-item:first-of-type::before, html[data-barra-alfa] .v2 .ba-grupo-itens > :first-child::before { top: 50%; }
+/* 12. Rótulos: "(opcional)" sempre entre parênteses e em cinza; asterisco de obrigatório some (o sistema avisa ao salvar). */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal label > em.opc, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .p-modal label > small { font-style: normal; color: var(--txt-3); font-weight: 400; }
+/* 13. Cabeçalho da conversa (WhatsApp, Pós-venda): os chips cabem numa linha (rolam para o lado), sem empurrar os botões. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-hchips, html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-cab-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+/* 14. Sobras da auditoria: "Marcar débito parado" (Novos) deixa de ser quieto — botão com fio, sempre; "Esvaziar" e
+       "Esvaziar ciclos…" (Gestão › Ciclos) viram botão vermelho com fio, como o "Apagar" das outras janelas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado { color: var(--txt) !important; background: #FFFFFF !important; border-color: #D9D5CF !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .fin-acoes .fin-btn.fin-ok.nv-parado { background: #1E1E21 !important; border-color: #35353A !important; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv { border: 1px solid rgba(var(--rubro-rgb), .35); background: transparent; padding: 0 10px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .cic-esv:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .08); border-color: var(--rubro); }
+/* 15. Gráfico "Recebido por mês": o mês escolhido em laranja SÓLIDO, sem degradê creme→laranja nem halo. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .pn-graf-col.on .pn-graf-bar { background: var(--azul); box-shadow: none; }
+/* 16. Sobras da auditoria, parte 2 (dono: "sim"):
+      · toda coluna de ação de tabela ganha cabeçalho visível ("Ações"), como as outras colunas;
+      · "(opcional)" sempre em cinza, peso normal;
+      · Kanban: o título na mesma margem das outras telas (a página já dá o respiro; o quadro não repete);
+      · Novidades: largura total, como as outras telas. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 thead th > .pn-vh { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; margin: 0; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.nc-opc, .chk-opt, .ia-hint) { color: var(--txt-3); font-weight: 400; font-size: 11.5px; margin-left: 4px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .nv-pg { max-width: none; margin: 0; }
+/* 17. Kanban na mesma margem das outras telas (o quadro vinha com 26px); opções da "Nova IA" sempre com fio;
+       mockup do celular (Cobranças › Conversas): a lista reserva a altura da barra de abas, nada passa por trás. */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pg { padding: 20px 24px 12px; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .irs-opcao { background: #FFFFFF; border: 1px solid #D9D5CF; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .irs-opcao { background: #1E1E21; border-color: #35353A; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .irs-opcao.on { border-color: var(--azul); }
+html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 90px; }
+html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { padding-bottom: 66px; }
+html:root[data-repaginada][data-repaginada] .v2 .kb-pg.kb-pro { padding: 20px 24px 12px; }
+html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 12px; margin-bottom: 86px; }
+html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { margin-bottom: 62px; }
+html[data-barra-alfa]:not(#rv-kb):not(#rv-kb2) .v2 .kb-pro.kb-pg { padding: 20px 24px 12px; }
+/* 27/11 — CARREGAMENTO: um cartão só para o sistema inteiro (components/CarregandoTela) e os três antigos (Dashboard,
+   Kanban, WhatsApp) na mesma cor laranja, para ser UMA família. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.d5-carr-ic i, .d5-carr-barra i, .wa-carr-ic i, .wa-carr-barra i) { background: var(--azul); }
+html:root[data-barra-alfa] .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pro :is(.kb-carr-ic i, .kb-carr-barra i) { background: var(--azul); }
+/* 27/11 (dono): cartão de carregamento SEMPRE no meio da tela e o fundo embaçado atrás — nos quatro cartões. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.ct-carr, .d5-carr) {
+  top: 0; left: 0; right: 0; bottom: auto; height: min(100%, 100dvh); align-items: center; padding: 0 16px; z-index: 30; pointer-events: auto;
+  background: rgba(255, 255, 255, .42); -webkit-backdrop-filter: blur(7px) saturate(1.05); backdrop-filter: blur(7px) saturate(1.05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.ct-carr, .d5-carr) { background: rgba(10, 10, 10, .45); }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 .wa-carr {
+  position: absolute; inset: 0; z-index: 30; padding: 16px;
+  background: rgba(255, 255, 255, .42); -webkit-backdrop-filter: blur(7px) saturate(1.05); backdrop-filter: blur(7px) saturate(1.05);
+}
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 .wa-carr { background: rgba(10, 10, 10, .45); }
+html:root[data-barra-alfa] .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-fundo { filter: blur(6px); opacity: .55; }
+html:root[data-barra-alfa] .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pro .kb-carr { min-height: calc(100dvh - 96px); }
+html:root[data-barra-alfa] .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa { position: relative; z-index: 1; }
