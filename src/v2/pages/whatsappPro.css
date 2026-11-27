@@ -516,8 +516,11 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .a
    Regras: dourado SÓ na conversa selecionada, nas não lidas e no Enviar; um horário por linha; no máximo
    dois selos por item (situação + um alerta escrito); nada abaixo de 11px; nada de caractere como ícone. */
 
-/* botões só do celular: fora do celular não existem */
-.v2 :is(.wa-cel-volta, .wa-cel-so) { display: none; }
+/* botões só do celular: fora do celular não existem. Peso 0,3,0 de propósito (27/11): no build o
+   whatsapp.css vai para um chunk próprio (MobileShell e ConversaWa também o importam) carregado DEPOIS
+   deste, e o `.v2 .ib2 { display: flex }` dele (0,2,0) vencia o `display: none` — o "<" e o "i" do
+   celular apareciam no computador (as duas telas do dono de 27/11 mostram isso). */
+.v2 .ib2:is(.wa-cel-volta, .wa-cel-so), .v2 :is(.wa-cel-volta, .wa-cel-so) { display: none; }
 
 /* ---------- fila ---------- */
 /* a barra à esquerda marca SÓ a selecionada (a espera virou selo escrito) */
