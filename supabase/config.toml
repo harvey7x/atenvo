@@ -503,3 +503,14 @@ verify_jwt = true
 verify_jwt = true
 [functions.bom-dia-voz]
 verify_jwt = true
+
+# 28/11 (dono: trazer o Reviza): funções novas do Atendimento. Deploy SEMPRE com o nome (senão volta a exigir JWT).
+# entrada-webhook: o outro sistema (URA etc.) chama com a CHAVE da entrada (longa e aleatória), sem login.
+[functions.entrada-webhook]
+verify_jwt = false
+# retomada-processar: cron por minuto com x-retomada-secret (webhook_config.retomada).
+[functions.retomada-processar]
+verify_jwt = false
+# meta-anuncios: a tela (login de administrador, conferido na função) e o agendador (x-anuncios-secret).
+[functions.meta-anuncios]
+verify_jwt = false
