@@ -38,7 +38,7 @@
 .aut-linha { display: flex; gap: 8px; }
 .aut-linha .inp:first-child { flex: 1; min-width: 0; }
 .aut-linha select.inp { width: 140px; }
-.aut-teste .badge, .aut-teste [class*="badge"] { align-self: flex-start; margin-top: 6px; }
+.aut-teste [class*="badge"] { align-self: flex-start; margin-top: 6px; }
 @media (max-width: 640px) { .aut-grade2 { grid-template-columns: minmax(0, 1fr); } .v2 .aut-busca { width: 100%; margin-left: 0; } }
 /* aplicar uma sequência (no WhatsApp) */
 .aplseq-quando { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }

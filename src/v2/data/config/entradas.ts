@@ -5,7 +5,7 @@
    FORMATO DA URA REVERSA (Telein, vídeo do dono 24/11): a Telein chama o endereço por GET com os dados no próprio
    endereço — enderecoTelein() monta o endereço já com os marcadores dela para colar na campanha. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isPrevia, isRevizaMode, supabase } from '@/lib/supabase';
+import { isPrevia, supabase } from '@/lib/supabase';
 import { temRecurso } from './recursos';
 
 export interface Entrada {
@@ -22,7 +22,7 @@ export interface EventoEntrada {
 
 const CHAVE = ['reviza', 'entradas'] as const;
 const CHAVE_EV = ['reviza', 'entradas', 'eventos'] as const;
-const ligado = () => isRevizaMode && !!supabase && temRecurso('atendimento');
+const ligado = () => !!supabase && temRecurso('atendimento');
 const BASE = `${String(import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '')}/functions/v1/entrada-webhook`;
 /** o endereço que o outro sistema chama (na prévia, um endereço de exemplo) */
 export const enderecoDaEntrada = (chave: string) => (isPrevia ? `https://seu-projeto.supabase.co/functions/v1/entrada-webhook/${chave}` : `${BASE}/${chave}`);

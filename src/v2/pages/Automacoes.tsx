@@ -16,7 +16,6 @@ import {
 import { usePessoasEEtapas } from '@/data/avisosEquipe';
 import { Formularios } from './automacoes/Formularios';
 import { Disparos } from './automacoes/Disparos';
-import { isRevizaMode } from '@/lib/supabase';
 import { temRecurso } from '../data/config/recursos';
 import './painel/painel.css';
 import './config/config.css';
@@ -31,8 +30,8 @@ export default function Automacoes() {
   const { secao } = useParams();
   const { currentOrg } = useOrg();
   const nav = useNavigate();
-  const formsLigado = isRevizaMode && temRecurso('formularios');
-  const dispLigado = isRevizaMode && temRecurso('disparos');
+  const formsLigado = temRecurso('formularios');
+  const dispLigado = temRecurso('disparos');
   if (secao !== 'sequencias' && secao !== 'palavras' && !(secao === 'formularios' && formsLigado) && !(secao === 'disparos' && dispLigado)) return <Navigate to="/automacoes/sequencias" replace />;
   const gestao = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
   return (

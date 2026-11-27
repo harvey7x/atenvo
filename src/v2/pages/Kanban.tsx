@@ -367,7 +367,7 @@ export default function KanbanV2() {
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
   // Quadro | Lista (26/11, como no CRM do sistema de antes) — fica lembrado no navegador de cada um
-  const listaLigada = isRevizaMode && temRecurso('crm-extra');
+  const listaLigada = temRecurso('crm-extra');
   const [vista, setVistaSt] = useState<'quadro' | 'lista'>(() => { try { return localStorage.getItem('reviza-kb-vista') === 'lista' ? 'lista' : 'quadro'; } catch { return 'quadro'; } });
   const setVista = (v: 'quadro' | 'lista') => { setVistaSt(v); try { localStorage.setItem('reviza-kb-vista', v); } catch { /* sem navegador */ } };
   const emLista = listaLigada && vista === 'lista';
@@ -404,7 +404,7 @@ export default function KanbanV2() {
   const repassePorOpp = useMemo(() => repassesPorOportunidade(vacuoQ.data ?? []), [vacuoQ.data]);
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
   // campos do cliente marcados para o cartão (26/11, migration 110): até 3, embaixo do nome
-  const camposLigados = isRevizaMode && temRecurso('campos');
+  const camposLigados = temRecurso('campos');
   const camposQ = useCampos(camposLigados);
   const camposCartao = useMemo(() => (camposLigados ? (camposQ.data ?? []) : []).filter((c) => c.ativo && c.noCartao).slice(0, 3), [camposQ.data, camposLigados]);
   const valoresCartaoQ = useValoresNoCartao(useMemo(() => leads.map((l) => l.contatoId ?? ''), [leads]), camposCartao);

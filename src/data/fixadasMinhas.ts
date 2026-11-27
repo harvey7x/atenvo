@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { temRecurso } from '@/v2/data/config/recursos';
 
@@ -10,7 +10,7 @@ import { temRecurso } from '@/v2/data/config/recursos';
    DEMO É O CONTRATO: sem backend, guarda no navegador.
    ------------------------------------------------------------------ */
 
-export const FIXAR_MINHA_LIGADO = (): boolean => isRevizaMode && temRecurso('crm-extra');
+export const FIXAR_MINHA_LIGADO = (): boolean => temRecurso('crm-extra');
 const REAL: boolean = isSupabaseConfigured && !!supabase;
 const G = 'previa-fixadas-minhas';
 const C = 'atd-fixadas-minhas';

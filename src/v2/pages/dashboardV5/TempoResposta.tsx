@@ -115,7 +115,7 @@ function Corpo({ d, hoje, comparacao, verFila, setVerFila, abrir }: { d: DashTem
                   const estourou = p.medianaMin != null && p.medianaMin > d.metaMin;
                   return (
                     <tr key={p.id ?? 'sem'}>
-                      <th scope="row"><span className={'tr-nome' + (p.id ? '' : ' sem')}>{p.nome}</span></th>
+                      <th scope="row"><span className={'trp-nome' + (p.id ? '' : ' sem')}>{p.nome}</span></th>
                       <td className="d5-dir num">{fmtInt(p.respondidos)}</td>
                       <td className="d5-dir num"><span className={estourou ? 'tr-fora' : undefined}>{fmtMin(p.medianaMin)}</span></td>
                       <td className="d5-dir num">{fmtMin(p.mediaMin)}</td>

@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 import { temRecurso } from '@/v2/data/config/recursos';
@@ -19,7 +19,7 @@ import { temRecurso } from '@/v2/data/config/recursos';
 
 export const CHAT_REAL: boolean = isSupabaseConfigured && !!supabase;
 /** o chat existe nesta instalação? (só na Reviza, com o recurso ligado — ver config/recursos.ts) */
-export const chatEquipeLigado = (): boolean => isRevizaMode && temRecurso('chat-equipe');
+export const chatEquipeLigado = (): boolean => temRecurso('chat-equipe');
 
 export type TipoSala = 'direta' | 'grupo';
 export interface MembroSala { id: string; nome: string; lidoAte: string | null }

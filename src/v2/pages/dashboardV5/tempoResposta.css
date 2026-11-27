@@ -6,8 +6,8 @@
 .v2 .tr-lk { color: var(--txt-2); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 .v2 .tr-lk:hover { color: var(--txt); }
 .v2 .tr-tab th[scope="row"], .v2 .tr-fila th[scope="row"] { font-weight: 400; }
-.v2 .tr-nome { font-weight: 500; color: var(--txt); }
-.v2 .tr-nome.sem { font-weight: 400; color: var(--txt-3); }
+.v2 .trp-nome { font-weight: 500; color: var(--txt); }
+.v2 .trp-nome.sem { font-weight: 400; color: var(--txt-3); }
 .v2 .tr-fora { color: var(--rubro, #c0392b); font-weight: 600; }
 .v2 .tr-pct { display: inline-flex; align-items: center; gap: 8px; }
 .v2 .tr-barra { display: block; width: 90px; height: 6px; border-radius: 3px; background: rgba(var(--tint), .08); overflow: hidden; }

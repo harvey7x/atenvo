@@ -677,7 +677,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
   const motivosQ = useMotivos();
   const opcoesFech = opcoesDeFechamento(motivosQ.data);
   // o cofre de conversas (26/11, migration 113): a conversa trancada só mostra o conteúdo com a senha do cofre
-  const cofre = useCofreDaConversa(isRevizaMode && temRecurso('cofre'));
+  const cofre = useCofreDaConversa(temRecurso('cofre'));
   const noCofre = (id: string | undefined | null) => !!id && cofre.trancada(id) && !cofre.aberta(id);
   // Automações › Sequências (26/11, migration 116): aplicar um modelo na conversa
   const [seqAberta, setSeqAberta] = useState(false);
@@ -1882,7 +1882,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                         key={p.id} type="button" role="option" aria-selected={i === idx} className={'wa-mencao' + (i === idx ? ' on' : '')}
                         onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setMencaoIdx(i)} onClick={() => escolherMencao(p)}
                       >
-                        <span className="av" aria-hidden>{initials(p.nome)}</span><span className="nm">{p.nome}</span>
+                        <span className="wa-mencao-av" aria-hidden>{initials(p.nome)}</span><span className="nm">{p.nome}</span>
                       </button>
                     ))}
                   </div>
@@ -2075,8 +2075,8 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           )}
 
           {/* campos personalizados do cliente (26/11, migration 110): os de Configurações › Campos do cliente */}
-          {isRevizaMode && temRecurso('campos') && <CamposDoCliente key={current.contatoId ?? current.id} contatoId={current.contatoId ?? null} />}
-          {isRevizaMode && temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
+          {temRecurso('campos') && <CamposDoCliente key={current.contatoId ?? current.id} contatoId={current.contatoId ?? null} />}
+          {temRecurso('agenda') && <ProximasReunioes conversaId={current.id} cliente={nomeExibicao(current)} />}
           {!noCofre(current.id) && (<>
           <MidiasResumo midias={midias} demo={demo} aoAbrirAba={setMidiasAba} aoAbrirFoto={abrirFotoDoPainel}
             rodape={<DocumentosDaConversa conversaId={current.id} msgs={current.msgs} demo={demo} aoIrParaMensagem={irParaMensagem} />} />
@@ -2097,7 +2097,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
 
           <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
           {/* Financeiro do cliente (26/11, migration 112): o que comprou e o que está em cobrança, e o "Novo lançamento" */}
-          {isRevizaMode && temRecurso('financeiro') && <FinanceiroDoCliente key={'fin-' + (current.contatoId ?? current.id)} contatoId={current.contatoId ?? null} />}
+          {temRecurso('financeiro') && <FinanceiroDoCliente key={'fin-' + (current.contatoId ?? current.id)} contatoId={current.contatoId ?? null} />}
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
@@ -2343,10 +2343,10 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
                   title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — desliga e você assume') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — reativa a IA' : 'Liga a IA nesta conversa')}
                   onClick={() => { setPop(null); void alternarIa(); }}>{iaAtiva ? 'Desligar a IA nesta conversa' : 'Ligar a IA nesta conversa'}</button>
               )}
-              {isRevizaMode && temRecurso('automacoes') && (
+              {temRecurso('automacoes') && (
                 <button type="button" className="it" onClick={() => { setPop(null); setSeqAberta(true); }}>Aplicar uma sequência</button>
               )}
-              {isRevizaMode && temRecurso('agenda') && (
+              {temRecurso('agenda') && (
                 <button type="button" className="it" onClick={() => { setPop(null); nav(`/agenda?nova=1&conversa=${encodeURIComponent(current.id)}&cliente=${encodeURIComponent(nomeExibicao(current))}`); }}>Agendar reunião</button>
               )}
               {!noCofre(current.id) && <button type="button" className="it" onClick={() => { setPop(null); setBuscaConv(true); }}>Buscar na conversa</button>}
@@ -2369,7 +2369,7 @@ export default function WhatsAppV2({ modo = 'atendimento' }: { modo?: 'atendimen
           {pop.kind === 'lista' && (
             <>
               <button type="button" className="it" onClick={() => { setPop(null); setSelecao(new Set()); }}>Selecionar conversas</button>
-              {isRevizaMode && temRecurso('resumo-dia') && currentOrg.role === 'admin' && (
+              {temRecurso('resumo-dia') && currentOrg.role === 'admin' && (
                 <button type="button" className="it" onClick={() => { setPop(null); setDesempenhoAberto(true); }}>Desempenho do chat</button>
               )}
               <button type="button" className="it" onClick={() => { setPop(null); alternarPrivado(); }}>{privado ? 'Mostrar telefones e mensagens' : 'Ocultar telefones e mensagens'}</button>

@@ -30,7 +30,7 @@ export interface Equipe {
 }
 
 const CHAVE = ['reviza', 'equipes'] as const;
-const ligado = () => isRevizaMode && !!supabase && temCadastroAtendimento();
+const ligado = () => !!supabase && temCadastroAtendimento();
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 const ler = (r: Record<string, unknown>): Equipe => ({
   id: String(r.id), nome: String(r.nome ?? ''), gerenteId: r.gerente_id ? String(r.gerente_id) : null, membros: ids(r.membros), canais: ids(r.canais),

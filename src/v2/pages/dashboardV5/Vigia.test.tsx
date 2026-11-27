@@ -9,7 +9,7 @@ import type { VigiaCaso, VigiaDados } from '@/data/vigiaRespostas';
 
 const estado = vi.hoisted(() => ({ role: 'admin' as string, variante: null as string | null }));
 vi.mock('@/context/OrgContext', () => ({ useOrg: () => ({ currentOrg: { id: 'org1', role: estado.role } }) }));
-vi.mock('@/lib/supabase', () => ({ supabase: null, isSupabaseConfigured: false }));
+vi.mock('@/lib/supabase', () => ({ supabase: null, isSupabaseConfigured: false, isPrevia: false, isRevizaMode: false, isDemoMode: false }));
 vi.mock('@/data/vigiaRespostas', async (original) => {
   const m = await original<typeof import('@/data/vigiaRespostas')>();
   return {
