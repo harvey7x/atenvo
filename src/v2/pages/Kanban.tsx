@@ -265,7 +265,7 @@ function CarregandoKanban() {
   const pct = pctProgresso(p);
   return (
     <div className="kb-pg kb-pro">
-      <div className="kb-carr" role="status" aria-live="polite" aria-busy>
+      <div className="kb-carr" role="status" aria-live="polite" aria-busy data-carregando-proprio>
         <div className="kb-carr-fundo" aria-hidden>
           {[4, 3, 4, 2, 3, 2].map((n, i) => (
             <div key={i} className="kb-carr-col">

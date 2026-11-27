@@ -74,7 +74,7 @@ function useHojeSP(): string {
    chamada só ao banco, então a barra é de espera (sem porcentagem inventada). */
 function CarregandoDash() {
   return (
-    <div className="d5-carr" role="status" aria-live="polite">
+    <div className="d5-carr" role="status" aria-live="polite" data-carregando-proprio>
       <div className="d5-carr-caixa">
         <span className="d5-carr-ic" aria-hidden><i /><i /><i /><i /></span>
         <strong>Carregando o Dashboard</strong>

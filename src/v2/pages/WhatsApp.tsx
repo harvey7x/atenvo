@@ -136,7 +136,7 @@ function IniciandoWhatsApp() {
   const p = useProgressoCarga(PROGRESSO_WA);
   const pct = pctProgresso(p);
   return (
-    <div className="wa-carr" role="status" aria-live="polite" aria-busy>
+    <div className="wa-carr" role="status" aria-live="polite" aria-busy data-carregando-proprio>
       <div className="wa-carr-caixa">
         <span className="wa-carr-ic" aria-hidden><IcWa /></span>
         <strong>Iniciando o WhatsApp</strong>

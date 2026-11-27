@@ -500,7 +500,9 @@ html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) > button:not(.p-btn):not(.pn-fin-ok):not(.fin-btn) { background: #1E1E21; border-color: #35353A; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.lnk, button.lk, .pn-link):hover { border-color: #B8B2AA; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(table, .pn-eq) :is(button.pn-fin-nao, .num-remover, .btn-perigo:not(.p-btn)) { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); }
-html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes) { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+/* :not(td): a célula da tabela também usa .pn-fin-acoes; virar inline-flex a encolhia a 16px e os botões saíam por cima da coluna ao lado (27/11) */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.pn-us-acoes, .pn-fin-acoes):not(td):not(th) { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 td.pn-fin-acoes { white-space: nowrap; }
 /* 5. Checkbox nativo no escuro (Avisos, Campos, Equipes, Webhooks, Formulários): acento no tema. */
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #1D1C1A; }
 html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="checkbox"], html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not([data-tema="light"]):not(#rv-graf):not(#rv-g2) .v2 input[type="radio"] { accent-color: #F2F0EC; color-scheme: dark; }
@@ -557,3 +559,7 @@ html:root[data-repaginada][data-repaginada] .v2 .kb-pg.kb-pro { padding: 20px 24
 html[data-barra-alfa] .v2 .zp-lista-rol { padding-bottom: 12px; margin-bottom: 86px; }
 html[data-barra-alfa] .v2 .fz-fone .zp-lista-rol { margin-bottom: 62px; }
 html[data-barra-alfa]:not(#rv-kb):not(#rv-kb2) .v2 .kb-pro.kb-pg { padding: 20px 24px 12px; }
+/* 27/11 — CARREGAMENTO: um cartão só para o sistema inteiro (components/CarregandoTela) e os três antigos (Dashboard,
+   Kanban, WhatsApp) na mesma cor laranja, para ser UMA família. */
+html[data-barra-alfa][data-moldura][data-moldura][data-moldura]:not(#rv-graf):not(#rv-g2) .v2 :is(.d5-carr-ic i, .d5-carr-barra i, .wa-carr-ic i, .wa-carr-barra i) { background: var(--azul); }
+html:root[data-barra-alfa] .v2 .kb-pro.kb-pro.kb-pro.kb-pro.kb-pro :is(.kb-carr-ic i, .kb-carr-barra i) { background: var(--azul); }

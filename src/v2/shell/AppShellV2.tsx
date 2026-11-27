@@ -24,6 +24,7 @@ import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { lerMoldura } from '../lib/molduraAlfa';
 import { instalarNumerosSobem } from '../lib/numerosSobem';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
+import { CarregandoTela } from '../components/CarregandoTela';
 import { LicencaGate } from '../components/LicencaGate';
 import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
 import { useConfiguracaoPendente } from '../data/cobranca/configuracao';
@@ -1298,6 +1299,7 @@ export default function AppShellV2({ naoEncontrada = false }: { naoEncontrada?: 
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp|pos-venda|chat-equipe)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
+              {!acessoCarregando && <CarregandoTela />}
               {acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
                 : naoEncontrada ? <PaginaNaoEncontrada home={homeDaPessoa} rotuloHome={homeDaPessoa.startsWith('/cobrancas') ? 'Voltar ao Painel' : 'Voltar ao WhatsApp'} />
                 : isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
